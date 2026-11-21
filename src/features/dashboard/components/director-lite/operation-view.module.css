@@ -94,3 +94,67 @@ a.rowName:hover { text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 639px) {
   .barCol { display: none; }
 }
+
+/* ------------------------------------------------------------------ estilo Accordee (21/11/2026)
+ * Referência: docs/design-system/referencias/accordee.md (/home do demo). Mesmo conteúdo, outro desenho:
+ * números em cartões separados, painéis com cabeçalho de 44px e hairline, texto de 13px, links neutros com seta.
+ */
+.view { gap: var(--space-4); }
+.strip { border: 0; border-radius: 0; background: transparent; }
+.stripGrid { gap: var(--space-4); }
+.stripCell,
+.stripCell:nth-child(2n),
+.stripCell + .stripCell {
+  gap: 4px;
+  padding: 12px 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.stripLabel { color: var(--text-muted); font-size: 13px; line-height: 20px; }
+.stripValue { font-size: 24px; font-weight: 400; line-height: 32px; letter-spacing: normal; }
+.stripContext { font-size: 12px; line-height: 18px; }
+.track { height: 4px; }
+.fill { background: var(--series-1); }
+
+.columns, .side, .main { gap: var(--space-4); }
+
+.panel { gap: 12px; padding: 0 0 16px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.panel > :not(.panelHead):not(.table) { margin-inline: 16px; }
+.panelHead {
+  flex-wrap: nowrap;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+.panelTitle { font-size: 13px; font-weight: 500; line-height: 20px; }
+.panelMeta { overflow: hidden; color: var(--text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.count { min-width: 18px; height: 18px; padding: 0 5px; font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.panelFoot, .tableFoot { font-size: 12px; }
+.emptyText { font-size: 13px; }
+
+.attentionItem { padding: 10px 0; }
+.attentionTitle { font-size: 13px; font-weight: 500; }
+.attentionDetail { font-size: 12px; color: var(--text-muted); }
+.verb, .inlineLink, .panelFooterLink { min-height: 28px; color: var(--text-secondary); font-size: 13px; font-weight: 400; }
+.verb:hover, .inlineLink:hover, .panelFooterLink:hover { color: var(--foreground); text-decoration: none; }
+.verb:focus-visible { outline-color: var(--ring); }
+
+.groupLabel { margin-top: 4px; font-size: 11px; letter-spacing: 0.04em; }
+.nowRow { font-size: 13px; }
+.nowDetail { font-size: 12px; }
+.figures dd { font-size: 20px; font-weight: 400; }
+
+.stages { gap: 10px; }
+.stageLabel { font-size: 13px; }
+.stageValue { font-size: 13px; font-weight: 400; }
+
+.table { font-size: 13px; }
+.table th, .table td { padding: 6px 8px; border-top-color: var(--border); }
+.table th:first-child, .table td:first-child { padding-left: 16px; }
+.table th:last-child, .table td:last-child { padding-right: 16px; }
+.table thead th { padding-block: 0 6px; font-size: 12px; font-weight: 400; }
+.table tbody th { font-weight: 400; }
+.table tbody tr { transition: background-color var(--duration-fast, 150ms) var(--ease-standard, ease); }
+.num[data-warn="true"] { font-weight: 500; }

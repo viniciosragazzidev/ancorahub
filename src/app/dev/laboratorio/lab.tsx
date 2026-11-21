@@ -31,6 +31,7 @@ import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-anco
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
 import { LeadHoverLab } from "./lead-hover-lab";
+import { AccordeeLab } from "./accordee-lab";
 import { labQualificationServices, QualificationLeadsLab } from "./qualification-leads-lab";
 import { labRecoveryCallQueue, RecoveryFunnelLab } from "./recovery-funnel-lab";
 import { labRecoverySettings, RecoveryCadenceLab } from "./recovery-cadence-lab";
@@ -38,7 +39,7 @@ import { NurtureLab } from "./nurture-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -56,6 +57,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "funilRecuperacao", label: "Funil de recuperação e fila de ligação" },
   { id: "cadenciaRecuperacao", label: "Cadência de recuperação" },
   { id: "nutricao", label: "Nutrição, A/B e Sasá (recuperar)" },
+  { id: "accordee", label: "Estilo Accordee (Início e Conversas do diretor)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -290,6 +292,8 @@ export function FlowLab() {
           <InterfaceMotionProvider enabled={!killSwitch}>
             <MotionShowcase delay={delay} failing={outcome === "falha"} />
           </InterfaceMotionProvider>
+        ) : flow === "accordee" ? (
+          <AccordeeLab />
         ) : flow === "leadHover" ? (
           <LeadHoverLab />
         ) : flow === "etapaLead" ? (

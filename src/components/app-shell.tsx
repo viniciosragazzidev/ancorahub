@@ -23,6 +23,7 @@ import type { UserDisplayInfo } from "@/shared/auth/actions";
 import "@/components/arc/director-skin.css";
 import "@/components/arc/director-primitives.css";
 import "@/components/arc/director-chrome.css";
+import "@/components/arc/director-accordee.css";
 
 
 type Branding = {

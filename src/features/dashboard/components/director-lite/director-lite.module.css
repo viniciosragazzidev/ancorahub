@@ -907,3 +907,34 @@ button.heatCell:hover { transform: scale(1.12); }
 
 .help > summary.pill { list-style: none; display: inline-flex; align-items: center; }
 .help > summary.pill::-webkit-details-marker { display: none; }
+
+/* ------------------------------------------------------------------ estilo Accordee (21/11/2026)
+ * Controles do topo do Painel como no /home do demo (docs/design-system/referencias/accordee.md): abas sem trilho,
+ * ativa em Paper Mist; período num grupo com borda; unidade/fila e ajuda em botões de 28px com borda.
+ * Só com mouse: no toque os controles seguem com 44px.
+ */
+.headerBlock { gap: 12px; }
+@media (hover: hover) and (pointer: fine) {
+  .titleBlock .pills { padding: 0; gap: 4px; border-radius: 0; background: transparent; }
+  .titleBlock .pill { min-height: 28px; padding: 0 8px; border-radius: 8px; font-size: 13px; font-weight: 400; }
+  .titleBlock .pill:hover { background: var(--surface-muted); }
+  .titleBlock .pill[data-active="true"] { background: var(--surface-muted); box-shadow: none; font-weight: 500; }
+  .titleBlock .pillBg { border-radius: 8px; background: var(--surface-muted); box-shadow: none; }
+
+  .periodGroup { align-items: center; gap: 8px; }
+  .periodGroup .pills { padding: 2px; gap: 0; border: 1px solid var(--border); border-radius: 8px; background: transparent; }
+  .periodGroup .pill { min-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 400; }
+  .periodGroup .pill[data-active="true"] { background: var(--surface-muted); box-shadow: none; color: var(--foreground); }
+  .periodGroup .pillBg { border-radius: 6px; background: var(--surface-muted); box-shadow: none; }
+  .periodGroup .help > summary.pill { min-height: 28px; border: 1px solid var(--border); border-radius: 8px; }
+
+  .unitSelect { min-height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; font-weight: 400; box-shadow: var(--ac-shadow-frame, none); }
+  .helpButton { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; }
+  .helpPanel { border: 1px solid var(--border); border-radius: 12px; font-size: 13px; }
+}
+/* Celular: o grupo de período passava 26px da tela (a coluna do grid crescia com o conteúdo). */
+.dashboard, .headerBlock { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 767px) {
+  .periodGroup { flex-wrap: wrap; min-width: 0; }
+  .periodGroup > .pills { min-width: 0; }
+}

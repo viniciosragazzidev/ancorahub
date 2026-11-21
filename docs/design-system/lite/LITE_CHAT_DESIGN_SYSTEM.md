@@ -76,7 +76,7 @@ Os tokens valem **abaixo da classe `.arc-venancor`** (não no `:root`), para nã
 **Tema escuro:** o kit troca o azul de ação para `oklch(70% .17 255)` (strong `76% .15`, soft `/ .16`) sob `.dark`. Superfícies seguem os tokens Arc de `:root[data-theme="dark"]`. O aviso dinâmico é sempre escuro (`oklch(18% .01 260)`), nos dois temas. Gap (G2): tema escuro do Lite não foi validado tela a tela.
 
 ### 2.3 Tipografia
-- Família única: **Plus Jakarta Sans** (`--font-jakarta-sans`) para corpo e títulos.
+- Família única: **Inter** (`--font-inter`) para corpo e títulos (desde 21/11/2026; antes Plus Jakarta Sans).
 - Pesos: **400** (texto) e **500** (ênfase, nomes, títulos, botões). Nunca 600/700.
 - Escala (`--text-*`): xs 12, sm 14, base 16, lg 18, xl 22, 2xl 28, 3xl 36.
 - Uso no chat: mensagem 16/1.5; nome no cabeçalho 16/1.2 peso 500; linha da conversa 14 (nome 500, prévia 400 muted); horário 12 tabular; pergunta 16 peso 500; opção 14; dica 12 muted; data/sistema 12.
