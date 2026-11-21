@@ -35,6 +35,8 @@
 .stack > *:nth-child(4) { --enter-i: 3; }
 .stack > *:nth-child(5) { --enter-i: 4; }
 .stack > *:nth-child(n + 6) { --enter-i: 5; }
+/* Stack dentro de stack: só o de dentro anima, para a página não subir duas vezes. */
+.stack > .stack { animation: none; }
 /* Grade de números: quem entra são os cards, não a grade. */
 .stack > .stats { animation: none; }
 .stats > * {
