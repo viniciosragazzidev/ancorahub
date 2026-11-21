@@ -21,7 +21,7 @@ const SCENARIOS: Array<{ id: Scenario; label: string }> = [
   { id: "limite", label: "131049 no S4" },
   { id: "sair", label: "Pede SAIR no S2" },
   { id: "semTemplate", label: "Templates não aprovados" },
-  { id: "dec155", label: "Marketing barrado (DEC-155)" },
+  { id: "dec155", label: "Marketing sem a exceção (DEC-155)" },
 ];
 
 const fmt = new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });

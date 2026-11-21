@@ -1,5 +1,9 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-190 - Exceção da DEC-155 para a recuperação de leads
+
+**Confirmada por Vinicios em 2026-11-21** ("abre exceção na DEC-155 para a recuperação"). A DEC-155 continua valendo: atendimento, primeiro contato, lembrete T1 e requalificação usam só template Utility. A exceção vale **só** para os passos de recuperação que são Marketing por natureza: T2, T3 e T4 do turbo (`anc_t2_beneficio`, `anc_t3_ligacao`, `anc_t4_despedida`), S4, S5 e S6 da cadência única (`anc_s4_cotacao`, `anc_s5_ligacao`, `anc_s6_despedida`) e a nutrição (`anc_n_reajuste`). Esses passos podem usar o template Marketing aprovado na WABA ativa, e só quando a recuperação está ligada e a conferência jurídica foi registrada em /qualificacao/turbo › Configurar recuperação (cada segmento segue com o próprio interruptor). Qualquer outro Marketing continua barrado. Ficam valendo as proteções da cadência: saída "SAIR" (opt-out), limite 131049 (espera de 24 h, para no segundo erro), segunda a sábado (domingo só para quem escreveu no domingo), no máximo 6 mensagens automáticas sem resposta e 10% de grupo de controle. Custo estimado de Marketing: cerca de R$ 0,35 por mensagem entregue, mostrado na configuração. Lista e regra em `src/features/lead-recovery/marketing-exception.ts`; plano `docs/implementations/active/2026-11-21-recuperacao-de-leads.md` §13.
+
 ## DEC-189 - Identidade do Capitão Âncora e da assistente Sasá
 
 **Pedido do Vinicios em 2026-11-18; aprovado na conversa.** A prancha oficial fornecida passa a definir o mascote principal do CorreTop/Âncora Saúde: marinheiro adulto, rosto arredondado cor de pêssego, olhos castanhos grandes, nariz alaranjado, bigode branco curvado, boné branco de aba azul-marinho com âncora dourada, uniforme branco e azul-marinho, lenço azul e detalhes dourados. A paleta oficial é #002B73, #0B5ED7, #00B26B, #7ED957, #FFC400, #FF8A65, #FFF6E9 e #1F2937.

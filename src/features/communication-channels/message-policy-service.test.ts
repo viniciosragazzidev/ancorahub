@@ -67,6 +67,21 @@ describe("qualification template cost policy", () => {
     await expect(resolveApprovedMetaEventTemplate({ ...input, templateName: "anc_t1_lembrete" })).resolves.toBeNull();
   });
 
+  it("recovery exception (DEC-190): a listed Marketing recovery template goes out only with the exception", async () => {
+    database.results.push(channel, [{ ...marketing, name: "anc_s4_cotacao", variables: ["nome", "empresa"] }]);
+    const plan = await resolveApprovedMetaEventTemplate({ ...input, templateName: "anc_s4_cotacao", allowRecoveryMarketing: true });
+    expect(plan?.primary.templateName).toBe("anc_s4_cotacao");
+    database.results.push(channel, [{ ...marketing, name: "anc_s4_cotacao" }]);
+    await expect(resolveApprovedMetaEventTemplate({ ...input, templateName: "anc_s4_cotacao" })).resolves.toBeNull();
+  });
+
+  it("recovery exception never covers unlisted Marketing or the T1 reminder", async () => {
+    database.results.push(channel, [{ ...marketing, name: "promo_black_friday" }]);
+    await expect(resolveApprovedMetaEventTemplate({ ...input, templateName: "promo_black_friday", allowRecoveryMarketing: true })).resolves.toBeNull();
+    database.results.push(channel, [{ ...marketing, name: "anc_t1_lembrete" }]);
+    await expect(resolveApprovedMetaEventTemplate({ ...input, templateName: "anc_t1_lembrete", allowRecoveryMarketing: true })).resolves.toBeNull();
+  });
+
   it("blocks when the default first-contact alternative has also been reclassified", async () => {
     database.results.push([policy], channel, [marketing], channel, [{ ...utility, category: "MARKETING" }]);
     await expect(resolveApprovedMetaEventTemplate(input)).resolves.toBeNull();
