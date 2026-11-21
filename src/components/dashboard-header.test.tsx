@@ -37,7 +37,8 @@ describe("DashboardHeader", () => {
     render(<ArcScopeProvider enabled><DashboardHeader breadcrumb="Equipe" title="Perfil do corretor" /></ArcScopeProvider>);
     expect(screen.getByTestId("lite-header")).toHaveTextContent("Perfil do corretor");
     expect(screen.queryByTestId("global-search")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("theme-toggle")).not.toBeInTheDocument();
+    // Desde 21/11/2026 o diretor tem tema escuro: o botão de tema fica no topo.
+    expect(screen.getByTestId("theme-toggle")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Abrir perfil e mais opções" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Abrir menu Mais" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("Mais opções");

@@ -238,3 +238,6 @@
   .arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] { height: 28px; min-height: 28px; padding: 0 8px 0 6px; font-size: 13px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"] > span:first-child { width: 16px; height: 16px; }
 }
+
+/* Botão de tema no topo: mesmo desenho das outras ações do topo (sem borda própria). */
+.arc-venancor[data-skin="diretor"] .director-theme-toggle { border: 0; box-shadow: none; }

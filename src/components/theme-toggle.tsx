@@ -21,8 +21,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     setTheme(next);
   }
 
-  if (directorLiteEnabled) return null;
-
+  // Desde 21/11/2026 o modo diretor tem tema escuro (director-accordee.css): o botão aparece no topo, como ação de 28px.
   if (!isClient) {
     return (
       <div
@@ -40,6 +39,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-pressed={theme === "dark"}
       className={cn(
         "flex size-9 cursor-pointer items-center justify-center rounded-md border border-border/80 bg-background text-foreground shadow-none transition-colors hover:bg-muted",
+        directorLiteEnabled && "director-header-action director-theme-toggle",
         className,
       )}
       theme={theme}
