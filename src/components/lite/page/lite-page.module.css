@@ -17,6 +17,46 @@
   min-width: 0;
 }
 
+/*
+ * Entrada em sequência das regiões da página (plano de movimento 18/11/2026, etapa 2; mesma receita de
+ * .ct-enter-seq em src/styles/interface-motion.css). Cada região sobe 8px, sai de um desfoque leve e aparece
+ * em 480ms; a próxima começa 80ms depois, até 6 passos. Os cards de .stats entram em onda de 35ms a partir
+ * do atraso da região que os contém (--enter-at é herdado). Fill "backwards": nada fica preso depois.
+ * Movimento reduzido, "Menos animação" e kill switch desligam (regras no fim do arquivo).
+ */
+.stack > * {
+  --enter-i: 0;
+  --enter-at: calc(min(var(--enter-i), 5) * var(--duration-micro, 80ms));
+  animation: enter var(--duration-considered, 480ms) var(--ease-enter, cubic-bezier(0.16, 1, 0.3, 1)) backwards;
+  animation-delay: var(--enter-at);
+}
+.stack > *:nth-child(2) { --enter-i: 1; }
+.stack > *:nth-child(3) { --enter-i: 2; }
+.stack > *:nth-child(4) { --enter-i: 3; }
+.stack > *:nth-child(5) { --enter-i: 4; }
+.stack > *:nth-child(n + 6) { --enter-i: 5; }
+/* Grade de números: quem entra são os cards, não a grade. */
+.stack > .stats { animation: none; }
+.stats > * {
+  --enter-j: 0;
+  animation: enter var(--duration-considered, 480ms) var(--ease-enter, cubic-bezier(0.16, 1, 0.3, 1)) backwards;
+  animation-delay: calc(var(--enter-at, 0ms) + min(var(--enter-j), 7) * var(--duration-stagger, 35ms));
+}
+.stats > *:nth-child(2) { --enter-j: 1; }
+.stats > *:nth-child(3) { --enter-j: 2; }
+.stats > *:nth-child(4) { --enter-j: 3; }
+.stats > *:nth-child(5) { --enter-j: 4; }
+.stats > *:nth-child(6) { --enter-j: 5; }
+.stats > *:nth-child(7) { --enter-j: 6; }
+.stats > *:nth-child(n + 8) { --enter-j: 7; }
+@keyframes enter {
+  from { opacity: 0; transform: translateY(var(--distance-base, 8px)); filter: blur(var(--blur-small, 2px)); }
+}
+:global(html[data-interface-motion="off"]) :is(.stack, .stats) > * { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.stack, .stats) > * { animation: none; }
+}
+
 .group {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
