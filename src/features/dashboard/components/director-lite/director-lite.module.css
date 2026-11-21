@@ -916,21 +916,21 @@ button.heatCell:hover { transform: scale(1.12); }
 .headerBlock { gap: 12px; }
 @media (hover: hover) and (pointer: fine) {
   .titleBlock .pills { padding: 0; gap: 4px; border-radius: 0; background: transparent; }
-  .titleBlock .pill { min-height: 28px; padding: 0 8px; border-radius: 8px; font-size: 13px; font-weight: 400; }
+  .titleBlock .pill { min-height: 28px; padding: 0 8px; border-radius: 6px; font-size: 13px; font-weight: 400; }
   .titleBlock .pill:hover { background: var(--surface-muted); }
   .titleBlock .pill[data-active="true"] { background: var(--surface-muted); box-shadow: none; font-weight: 500; }
-  .titleBlock .pillBg { border-radius: 8px; background: var(--surface-muted); box-shadow: none; }
+  .titleBlock .pillBg { border-radius: 6px; background: var(--surface-muted); box-shadow: none; }
 
   .periodGroup { align-items: center; gap: 8px; }
-  .periodGroup .pills { padding: 2px; gap: 0; border: 1px solid var(--border); border-radius: 8px; background: transparent; }
+  .periodGroup .pills { padding: 2px; gap: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent; }
   .periodGroup .pill { min-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 400; }
   .periodGroup .pill[data-active="true"] { background: var(--surface-muted); box-shadow: none; color: var(--foreground); }
   .periodGroup .pillBg { border-radius: 6px; background: var(--surface-muted); box-shadow: none; }
-  .periodGroup .help > summary.pill { min-height: 28px; border: 1px solid var(--border); border-radius: 8px; }
+  .periodGroup .help > summary.pill { min-height: 28px; border: 1px solid var(--border); border-radius: 6px; }
 
-  .unitSelect { min-height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; font-weight: 400; box-shadow: var(--ac-shadow-frame, none); }
-  .helpButton { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; }
-  .helpPanel { border: 1px solid var(--border); border-radius: 12px; font-size: 13px; }
+  .unitSelect { min-height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 13px; font-weight: 400; box-shadow: var(--ac-shadow-frame, none); }
+  .helpButton { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 12px; }
+  .helpPanel { border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
 }
 /* Celular: o grupo de período passava 26px da tela (a coluna do grid crescia com o conteúdo). */
 .dashboard, .headerBlock { grid-template-columns: minmax(0, 1fr); }

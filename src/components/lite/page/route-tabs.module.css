@@ -49,7 +49,7 @@
    ativa em Paper Mist (--surface-muted) com texto principal. No toque seguem os chips de 44px. */
 @media (hover: hover) and (pointer: fine) {
   .list { gap: 4px; }
-  .tab { min-height: 28px; padding: 0 8px; border-color: transparent; border-radius: 8px; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 400; }
+  .tab { min-height: 28px; padding: 0 8px; border-color: transparent; border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 400; }
   .tab:hover { background: var(--surface-muted); color: var(--foreground); }
   .tab[aria-current="page"] { background: var(--surface-muted); color: var(--foreground); font-weight: 500; }
 }

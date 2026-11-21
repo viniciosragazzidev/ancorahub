@@ -91,8 +91,8 @@ Nenhuma rota pediu login. Nada foi digitado no demo.
 
 ## 6. Decisões pendentes (token novo: precisa de aprovação)
 
-1. **Raio de cartão 8px e de botão 6px** (demo) contra 12px e 8px (tokens). Mantidos os tokens; para ficar idêntico ao
-   demo, aprovar raio 8 para cartão e 6 para botão no modo diretor.
+1. **Raio de cartão 8px e de botão 6px** (demo) contra 12px e 8px (tokens). **Aprovado pelo Vinicios em 21/11/2026 para
+   o modo diretor**: `--radius-card: 8px` e botões com 6px em `director-accordee.css`. Pílula segue para status e contagem.
 2. **Peso 440** (o "medium" do demo) contra 500. Mantido 500.
 3. **Cinza zinco** (`#09090b`, `#52525b`, `#71717a`, `#f4f4f5`) contra o neutro do documento (`#0a0a0a`, `#525252`,
    `#737373`, `#f5f5f5`). Diferença invisível a olho; mantido o documento.
@@ -112,8 +112,11 @@ Nenhuma rota pediu login. Nada foi digitado no demo.
   No toque, alvos de 44px mantidos.
 - Laboratório: `/dev/laboratorio` → "Estilo Accordee", com Início/Conversas e o interruptor de modo escuro.
 
+- Segunda rodada (21/11/2026): grupos por data na lista ("Hoje", "Ontem", "Esta semana", "Mais antigas", fixos ao
+  rolar); topo da conversa numa linha de 44px (com o perfil aberto ao lado, telefone, dono e status de qualificação
+  ficam só no perfil, sem repetir; botão de tags só com ícone com mouse); perfil em pares rótulo/valor com hairline,
+  sem caixas cinza; mensagens enviadas com avatar da equipe (pessoa) ou da IA (brilho), ao lado do rótulo.
+
 ## 8. Fica para depois
 
 - A hora que vira `⋯` no hover da linha (demo) pede um menu de ações por conversa que a lista ainda não tem.
-- Grupos por data fixos no topo da lista ("Hoje", "Ontem") pedem agrupar a lista no componente; hoje ela vem
-  ordenada sem cabeçalhos.

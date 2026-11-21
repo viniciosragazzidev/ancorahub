@@ -4,10 +4,11 @@ import { LeadJourneyView } from "@/features/lead-journey/components/lead-journey
 import { deriveLeadJourney } from "@/features/lead-journey/journey";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { conversationDayGroup } from "./conversation-day-group";
 import styles from "./conversas-lite.module.css";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
@@ -793,8 +794,15 @@ export function ConversationsWorkspace({
           <ScrollArea className="min-h-0 flex-1">
             <div className="p-2">
               {filtered.map((conversation, index) => (
+                <Fragment key={conversation.id}>
+                {directorSkinEnabled ? (() => {
+                  // Grupos por data como no demo (estilo Accordee, 21/11/2026): o rótulo aparece quando muda.
+                  const label = conversationDayGroup(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt);
+                  const previous = index > 0 ? filtered[index - 1] : null;
+                  const previousLabel = previous ? conversationDayGroup(previous.latestMessage?.sentAt ?? previous.stageEnteredAt) : null;
+                  return label && label !== previousLabel ? <p data-conversations-part="day-group" className={styles.dayGroup}>{label}</p> : null;
+                })() : null}
                 <motion.div
-                  key={conversation.id}
                   // The first rows come in one after the other; the rest just appear.
                   initial={directorSkinEnabled || reduceMotion || index > 14 ? false : { opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -808,6 +816,7 @@ export function ConversationsWorkspace({
                     onClick={() => selectConversation(conversation.id)}
                   />
                 </motion.div>
+                </Fragment>
               ))}
               {!filtered.length ? <EmptyConversationList hasQuery={Boolean(query || filter !== "all" || branchFilter !== "all" || tagFilter !== "all")} /> : null}
             </div>
@@ -1517,8 +1526,10 @@ function ConversationHistory({ client, directorSkinEnabled }: { client: Conversa
                       <MessageRow
                         clientName={client.nome}
                         message={message}
-                        showAvatar={mi === group.messages.length - 1}
+                        // Diretor (sem balão): o avatar acompanha o rótulo, na primeira mensagem do grupo.
+                        showAvatar={directorSkinEnabled ? mi === 0 : mi === group.messages.length - 1}
                         showHeader={mi === 0}
+                        teamAvatar={directorSkinEnabled}
                       />
                     </motion.div>
                   ))}
@@ -1826,11 +1837,14 @@ function MessageRow({
   clientName,
   showAvatar,
   showHeader,
+  teamAvatar = false,
 }: {
   message: ConversationMessage;
   clientName: string;
   showAvatar: boolean;
   showHeader: boolean;
+  /** Modo diretor (estilo Accordee, 21/11/2026): mensagens sem balão, então as enviadas ganham um avatar da equipe ou da IA para ler quem falou sem ler o rótulo. */
+  teamAvatar?: boolean;
 }) {
   const isOutbound = message.direction === "outgoing" || message.direction === "outbound";
   const mediaData = message.media ?? null;
@@ -1838,7 +1852,17 @@ function MessageRow({
 
   return (
     <Message align={isOutbound ? "end" : "start"} className="ct-reveal-fast">
-      {isOutbound ? null : (
+      {isOutbound ? (
+        teamAvatar ? (
+          <MessageAvatar aria-hidden="true" className={cn(!showAvatar && "invisible")} data-conversations-part="team-avatar" data-sender={message.senderRole === "assistant" || message.direction === "outbound" ? "ai" : "team"}>
+            {showAvatar ? (
+              <span className="grid size-8 place-items-center rounded-full border border-border bg-muted text-muted-foreground">
+                {message.senderRole === "assistant" || message.direction === "outbound" ? <Sparkles className="size-4" /> : <UserCheck className="size-4" />}
+              </span>
+            ) : null}
+          </MessageAvatar>
+        ) : null
+      ) : (
         <MessageAvatar aria-hidden={!showAvatar} className={cn(!showAvatar && "invisible")}>
           {showAvatar ? <ContactAvatar className="size-8" name={clientName} /> : null}
         </MessageAvatar>

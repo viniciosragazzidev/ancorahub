@@ -26,6 +26,10 @@
   --sidebar-foreground: #171717; /* Charcoal */
   --ac-sidebar-active: #f5f5f5;
   --ac-shadow-frame: rgba(0, 0, 0, 0.05) 0px 1px 2px 0px; /* --shadow-subtle */
+  /* Raios aprovados pelo Vinicios em 21/11/2026 para o modo diretor: cartão 8px, botão 6px (accordee.md §6). */
+  --radius-card: 8px;
+  --ac-radius-card: 8px;
+  --ac-radius-button: 6px;
   font-family: var(--font-body);
 }
 
@@ -74,7 +78,7 @@
     min-height: 0;
     margin: 8px 8px 8px 0;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 8px;
     background: var(--surface);
     box-shadow: var(--ac-shadow-frame);
   }
@@ -97,7 +101,7 @@
   font-weight: 400;
 }
 .arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"] {
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--text-secondary);
 }
 .arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"]:hover {
@@ -117,7 +121,7 @@
 .arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-footer"] button[data-slot="tooltip-trigger"],
 .arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) :is(.director-agent-link, .director-duty-link) {
   border-color: transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
   box-shadow: none;
@@ -135,7 +139,7 @@
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div { gap: 8px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child {
     width: 28px; min-width: 28px; height: 28px; flex-basis: 28px; padding: 3px;
-    border-radius: 8px; border-color: var(--border); background: var(--surface);
+    border-radius: 6px; border-color: var(--border); background: var(--surface);
   }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img { width: 20px; height: 20px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > div > p:first-child { font-size: 13px; font-weight: 500; letter-spacing: normal; }
@@ -176,7 +180,7 @@
   .arc-venancor[data-skin="diretor"] .director-light-app-header button[aria-label="Abrir menu principal"],
   .arc-venancor[data-skin="diretor"] .director-light-app-header button[aria-label="Voltar"] {
     width: 28px; min-width: 28px; height: 28px; min-height: 28px; flex: 0 0 28px;
-    border-radius: 8px; background: transparent; color: var(--text-secondary);
+    border-radius: 6px; background: transparent; color: var(--text-secondary);
   }
   .arc-venancor[data-skin="diretor"] .director-header-action:hover,
   .arc-venancor[data-skin="diretor"] .director-light-app-header :is(button, a)[aria-label]:hover { background: var(--surface-muted); color: var(--foreground); }
@@ -192,7 +196,12 @@
 
 /* Rodapé da sidebar: perfil numa linha de 32px com avatar de 24px. */
 @media (hover: hover) and (pointer: fine) {
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] { min-height: 32px; height: 32px; padding: 0 6px; border-radius: 8px; gap: 8px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] { min-height: 32px; height: 32px; padding: 0 6px; border-radius: 6px; gap: 8px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"]:hover { background: var(--ac-sidebar-active); }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] [data-slot="avatar"] { width: 24px; height: 24px; font-size: 11px; }
 }
+
+/* Botões do modo diretor com 6px (aprovado em 21/11/2026), no lugar da pílula. Pílula fica para status e contagem. */
+.arc-venancor[data-skin="diretor"] :is([data-slot="button"], [data-slot$="-trigger"][data-variant]) { border-radius: 6px; }
+/* Campos de várias linhas com o raio de input (6px) do design system. */
+.arc-venancor[data-skin="diretor"] textarea { border-radius: 6px; }
