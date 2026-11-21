@@ -8,6 +8,7 @@ import { decryptMetaToken, encryptMetaToken } from "./meta-oauth";
 import { consumeMetaConnectionAttempt, readVerifiedMetaConnectionAttempt } from "./meta-connection-attempts";
 import { startMetaMarketingConnection } from "./meta-marketing-connection-service";
 import { runMetaTenantSync } from "./meta-sync-service";
+import { requireMetaCaptureManager } from "./meta-capture-access";
 import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
 import { resolvePageAccessToken, subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
 import { resolveMetaCapturePolicy } from "./meta-capture-policy";
@@ -500,7 +501,7 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
   enabled: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const context = await getRequiredTenantContext();
+    const context = await requireMetaCaptureManager();
     const db = getDatabase();
 
     const [campaign] = await db
@@ -602,7 +603,7 @@ export async function setMetaGlobalCaptureModeAction(input: {
   mode: "all" | "selective" | "disabled";
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const context = await getRequiredTenantContext();
+    const context = await requireMetaCaptureManager();
     const { setSystemSetting } = await import("@/features/system-settings/queries");
     await setSystemSetting(`meta_lead_capture_mode_${context.tenantId}`, input.mode);
     const db = getDatabase();
@@ -622,7 +623,7 @@ export async function toggleMetaAdCaptureEligibilityAction(input: {
   enabled: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const context = await getRequiredTenantContext();
+    const context = await requireMetaCaptureManager();
     if (input.enabled) {
       await ensureCaptureModeActiveIfDisabled(context.tenantId);
     }
@@ -656,7 +657,7 @@ export async function toggleMetaFormCaptureEligibilityAction(input: {
   enabled: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const context = await getRequiredTenantContext();
+    const context = await requireMetaCaptureManager();
     if (input.enabled) {
       await ensureCaptureModeActiveIfDisabled(context.tenantId);
     }
@@ -691,8 +692,8 @@ export async function batchSetMetaCaptureEligibilityAction(input: {
   enabled: boolean;
 }): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
+    const context = await requireMetaCaptureManager();
     if (!input.assetIds.length) return { success: true, count: 0 };
-    const context = await getRequiredTenantContext();
     if (input.enabled) {
       await ensureCaptureModeActiveIfDisabled(context.tenantId);
     }
