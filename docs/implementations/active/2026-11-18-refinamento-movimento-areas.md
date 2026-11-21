@@ -1,6 +1,6 @@
 # Refinamento de áreas, movimento e entrada de rotas · plano
 
-Data: 18/11/2026 · Dono: Vinicios · Status: **§8 decidido em 18/11 (recomendações adotadas); etapa 0 entregue em 18/11** (branch `feat/movimento-e0-fundacao`); etapas 1 a 10 pendentes
+Data: 18/11/2026 · Dono: Vinicios · Status: **etapas 0 a 10 com entrega no Lite em 20/11** (ver "Rodada Lite de 20/11" abaixo); etapa 1 só de organização (o estilo de cards foi recusado em 18/11)
 Padrões que mandam: `docs/design-system.md` (tokens, densidade), `docs/design-system/FEEDBACK.md` (níveis 0 a 3; vence qualquer conflito de movimento), `docs/design-system/MOTION_RULES.md` (tokens canônicos em `src/components/arc/motion-tokens.ts`), `docs/ux/motion-frequencia.md` (orçamento por frequência).
 Referências: landing https://salte.app/ (estudada no navegador em 18/11) e os quatro prints enviados pelo usuário. O vídeo do X (`johny_victor_/status/2122792281380139213`) **não pôde ser visto**: o post abre, mas o player fica atrás da parede de login do X. O plano segue sem ele.
 
@@ -100,6 +100,24 @@ Teto total de entrada de uma rota: **240 + 5 × 35 = 415 ms** para o último blo
 **Movimento reduzido**, em toda etapa: com qualquer um dos três sinais ligado (SO, "Menos animação", kill switch), deslocamento, escala, blur e cascata viram zero; fica só opacidade de no máximo 120 ms ou troca seca. O shimmer do skeleton vira cor fixa.
 
 ---
+
+## Rodada Lite de 20/11/2026 (o Lite é a única versão)
+
+Pedido: "faz todos recomendados". Tudo na `feat/diretor-visual-lite`, a partir da ponta remota, com merge na `preview/3005`.
+
+| Etapa | O que entrou no Lite | Onde |
+|---|---|---|
+| 0 | já estava na branch (tokens únicos, `useMotionAllowed`, laboratório) | — |
+| 1 | só organização: Resumo do diretor reorganizado em 18/11. O estilo de cards da etapa 1 foi **recusado** pelo usuário e segue desfeito | `operation-view.tsx` |
+| 2 | as ~89 telas que usam o `.stack` do Lite entram em sequência (480ms, 80ms entre regiões, até 6); cards de `.stats` em onda de 35ms a partir da região; stack aninhado não sobe duas vezes | `lite-page.module.css` |
+| 3 | no diretor, o carregamento de rota sem `loading.tsx` próprio mostra a forma da página (título, 4 números, painel) no lugar do anel | `route-loading.tsx` |
+| 4 | vazio no ritmo do FEEDBACK (visual, texto +80ms, ação +160ms) no `EmptyState` do Arc e no `.empty` do Lite | `empty-state.module.css`, `lite-page.module.css` |
+| 5 | já coberta: `TabsContent` troca só com opacidade em 160ms e o indicador desliza em 240ms; respeita "Menos animação" desde a etapa 0 | `ui/tabs.tsx` |
+| 6 | painel lateral do Lite: véu 160ms, painel desliza 12px em 240ms, seções em sequência de 35ms (até 4). Menus já em 160/120ms desde a etapa 0 | `side-panel.module.css` |
+| 7 | linhas das tabelas Lite seguem paradas (DEC-034): a região já entra pelo `.stack`, e `/leads` é de alta frequência | — |
+| 8 | `LiteNumber countFromZero` só na primeira visita do dia à rota (nível 2 do FEEDBACK); valor que muda com a tela aberta continua rolando | `lite/motion/number.tsx` |
+| 9 | `scripts/check-motion.mjs` em catraca (bounce, transition-all, elevação no hover, duração solta, som/vibração fora do `useFeedback`), no `npm run lint`; bounce do assistente trocado por pulso | `scripts/` |
+| 10 | exceção escrita no `design-system.md` e peça `BrandSurface` pronta; login e landing **não** foram trocados (o login branco é decisão de 22/10) | `components/brand/` |
 
 ## 6. Etapas, em ordem
 
