@@ -725,16 +725,9 @@ export function DistributionInbox({
   ];
 
   const archivedLeadColumns: LiteColumn<Lead>[] = [
-    {
-      id: "lead",
-      label: "Lead",
-      primary: true,
-      render: (lead) => (
-        <LeadNameHoverCard lead={distributionLeadPreview(lead, branches)} href={`/leads/${lead.id}`}>
-          <span tabIndex={0} className="underline-offset-4 outline-none hover:underline focus-visible:underline">{lead.name || "Lead sem nome"}</span>
-        </LeadNameHoverCard>
-      ),
-    },
+    // Sem hover card aqui: esta lista desenha todos os leads sem corretor de uma vez (milhares), e uma prévia por
+    // linha pesaria a tela. A lista paginada de cima tem a prévia.
+    { id: "lead", label: "Lead", primary: true, render: (lead) => lead.name || "Lead sem nome" },
     { id: "phone", label: "Telefone", secondary: true, render: (lead) => lead.phone || "Sem telefone" },
     { id: "branch", label: "Unidade", render: (lead) => branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral" },
     {
