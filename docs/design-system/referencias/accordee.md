@@ -106,4 +106,14 @@ Nenhuma rota pediu login. Nada foi digitado no demo.
 - Início (Visão da operação): números em cartões, painéis com cabeçalho de 44px, abas e período no padrão do demo.
   Mesmo conteúdo e ações.
 - Abas de seção (`route-tabs`) no padrão de 28px com mouse.
+- Conversas (Inbox do diretor), no padrão do §4: lista, conversa e perfil numa folha só com hairlines; linhas da
+  lista de borda a borda (12/16, selecionada em Paper Mist); mensagens sem balão (rótulo + hora numa linha, texto
+  14/24); separador de dia em pílula com borda; compositor em cartão de raio 12. Mesmas ações e informações.
+  No toque, alvos de 44px mantidos.
 - Laboratório: `/dev/laboratorio` → "Estilo Accordee", com Início/Conversas e o interruptor de modo escuro.
+
+## 8. Fica para depois
+
+- A hora que vira `⋯` no hover da linha (demo) pede um menu de ações por conversa que a lista ainda não tem.
+- Grupos por data fixos no topo da lista ("Hoje", "Ontem") pedem agrupar a lista no componente; hoje ela vem
+  ordenada sem cabeçalhos.

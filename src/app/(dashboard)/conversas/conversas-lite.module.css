@@ -654,3 +654,127 @@
 .quickTab[data-active="true"] .quickCount { background: var(--surface); }
 .searchResult { margin: 0; padding: 6px 16px; border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--text-xs); }
 .clearSearch { border: 0; background: none; padding: 0; color: var(--primary); font: inherit; cursor: pointer; }
+
+/* ------------------------------------------------------------------ estilo Accordee (21/11/2026)
+ * Conversas do diretor no padrão do /messages do demo (docs/design-system/referencias/accordee.md §4).
+ * Mesmo conteúdo e ações; muda o desenho:
+ * - lista, conversa e perfil numa folha só, separados por hairline (sem cartões soltos nem vão entre eles);
+ * - linha da lista de borda a borda: 16/12 de respiro, hairline embaixo, selecionada em Paper Mist;
+ * - mensagens sem balão: rótulo e hora numa linha, texto de 14/24 embaixo, hover da linha em Paper Mist;
+ * - compositor num cartão de raio 12 com borda, campo sem borda própria.
+ * A densidade de 28px vale só com mouse; no toque os controles seguem com 44px.
+ */
+.root.root[data-skin="diretor"] [data-conversations-part="content"] { width: 100%; max-width: none; padding: 0; }
+.root[data-skin="diretor"] [data-conversations-part="panes"] { gap: 0; }
+.root[data-skin="diretor"] [data-conversations-part="pane"] { border: 0 !important; border-radius: 0; }
+.root[data-skin="diretor"] [data-conversations-part="pane"][aria-label="Lista de atendimentos"] { border-right: 1px solid var(--border) !important; }
+.root[data-skin="diretor"] [data-conversations-part="pane"][aria-label="Perfil do cliente"] { border-left: 1px solid var(--border) !important; }
+.root[data-skin="diretor"] [data-conversations-part="pane"] > header,
+.root[data-skin="diretor"] [data-conversations-part="pane"] > div > header,
+.root[data-skin="diretor"] [data-conversations-part="search-header"] { border-color: var(--border); }
+
+/* Lista */
+.root[data-skin="diretor"] [data-conversations-part="search-header"] { border-bottom: 1px solid var(--border); padding: 8px; }
+.root[data-skin="diretor"] [data-conversations-part="search"] input { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; }
+.root[data-skin="diretor"] .quickTabs { gap: 4px; padding: 8px; border-bottom-color: var(--border); }
+.root[data-skin="diretor"] .quickTab { border: 1px solid transparent; border-radius: 8px; font-size: 13px; font-weight: 400; }
+.root[data-skin="diretor"] .quickTab[data-active="true"] { border-color: var(--border); background: var(--surface-muted); }
+.root[data-skin="diretor"] .quickCount { min-width: 0; padding: 0; background: transparent; font-size: 12px; }
+.root[data-skin="diretor"] .quickTab[data-active="true"] .quickCount { background: transparent; }
+.root[data-skin="diretor"] [aria-label="Lista de atendimentos"] [data-slot="scroll-area-viewport"] > div > :global(.p-2) { padding: 0; }
+.root[data-skin="diretor"] [data-conversations-part="row"] {
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+.root[data-skin="diretor"] [data-conversations-part="row"]:hover,
+.root[data-skin="diretor"] [data-conversations-part="row"][data-active="true"] { background: var(--surface-muted); }
+.root[data-skin="diretor"] [data-conversations-part="row"]:active { transform: none; }
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.text-sm) { font-size: 13px; line-height: 20px; }
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.text-xs),
+.root[data-skin="diretor"] [data-conversations-part="row-time"] { font-size: 12px; }
+.root[data-skin="diretor"] [data-conversations-part="row"] > [role="img"] { width: 32px; height: 32px; }
+
+/* Topo da conversa */
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] { padding: 8px 16px; background: var(--surface); }
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] h2 { font-size: 13px; font-weight: 500; letter-spacing: normal; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [data-slot="animated-badge"] { height: 22px; border-radius: 6px; font-size: 12px; font-weight: 400; }
+
+/* Separador de dia: pílula central com borda, como no demo. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] span[class*="rounded-full"][class*="bg-muted"] {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Mensagens sem balão */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message"] {
+  flex-direction: row;
+  gap: 12px;
+  margin-inline: -8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: background-color var(--duration-fast, 150ms) var(--ease-in-out, ease);
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message"]:hover { background: color-mix(in oklab, var(--surface-muted) 60%, transparent); }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message"][data-align="end"] { padding-left: 52px; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-content"] {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 2px 0;
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-content"] > * { grid-column: 1 / -1; justify-self: start; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-header"] { grid-row: 1; grid-column: 1; padding: 0; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-footer"] { grid-row: 1; grid-column: 2; justify-self: start; padding: 0; font-size: 12px; color: var(--text-muted); }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-header"] ~ [data-slot="message-footer"] { margin-left: 8px; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-header"] > span {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-header"] > span > span[aria-hidden="true"] { display: none; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble"] { max-width: 100%; align-self: start; justify-self: start; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble-content"] {
+  max-width: 72ch;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  font-size: 14px;
+  line-height: 24px;
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble-content"] p { line-height: 24px; }
+
+/* Compositor em cartão */
+.root[data-skin="diretor"] [data-conversations-part="chat-input"] { padding: 8px 16px 16px; border-top: 0; background: var(--surface); }
+.root[data-skin="diretor"] [data-conversations-part="chat-input"] > form {
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--ac-shadow-frame, none);
+}
+.root[data-skin="diretor"] [data-conversations-part="composer-input"] { border: 0; background: transparent; box-shadow: none; font-size: 14px; }
+.root[data-skin="diretor"] [data-conversations-part="composer-input"]:focus-visible { outline: none; box-shadow: none; }
+.root[data-skin="diretor"] [data-conversations-part="chat-input"] > form:focus-within { border-color: var(--border-strong); }
+
+@media (hover: hover) and (pointer: fine) {
+  .root[data-skin="diretor"] .quickTab { min-height: 28px; padding: 0 10px; }
+  .root[data-skin="diretor"] [data-conversations-part="search"] input { min-height: 32px; height: 32px; }
+  .root[data-skin="diretor"] [data-conversations-part="search-header"] button { min-height: 32px; height: 32px; border-radius: 8px; }
+  .root[data-skin="diretor"] [data-conversations-part="workspace"] [data-conversations-part="chat-header"] :is(button, a[aria-label]) { min-height: 28px; height: 28px; border-radius: 8px; }
+  .root[data-skin="diretor"] [data-conversations-part="workspace"] [data-conversations-part="chat-input"] :is(button, a[aria-label]) { min-height: 28px; height: 28px; min-width: 28px; border-radius: 8px; }
+  .root[data-skin="diretor"] [data-conversations-part="composer-input"] { min-height: 28px; }
+}
