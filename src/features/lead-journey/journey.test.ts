@@ -26,8 +26,8 @@ describe("deriveLeadJourney", () => {
     expect(journey.detail).toBe("2 de 6 lembretes");
   });
 
-  it("R1 no fim dos lembretes aponta para a fila de ligação", () => {
-    expect(deriveLeadJourney({ now, status: "new", qualificationStatus: "cold", aiFirstContactAt: ago(5000), cadence: { sent: 6, total: 6 } }).nextStep).toContain("fila de ligação");
+  it("R1 no fim dos lembretes", () => {
+    expect(deriveLeadJourney({ now, status: "new", qualificationStatus: "cold", aiFirstContactAt: ago(5000), cadence: { sent: 6, total: 6 } }).nextStep).toBe("Fim dos lembretes automáticos");
   });
 
   it("Q3: em conversa, com o próximo campo como subpasso", () => {

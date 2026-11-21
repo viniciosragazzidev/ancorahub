@@ -1,6 +1,6 @@
 import { CADENCE } from "@/features/qualification-turbo/cadence";
 
-import { currentField, deriveLeadJourney, type JourneyCode, type LeadJourney, type RecoveryMark } from "./journey";
+import { deriveLeadJourney, type JourneyCode, type LeadJourney, type RecoveryMark } from "./journey";
 
 /** Linha crua de listQualificationLeads (Postgres). */
 export type QualificationLeadSource = {
@@ -123,7 +123,7 @@ export function buildQualificationRow(source: QualificationLeadSource, now = new
     brokerName: source.broker_name,
     livesCount: source.lives_count,
     sourceChannel: source.source_channel,
-    field: inboundCount > 0 ? currentField(collected)?.label ?? null : null,
+    field: journey.code === "Q3" || journey.code === "R2" ? journey.detail : null,
     touches: { sent: touches.sent, total: touches.total },
     lastInboundAt: iso(source.last_inbound_at),
     journey,
