@@ -180,6 +180,11 @@ export type RecoveryFunnelData = {
   steps: RecoveryStepRow[];
   weeks: RecoveryWeek[];
   health: RecoveryHealth;
+  /** Fila de ligação por unidade (fase 4). */
+  callQueue?: Array<{ branch: string; branchId: string | null; total: number; avgHours: number | null; profileA: number }>;
+  /** Frios segurados que podem ir para a fila em lote. */
+  heldCold?: number;
+  callQueueEnabled?: boolean;
 };
 
 /** Taxa em % com uma casa, ou null sem base. */

@@ -55,6 +55,11 @@ export async function fetchColdCandidates(input: {
   now?: Date;
   /** Regras da tela do diretor (período dos leads, tentativas, intervalo). Sem elas, o padrão. */
   rules?: { maxAgeDays: number; minAgeDays: number; maxAttempts: number; cooldownMs: number };
+  /**
+   * Recuperação, fase 4 (fila "Sem resposta" ligada): a fila de ligação vem primeiro, pela pontuação (A4 antes de
+   * D1), e entra mesmo sem estar fria (quem parou no meio). O resto da base de frios segue depois, como hoje.
+   */
+  recoveryQueueFirst?: boolean;
 }): Promise<CallAncoraContact[]> {
   const now = input.now ?? new Date();
   const rules = input.rules;
@@ -69,7 +74,11 @@ export async function fetchColdCandidates(input: {
     .from(schema.leads)
     .where(and(
       eq(schema.leads.tenantId, input.tenantId),
-      eq(schema.leads.qualificationStatus, "cold"),
+      input.recoveryQueueFirst
+        ? sql`(${schema.leads.qualificationStatus} = 'cold' or ${schema.leads.qualificationDetails}->'recovery'->>'state' = 'call_queue')`
+        : eq(schema.leads.qualificationStatus, "cold"),
+      // Nutrição, momento ruim e "Não contatar" (marcas da recuperação) ficam fora da base.
+      sql`coalesce(${schema.leads.qualificationDetails}->'recovery'->>'state', '') not in ('nurture', 'bad_moment', 'do_not_contact')`,
       isNull(schema.leads.corretorId),
       isNull(schema.leads.deletedAt),
       isNull(schema.leads.archivedAt),
@@ -91,7 +100,12 @@ export async function fetchColdCandidates(input: {
       createdAfter ? sql`${schema.leads.createdAt} >= ${createdAfter.toISOString()}::timestamptz` : undefined,
       createdBefore ? sql`${schema.leads.createdAt} <= ${createdBefore.toISOString()}::timestamptz` : undefined,
     ))
-    .orderBy(asc(schema.leads.createdAt), asc(schema.leads.id))
+    .orderBy(...(input.recoveryQueueFirst
+      ? [
+        sql`(${schema.leads.qualificationDetails}->'recovery'->>'state' = 'call_queue') desc nulls last`,
+        sql`(${schema.leads.qualificationDetails}->'recovery'->>'rank')::int desc nulls last`,
+      ]
+      : []), asc(schema.leads.createdAt), asc(schema.leads.id))
     // Busca um pouco mais para compensar telefones inválidos.
     .limit(limit * 3);
 

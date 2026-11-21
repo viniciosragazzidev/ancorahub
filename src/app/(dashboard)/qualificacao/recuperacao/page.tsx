@@ -53,6 +53,7 @@ export default async function QualificacaoRecuperacaoPage({ searchParams }: { se
       <main className={litePage.stack}>
         <RecoveryFunnelView
           data={data}
+          canEdit={context.role === "director"}
           filters={(
             <>
               <LiteUrlSelect label="Intervalo" param="periodo" value={periodValue} defaultValue="7" options={[{ value: "hoje", label: "Hoje" }, { value: "7", label: "7 dias" }, { value: "30", label: "30 dias" }]} />

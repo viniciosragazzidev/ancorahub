@@ -32,11 +32,12 @@ export const LAB_QUALIFICATION_SOURCES: QualificationLeadSource[] = [
   source({ id: "lab-r1", nome: "Diego Nunca", qualification_status: "cold", turbo: turbo(2, 300), first_ai_at: minutesAgo(300), last_ai_at: minutesAgo(180) }),
   source({ id: "lab-r1b", nome: "Elisa Fim dos lembretes", qualification_status: "cold", turbo: { ...turbo(4, 5000), stoppedAt: minutesAgo(10), stopReason: "finished" }, first_ai_at: minutesAgo(5000), last_ai_at: minutesAgo(800) }),
   source({ id: "lab-r3", nome: "Fábio Morno", qualification_status: "warm", inbound_count: 4, first_ai_at: minutesAgo(90), last_inbound_at: minutesAgo(40), last_ai_at: minutesAgo(39), collected_fields: ["planType", "numberOfLives", "age"] }),
-  source({ id: "lab-q4", nome: "Gabi Quente", qualification_status: "hot", distribution_status: "manual_hold", inbound_count: 6, last_inbound_at: minutesAgo(20) }),
+  source({ id: "lab-q4", nome: "Gabi Quente", qualification_status: "hot", distribution_status: "manual_hold", inbound_count: 6, last_inbound_at: minutesAgo(20), first_ai_at: minutesAgo(60), first_inbound_at: minutesAgo(55), score_memory: { planType: { value: "empresarial" }, numberOfLives: { value: "8" }, averageAge: { value: "34" } } }),
   source({ id: "lab-q5", nome: "Hugo Na fila", qualification_status: "qualified", distribution_status: "queued", inbound_count: 5, last_inbound_at: minutesAgo(5) }),
   source({ id: "lab-n1", nome: "Iara 1º contato atrasado", status: "distributed", qualification_status: "hot", corretor_id: "u1", broker_name: "Vinicios Ragazzi", assigned_at: minutesAgo(27), inbound_count: 5 }),
   source({ id: "lab-n2", nome: "João Cotação", status: "quote_sent", qualification_status: "hot", corretor_id: "u1", broker_name: "Ana Paula", assigned_at: minutesAgo(600), first_contact_at: minutesAgo(590), inbound_count: 8 }),
   source({ id: "lab-n6", nome: "Karen Ganho", status: "converted", qualification_status: "hot", corretor_id: "u1", broker_name: "Ana Paula", inbound_count: 9 }),
+  source({ id: "lab-r4", nome: "Marina Fila de ligação", qualification_status: "cold", recovery: { state: "call_queue", at: minutesAgo(30), score: "A2" }, turbo: { ...turbo(4, 6000), stoppedAt: minutesAgo(40), stopReason: "finished" }, score_memory: { planType: { value: "empresarial" }, numberOfLives: { value: "5" } }, operator: "Amil" }),
   source({ id: "lab-x1", nome: "Lucas Saiu", qualification_status: "cold", opt_out_at: minutesAgo(60), inbound_count: 1, last_inbound_at: minutesAgo(60) }),
 ];
 
@@ -56,6 +57,10 @@ export function labQualificationServices(delay: number, failing: boolean) {
     timeline: async () => {
       await wait();
       return failing ? { ok: false as const, error: "Não consegui carregar a linha do tempo agora." } : { ok: true as const, data: { items: LAB_TIMELINE } };
+    },
+    toCallQueue: async () => {
+      await wait();
+      return failing ? { ok: false as const, error: "Não consegui mandar para a fila agora." } : { ok: true as const, data: { score: "B2" } };
     },
     doNotContact: async () => {
       await wait();

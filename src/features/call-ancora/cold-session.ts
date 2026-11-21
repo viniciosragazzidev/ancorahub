@@ -1,6 +1,13 @@
 import "server-only";
 
 import { COLD_PAGE_SIZE, coldReservations, fetchColdCandidates, isColdLeadStillFree } from "./cold-base";
+import { getRecoverySettings } from "@/features/lead-recovery/settings";
+
+/** Fila "Sem resposta" da recuperação (fase 4): ligada e com a conferência jurídica registrada. */
+async function recoveryQueueOn(tenantId: string) {
+  const recovery = await getRecoverySettings(tenantId).catch(() => null);
+  return Boolean(recovery?.enabled && recovery.callQueue && recovery.legalReviewedAt);
+}
 import { CALL_ANCORA_LEAD_TAKEN_MESSAGE, recordColdOutcome } from "./cold-outcome";
 import { countCallAncoraContactsToday, readCallAncoraSettings } from "./settings";
 import { isWindowOpenFor } from "./settings-rules";
@@ -57,6 +64,7 @@ export async function syncColdQueue(scope: Scope, now = new Date()) {
       maxAttempts: settings.maxAttemptsPerLead,
       cooldownMs: settings.attemptCooldownHours * 60 * 60_000,
     },
+    recoveryQueueFirst: await recoveryQueueOn(scope.tenantId),
   });
   const picked = [];
   for (const contact of candidates) {

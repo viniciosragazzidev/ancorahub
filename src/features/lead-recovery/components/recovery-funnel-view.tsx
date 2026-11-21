@@ -11,6 +11,7 @@ import Link from "next/link";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import page from "@/components/lite/page/lite-page.module.css";
 
+import { CallQueuePanel } from "./call-queue-panel";
 import { rate, RECOVERY_BASELINE_PER_WEEK, RECOVERY_TARGET_PER_WEEK, type RecoveryFunnelData, type RecoveryStepRow, type RecoveryWeek } from "../metrics-core";
 
 const n = (value: number) => value.toLocaleString("pt-BR");
@@ -48,7 +49,7 @@ function weekColumns(controlPct: number): LiteColumn<RecoveryWeek>[] {
   ];
 }
 
-export function RecoveryFunnelView({ data, filters }: { data: RecoveryFunnelData; filters?: ReactNode }) {
+export function RecoveryFunnelView({ data, filters, canEdit = false }: { data: RecoveryFunnelData; filters?: ReactNode; canEdit?: boolean }) {
   const { numbers, steps, weeks, health } = data;
   const lastFull = weeks.length > 1 ? weeks[weeks.length - 2] : weeks[weeks.length - 1];
   const lastTotal = lastFull ? lastFull.recovered + lastFull.recoveredControl : 0;
@@ -79,6 +80,8 @@ export function RecoveryFunnelView({ data, filters }: { data: RecoveryFunnelData
           <Stat label="Não contatar" value={n(numbers.doNotContact)} />
         </div>
       </section>
+
+      {data.callQueue ? <CallQueuePanel rows={data.callQueue} heldCold={data.heldCold ?? 0} enabled={Boolean(data.callQueueEnabled)} canEdit={canEdit} /> : null}
 
       <section className={page.group} aria-labelledby="recovery-steps-title">
         <header className={page.cardHead}>

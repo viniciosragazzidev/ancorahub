@@ -34,7 +34,9 @@ export async function listQualificationLeads(tenantId: string, filter: Qualifica
       l.qualification_details->'turbo' as turbo,
       l.qualification_details->'recovery' as recovery,
       conv.opt_out_at, conv.wrong_number_at, conv.memory->'collectedFields' as collected_fields,
-      msg.inbound_count, msg.last_inbound_at, msg.last_ai_at, msg.first_ai_at,
+      jsonb_build_object('planType', conv.memory->'planType', 'numberOfLives', conv.memory->'numberOfLives', 'age', conv.memory->'age', 'averageAge', conv.memory->'averageAge', 'companyHasCnpj', conv.memory->'companyHasCnpj') as score_memory,
+      coalesce(l.source_metadata->>'operadora', l.source_metadata->>'operator') as operator,
+      msg.inbound_count, msg.last_inbound_at, msg.last_ai_at, msg.first_ai_at, msg.first_inbound_at,
       exists (select 1 from whatsapp_messages s where s.tenant_id = l.tenant_id and s.lead_id = l.id
         and s.id like 'ai\\_silence\\_followup\\_%' and s.provider_status = 'sent') as silence_sent
     from leads l
@@ -48,7 +50,8 @@ export async function listQualificationLeads(tenantId: string, filter: Qualifica
       select count(*) filter (where m.direction in ('incoming', 'inbound'))::int as inbound_count,
         max(m.sent_at) filter (where m.direction in ('incoming', 'inbound')) as last_inbound_at,
         max(m.sent_at) filter (where m.direction in ('outbound', 'outgoing') and m.sender_role = 'assistant') as last_ai_at,
-        min(m.sent_at) filter (where m.direction in ('outbound', 'outgoing') and m.sender_role = 'assistant') as first_ai_at
+        min(m.sent_at) filter (where m.direction in ('outbound', 'outgoing') and m.sender_role = 'assistant') as first_ai_at,
+          min(m.sent_at) filter (where m.direction in ('incoming', 'inbound')) as first_inbound_at
       from whatsapp_messages m where m.tenant_id = l.tenant_id and m.lead_id = l.id
     ) msg on true
     where l.tenant_id = ${tenantId} and l.deleted_at is null and l.archived_at is null
@@ -75,8 +78,10 @@ function leadRowQuery(tenantId: string, leadId: string) {
         l.assigned_at, l.first_contact_at, l.distribution_status, l.created_at, l.source_channel, l.lives_count,
         l.queue_id, q.name as queue_name, u.name as broker_name,
         l.qualification_details->'turbo' as turbo, l.qualification_details->'recovery' as recovery,
-        conv.opt_out_at, conv.wrong_number_at, conv.memory->'collectedFields' as collected_fields, conv.memory as memory,
-        msg.inbound_count, msg.last_inbound_at, msg.last_ai_at, msg.first_ai_at,
+        conv.opt_out_at, conv.wrong_number_at, conv.memory->'collectedFields' as collected_fields,
+      jsonb_build_object('planType', conv.memory->'planType', 'numberOfLives', conv.memory->'numberOfLives', 'age', conv.memory->'age', 'averageAge', conv.memory->'averageAge', 'companyHasCnpj', conv.memory->'companyHasCnpj') as score_memory,
+      coalesce(l.source_metadata->>'operadora', l.source_metadata->>'operator') as operator, conv.memory as memory,
+        msg.inbound_count, msg.last_inbound_at, msg.last_ai_at, msg.first_ai_at, msg.first_inbound_at,
         exists (select 1 from whatsapp_messages s where s.tenant_id = l.tenant_id and s.lead_id = l.id
           and s.id like 'ai\\_silence\\_followup\\_%' and s.provider_status = 'sent') as silence_sent
       from leads l
@@ -90,7 +95,8 @@ function leadRowQuery(tenantId: string, leadId: string) {
         select count(*) filter (where m.direction in ('incoming', 'inbound'))::int as inbound_count,
           max(m.sent_at) filter (where m.direction in ('incoming', 'inbound')) as last_inbound_at,
           max(m.sent_at) filter (where m.direction in ('outbound', 'outgoing') and m.sender_role = 'assistant') as last_ai_at,
-          min(m.sent_at) filter (where m.direction in ('outbound', 'outgoing') and m.sender_role = 'assistant') as first_ai_at
+          min(m.sent_at) filter (where m.direction in ('outbound', 'outgoing') and m.sender_role = 'assistant') as first_ai_at,
+          min(m.sent_at) filter (where m.direction in ('incoming', 'inbound')) as first_inbound_at
         from whatsapp_messages m where m.tenant_id = l.tenant_id and m.lead_id = l.id
       ) msg on true
       where l.tenant_id = ${tenantId} and l.id = ${leadId} and l.deleted_at is null
