@@ -10,6 +10,7 @@ import { matchesPostSaleRuleFilter, postSaleRuleLabel, POST_SALE_RULE_FILTERS, t
 import { answerChips, intentDetails, matchesSearch, paginate, RESPONSE_GROUP_LABELS, responseGroups, type AnswerChip, type ResponseGroup } from "@/features/post-sale-audit/responses-view";
 import { lossReasonCheckSummary, readLossReasonCheck } from "@/features/post-sale-audit/loss-reason-check";
 import { cn } from "@/lib/utils";
+import { useHrefAllowed } from "@/features/dashboard/components/allowed-link";
 
 export type PostSaleResponseRow = {
   id: string;
@@ -38,6 +39,7 @@ const dateTime = (value: string | null) => value ? new Date(value).toLocaleStrin
 
 /** "Quem respondeu" (09/11): the clients who answered, searchable, 10 per page, with the conversation. */
 export function PostSaleResponses({ responses }: { responses: PostSaleResponseRow[] }) {
+  const canOpenConversations = useHrefAllowed()("/conversas");
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<ResponseGroup>("all");
   const [rule, setRule] = useState<PostSaleRuleFilter>("all");
@@ -172,7 +174,7 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
                         {resuming === row.id ? "Enviando…" : "Retomar agora"}
                       </Button>
                     ) : null}
-                    <Button render={<Link href={`/conversas?leadId=${row.leadId}`} />} size="sm">Abrir conversa</Button>
+                    {canOpenConversations ? <Button render={<Link href={`/conversas?leadId=${row.leadId}`} />} size="sm">Abrir conversa</Button> : null}
                     <Button render={<Link href={`/leads/${row.leadId}`} />} size="sm" variant="outline">Ver lead</Button>
                   </div>
                 </div>
