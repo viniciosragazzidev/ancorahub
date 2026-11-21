@@ -27,6 +27,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       <div
         className={cn(
           "flex size-9 items-center justify-center rounded-md border border-border/80 bg-background",
+          directorLiteEnabled && "director-header-action director-theme-toggle",
           className,
         )}
       />

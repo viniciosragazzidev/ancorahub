@@ -991,3 +991,66 @@
 }
 .root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble-content"] button[class*="bg-primary/10"]:hover { background: var(--surface-muted) !important; }
 .root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble-content"] [class*="bg-muted-foreground/50"] { background: var(--text-muted) !important; }
+
+/* ------------------------------------------------------------------ chat claro de ler (21/11/2026, "tá confuso")
+ * Substitui os blocos de largura total com barra: o cliente fala à esquerda, solto no branco, com avatar alinhado ao
+ * nome; a equipe e a IA falam à direita, num balão compacto (azul lavado para o atendente, cinza para a IA), com rótulo
+ * e hora em cima. Mesmo modelo do WhatsApp, que o corretor já lê de relance.
+ */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-avatar"] { translate: none !important; transform: none !important; align-self: flex-start !important; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] {
+  margin-inline: 0;
+  padding: 0;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"],
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:has([data-conversations-part="team-avatar"]) {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  padding: 2px 0 2px 64px;
+  background: transparent;
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-conversations-part="team-avatar"] { display: none; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message-content"] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message-content"] > * { justify-self: auto; align-self: flex-end; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message-header"] { order: 0; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message-footer"] { order: 1; margin-left: 0 !important; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="bubble"] { order: 2; align-self: flex-end; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="bubble-content"] {
+  align-self: flex-end;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface-muted) !important;
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-kind="broker"] [data-slot="bubble-content"] { background: var(--info-subtle) !important; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:hover { background: transparent; }
+/* Rótulo e hora da equipe numa linha só, à direita, acima do balão. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:has([data-slot="message-header"]) [data-slot="message-content"] { display: grid; grid-template-columns: auto auto; justify-content: end; column-gap: 8px; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:has([data-slot="message-header"]) [data-slot="message-header"] { grid-row: 1; grid-column: 1; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:has([data-slot="message-header"]) [data-slot="message-footer"] { grid-row: 1; grid-column: 2; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:has([data-slot="message-header"]) [data-slot="bubble"],
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:has([data-slot="message-header"]) [data-slot="message-content"] > p { grid-row: 2; grid-column: 1 / -1; justify-self: end; }
+/* Cliente: sem fundo no hover (fica calmo), avatar ao lado do nome. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="client"] [data-slot="message"] { padding-right: 64px; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="client"] [data-slot="message"]:hover { background: transparent; }
+/* Respiro entre quem fala. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-group"] { gap: 4px; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-group"] + [data-slot="message-group"] { margin-top: 12px; }
+/* Os balões nunca passam da coluna da conversa: o conteúdo encolhe (link longo vira reticências). */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-group"],
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-group"] > *,
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message"] { min-width: 0; max-width: 100%; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message-content"] { flex: 1 1 auto; width: auto; min-width: 0; max-width: 100%; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:has([data-slot="message-header"]) [data-slot="message-content"] { grid-template-columns: minmax(0, 1fr) auto; justify-content: stretch; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:has([data-slot="message-header"]) [data-slot="message-header"] { justify-self: end; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] :is([data-slot="bubble"], [data-slot="bubble-content"]) { min-width: 0; max-width: min(72ch, 100%); }
+/* A rolagem (Radix) embrulha o conteúdo em display: table, que crescia com um link longo e empurrava os balões para
+   fora da coluna. Em bloco, a largura é a da coluna. */
+.root[data-skin="diretor"] [data-conversations-part="pane"] [data-slot="scroll-area-viewport"] > div { display: block !important; min-width: 0 !important; }
