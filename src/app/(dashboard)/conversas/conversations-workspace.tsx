@@ -1514,7 +1514,8 @@ function ConversationHistory({ client, directorSkinEnabled }: { client: Conversa
                   <div className="h-px flex-1 bg-border/50" />
                 </div>
               ) : (
-                <MessageGroup key={gi}>
+                // Diretor (sem balão): o grupo diz quem falou, para o CSS separar cliente de equipe/IA.
+                <MessageGroup key={gi} data-sender-group={directorSkinEnabled ? group.type : undefined}>
                   {group.messages.map((message, mi) => (
                     <motion.div
                       key={message.id}

@@ -117,6 +117,10 @@ Nenhuma rota pediu login. Nada foi digitado no demo.
   ficam só no perfil, sem repetir; botão de tags só com ícone com mouse); perfil em pares rótulo/valor com hairline,
   sem caixas cinza; mensagens enviadas com avatar da equipe (pessoa) ou da IA (brilho), ao lado do rótulo.
 
+- Terceira rodada (21/11/2026): fala da equipe/IA num bloco em Paper Mist com barra de 2px à esquerda, fala do
+  cliente solta no branco; nada cortado na coluna estreita (topo esconde telefone/status inteiros por container query,
+  lista com 320px entre 1024 e 1279px, abas e selos quebram linha, nome do cliente antes do nome do corretor).
+
 ## 8. Fica para depois
 
 - A hora que vira `⋯` no hover da linha (demo) pede um menu de ações por conversa que a lista ainda não tem.
