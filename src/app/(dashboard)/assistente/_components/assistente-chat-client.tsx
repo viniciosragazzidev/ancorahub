@@ -402,9 +402,9 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                       <Sparkle size={18} className="animate-spin" />
                     </div>
                     <div className="flex items-center gap-1.5 bg-card border border-border px-3 py-2 rounded-2xl">
-                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-bounce"></span>
-                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-bounce [animation-delay:0.2s]"></span>
-                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-bounce [animation-delay:0.4s]"></span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse motion-reduce:animate-none"></span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse motion-reduce:animate-none [animation-delay:0.2s]"></span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse motion-reduce:animate-none [animation-delay:0.4s]"></span>
                       <span className="ml-1 text-[11px] font-mono text-sky-500">Executando ferramenta MCP...</span>
                     </div>
                   </motion.div>
