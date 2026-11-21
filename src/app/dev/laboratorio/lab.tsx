@@ -31,10 +31,11 @@ import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-anco
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
 import { LeadHoverLab } from "./lead-hover-lab";
+import { labQualificationServices, QualificationLeadsLab } from "./qualification-leads-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -48,6 +49,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "movimento", label: "Movimento (componentes)" },
   { id: "callAncora", label: "Call Âncora (celular simulado)" },
   { id: "leadHover", label: "Hover card do lead (desktop)" },
+  { id: "etapaLead", label: "Etapa do lead (qualificação)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -133,6 +135,7 @@ export function FlowLab() {
     if (!sasaState.current.offline) window.dispatchEvent(new Event("online"));
   };
   const lab = useMemo<DevLab>(() => ({
+    qualificationLeads: labQualificationServices(delay, outcome === "falha"),
     sasa: {
       ...createLabSasa(sasaState.current, { delay, outcome }),
       open: (open) => {
@@ -281,6 +284,8 @@ export function FlowLab() {
           </InterfaceMotionProvider>
         ) : flow === "leadHover" ? (
           <LeadHoverLab />
+        ) : flow === "etapaLead" ? (
+          <QualificationLeadsLab />
         ) : flow === "callAncora" ? (
           <CallAncoraWorkspace brokerFirstName="Vinicios" />
         ) : (

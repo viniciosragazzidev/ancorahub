@@ -1,5 +1,7 @@
 "use client";
 
+import { LeadJourneyView } from "@/features/lead-journey/components/lead-journey-view";
+import { deriveLeadJourney } from "@/features/lead-journey/journey";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useLayoutEffect, useMemo, useState, useRef, type ReactNode } from "react";
@@ -2400,6 +2402,9 @@ function ClientProfile({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-5 p-4">
+          <ProfileSection title="Etapa do lead">
+            <LeadJourneyView journey={conversationJourney(client)} />
+          </ProfileSection>
           {isQualified ? (
             <ProfileSection title="Status de Qualificação">
               <div className="rounded-[var(--radius-card)] border border-border/80 bg-card p-3 space-y-2.5">
@@ -2556,6 +2561,27 @@ function ClientProfile({
       </ScrollArea>
     </div>
   );
+}
+
+/**
+ * Etapa do lead no painel lateral (plano de recuperação §8.1). Usa só o que a conversa já carregou: as mensagens
+ * recentes dizem se o cliente respondeu e quando a IA falou por último.
+ */
+function conversationJourney(client: ConversationItem) {
+  const messages = client.messages.filter((message) => !message.transition);
+  const inbound = messages.filter((message) => message.direction === "incoming" || message.direction === "inbound");
+  const ai = messages.filter((message) => message.direction !== "incoming" && message.direction !== "inbound" && message.senderRole === "assistant");
+  const latest = (list: ConversationMessage[]) => list.reduce<string | null>((max, message) => (!max || message.sentAt > max ? message.sentAt : max), null);
+  const earliest = ai.reduce<string | null>((min, message) => (!min || message.sentAt < min ? message.sentAt : min), null);
+  return deriveLeadJourney({
+    status: client.status,
+    qualificationStatus: client.qualificationStatus ?? null,
+    corretorId: client.corretorId,
+    inboundCount: client.hasIncoming && !inbound.length ? 1 : inbound.length,
+    lastInboundAt: latest(inbound),
+    lastAiMessageAt: latest(ai),
+    aiFirstContactAt: earliest,
+  });
 }
 
 function ProfileSection({ action, children, title }: { action?: ReactNode; children: ReactNode; title: string }) {
