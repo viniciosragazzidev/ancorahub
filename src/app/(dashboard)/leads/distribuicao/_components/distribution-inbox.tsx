@@ -615,7 +615,12 @@ export function DistributionInbox({
       id: "lead",
       label: "Lead",
       primary: true,
-      render: (lead) => <span className={liteStyles.leadName} title={lead.name || "Lead sem nome"}>{lead.name || "Lead sem nome"}</span>,
+      // Hover card do lead (20/11): no Lite também (era só na tabela antiga). No toque, só o nome.
+      render: (lead) => (
+        <LeadNameHoverCard lead={distributionLeadPreview(lead, branches)} href={`/leads/${lead.id}`}>
+          <span tabIndex={0} className={`${liteStyles.leadName} underline-offset-4 outline-none hover:underline focus-visible:underline`} title={lead.name || "Lead sem nome"}>{lead.name || "Lead sem nome"}</span>
+        </LeadNameHoverCard>
+      ),
     },
     { id: "phone", label: "Telefone", secondary: true, render: (lead) => lead.phone || "Sem telefone" },
     {
@@ -720,7 +725,16 @@ export function DistributionInbox({
   ];
 
   const archivedLeadColumns: LiteColumn<Lead>[] = [
-    { id: "lead", label: "Lead", primary: true, render: (lead) => lead.name || "Lead sem nome" },
+    {
+      id: "lead",
+      label: "Lead",
+      primary: true,
+      render: (lead) => (
+        <LeadNameHoverCard lead={distributionLeadPreview(lead, branches)} href={`/leads/${lead.id}`}>
+          <span tabIndex={0} className="underline-offset-4 outline-none hover:underline focus-visible:underline">{lead.name || "Lead sem nome"}</span>
+        </LeadNameHoverCard>
+      ),
+    },
     { id: "phone", label: "Telefone", secondary: true, render: (lead) => lead.phone || "Sem telefone" },
     { id: "branch", label: "Unidade", render: (lead) => branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral" },
     {

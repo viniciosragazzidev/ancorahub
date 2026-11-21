@@ -17,6 +17,7 @@ import { LitePagination, useLitePages } from "@/components/lite/data/pagination"
 import { LITE_TIME_ZONE, liteDateFormatter } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
 import { acceptRate, formatDuration, RANK_LABEL, type BrokerOfferStats, type RankPosition } from "@/features/engagement/ranking";
+import { LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { SupervisorNoteHistory } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
 import { BrokerLeadsExportButton } from "./broker-leads-export-button";
@@ -119,7 +120,20 @@ function LeadsSection({ leads, limit, now }: { leads: Lead[]; limit: number; now
       primary: true,
       render: (lead) => (
         <span>
-          <Link href={`/leads/${lead.id}`} className={`${page.cellTitle} ${page.cellLink}`} title={lead.name}>{lead.name}</Link>
+          {/* Hover card do lead (20/11): no desktop com mouse, o essencial sem sair do perfil; no toque, só o link. */}
+          <LeadNameHoverCard
+            lead={{
+              id: lead.id,
+              name: lead.name,
+              status: lead.status,
+              phone: lead.phone,
+              lastActivityAt: lead.firstContactAt ?? lead.assignedAt ?? lead.createdAt,
+              context: lead.queueName,
+            }}
+            href={`/leads/${lead.id}`}
+          >
+            <Link href={`/leads/${lead.id}`} className={`${page.cellTitle} ${page.cellLink}`} title={lead.name}>{lead.name}</Link>
+          </LeadNameHoverCard>
           {lead.queueName ? <span className={page.cellSub}>{lead.queueName}</span> : null}
         </span>
       ),
