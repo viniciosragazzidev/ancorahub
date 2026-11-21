@@ -6,6 +6,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getPostSaleWorkspaceAction, previewPostSaleAudienceAction } from "@/features/post-sale-audit/actions";
 import { POST_SALE_CAMPAIGN_MAX_LEADS, postSaleAudienceSchema, type PostSaleAudience } from "@/features/post-sale-audit/rules";
 import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
+import { UnitManagerLinks } from "@/features/dashboard/components/allowed-link";
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { PostSaleWorkspace } from "./post-sale-workspace";
 import { parsePostSaleTab } from "./post-sale-tabs";
 
@@ -50,7 +52,10 @@ export default async function PostSalePage({ searchParams }: { searchParams: Pos
   }
   return (
     <BrokerProfileViewerProvider viewerRole={context.role}>
-      <PostSaleWorkspace initialTab={parsePostSaleTab(params.aba, rawLeadIds !== undefined)} initialData={initial.data} initialAudience={initialAudience} initialPreview={initialPreview} initialFeedback={initialFeedback} />
+      {/* Gestor de unidade (20/11): "Abrir conversa" leva às conversas de qualificação, que são do diretor, e sai. */}
+      <UnitManagerLinks active={isOutsideManagerScope(context.role, context.jobTitle)}>
+        <PostSaleWorkspace initialTab={parsePostSaleTab(params.aba, rawLeadIds !== undefined)} initialData={initial.data} initialAudience={initialAudience} initialPreview={initialPreview} initialFeedback={initialFeedback} />
+      </UnitManagerLinks>
     </BrokerProfileViewerProvider>
   );
 }
