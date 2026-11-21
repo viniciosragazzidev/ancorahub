@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
+import { isFirstTimeToday, markSeenToday } from "@/components/motion/first-time-today/first-time-today-core";
 
 import { easeStandard } from "./shared";
 
@@ -15,7 +16,10 @@ export interface LiteNumberProps {
   /** `percent` recebe o valor já em pontos percentuais (12 vira 12%). */
   format?: LiteNumberFormat;
   decimals?: number;
-  /** Ao montar, rola de zero até o valor (KPI da sessão). Sem isso, o número aparece pronto. */
+  /**
+   * Ao montar, rola de zero até o valor. É nível 2 do FEEDBACK.md (no máximo uma vez por dia por tipo): vale só na
+   * primeira visita do dia a esta rota; nas outras, o número aparece pronto. Sem isso, aparece sempre pronto.
+   */
   countFromZero?: boolean;
   /** Anuncia o valor final para leitor de tela, numa região própria (aria-live educado). */
   live?: boolean;
@@ -42,7 +46,33 @@ function formatterFor(format: LiteNumberFormat, decimals: number | undefined, lo
  * e no primeiro render do cliente; a contagem começa depois da hidratação. Com movimento reduzido,
  * o número vai direto ao final.
  */
-export function LiteNumber({ value, format = "integer", decimals, countFromZero = false, live = false, className, locale = "pt-BR" }: LiteNumberProps) {
+/** Uma decisão por visita: todos os números da mesma rota que montam juntos contam ou não contam juntos. */
+const VISIT_WINDOW_MS = 1500;
+const visitDecision = new Map<string, { at: number; count: boolean }>();
+
+function safeStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** Primeira visita do dia a `route` (America/Sao_Paulo), decidida uma vez por visita e no cliente. */
+export function countsToday(route: string, now = new Date()): boolean {
+  const key = `lite-number:${route}`;
+  const recent = visitDecision.get(key);
+  if (recent && now.getTime() - recent.at < VISIT_WINDOW_MS) return recent.count;
+  const storage = safeStorage();
+  const count = isFirstTimeToday(storage, key, now);
+  if (count) markSeenToday(storage, key, now);
+  visitDecision.set(key, { at: now.getTime(), count });
+  return count;
+}
+
+export function LiteNumber({ value, format = "integer", decimals, countFromZero: wantsCount = false, live = false, className, locale = "pt-BR" }: LiteNumberProps) {
+  // Decide no primeiro render do cliente (estado preguiçoso), pela rota atual; no servidor é sempre "pronto".
+  const [countFromZero] = useState(() => wantsCount && typeof window !== "undefined" && countsToday(window.location.pathname));
   const text = formatterFor(format, decimals, locale).format(format === "percent" ? value / 100 : value);
   return (
     <span className={className} style={{ fontVariantNumeric: "tabular-nums" }}>
