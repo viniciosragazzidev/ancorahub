@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isRecoveryMarketingTemplate } from "@/features/lead-recovery/marketing-exception";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -646,13 +647,19 @@ export async function resolveApprovedMetaEventTemplate(input: {
   templateName?: string;
   /** The selected source channel's WABA. */
   wabaId?: string | null;
+  /**
+   * Exceção da DEC-155 para a recuperação (DEC-190): com isto, um template nomeado da lista de recuperação pode
+   * sair como Marketing. Sem isto (todo o resto), a qualificação segue só com Utility.
+   */
+  allowRecoveryMarketing?: boolean;
 }): Promise<ResolvedEventMessagePlan | null> {
   const event = getMessageEventByPurpose(input.purpose);
   if (!event) return null;
 
   if (input.templateName) {
     const named = await loadApprovedMetaResourceByName(input.tenantId, input.templateName, input.wabaId);
-    if (!named || (event.key === "FIRST_CONTACT" && named.category !== "UTILITY")) return null;
+    if (!named) return null;
+    if (event.key === "FIRST_CONTACT" && named.category !== "UTILITY" && !isRecoveryMarketingTemplate(named.name, named.category, Boolean(input.allowRecoveryMarketing))) return null;
     const automatic = buildAutomaticMetaVariableMappings(event, named.variables);
     return {
       eventKey: event.key,

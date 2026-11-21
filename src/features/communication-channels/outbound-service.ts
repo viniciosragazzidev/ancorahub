@@ -401,6 +401,8 @@ export async function enqueueMetaTemplateMessage(input: {
   templateName?: string;
   /** Preserve the exact selected source channel for post-sale contact. */
   strictSourceChannel?: boolean;
+  /** Exceção da DEC-155 (DEC-190): passo de recuperação pode usar o template Marketing nomeado da lista. */
+  allowRecoveryMarketing?: boolean;
 }) {
   const requestedDestinationPhone = phoneSchema.parse(input.destinationPhone);
   // A team member's number comes from their profile. The message-history lookup is for leads only:
@@ -428,7 +430,7 @@ export async function enqueueMetaTemplateMessage(input: {
     throw outboundChannelError("META_CHANNEL_UNAVAILABLE", "Não existe um canal oficial da Meta ativo para este tenant.");
   }
   const messagePlan = input.requireApprovedMetaTemplate
-    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables, templateName: input.templateName, wabaId: channel?.wabaId ?? null })
+    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables, templateName: input.templateName, wabaId: channel?.wabaId ?? null, allowRecoveryMarketing: input.allowRecoveryMarketing })
     : input.purpose === "dutyPresenceConfirmation" ? null : await resolveEventMessagePlan({
       tenantId: input.tenantId,
       recipientType: input.recipientType,

@@ -18,6 +18,9 @@ import { useDevLab } from "@/lib/dev-lab";
 import { saveRecoverySettingsAction } from "../actions";
 import { RECOVERY_STEPS } from "../cadence-rules";
 import { recoveryBlockers, type RecoveryChannelSetting, type RecoverySettings, type RecoveryStepId } from "../settings-core";
+import { META_COST_BRL } from "../touch-cost";
+
+const brl = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const STEP_TEXT: Record<RecoveryStepId, string> = {
   s2: "S2 · +3 h · pergunta simples (texto livre)",
@@ -99,7 +102,7 @@ export function RecoverySettingsLite({ initial, canEdit }: { initial: RecoverySe
       <Row id="recovery-warm" title="Morno sem contato do corretor" description="Se o corretor não fizer o 1º contato em 2 h, a IA avisa o cliente que ele vai chamar." checked={settings.warmBridge} disabled={disabled} onChange={(value) => save({ ...settings, warmBridge: value })} />
       <Row id="recovery-call-queue" title="Fila de ligação (Sem resposta)" description="Quem termina a cadência sem responder vai para a fila da unidade, trabalhada pelo Call Âncora, no lugar do segurado sem dono." checked={settings.callQueue} disabled={disabled} onChange={(value) => save({ ...settings, callQueue: value })} />
       <Row id="recovery-scoring" title="Pontuação perfil × interesse" description="Ordena a fila de ligação e o Call Âncora pela chance de venda (A1 a D4). Nunca usa dado de saúde." checked={settings.scoring} disabled={disabled} onChange={(value) => save({ ...settings, scoring: value })} />
-      <Row id="recovery-nurture" title="Nutrição mensal" description="Quem não atendeu a fila ou disse 'agora não': até 3 toques, um por mês, com motivo concreto (reajuste, faixa de idade)." checked={settings.nurture} disabled={disabled} onChange={(value) => save({ ...settings, nurture: value })} />
+      <Row id="recovery-nurture" title="Nutrição mensal" description={`Quem não atendeu a fila ou disse 'agora não': até 3 toques, um por mês, com motivo concreto (reajuste, faixa de idade). Template de Marketing, cerca de ${brl(META_COST_BRL.marketing)} cada.`} checked={settings.nurture} disabled={disabled} onChange={(value) => save({ ...settings, nurture: value })} />
       <Row id="recovery-ab" title="Teste A/B por passo" description="Testa variantes de cada passo e passa a usar mais a que recupera mais, depois de amostra suficiente." checked={settings.stepExperiments} disabled={disabled} onChange={(value) => save({ ...settings, stepExperiments: value })} />
       <div className={sections.formBody}>
         <div className={form.field}>
@@ -122,7 +125,7 @@ export function RecoverySettingsLite({ initial, canEdit }: { initial: RecoverySe
         const template = id === "s4" || id === "s5" || id === "s6" || id.startsWith("n");
         return (
           <div key={id} className={sections.formBody}>
-            <Row id={`recovery-step-${id}`} title={STEP_TEXT[id]} description={template ? "Template de marketing aprovado pela Meta. Sai só pela Meta oficial." : "Texto livre, com prévia na Qualificação. Vai com a saída: “Se não quiser mais receber, responda SAIR.”"} checked={settings.steps[id].enabled} disabled={disabled} onChange={(value) => setStep(id, { enabled: value })} />
+            <Row id={`recovery-step-${id}`} title={STEP_TEXT[id]} description={template ? `Template de Marketing aprovado pela Meta (exceção da DEC-155 só para a recuperação). Sai só pela Meta oficial, cerca de ${brl(META_COST_BRL.marketing)} por mensagem entregue.` : "Texto livre, com prévia na Qualificação. Vai com a saída: “Se não quiser mais receber, responda SAIR.”"} checked={settings.steps[id].enabled} disabled={disabled} onChange={(value) => setStep(id, { enabled: value })} />
             {!template ? (
               <div className={form.field}>
                 <span className={form.label}>Canal</span>

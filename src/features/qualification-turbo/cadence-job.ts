@@ -12,7 +12,8 @@ import { withJobLease } from "@/shared/db/job-lease";
 
 import { qualificationTemplateVariables, REQUESTED_OPERATOR_METADATA_KEYS, requestedOperator } from "./approaches";
 import { decideNextTouch, type TurboState, type TurboTouchRecord } from "./cadence";
-import { companyNameFor, getTurboSettings, listApprovedTemplateNames, readTurboState, writeTurboState } from "./service";
+import { companyNameFor, getTurboSettings, listApprovedTemplateNames, listApprovedTemplatesByCategory, readTurboState, writeTurboState } from "./service";
+import { recoveryMarketingAllowed, recoveryUsableTemplates } from "@/features/lead-recovery/marketing-exception";
 
 /** Leads looked at per run (every 2 minutes); "wait" decisions cost no network call. */
 const MAX_LEADS_PER_RUN = 1000;
@@ -125,18 +126,21 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
   const lastInbound = new Map(inbound.map((row) => [row.leadId, row.at ? new Date(row.at) : null]));
   const conversationByLead = new Map(conversations.map((row) => [row.leadId, row]));
 
-  const tenantCache = new Map<string, { cadence: boolean; approved: Set<string>; empresa: string; botName: string; controlPct: number }>();
+  const tenantCache = new Map<string, { cadence: boolean; approved: Set<string>; empresa: string; botName: string; controlPct: number; marketingOk: boolean }>();
   const tenantContext = async (tenantId: string) => {
     const cached = tenantCache.get(tenantId);
     if (cached) return cached;
     const settings = await getTurboSettings(tenantId);
-    const [approved, empresa, qualification, recovery] = await Promise.all([
-      listApprovedTemplateNames(tenantId),
+    const [byCategory, empresa, qualification, recovery] = await Promise.all([
+      listApprovedTemplatesByCategory(tenantId),
       companyNameFor(tenantId, settings),
       getQualificationTenantSettings(tenantId).catch(() => null),
       getRecoverySettings(tenantId).catch(() => null),
     ]);
-    const value = { cadence: settings.enabled && settings.cadence, approved, empresa, botName: qualification?.assistantName?.trim() || "Assistente", controlPct: recovery?.controlPct ?? 10 };
+    // DEC-155 com a exceção da recuperação (DEC-190): T2–T4 (Marketing) só com a recuperação ligada e a conferência jurídica.
+    const marketingOk = recoveryMarketingAllowed(recovery);
+    const approved = recoveryUsableTemplates({ utility: byCategory.utility, marketing: byCategory.marketing, allowed: marketingOk });
+    const value = { cadence: settings.enabled && settings.cadence, approved, empresa, botName: qualification?.assistantName?.trim() || "Assistente", controlPct: recovery?.controlPct ?? 10, marketingOk };
     tenantCache.set(tenantId, value);
     return value;
   };
@@ -192,6 +196,7 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
         idempotencyKey: `qualification-turbo:${lead.id}:${decision.step.touch}:${attempt}`,
         requireApprovedMetaTemplate: true,
         templateName: decision.step.template,
+        allowRecoveryMarketing: tenant.marketingOk,
       });
       record = { ...record, outboundId: queued.id };
       await processMetaOutboundBatch(1, lead.tenantId, queued.id).catch(() => null);

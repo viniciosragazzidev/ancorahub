@@ -64,6 +64,24 @@ export async function saveTurboSettings(tenantId: string, settings: TurboSetting
   await setSystemSetting(settingKey(tenantId), JSON.stringify(settings));
 }
 
+/** Aprovados na WABA ativa por categoria (a exceção da DEC-155 para a recuperação precisa dos Marketing). */
+export async function listApprovedTemplatesByCategory(tenantId: string) {
+  const wabaId = await getActiveWabaId(tenantId);
+  if (!wabaId) return { utility: new Set<string>(), marketing: new Set<string>() };
+  const rows = await getDatabase().select({ name: schema.metaWhatsAppTemplates.name, category: schema.metaWhatsAppTemplates.category })
+    .from(schema.metaWhatsAppTemplates)
+    .where(and(
+      eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
+      eq(schema.metaWhatsAppTemplates.wabaId, wabaId),
+      eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+      isNull(schema.metaWhatsAppTemplates.deletedAt),
+    ));
+  return {
+    utility: new Set(rows.filter((row) => (row.category ?? "").toUpperCase() === "UTILITY").map((row) => row.name)),
+    marketing: new Set(rows.filter((row) => (row.category ?? "").toUpperCase() === "MARKETING").map((row) => row.name)),
+  };
+}
+
 /** Eligible Utility templates of the active WABA; Marketing touches are skipped. */
 export async function listApprovedTemplateNames(tenantId: string) {
   const wabaId = await getActiveWabaId(tenantId);

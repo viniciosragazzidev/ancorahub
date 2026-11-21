@@ -23,6 +23,7 @@ import { touchCostBrl } from "./touch-cost";
 import { enterCallQueue, sweepTurboFinishedIntoCallQueue } from "./call-queue";
 import { decideNurtureTouch, LOST_REASON_FOR_NURTURE, LOST_TO_NURTURE_DAYS, nextNurtureDate, NURTURE_TEMPLATE } from "./nurture-rules";
 import { chooseStepVariant, stepVariantText } from "./step-experiments";
+import { recoveryMarketingAllowed, recoveryUsableTemplates } from "./marketing-exception";
 
 const TIME_BUDGET_MS = 40_000;
 const LIMIT_PER_SEGMENT = 60;
@@ -34,8 +35,8 @@ function rowsOf<T>(result: unknown): T[] {
 }
 
 /**
- * Templates aprovados na WABA ativa, separados por categoria. Só Utility pode sair (DEC-155, 27/10/2026: a
- * qualificação e os lembretes não usam Marketing); os de Marketing aprovados viram o motivo "marketing_blocked".
+ * Templates aprovados na WABA ativa, separados por categoria. A qualificação usa só Utility (DEC-155); a exceção da
+ * recuperação (DEC-190) libera os Marketing da lista RECOVERY_MARKETING_TEMPLATES. Outro Marketing segue barrado.
  */
 async function approvedTemplates(tenantId: string) {
   const wabaId = await getActiveWabaId(tenantId);
@@ -244,7 +245,8 @@ async function processLead(input: {
     touches: touches.map((touch) => ({ ...touch, at: touch.at })),
     automaticSentSinceStart: automatic.length,
     lastAutomaticAt: automatic[0]?.sentAt ?? null,
-    approvedTemplates: input.approved.utility,
+    // DEC-190: o runner só roda com a recuperação ligada e a conferência jurídica, então a exceção vale aqui.
+    approvedTemplates: recoveryUsableTemplates({ utility: input.approved.utility, marketing: input.approved.marketing, allowed: recoveryMarketingAllowed(input.settings) }),
     marketingTemplates: input.approved.marketing,
   });
 
@@ -324,6 +326,7 @@ async function sendStep(input: { tenantId: string; leadId: string; phone: string
       const queued = await enqueueMetaTemplateMessage({
         tenantId: input.tenantId, recipientType: "lead", recipientId: input.leadId, destinationPhone: input.phone, purpose: "leadQualification",
         variables: input.variables, idempotencyKey: `lead-recovery:${input.leadId}:${input.step.id}:${input.attempt}`, requireApprovedMetaTemplate: true, templateName: input.step.template,
+        allowRecoveryMarketing: true,
       });
       await processMetaOutboundBatch(1, input.tenantId, queued.id).catch(() => null);
       const [row] = await db.select({ status: schema.whatsappOutboundMessages.status, errorCode: schema.whatsappOutboundMessages.providerErrorCode, providerMessageId: schema.whatsappOutboundMessages.providerMessageId, renderedBody: schema.whatsappOutboundMessages.renderedBody, channelId: schema.whatsappOutboundMessages.channelId, destinationPhone: schema.whatsappOutboundMessages.destinationPhone })
@@ -455,7 +458,7 @@ async function runNurture(input: { tenantId: string; settings: RecoverySettings;
     const decision = decideNurtureTouch({
       now, settings: input.settings, leadId: row.id,
       nurture: { state: row.recovery.state, at: new Date(row.recovery.at ?? now.toISOString()), until: row.recovery.until ? new Date(row.recovery.until) : null, touches },
-      lastInboundAt: row.last_in ? new Date(row.last_in) : null, optedOut: Boolean(row.opted_out), hasBroker: Boolean(row.corretor_id), approvedTemplates: input.approved.utility, marketingTemplates: input.approved.marketing,
+      lastInboundAt: row.last_in ? new Date(row.last_in) : null, optedOut: Boolean(row.opted_out), hasBroker: Boolean(row.corretor_id), approvedTemplates: recoveryUsableTemplates({ utility: input.approved.utility, marketing: input.approved.marketing, allowed: recoveryMarketingAllowed(input.settings) }), marketingTemplates: input.approved.marketing,
     });
     const update = (value: Record<string, unknown>) => db.update(schema.leads).set({
       qualificationDetails: sql`jsonb_set(coalesce(${schema.leads.qualificationDetails}, '{}'::jsonb), '{recovery}', coalesce(${schema.leads.qualificationDetails}->'recovery', '{}'::jsonb) || ${JSON.stringify(value)}::jsonb)`,
