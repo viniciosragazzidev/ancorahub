@@ -121,6 +121,7 @@ Nenhuma rota pediu login. Nada foi digitado no demo.
   cliente solta no branco; nada cortado na coluna estreita (topo esconde telefone/status inteiros por container query,
   lista com 320px entre 1024 e 1279px, abas e selos quebram linha, nome do cliente antes do nome do corretor).
 
-## 8. Fica para depois
-
-- A hora que vira `⋯` no hover da linha (demo) pede um menu de ações por conversa que a lista ainda não tem.
+- Quarta rodada (21/11/2026): `⋯` no lugar da hora ao passar o mouse ou focar a linha, com menu (Abrir conversa, Abrir
+  lead, Abrir no WhatsApp, Ligar, Copiar telefone, Copiar link da conversa); corretor só no hover da linha; lead já com
+  corretor: selo neutro "Corretor" na lista e, no chat, a fala humana em bloco azul lavado com barra azul (IA segue
+  cinza, cliente solto no branco).

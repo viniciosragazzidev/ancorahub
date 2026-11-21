@@ -925,3 +925,40 @@
   .root[data-skin="diretor"] [data-conversations-part="row"]:is(:hover, :focus-within) [data-conversations-part="row-owner-name"] { display: block; }
   .root[data-skin="diretor"] [data-conversations-part="row"]:not(:hover):not(:focus-within) :global(.truncate.text-sm) { max-width: 100%; }
 }
+
+/* Lead já com corretor (pedido do Vinicios, 21/11/2026): a fala humana fica no tom do corretor (azul de destaque lavado,
+   barra azul), a da IA segue cinza; cliente segue solto no branco. Uma cor cromática só no chat. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-kind="broker"] {
+  border-left-color: var(--series-1);
+  background: var(--info-subtle);
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-kind="broker"] [data-slot="message-header"] > span { color: var(--foreground); }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-kind="broker"] [data-conversations-part="team-avatar"] > span { border-color: color-mix(in oklab, var(--series-1) 35%, transparent); color: var(--series-1-text, var(--series-1)); }
+
+/* Menu "⋯" da linha: com mouse, toma o lugar da hora no hover ou no foco; no toque fica escondido (as mesmas ações
+   estão no topo da conversa). */
+.root[data-skin="diretor"] [data-conversations-part="row-actions"] { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .root[data-skin="diretor"] [data-conversations-part="row"]:is(:hover, :focus-within) [data-conversations-part="row-time"],
+  .root[data-skin="diretor"] [data-conversations-part="row"]:has([data-conversations-part="row-actions"][aria-expanded="true"]) [data-conversations-part="row-time"] { display: none; }
+  .root[data-skin="diretor"] [data-conversations-part="row"]:is(:hover, :focus-within) [data-conversations-part="row-actions"],
+  .root[data-skin="diretor"] [data-conversations-part="row-actions"][aria-expanded="true"] { display: inline-grid; }
+  .root[data-skin="diretor"] [data-conversations-part="workspace"] [data-conversations-part="row"] button[data-conversations-part="row-actions"] { width: 20px; height: 20px; min-width: 20px; min-height: 20px; }
+}
+
+/* Lista: lead já com corretor ganha o selo "Com corretor" (neutro: a linha já tem o selo verde de qualificação e o
+   design system não deixa duas cores cromáticas no mesmo componente). */
+.root[data-skin="diretor"] [data-conversations-part="row-broker-chip"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
