@@ -14,6 +14,7 @@ import { LitePagination } from "@/components/lite/data/pagination";
 import { formatLiteDate } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
 import styles from "./archived-leads-lite.module.css";
+import { LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 
@@ -48,7 +49,20 @@ function qualificationLabel(status: string | null) {
 }
 
 const columns: LiteColumn<ArchivedLeadLiteRow>[] = [
-  { id: "lead", label: "Lead", primary: true, render: (lead) => <span className={page.cellTitle}>{lead.name}</span> },
+  {
+    id: "lead",
+    label: "Lead",
+    primary: true,
+    // Hover card do lead (20/11): no desktop com mouse, o essencial do arquivado sem sair da lista; no toque, só o nome.
+    render: (lead) => (
+      <LeadNameHoverCard
+        lead={{ id: lead.id, name: lead.name, status: lead.status, phone: lead.phone, lastActivityAt: lead.archivedAt, context: "Arquivado" }}
+        href={`/leads/${lead.id}`}
+      >
+        <span tabIndex={0} className={`${page.cellTitle} underline-offset-4 outline-none hover:underline focus-visible:underline`}>{lead.name}</span>
+      </LeadNameHoverCard>
+    ),
+  },
   {
     id: "contact",
     label: "Contato",
