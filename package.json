@@ -7,7 +7,7 @@
     "prebuild": "node scripts/prebuild-extension.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "node scripts/check-encoding.mjs && eslint",
+    "lint": "node scripts/check-encoding.mjs && node scripts/check-motion.mjs && eslint",
     "lint:encoding": "node scripts/check-encoding.mjs",
     "type-check": "tsc --noEmit",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
@@ -32,7 +32,8 @@
     "ui:audit": "tsx scripts/ui/audit-ui-components.ts",
     "ui:audit:strict": "tsx scripts/ui/audit-ui-components.ts --strict",
     "ui:catalog": "tsx scripts/ui/build-route-component-catalog.ts --write",
-    "check:lite-skin": "node scripts/check-lite-skin.mjs"
+    "check:lite-skin": "node scripts/check-lite-skin.mjs",
+    "check:motion": "node scripts/check-motion.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.17",
