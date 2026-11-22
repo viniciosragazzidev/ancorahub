@@ -292,11 +292,11 @@ Tarefa principal da tela mais usada: no Início do corretor, ver a próxima aç�
 - 2026-11-22: brief do craft acrescentado a este arquivo, mantendo o registro da impeccable acima. Por quê: as duas skills leem o `DESIGN.md`.
 - 2026-11-22: brief aprovado pelo Vinicios, inclusive a lista "Nunca parecer".
 - 2026-11-22: CLAUDE.md e AGENTS.md passam a apontar para o design system do Lite. Por quê: o Lite é a única versão.
+- 2026-11-22: partes antigas do `docs/design-system.md` (sistema "Dub") marcadas como descontinuadas; continuam valendo Product Density, assets contextuais, feedback e superfícies de marca.
 - 2026-11-22: importação do design system para uma ferramenta de design recusada por ora. Por quê: não há Paper, pen.dev nem Figma configurado; o craft desenha em HTML a partir dos tokens do código.
 
 ## Open questions
 
 - O frontmatter e as seções da impeccable acima descrevem só o cotador, em 11/11/2026, e ainda citam Plus Jakarta Sans. O Lite usa Inter desde 21/11. Atualizar com `impeccable document` (que também regera `.impeccable/design.json`)?
-- O `docs/design-system.md` ainda descreve o sistema antigo (Satoshi, CTA `#1e40af`, borda `#e5e5e5`, input com borda preta). O CLAUDE.md já aponta para o Lite; falta marcar as partes antigas desse doc como descontinuadas.
 - Gap G1: convivem dois azuis, o de ação do chat e o índigo dos controles Arc. Unificar ou manter?
 - Gap G2: o tema escuro do Lite ainda não foi validado tela a tela.
