@@ -58,6 +58,11 @@ export function seatLabelsFrom(parts: ReadonlyArray<{ type: string }>) {
   return labels;
 }
 
+const STAGE_LABEL: Record<string, string> = {
+  new: "novo", in_contact: "em contato", quote_sent: "cotação enviada", negotiation: "em negociação", documentation_pending: "documentação pendente",
+  under_analysis: "em análise", awaiting_reply: "aguardando resposta", lost: "perdido",
+};
+
 function fallbackSeatLabel(id: string) {
   const date = id.slice(-10);
   return `${date.slice(8, 10)}/${date.slice(5, 7)}`;
@@ -111,7 +116,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
   const input = part.input ?? {};
   const level = entry ? confirmLevelFor(entry, input) : "toque";
   const isPeople = name === "corretor_pausar";
-  const isLeads = name === "plantao_dar_leads" || name === "lead_tirar_corretor";
+  const isLeads = name === "plantao_dar_leads" || name === "lead_tirar_corretor" || name === "lead_mudar_etapa";
   const ids = Array.isArray(input.ocorrencia_ids) ? (input.ocorrencia_ids as string[])
     : isPeople && Array.isArray(input.corretor_ids) ? (input.corretor_ids as string[])
     : isLeads && Array.isArray(input.lead_ids) ? (input.lead_ids as string[]) : [];
@@ -139,9 +144,14 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "plantao_reenviar_convite" ? `Reenviar o convite de presença para ${label(input.corretor_id)}?`
     : name === "plantao_dar_leads" ? `Passar ${ids.length || Number(input.quantidade ?? 1)} ${(ids.length || Number(input.quantidade ?? 1)) === 1 ? "lead" : "leads"} do plantão para ${label(input.corretor_id)}?${ids.length ? "" : input.criterio === "quentes" ? " (os mais quentes)" : " (os mais antigos)"}`
     : name === "lead_tirar_corretor" ? `Tirar o corretor de ${ids.length} ${ids.length === 1 ? "lead" : "leads"}?`
+    : name === "lead_mudar_etapa" ? `Mudar ${ids.length} ${ids.length === 1 ? "lead" : "leads"} para ${STAGE_LABEL[String(input.etapa)] ?? String(input.etapa)}?`
+    : name === "carteira_transferir" ? `Transferir toda a carteira de ${label(input.de_id)} para ${label(input.para_id)}?`
+    : name === "fila_distribuir_sem_dono" ? "Distribuir todos os leads sem dono?"
     : name === "escala_mensal_publicar" ? `Publicar a ${seatLabels.get(String(input.plano_id)) ?? "escala do mês"}?`
     : name === "escala_tirar_dia" ? (input.voltar ? `Devolver o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} à escala?` : `Tirar o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} da escala?`) : null;
-  const strongNote = name === "escala_mensal_publicar"
+  const strongNote = name === "carteira_transferir" ? "Todos os leads abertos mudam de corretor e os dois recebem aviso. Não tem Desfazer: a carteira se mistura com a do outro."
+    : name === "fila_distribuir_sem_dono" ? "Os leads sem corretor entram na distribuição agora e os corretores recebem as ofertas. Não tem Desfazer."
+    : name === "escala_mensal_publicar"
     ? "Grava a escala, avisa todos os escalados e tira quem saiu. Não tem Desfazer."
     : name === "escala_tirar_dia" && !input.voltar ? "Os plantões do dia que não começaram saem e os escalados recebem aviso. Devolver o dia depois não traz as pessoas de volta." : null;
   const noUndoNote = strongNote ?? (name === "plantao_liberar_presenca" ? `Ela passa a receber leads do plantão.${typeof input.nota === "string" && input.nota ? ` Motivo: ${input.nota}.` : ""} Não tem Desfazer.` : null);
@@ -149,7 +159,8 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "plantao_passar_cadeira" ? "Passar" : name === "plantao_trocar_corretores" ? "Trocar"
     : name === "plantao_marcar_falta" ? (input.falta === false ? "Desfazer falta" : "Marcar falta") : name === "plantao_liberar_presenca" ? "Liberar"
     : name === "plantao_reenviar_convite" ? "Reenviar"
-    : name === "plantao_dar_leads" ? "Passar leads" : name === "lead_tirar_corretor" ? `Tirar de ${ids.length}`
+    : name === "plantao_dar_leads" ? "Passar leads" : name === "lead_mudar_etapa" ? "Mudar etapa"
+    : name === "carteira_transferir" ? "Transferir carteira" : name === "fila_distribuir_sem_dono" ? "Distribuir agora" : name === "lead_tirar_corretor" ? `Tirar de ${ids.length}`
     : name === "escala_mensal_publicar" ? "Publicar escala" : name === "escala_tirar_dia" ? (input.voltar ? "Devolver o dia" : "Tirar o dia") : "Confirmar";
   const respond = (approved: boolean) => {
     if (sent || !part.approval) return;

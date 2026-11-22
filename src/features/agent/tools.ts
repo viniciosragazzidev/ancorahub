@@ -901,6 +901,144 @@ export function buildAgentTools(env: ToolEnv) {
       }),
     }),
 
+    carteira_transferir: tool({
+      description:
+        "B4: transfere TODA a carteira de leads abertos de um corretor para outro (\"passa todos os leads do Bruno para a Ana\"). " +
+        "Confirmação forte; não tem Desfazer (a carteira se mistura com a do outro).",
+      inputSchema: z.object({ de_id: PERSON_ID, para_id: PERSON_ID }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("carteira_transferir", toolCallId, input, async () => {
+        const people = await peopleMap();
+        const from = people.get(input.de_id);
+        const to = people.get(input.para_id);
+        if (!from || !to) return fail("pessoa", "Não achei uma das pessoas.", "Confira com pessoas_buscar.");
+        if (from.id === to.id) return fail("mesma_pessoa", "É a mesma pessoa.", "Escolha outro corretor.");
+        if (to.role !== "broker" || to.status !== "active") return fail("pessoa", `${to.name} não é corretor ativo.`, "Escolha outro corretor.");
+        const message = await backend.transferPortfolio(from.id, to.id);
+        return { ok: true, message: `Carteira de ${from.name} foi para ${to.name}. ${message}`, href: "/equipe" };
+      }),
+    }),
+
+    lead_reenviar_oferta: tool({
+      description: "B5: reenvia a oferta do lead ao mesmo corretor (\"reenvia o lead da Maria para o Bruno\").",
+      inputSchema: z.object({ lead_id: z.string().min(1).max(80) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("lead_reenviar_oferta", toolCallId, input, async () => {
+        const lead = await backend.leadById(input.lead_id);
+        if (!lead) return fail("lead", "Não achei esse lead.", "Use leads_buscar.");
+        if (!lead.brokerId) return fail("sem_corretor", `${lead.name} está sem corretor.`, "Use lead_dar para dar o lead a alguém.");
+        await backend.resendOffer(lead.id);
+        return { ok: true, message: `Oferta de ${lead.name} reenviada para ${lead.brokerName ?? "o corretor"}.`, href: `/leads/${lead.id}` };
+      }),
+    }),
+
+    lead_mudar_etapa: tool({
+      description:
+        "B6: muda a etapa de um ou mais leads (\"põe o lead do João em negociação\", \"marca como perdido, preço\"). " +
+        "Perdido exige motivo_perda. Mais de um lead ou perdido pede confirmação.",
+      inputSchema: z.object({
+        lead_ids: z.array(z.string().min(1).max(80)).min(1).max(50),
+        etapa: z.enum(["new", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "lost"]),
+        motivo_perda: z.enum(["preco", "carência", "encontrou_mais_barato", "ja_contratou", "desistiu", "problema_saude", "nao_qualificado", "sem_interesse", "sem_contato", "outro"]).optional(),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("lead_mudar_etapa", toolCallId, input, async () => {
+        if (input.etapa === "lost" && !input.motivo_perda) return fail("motivo", "Para marcar como perdido preciso do motivo.", "Pergunte o motivo ao diretor (preço, já contratou, sem interesse…).");
+        const leads = (await Promise.all(input.lead_ids.map((id) => backend.leadById(id)))).filter((lead): lead is LeadSummary => Boolean(lead));
+        if (!leads.length) return fail("lead", "Não achei esses leads.", "Use leads_buscar.");
+        const changed = await backend.changeStage(leads.map((lead) => lead.id), input.etapa, input.motivo_perda ?? null);
+        const previous = new Set(leads.map((lead) => lead.status));
+        const prior = previous.size === 1 ? [...previous][0]! : null;
+        return {
+          ok: true,
+          message: `${changed.length === 1 ? leads[0]!.name : `${changed.length} leads`} agora em ${stageLabel(input.etapa)}${input.motivo_perda ? ` (motivo: ${input.motivo_perda.replace(/_/g, " ")})` : ""}.`,
+          href: changed.length === 1 ? `/leads/${changed[0]}` : "/leads",
+          // Desfazer volta à etapa anterior quando todos estavam na mesma (e não era encerrado).
+          undo: prior && prior !== "lost" && prior !== "converted" && prior !== "distributed"
+            ? { tool: "lead_mudar_etapa", input: { lead_ids: changed, etapa: prior }, label: "Desfazer" }
+            : undefined,
+        };
+      }),
+    }),
+
+    lead_anotar: tool({
+      description: "B7: escreve uma nota no histórico do lead (o corretor é avisado). Use as palavras do diretor.",
+      inputSchema: z.object({ lead_id: z.string().min(1).max(80), texto: z.string().min(2).max(2000) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("lead_anotar", toolCallId, input, async () => {
+        const lead = await backend.leadById(input.lead_id);
+        if (!lead) return fail("lead", "Não achei esse lead.", "Use leads_buscar.");
+        await backend.addNote(lead.id, input.texto.trim(), `agente:${toolCallId}`);
+        return { ok: true, message: `Nota no histórico de ${lead.name}.${lead.brokerName ? ` ${lead.brokerName} foi avisado.` : ""}`, href: `/leads/${lead.id}` };
+      }),
+    }),
+
+    lead_tarefa: tool({
+      description:
+        "B7: cria tarefa/retorno no lead (\"cria retorno amanhã às 10 pro Bruno com a Maria\"). quando em AAAA-MM-DDTHH:MM (horário de São Paulo). " +
+        "Sem responsável dito: o corretor do lead.",
+      inputSchema: z.object({
+        lead_id: z.string().min(1).max(80),
+        titulo: z.string().min(2).max(140),
+        quando: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Use AAAA-MM-DDTHH:MM.").optional(),
+        responsavel_ids: z.array(PERSON_ID).max(5).optional(),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("lead_tarefa", toolCallId, input, async () => {
+        const lead = await backend.leadById(input.lead_id);
+        if (!lead) return fail("lead", "Não achei esse lead.", "Use leads_buscar.");
+        const assignees = input.responsavel_ids?.length ? input.responsavel_ids : lead.brokerId ? [lead.brokerId] : [];
+        const dueAt = input.quando ? new Date(`${input.quando}:00-03:00`).toISOString() : null;
+        await backend.createTask(lead.id, input.titulo.trim(), dueAt, assignees);
+        const people = await peopleMap();
+        const when = input.quando ? ` para ${input.quando.slice(8, 10)}/${input.quando.slice(5, 7)} às ${input.quando.slice(11, 16)}` : "";
+        return { ok: true, message: `Tarefa "${input.titulo.trim()}" em ${lead.name}${when}${assignees.length ? `, com ${assignees.map((id) => nameOf(people, id)).join(", ")}` : ""}.`, href: `/leads/${lead.id}` };
+      }),
+    }),
+
+    fila_distribuir_sem_dono: tool({
+      description: "B8: manda para a distribuição todos os leads sem corretor (\"distribui os leads sem dono\"). Confirmação forte; não tem Desfazer.",
+      inputSchema: z.object({}),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("fila_distribuir_sem_dono", toolCallId, input, async () => {
+        const message = await backend.distributeUnassigned();
+        return { ok: true, message, href: "/distribuicao" };
+      }),
+    }),
+
+    corretor_diagnosticar: tool({
+      description:
+        "B10: \"por que a Ana não recebe lead?\" Confere cadastro ativo, pausa geral, se está num plantão agora (presença, falta, pausa no plantão), " +
+        "WhatsApp conectado e leads esperando no plantão. Devolve os motivos encontrados e o que fazer.",
+      inputSchema: z.object({ corretor_id: PERSON_ID }),
+      execute: async ({ corretor_id }): Promise<ToolResult> => {
+        const [people, duties, whatsappOff] = await Promise.all([peopleMap(), backend.dutySoon(), backend.whatsappDisconnected().catch(() => [] as string[])]);
+        const person = people.get(corretor_id);
+        if (!person) return fail("pessoa", "Não achei essa pessoa.", "Use pessoas_buscar.");
+        const reasons: string[] = [];
+        const fixes: string[] = [];
+        if (person.status !== "active") { reasons.push("cadastro inativo"); fixes.push("ativar o cadastro na Equipe"); }
+        if (person.availability !== "available") { reasons.push(`recebimento geral ${person.availability === "paused" ? "pausado" : "desligado (offline)"}`); fixes.push("\"ativa a pessoa\" (corretor_pausar)"); }
+        const running = duties.filter((duty) => duty.running !== false).flatMap((duty) => duty.brokers.filter((broker) => broker.id === corretor_id).map((broker) => ({ duty, broker })));
+        const upcoming = duties.filter((duty) => duty.running === false && duty.brokers.some((broker) => broker.id === corretor_id));
+        if (!running.length) {
+          reasons.push(upcoming.length ? `não está em plantão agora (próximo: ${dutyLabel(upcoming[0]!)})` : "não está escalada em plantão agora nem nas próximas 24 h");
+          fixes.push("escalar num plantão (plantao_escalar_em_vagas) ou dar leads direto (lead_dar)");
+        }
+        for (const { duty, broker } of running) {
+          if (broker.presence === "absent") { reasons.push(`falta marcada em ${duty.scheduleName}`); fixes.push("tirar a falta"); }
+          else if (broker.presence !== "confirmed") { reasons.push(`presença não confirmada em ${duty.scheduleName}`); fixes.push("liberar a presença ou reenviar o convite"); }
+          if (broker.pausedHere) { reasons.push(`pausada em ${duty.scheduleName}`); fixes.push("retomar no plantão"); }
+        }
+        if (whatsappOff.includes(corretor_id)) { reasons.push("WhatsApp pessoal desconectado"); fixes.push("pedir para conectar o WhatsApp no app"); }
+        let waiting = 0;
+        for (const { duty } of running) waiting += (await backend.dutyAvailableLeads(duty.scheduleId).catch(() => [])).length;
+        if (running.length && !reasons.length) {
+          return { ok: true, message: `${person.name} está apta a receber: plantão ${running.map((item) => item.duty.scheduleName).join(", ")}, presença confirmada, sem pausa.${waiting ? ` ${waiting} leads esperando no plantão.` : " Não há lead esperando no plantão agora."}`, href: "/plantoes" };
+        }
+        return {
+          ok: true,
+          message: `${person.name} não recebe porque: ${reasons.join("; ")}. Para resolver: ${[...new Set(fixes)].join("; ")}.`,
+          data: { motivos: reasons },
+          href: "/plantoes",
+        };
+      },
+    }),
+
     corretor_pausar: tool({
       description:
         "A10: pausa ou retoma o recebimento GERAL de leads de um ou mais corretores (vale para todos os plantões e filas). " +

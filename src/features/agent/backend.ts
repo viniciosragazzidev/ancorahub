@@ -114,6 +114,20 @@ export interface AgentBackend {
   giveLead(leadId: string, brokerId: string): Promise<void>;
   /** Tira o corretor do lead (fica em espera manual, sem dono). */
   unassignLead(leadId: string): Promise<void>;
+  /** Transfere a carteira inteira de um corretor para outro (tela Equipe). Devolve a mensagem da tela. */
+  transferPortfolio(fromId: string, toId: string): Promise<string>;
+  /** Reenvia a oferta do lead ao mesmo corretor. */
+  resendOffer(leadId: string): Promise<void>;
+  /** Muda a etapa de um ou mais leads (ação em lote do diretor). `lost` exige motivo. */
+  changeStage(leadIds: string[], status: string, lostReason: string | null): Promise<string[]>;
+  /** Nota no histórico do lead (o corretor é avisado). */
+  addNote(leadId: string, text: string, clientMessageId: string): Promise<void>;
+  /** Tarefa/retorno no lead. */
+  createTask(leadId: string, title: string, dueAt: string | null, assigneeIds: string[]): Promise<void>;
+  /** Distribui todos os leads sem corretor. Devolve a mensagem da tela. */
+  distributeUnassigned(): Promise<string>;
+  /** Ids dos corretores sem WhatsApp pessoal conectado. */
+  whatsappDisconnected(): Promise<string[]>;
   /** Pausa ou retoma o recebimento geral de leads dos corretores. */
   setAvailability(brokerIds: string[], target: "available" | "paused"): Promise<void>;
   /** Grava a trilha em agent_actions; devolve o id ou null (tabela ausente, erro). Idempotente por toolCallId. */

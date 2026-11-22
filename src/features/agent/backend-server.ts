@@ -23,10 +23,15 @@ import {
   removeBrokerFromPublishedOccurrenceAction,
   updateMonthlyDutyDraftAction,
 } from "@/features/lead-distribution/monthly-duty-actions";
-import { assignLeadToBrokerAction } from "@/features/lead-distribution/actions";
+import { transferLeadsAction } from "@/app/(dashboard)/equipe/actions";
+import { bulkChangeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
+import { getBrokerWhatsAppStatusForContext } from "@/features/dashboard/today";
+import { assignLeadToBrokerAction, distributeAllUnassignedLeadsAction } from "@/features/lead-distribution/actions";
+import { addLeadNoteAction } from "@/features/leads/actions";
+import { createLeadTaskAction } from "@/features/leads/task-actions";
 import { assignDutyLeadToBrokerAction, getDutyAvailableLeadsAction } from "@/features/lead-distribution/duty-actions";
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
-import { getLeadDutyReassignmentOptions, reassignLeadAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
+import { getLeadDutyReassignmentOptions, reassignLeadAction, removeLeadAssignmentAction, resendLeadToSameBrokerAction } from "@/features/leads/management-actions";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -250,6 +255,50 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
       if (inDuty?.scheduleId) values.dutyScheduleId = inDuty.scheduleId;
       const result = await reassignLeadAction({}, formOf(values));
       if (result.error) throw new Error(result.error);
+    },
+
+    async transferPortfolio(fromId, toId) {
+      const result = await transferLeadsAction({}, formOf({ fromUserId: fromId, toUserId: toId }));
+      if (result.error) throw new Error(result.error);
+      return result.message ?? "Carteira transferida.";
+    },
+
+    async resendOffer(leadId) {
+      const result = await resendLeadToSameBrokerAction({}, formOf({ leadId }));
+      if (result.error) throw new Error(result.error);
+    },
+
+    async changeStage(leadIds, status, lostReason) {
+      const form = new FormData();
+      for (const id of leadIds) form.append("leadIds", id);
+      form.set("newStatus", status);
+      if (lostReason) form.set("motivoPerda", lostReason);
+      const result = await bulkChangeLeadStatusAction({}, form);
+      if (result.error) throw new Error(result.error);
+      return result.changedLeadIds ?? leadIds;
+    },
+
+    async addNote(leadId, text, clientMessageId) {
+      const result = await addLeadNoteAction({}, formOf({ leadId, content: text, clientMessageId }));
+      if (result.error) throw new Error(result.error);
+    },
+
+    async createTask(leadId, title, dueAt, assigneeIds) {
+      const form = formOf({ leadId, title, priority: "normal", ...(dueAt ? { dueAt } : {}) });
+      for (const id of assigneeIds) form.append("assigneeIds", id);
+      const result = await createLeadTaskAction({}, form);
+      if (result.error) throw new Error(result.error);
+    },
+
+    async distributeUnassigned() {
+      const result = await distributeAllUnassignedLeadsAction();
+      if (result.error) throw new Error(result.error);
+      return result.message ?? "Distribuição iniciada.";
+    },
+
+    async whatsappDisconnected() {
+      const status = await getBrokerWhatsAppStatusForContext(context);
+      return status.notConnected.map((item) => item.id);
     },
 
     async unassignLead(leadId) {

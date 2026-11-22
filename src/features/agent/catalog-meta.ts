@@ -123,6 +123,35 @@ export const AGENT_CATALOG = {
     name: "plantao_devolver_leads", title: "Devolver leads", doing: "Devolvendo os leads…", topic: "distribuicao",
     risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "direto",
   },
+  carteira_transferir: {
+    name: "carteira_transferir", title: "Transferir a carteira", doing: "Transferindo a carteira…", topic: "distribuicao",
+    risk: { readOnly: false, notifies: true, destructive: true }, roles: DIRECTOR, confirm: "forte", covers: ["B4"],
+  },
+  lead_reenviar_oferta: {
+    name: "lead_reenviar_oferta", title: "Reenviar a oferta", doing: "Reenviando a oferta…", topic: "distribuicao",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "direto", covers: ["B5"],
+  },
+  lead_mudar_etapa: {
+    name: "lead_mudar_etapa", title: "Mudar a etapa", doing: "Mudando a etapa…", topic: "leads",
+    risk: { readOnly: false }, roles: DIRECTOR,
+    confirm: (input) => (Array.isArray(input.lead_ids) && (input.lead_ids as unknown[]).length > 1 ? "toque" : input.etapa === "lost" ? "toque" : "direto"), covers: ["B6"],
+  },
+  lead_anotar: {
+    name: "lead_anotar", title: "Nota no lead", doing: "Anotando…", topic: "leads",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "direto", covers: ["B7"],
+  },
+  lead_tarefa: {
+    name: "lead_tarefa", title: "Tarefa no lead", doing: "Criando a tarefa…", topic: "leads",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "direto", covers: ["B7"],
+  },
+  fila_distribuir_sem_dono: {
+    name: "fila_distribuir_sem_dono", title: "Distribuir os sem dono", doing: "Distribuindo…", topic: "distribuicao",
+    risk: { readOnly: false, notifies: true, destructive: true }, roles: DIRECTOR, confirm: "forte", covers: ["B8"],
+  },
+  corretor_diagnosticar: {
+    name: "corretor_diagnosticar", title: "Diagnóstico do corretor", doing: "Verificando por que não recebe…", topic: "consulta",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["B10"],
+  },
   corretor_pausar: {
     name: "corretor_pausar", title: "Pausar recebimento", doing: "Mudando o recebimento de leads…", topic: "equipe",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: many("corretor_ids"), covers: ["A10"],

@@ -41,6 +41,11 @@ export const LAB_PHRASES = [
   "Passa 2 leads do plantão para a Carla",
   "Dá o lead do Sérgio para a Carla",
   "Tira o lead da Maria Clara da Carla",
+  "Passa todos os leads do Bruno para a Carla",
+  "Põe o lead do Sérgio em negociação",
+  "Anota no lead da Maria Clara que pediu proposta da Amil",
+  "Distribui os leads sem dono",
+  "Por que a Ana Souza não recebe lead?",
 ];
 
 function textOf(content: unknown) {
@@ -115,6 +120,40 @@ export function nextLabStep(prompt: Prompt): Step {
   if (request.includes("falta gente")) {
     if (!last) return { kind: "tool", name: "plantao_escala", input: { so_faltando_gente: true } };
     return { kind: "text", text: String(last.value?.message ?? "") };
+  }
+
+  // Bloco B, parte 2: carteira, etapa, nota, distribuir, diagnóstico.
+  if (request.includes("distribui os leads sem dono")) {
+    const done = find("fila_distribuir_sem_dono");
+    return done ? { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." } : { kind: "tool", name: "fila_distribuir_sem_dono", input: {} };
+  }
+  const portfolio = request.match(/^passa todos os leads d[ao] (\S+) para (?:a |o )?(\S+?)\??$/);
+  const diagnose = request.match(/^por que (?:a |o )?(.+?) n[ãa]o recebe/);
+  const stage = request.match(/^p[õo]e o lead d[ao] (.+?) em negocia[çc][ãa]o/);
+  const note = request.match(/^anota no lead d[ao] (.+?) que (.+)$/);
+  if (portfolio || diagnose || stage || note) {
+    const people = results.filter((item) => item.toolName === "pessoas_buscar");
+    const idOf = (item: (typeof results)[number] | undefined) => ((item?.value?.data as { pessoas?: Array<{ id: string }> } | undefined)?.pessoas ?? [])[0]?.id;
+    if (portfolio) {
+      if (people.length < 2) return { kind: "tool", name: "pessoas_buscar", input: { texto: portfolio[people.length + 1] } };
+      const done = find("carteira_transferir");
+      if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+      return { kind: "tool", name: "carteira_transferir", input: { de_id: idOf(people[0]), para_id: idOf(people[1]) } };
+    }
+    if (diagnose) {
+      if (!people.length) return { kind: "tool", name: "pessoas_buscar", input: { texto: diagnose[1] } };
+      const read = find("corretor_diagnosticar");
+      return read ? { kind: "text", text: String(read.value?.message ?? "") } : { kind: "tool", name: "corretor_diagnosticar", input: { corretor_id: idOf(people[0]) } };
+    }
+    const leadName = (stage ?? note)![1]!;
+    const leadsFound = find("leads_buscar");
+    if (!leadsFound) return { kind: "tool", name: "leads_buscar", input: { texto: leadName } };
+    const leadId = ((leadsFound.value?.data as { leads?: Array<{ id: string }> } | undefined)?.leads ?? [])[0]?.id;
+    if (!leadId) return { kind: "text", text: "Não achei o lead." };
+    const tool = stage ? "lead_mudar_etapa" : "lead_anotar";
+    const done = find(tool);
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return stage ? { kind: "tool", name: tool, input: { lead_ids: [leadId], etapa: "negotiation" } } : { kind: "tool", name: tool, input: { lead_id: leadId, texto: note![2] } };
   }
 
   // Bloco B: leads.

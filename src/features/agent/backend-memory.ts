@@ -30,6 +30,10 @@ export type MemoryWorld = {
   excludedDays?: string[];
   /** Leads do mundo de teste; `scheduleId` = plantão em cuja fila o lead sem dono espera. */
   leads?: Array<LeadSummary & { scheduleId?: string | null }>;
+  notes?: Array<{ leadId: string; text: string }>;
+  tasks?: Array<{ leadId: string; title: string; dueAt: string | null; assigneeIds: string[] }>;
+  offersResent?: string[];
+  whatsappOff?: string[];
 };
 
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
@@ -211,6 +215,43 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
       lead.brokerId = brokerId;
       lead.brokerName = world.people.find((person) => person.id === brokerId)?.name ?? null;
       lead.distributionStatus = "assigned";
+    },
+    async transferPortfolio(fromId, toId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const toName = world.people.find((person) => person.id === toId)?.name ?? null;
+      const moved = (world.leads ?? []).filter((lead) => lead.brokerId === fromId && lead.status !== "converted" && lead.status !== "lost");
+      for (const lead of moved) { lead.brokerId = toId; lead.brokerName = toName; }
+      return `${moved.length} leads transferidos.`;
+    },
+    async resendOffer(leadId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const lead = (world.leads ?? []).find((item) => item.id === leadId);
+      if (!lead?.brokerId) throw new Error("Este lead não tem corretor para reenviar a oferta.");
+      world.offersResent = [...(world.offersResent ?? []), leadId];
+    },
+    async changeStage(leadIds, status, lostReason) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      if (status === "lost" && !lostReason) throw new Error("Informe o motivo da perda.");
+      const changed: string[] = [];
+      for (const lead of world.leads ?? []) if (leadIds.includes(lead.id)) { lead.status = status; changed.push(lead.id); }
+      return changed;
+    },
+    async addNote(leadId, text) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.notes = [...(world.notes ?? []), { leadId, text }];
+    },
+    async createTask(leadId, title, dueAt, assigneeIds) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.tasks = [...(world.tasks ?? []), { leadId, title, dueAt, assigneeIds }];
+    },
+    async distributeUnassigned() {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const waiting = (world.leads ?? []).filter((lead) => !lead.brokerId && lead.distributionStatus === "unassigned");
+      for (const lead of waiting) lead.distributionStatus = "queued";
+      return `${waiting.length} leads entraram na distribuição.`;
+    },
+    async whatsappDisconnected() {
+      return world.whatsappOff ?? [];
     },
     async unassignLead(leadId) {
       if (world.failWrites) throw new Error("Falha simulada do servidor.");
