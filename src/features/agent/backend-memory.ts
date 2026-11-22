@@ -18,6 +18,12 @@ export type MemoryWorld = {
   presence?: Record<string, "confirmed" | "pending" | "absent">;
   /** Plantões presenciais pedem motivo para liberar sem foto. */
   presencialNeedsNote?: boolean;
+  /** Ordem manual do rodízio por plantão. */
+  queueOrder?: Record<string, string[]>;
+  /** Escalações marcadas como online dentro de plantão presencial. */
+  onlineHere?: string[];
+  /** Convites de presença reenviados (assignmentId). */
+  invites?: string[];
 };
 
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
@@ -82,6 +88,43 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
       }
       world.presence = { ...(world.presence ?? {}), [assignmentId]: "confirmed" };
       return { ok: true };
+    },
+    async queueOrders() {
+      return dutyWindows(0).filter((duty) => duty.running).map((duty) => {
+        const ids = duty.brokers.filter((broker) => !broker.pausedHere && !broker.pausedGlobal && broker.presence !== "absent").map((broker) => broker.id);
+        const saved = world.queueOrder?.[duty.scheduleId];
+        const ordered = saved ? [...saved.filter((id) => ids.includes(id)), ...ids.filter((id) => !saved.includes(id))] : ids;
+        const name = (id: string) => duty.brokers.find((broker) => broker.id === id)?.name ?? "Corretor";
+        return {
+          scheduleId: duty.scheduleId,
+          dutyDate: duty.dutyDate,
+          scheduleName: duty.scheduleName,
+          order: ordered.map((id, index) => ({ id, name: name(id), position: index + 1, isNext: index === 0 })),
+          blocked: duty.brokers.filter((broker) => !ids.includes(broker.id)).map((broker) => ({ id: broker.id, name: broker.name, reason: broker.presence === "absent" ? "Falta" : "Pausado" })),
+          manual: Boolean(saved),
+        };
+      });
+    },
+    async setQueueOrder(scheduleId, _dutyDate, brokerIds) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.queueOrder = { ...(world.queueOrder ?? {}), [scheduleId]: brokerIds };
+    },
+    async resetQueueOrder(scheduleId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const next = { ...(world.queueOrder ?? {}) };
+      delete next[scheduleId];
+      world.queueOrder = next;
+    },
+    async setOnlineMode(_scheduleId, assignmentId, online) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const set = new Set(world.onlineHere ?? []);
+      if (online) set.add(assignmentId); else set.delete(assignmentId);
+      world.onlineHere = [...set];
+    },
+    async sendPresenceInvite(_scheduleId, assignmentId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.invites = [...(world.invites ?? []), assignmentId];
+      return { delivered: true };
     },
     async pauseOnDuty(_scheduleId, assignmentId, paused) {
       if (world.failWrites) throw new Error("Falha simulada do servidor.");

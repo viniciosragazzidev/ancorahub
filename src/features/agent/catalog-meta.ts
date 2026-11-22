@@ -66,6 +66,22 @@ export const AGENT_CATALOG = {
     name: "plantao_liberar_presenca", title: "Liberar presença", doing: "Liberando a presença…", topic: "plantoes",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: "toque", covers: ["A8"],
   },
+  plantao_rodizio: {
+    name: "plantao_rodizio", title: "Rodízio", doing: "Lendo o rodízio…", topic: "plantoes",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["A11", "A14"],
+  },
+  plantao_rodizio_ordenar: {
+    name: "plantao_rodizio_ordenar", title: "Ordem do rodízio", doing: "Mudando a ordem do rodízio…", topic: "plantoes",
+    risk: { readOnly: false }, roles: DIRECTOR, confirm: "direto", covers: ["A11"],
+  },
+  plantao_modo_online: {
+    name: "plantao_modo_online", title: "Online no plantão", doing: "Mudando para online…", topic: "plantoes",
+    risk: { readOnly: false }, roles: DIRECTOR, confirm: "direto", covers: ["A12"],
+  },
+  plantao_reenviar_convite: {
+    name: "plantao_reenviar_convite", title: "Reenviar convite de presença", doing: "Reenviando o convite…", topic: "plantoes",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["A13"],
+  },
   corretor_pausar: {
     name: "corretor_pausar", title: "Pausar recebimento", doing: "Mudando o recebimento de leads…", topic: "equipe",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: many("corretor_ids"), covers: ["A10"],

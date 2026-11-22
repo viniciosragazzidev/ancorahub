@@ -6,7 +6,15 @@ import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { upcomingShift } from "@/features/dashboard/welcome-rules";
 import { getPublishedDutyScheduleIds, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 import { setBrokersAvailabilityAction } from "@/features/branches/actions";
-import { releaseDutyPresenceAction, setDutyAbsenceAction, toggleDutyRosterPauseAction } from "@/features/lead-distribution/duty-actions";
+import {
+  releaseDutyPresenceAction,
+  sendDutyPresenceInviteManuallyAction,
+  setDutyAbsenceAction,
+  setDutyAssignmentAttendanceModeAction,
+  toggleDutyRosterPauseAction,
+} from "@/features/lead-distribution/duty-actions";
+import { resetDutyManualQueueAction, saveDutyManualQueueAction } from "@/features/lead-distribution/duty-queue-order-actions";
+import { getDutyQueueOrderPreviews } from "@/features/lead-distribution/duty-queue-order-queries";
 import {
   addBrokerToPublishedOccurrenceAction,
   getMonthlyDutyPlanAction,
@@ -236,6 +244,39 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
 
     async releasePresence(scheduleId, assignmentId, note) {
       return releaseDutyPresenceAction(scheduleId, assignmentId, note);
+    },
+
+    async queueOrders() {
+      const previews = await getDutyQueueOrderPreviews(context);
+      return previews.map((preview) => ({
+        scheduleId: preview.scheduleId,
+        dutyDate: preview.dutyDate,
+        scheduleName: preview.scheduleName,
+        order: preview.order.map((item) => ({ id: item.id, name: item.name, position: item.position, isNext: item.isNext })),
+        blocked: preview.blocked.map((item) => ({ id: item.id, name: item.name, reason: item.reason })),
+        manual: preview.manual,
+      }));
+    },
+
+    async setQueueOrder(scheduleId, dutyDate, brokerIds) {
+      const result = await saveDutyManualQueueAction({ scheduleId, dutyDate, brokerIds });
+      if (!result.ok) throw new Error(result.reason);
+    },
+
+    async resetQueueOrder(scheduleId, dutyDate) {
+      const result = await resetDutyManualQueueAction({ scheduleId, dutyDate });
+      if (!result.ok) throw new Error(result.reason);
+    },
+
+    async setOnlineMode(scheduleId, assignmentId, online) {
+      const result = await setDutyAssignmentAttendanceModeAction({ scheduleId, assignmentId, mode: online ? "online" : null });
+      if (!result.ok) throw new Error(result.reason);
+    },
+
+    async sendPresenceInvite(scheduleId, assignmentId) {
+      const result = await sendDutyPresenceInviteManuallyAction(scheduleId, assignmentId);
+      if (!result.ok) throw new Error(result.reason);
+      return { delivered: result.delivered };
     },
 
     async setAvailability(brokerIds, target) {

@@ -127,11 +127,13 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
       : null;
   const swapTitle = name === "plantao_passar_cadeira" ? "Passar a cadeira?" : name === "plantao_trocar_corretores" ? "Trocar os dois de plantão?"
     : name === "plantao_marcar_falta" ? `${input.falta === false ? "Desfazer a falta de" : "Marcar falta de"} ${label(input.corretor_id)}?`
-    : name === "plantao_liberar_presenca" ? `Liberar a presença de ${label(input.corretor_id)}?` : null;
+    : name === "plantao_liberar_presenca" ? `Liberar a presença de ${label(input.corretor_id)}?`
+    : name === "plantao_reenviar_convite" ? `Reenviar o convite de presença para ${label(input.corretor_id)}?` : null;
   const noUndoNote = name === "plantao_liberar_presenca" ? `Ela passa a receber leads do plantão.${typeof input.nota === "string" && input.nota ? ` Motivo: ${input.nota}.` : ""} Não tem Desfazer.` : null;
   const confirmLabel = name === "plantao_escalar_em_vagas" ? `Escalar em ${count}` : name === "plantao_tirar_de_vagas" ? `Tirar de ${count}` : isPeople ? `${pausing ? "Pausar" : "Ativar"} ${count}`
     : name === "plantao_passar_cadeira" ? "Passar" : name === "plantao_trocar_corretores" ? "Trocar"
-    : name === "plantao_marcar_falta" ? (input.falta === false ? "Desfazer falta" : "Marcar falta") : name === "plantao_liberar_presenca" ? "Liberar" : "Confirmar";
+    : name === "plantao_marcar_falta" ? (input.falta === false ? "Desfazer falta" : "Marcar falta") : name === "plantao_liberar_presenca" ? "Liberar"
+    : name === "plantao_reenviar_convite" ? "Reenviar" : "Confirmar";
   const respond = (approved: boolean) => {
     if (sent || !part.approval) return;
     feedback("tap");

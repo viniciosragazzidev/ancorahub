@@ -33,7 +33,9 @@ describe("A7 e A8 com o agente real", { timeout: 20_000 }, () => {
     const first = await make().stream({ messages: [{ role: "user", content: [{ type: "text", text }] }] });
     const steps = await first.steps;
     const calls = steps.flatMap((step) => step.toolCalls.map((call) => call.toolName));
-    const request = steps.flatMap((step) => step.content).find((part) => part.type === "tool-approval-request") as { approvalId: string } | undefined;
+    // Só a confirmação que espera o diretor (as automáticas já executaram).
+    const request = steps.flatMap((step) => step.content).find((part) => part.type === "tool-approval-request" && !(part as { isAutomatic?: boolean }).isAutomatic) as { approvalId: string } | undefined;
+    await first.text;
     if (request && approve) {
       const response = await first.response;
       const second = await make().stream({
@@ -65,6 +67,38 @@ describe("A7 e A8 com o agente real", { timeout: 20_000 }, () => {
     const { world, backend } = await run("Libera a presença do Bruno, ele está aqui", (w) => { w.presence = { "s-manha:2026-11-21|u-bruno": "pending" }; });
     expect(world.presence?.["s-manha:2026-11-21|u-bruno"]).toBe("confirmed");
     expect(backend.actions[0]).toMatchObject({ tool: "plantao_liberar_presenca", status: "done", undo: null });
+  });
+
+  it("A11: de quem é a vez (leitura)", async () => {
+    const { calls, backend } = await run("De quem é a vez?");
+    expect(calls).toEqual(["plantao_rodizio"]);
+    expect(backend.actions).toHaveLength(0);
+  });
+
+  it("A11: põe a Carla primeiro; Desfazer volta ao automático", async () => {
+    const { world, backend, asked } = await run("Põe a Carla primeiro no rodízio");
+    expect(asked).toBe(false);
+    expect(world.queueOrder?.["s-manha"]).toEqual(["u-carla", "u-ana-lima"]);
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "plantao_rodizio_ordenar", input: { voltar_automatico: true } });
+  });
+
+  it("A11: volta o rodízio pro automático", async () => {
+    const { world } = await run("Volta o rodízio pro automático", (w) => { w.queueOrder = { "s-manha": ["u-carla", "u-ana-lima"] }; });
+    expect(world.queueOrder?.["s-manha"]).toBeUndefined();
+  });
+
+  it("A12: online no plantão presencial, com Desfazer", async () => {
+    const { world, backend } = await run("A Carla vai fazer online hoje");
+    expect(world.onlineHere).toEqual(["s-manha:2026-11-21|u-carla"]);
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "plantao_modo_online", input: { online: false } });
+  });
+
+  it("A13: reenvia o convite (pede confirmação; quem já confirmou não recebe de novo)", async () => {
+    const pending = await run("Manda de novo o aviso de presença pra Carla", (w) => { w.presence = { "s-manha:2026-11-21|u-carla": "pending" }; });
+    expect(pending.asked).toBe(true);
+    expect(pending.world.invites).toEqual(["s-manha:2026-11-21|u-carla"]);
+    const confirmed = await run("Manda de novo o aviso de presença pra Carla");
+    expect(confirmed.world.invites ?? []).toHaveLength(0);
   });
 
   it("A8: presencial sem motivo não libera e pede a nota", async () => {

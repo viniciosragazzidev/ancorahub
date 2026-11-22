@@ -534,6 +534,105 @@ export function buildAgentTools(env: ToolEnv) {
       }),
     }),
 
+    plantao_rodizio: tool({
+      description: "Lê o rodízio dos plantões em andamento: de quem é a vez, a ordem e quem está fora (pausa, falta). Para \"de quem é a vez?\" e antes de mudar a ordem.",
+      inputSchema: z.object({}),
+      execute: async (): Promise<ToolResult> => {
+        const orders = await backend.queueOrders();
+        if (!orders.length) return { ok: true, message: "Nenhum plantão em andamento agora.", data: { rodizios: [] } };
+        const lines = orders.map((item) => {
+          const order = item.order.map((broker) => `${broker.position}. ${broker.name}${broker.isNext ? " (é a vez)" : ""}`).join(", ") || "ninguém na vez";
+          const blocked = item.blocked.length ? ` Fora: ${item.blocked.map((broker) => `${broker.name} (${broker.reason})`).join(", ")}.` : "";
+          return `${item.scheduleName}${item.manual ? " (ordem manual)" : ""}: ${order}.${blocked}`;
+        });
+        return { ok: true, message: lines.join("\n"), data: { rodizios: orders }, href: "/plantoes" };
+      },
+    }),
+
+    plantao_rodizio_ordenar: tool({
+      description:
+        "A11: muda a ordem do rodízio do plantão em andamento. \"Põe a Carla primeiro\": primeiros = [Carla]. \"Primeiro a Ana, depois o Bruno\": primeiros = [Ana, Bruno]. " +
+        "Os outros seguem na ordem de hoje. \"Volta o rodízio pro automático\": voltar_automatico = true.",
+      inputSchema: z.object({
+        primeiros: z.array(PERSON_ID).max(20).optional().describe("Ids (de pessoas_buscar) na ordem que o diretor disse."),
+        voltar_automatico: z.boolean().optional(),
+        plantao_id: z.string().max(120).optional().describe("Só se houver mais de um plantão em andamento (scheduleId de plantao_rodizio)."),
+        ordem_completa: z.array(PERSON_ID).max(200).optional().describe("Uso interno do Desfazer: a ordem inteira."),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_rodizio_ordenar", toolCallId, input, async () => {
+        const orders = await backend.queueOrders();
+        const wanted = input.primeiros ?? input.ordem_completa ?? [];
+        const candidates = orders.filter((item) => (input.plantao_id ? item.scheduleId === input.plantao_id : wanted.length ? wanted.every((id) => item.order.some((broker) => broker.id === id)) : true));
+        if (!candidates.length) {
+          return fail("fora_do_rodizio", orders.length ? "Essa pessoa não está na vez de nenhum plantão agora (fora da escala, pausada ou com falta)." : "Nenhum plantão em andamento agora.", "Confira com plantao_rodizio.");
+        }
+        if (candidates.length > 1) return fail("varios_plantoes", `Há ${candidates.length} plantões em andamento: ${candidates.map((item) => item.scheduleName).join(", ")}.`, "Pergunte qual com escolher (id = scheduleId) e chame de novo com plantao_id.");
+        const target = candidates[0]!;
+        const current = target.order.map((broker) => broker.id);
+        const previous = target.manual ? { ordem_completa: current, plantao_id: target.scheduleId } : { voltar_automatico: true, plantao_id: target.scheduleId };
+        const name = (id: string) => target.order.find((broker) => broker.id === id)?.name ?? "Corretor";
+        if (input.voltar_automatico) {
+          if (!target.manual) return { ok: true, message: `${target.scheduleName} já está no rodízio automático. Nada mudou.` };
+          await backend.resetQueueOrder(target.scheduleId, target.dutyDate);
+          return { ok: true, message: `${target.scheduleName} voltou ao rodízio automático.`, href: "/plantoes", undo: { tool: "plantao_rodizio_ordenar", input: previous, label: "Desfazer" } };
+        }
+        if (!wanted.length) return fail("sem_ordem", "Não entendi quem vai na frente.", "Passe primeiros com os ids.");
+        const next = [...wanted.filter((id) => current.includes(id)), ...current.filter((id) => !wanted.includes(id))];
+        await backend.setQueueOrder(target.scheduleId, target.dutyDate, next);
+        return {
+          ok: true,
+          message: `Rodízio de ${target.scheduleName}: ${next.slice(0, 6).map((id, index) => `${index + 1}. ${name(id)}`).join(", ")}${next.length > 6 ? "…" : ""}.`,
+          href: "/plantoes",
+          undo: { tool: "plantao_rodizio_ordenar", input: previous, label: "Desfazer" },
+        };
+      }),
+    }),
+
+    plantao_modo_online: tool({
+      description: "A12: marca a pessoa como online num plantão presencial (confirma com um toque, sem foto) ou volta a seguir o plantão. \"A Ana vai fazer online hoje\".",
+      inputSchema: z.object({
+        corretor_id: PERSON_ID,
+        online: z.boolean().describe("true: online; false: volta a seguir o modo do plantão."),
+        plantao_id: z.string().max(120).optional(),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_modo_online", toolCallId, input, async () => {
+        const found = await dutyFor(input.corretor_id, input.plantao_id);
+        if (!found.ok) return found.result;
+        const { duty, broker, name } = found;
+        await backend.setOnlineMode(duty.scheduleId, broker.assignmentId, input.online);
+        return {
+          ok: true,
+          message: input.online
+            ? `${name} vai fazer ${dutyLabel(duty)} online: confirma a presença com um toque, sem foto.`
+            : `${name} volta a seguir o modo do ${dutyLabel(duty)}.`,
+          href: "/plantoes",
+          undo: { tool: "plantao_modo_online", input: { corretor_id: input.corretor_id, online: !input.online, plantao_id: duty.scheduleId }, label: "Desfazer" },
+        };
+      }),
+    }),
+
+    plantao_reenviar_convite: tool({
+      description: "A13: reenvia por WhatsApp o convite de confirmação de presença do plantão de agora ou do próximo (\"manda de novo o aviso de presença pra Ana\").",
+      inputSchema: z.object({
+        corretor_id: PERSON_ID,
+        plantao_id: z.string().max(120).optional(),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_reenviar_convite", toolCallId, input, async () => {
+        const found = await dutyFor(input.corretor_id, input.plantao_id);
+        if (!found.ok) return found.result;
+        const { duty, broker, name } = found;
+        if (broker.presence === "confirmed") return { ok: true, message: `${name} já confirmou a presença em ${dutyLabel(duty)}. Não reenviei.` };
+        const sent = await backend.sendPresenceInvite(duty.scheduleId, broker.assignmentId);
+        return {
+          ok: true,
+          message: sent.delivered
+            ? `Convite de presença reenviado para ${name} (${dutyLabel(duty)}).`
+            : `Convite de presença de ${name} (${dutyLabel(duty)}) entrou na fila de envio do WhatsApp.`,
+          href: "/plantoes",
+        };
+      }),
+    }),
+
     corretor_pausar: tool({
       description:
         "A10: pausa ou retoma o recebimento GERAL de leads de um ou mais corretores (vale para todos os plantões e filas). " +

@@ -29,6 +29,11 @@ export const LAB_PHRASES = [
   "A Carla faltou hoje",
   "Tira a falta da Carla",
   "Libera a presença do Bruno, ele está aqui",
+  "De quem é a vez?",
+  "Põe a Carla primeiro no rodízio",
+  "Volta o rodízio pro automático",
+  "A Carla vai fazer online hoje",
+  "Manda de novo o aviso de presença pra Carla",
 ];
 
 function textOf(content: unknown) {
@@ -103,6 +108,31 @@ export function nextLabStep(prompt: Prompt): Step {
   if (request.includes("falta gente")) {
     if (!last) return { kind: "tool", name: "plantao_escala", input: { so_faltando_gente: true } };
     return { kind: "text", text: String(last.value?.message ?? "") };
+  }
+
+  // A11 a A13: rodízio, online e convite de presença.
+  if (request.includes("de quem é a vez") || request.includes("de quem e a vez")) {
+    const read = find("plantao_rodizio");
+    return read ? { kind: "text", text: String(read.value?.message ?? "") } : { kind: "tool", name: "plantao_rodizio", input: {} };
+  }
+  if (/rod[íi]zio/.test(request) && /autom[áa]tico/.test(request)) {
+    const done = find("plantao_rodizio_ordenar");
+    return done ? { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." } : { kind: "tool", name: "plantao_rodizio_ordenar", input: { voltar_automatico: true } };
+  }
+  const first = request.match(/^p[õo]e (?:a |o )?(\S+) primeiro/);
+  const online = request.match(/^(?:a |o )?(\S+) vai fazer online/);
+  const invite = request.match(/aviso de presen[çc]a (?:pra|para) (?:a |o )?(\S+?)\??$/);
+  if (first || online || invite) {
+    const who = (first ?? online ?? invite)![1]!;
+    const people = find("pessoas_buscar");
+    if (!people) return { kind: "tool", name: "pessoas_buscar", input: { texto: who } };
+    const personId = ((people.value?.data as { pessoas?: Array<{ id: string }> } | undefined)?.pessoas ?? [])[0]?.id;
+    if (!personId) return { kind: "text", text: String(people.value?.message ?? "Não achei essa pessoa.") };
+    const tool = first ? "plantao_rodizio_ordenar" : online ? "plantao_modo_online" : "plantao_reenviar_convite";
+    const done = find(tool);
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    const input = first ? { primeiros: [personId] } : online ? { corretor_id: personId, online: true } : { corretor_id: personId };
+    return { kind: "tool", name: tool, input };
   }
 
   // A7 (falta) e A8 (liberar presença): o nome vem em lugares diferentes da frase.

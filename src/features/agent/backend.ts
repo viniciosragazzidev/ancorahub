@@ -30,6 +30,17 @@ export type DutyNow = {
   brokers: DutyNowBroker[];
 };
 
+/** Rodízio de um plantão em andamento: a ordem de quem recebe e quem está fora da vez. */
+export type DutyQueueOrder = {
+  scheduleId: string;
+  dutyDate: string;
+  scheduleName: string;
+  order: Array<{ id: string; name: string; position: number; isNext: boolean }>;
+  blocked: Array<{ id: string; name: string; reason: string }>;
+  /** true: o diretor já reordenou; false: ordem automática. */
+  manual: boolean;
+};
+
 export type AgentActionRecord = {
   toolCallId: string;
   tool: string;
@@ -59,6 +70,16 @@ export interface AgentBackend {
   removeSeat(occurrence: SeatOccurrence, brokerId: string): Promise<void>;
   /** Pausa ou retoma a pessoa só neste plantão (continua escalada). */
   pauseOnDuty(scheduleId: string, assignmentId: string, paused: boolean): Promise<void>;
+  /** Ordem do rodízio dos plantões em andamento. */
+  queueOrders(): Promise<DutyQueueOrder[]>;
+  /** Grava a ordem manual do rodízio da ocorrência em andamento. */
+  setQueueOrder(scheduleId: string, dutyDate: string, brokerIds: string[]): Promise<void>;
+  /** Volta o rodízio ao automático. */
+  resetQueueOrder(scheduleId: string, dutyDate: string): Promise<void>;
+  /** Marca a pessoa como online dentro de um plantão presencial (ou volta a seguir o plantão). */
+  setOnlineMode(scheduleId: string, assignmentId: string, online: boolean): Promise<void>;
+  /** Reenvia o convite de confirmação de presença por WhatsApp. */
+  sendPresenceInvite(scheduleId: string, assignmentId: string): Promise<{ delivered: boolean }>;
   /** Pausa ou retoma o recebimento geral de leads dos corretores. */
   setAvailability(brokerIds: string[], target: "available" | "paused"): Promise<void>;
   /** Grava a trilha em agent_actions; devolve o id ou null (tabela ausente, erro). Idempotente por toolCallId. */
