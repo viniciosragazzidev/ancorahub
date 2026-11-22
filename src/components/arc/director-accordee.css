@@ -141,10 +141,10 @@
   color: var(--foreground);
 }
 
-/* Densidade com mouse: sidebar de 216px, linhas de 32px (respiro pedido em 22/11/2026), ícones de 16px, texto de 13px. */
+/* Densidade com mouse: sidebar de 216px, linhas de 36px (respiro pedido em 22/11/2026), ícones de 16px, texto de 13px. */
 @media (hover: hover) and (pointer: fine) {
   [data-slot="sidebar-wrapper"]:has(> .arc-venancor[data-skin="diretor"] .director-sidebar) { --sidebar-width: 13.5rem !important; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] { gap: 12px; padding: 16px 8px 8px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] { gap: 16px; padding: 16px 12px 12px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div { gap: 8px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child {
     width: 28px; min-width: 28px; height: 28px; flex-basis: 28px; padding: 3px;
@@ -153,19 +153,19 @@
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img { width: 20px; height: 20px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > div > p:first-child { font-size: 13px; font-weight: 500; letter-spacing: normal; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > div > p + p { font-size: 12px; color: var(--text-muted); }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-content"] { padding: 8px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-content"] { padding: 8px 12px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [aria-label="Menu principal"] { gap: 4px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"] {
-    min-height: 32px; height: 32px; gap: 8px; padding: 6px 8px 6px 6px;
+    min-height: 36px; height: 36px; gap: 12px; padding: 8px 8px 8px 12px;
     font-size: 13px; line-height: 20px;
   }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"]:active { transform: none; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-label"] { font-size: 13px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-icon"] { width: 16px; min-width: 16px; height: 16px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-icon"] svg { width: 16px; height: 16px; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] { gap: 4px; padding: 8px 8px 12px; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] :is(button, a) { min-height: 32px; font-size: 13px; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] button[data-slot="tooltip-trigger"] { height: 32px; gap: 8px; padding: 0 8px 0 6px; font-weight: 400; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] { gap: 4px; padding: 12px 12px 16px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] :is(button, a) { min-height: 36px; font-size: 13px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] button[data-slot="tooltip-trigger"] { height: 36px; gap: 12px; padding: 0 8px 0 12px; font-weight: 400; }
   .arc-venancor[data-skin="diretor"] .director-sidebar :is(.director-agent-link, .director-duty-link) { min-height: 32px; height: 32px; gap: 8px; padding: 0 8px 0 6px; font-size: 13px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] { min-height: 32px; font-size: 13px; }
 }
@@ -295,3 +295,34 @@
 /* Recolhida: a Visão fica só no ícone, centrado como os itens do menu (antes sobrava "V…" cortado). */
 .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-shortcuts .director-role-switcher [data-slot="dropdown-menu-trigger"] { justify-content: center; padding: 0; }
 .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-shortcuts .director-role-switcher [data-slot="dropdown-menu-trigger"] > span.truncate { display: none; }
+
+/* Refino da sidebar (22/11/2026, 2ª rodada, pedido do Vinicios: "muito junto, confuso, pouco contraste").
+   - Itens comuns com texto em --foreground (antes Steel) e ícone em --text-secondary.
+   - Ativo no padrão do design system (Sidebar Nav Item): fundo Powder Blue (--accent-subtle) e texto/ícone em
+     --accent-strong, peso 500, no lugar do cinza quase igual ao fundo.
+   - Atalhos do topo com 40px, peso 500 e ícone na cor do texto: mais altos que o menu (36px) e dentro do cartão.
+   - Rodapé separado do menu por borda 1px Ash. */
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"] [data-slot="sidebar-nav-label"] { color: var(--foreground); }
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"] [data-slot="sidebar-nav-icon"] svg { color: var(--text-secondary); }
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"][aria-current="page"],
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"][aria-current="page"]:hover {
+  background: var(--accent-subtle);
+}
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"][aria-current="page"] :is([data-slot="sidebar-nav-label"], [data-slot="sidebar-nav-icon"]) { background: transparent; color: var(--accent-strong); }
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"][aria-current="page"] :is([data-slot="sidebar-nav-icon"] svg, svg) { color: var(--accent-strong); }
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-link"][aria-current="page"] [data-slot="sidebar-nav-label"] { font-weight: 500; }
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-footer"] { border-top: 1px solid var(--border); }
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) .director-shortcuts { gap: 2px; }
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) .director-shortcuts :is(.director-role-switcher [data-slot="dropdown-menu-trigger"], button[data-variant="sidebar"], .director-duty-link) {
+  color: var(--foreground);
+  font-weight: 500;
+}
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-shortcuts button[data-variant="sidebar"] strong,
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-shortcuts .director-duty-link > span:last-child { font-weight: 500; }
+@media (hover: hover) and (pointer: fine) {
+  .arc-venancor[data-skin="diretor"] .director-sidebar .director-shortcuts :is(.director-role-switcher [data-slot="dropdown-menu-trigger"], button[data-variant="sidebar"], .director-duty-link) {
+    height: 40px; min-height: 40px; gap: 12px; padding: 0 8px 0 12px;
+  }
+}
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > .director-shortcuts,
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] .director-shortcuts .director-super-admin-actions { gap: 2px; }
