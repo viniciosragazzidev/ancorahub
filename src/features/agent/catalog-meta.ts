@@ -224,6 +224,10 @@ export const AGENT_CATALOG = {
     name: "relatorio_plantao_enviar", title: "Enviar o relatório do plantão", doing: "Enviando o relatório…", topic: "plantoes",
     risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["D6"],
   },
+  agente_historico: {
+    name: "agente_historico", title: "O que o agente fez", doing: "Lendo o histórico…", topic: "sistema",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto",
+  },
   corretor_pausar: {
     name: "corretor_pausar", title: "Pausar recebimento", doing: "Mudando o recebimento de leads…", topic: "equipe",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: many("corretor_ids"), covers: ["A10"],

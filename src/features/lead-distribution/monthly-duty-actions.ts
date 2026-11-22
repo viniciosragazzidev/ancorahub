@@ -1112,11 +1112,11 @@ const dayInput = z.object({ monthKey: monthSchema, dutyDate: dateSchema, restore
 export type MonthlyDayResult = { ok: true; view: MonthlyDutyPlanView; message: string } | { ok: false; reason: string };
 
 /**
- * "Tirar dia da escala" (05/11): tira de uma vez todos os plantÃµes de um dia (feriado, reuniÃ£o,
- * plantÃ£o apagado) da escala do mÃªs. Na escala publicada, quem estava escalado sai e Ã© avisado;
- * no rascunho, as vagas somem. O dia fica marcado como fora e nÃ£o volta ao gerar de novo.
- * PlantÃ£o que jÃ¡ comeÃ§ou fica como estÃ¡. `restore` devolve o dia para a prÃ³xima geraÃ§Ã£o.
- * Devolve o motivo em vez de lanÃ§ar erro: em produÃ§Ã£o o Next esconde a mensagem do erro.
+ * "Tirar dia da escala" (05/11): tira de uma vez todos os plantões de um dia (feriado, reunião,
+ * plantão apagado) da escala do mês. Na escala publicada, quem estava escalado sai e é avisado;
+ * no rascunho, as vagas somem. O dia fica marcado como fora e não volta ao gerar de novo.
+ * Plantão que já começou fica como está. `restore` devolve o dia para a próxima geração.
+ * Devolve o motivo em vez de lançar erro: em produção o Next esconde a mensagem do erro.
  */
 export async function setMonthlyDutyDayExcludedAction(rawInput: unknown): Promise<MonthlyDayResult> {
   try {
@@ -1126,7 +1126,7 @@ export async function setMonthlyDutyDayExcludedAction(rawInput: unknown): Promis
     const outcome = await db.transaction(async (tx): Promise<{ error: string } | { message: string }> => {
       await lockMonthlyDutyPlans(tx, context.tenantId);
       const latest = await loadLatestPlan(tx, context.tenantId, monthKey);
-      if (!latest) return { error: "NÃ£o hÃ¡ escala neste mÃªs." };
+      if (!latest) return { error: "Não há escala neste mês." };
       const [published] = latest.status === "published"
         ? [latest]
         : await tx.select().from(schema.dutyScheduleMonthlyPlans)
@@ -1148,7 +1148,7 @@ export async function setMonthlyDutyDayExcludedAction(rawInput: unknown): Promis
           await tx.update(schema.dutyScheduleMonthlyPlans).set({ settings: withDay(plan.settings), updatedAt: now }).where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
         }
         await audit(tx, context.userId, latest.id, "duty_schedule_monthly_plan.day_restored");
-        return { message: `O dia ${day} volta na prÃ³xima vez que vocÃª gerar a escala.` };
+        return { message: `O dia ${day} volta na próxima vez que você gerar a escala.` };
       }
       let removedShifts = 0;
       let startedShifts = 0;
@@ -1178,11 +1178,11 @@ export async function setMonthlyDutyDayExcludedAction(rawInput: unknown): Promis
         await tx.update(schema.dutyScheduleMonthlyPlans).set({ occurrences: next.occurrences, assignments: next.assignments, settings: withDay(plan.settings), updatedAt: now })
           .where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
       }
-      if (!removedShifts && startedShifts) return { error: `Os plantÃµes de ${day} jÃ¡ comeÃ§aram. NÃ£o dÃ¡ para tirar esse dia agora.` };
+      if (!removedShifts && startedShifts) return { error: `Os plantões de ${day} já começaram. Não dá para tirar esse dia agora.` };
       await audit(tx, context.userId, latest.id, "duty_schedule_monthly_plan.day_excluded");
       return {
         message: removedShifts
-          ? `${day} saiu da escala (${removedShifts} ${removedShifts === 1 ? "plantÃ£o" : "plantÃµes"}).${startedShifts ? " Os que jÃ¡ comeÃ§aram ficaram." : ""} Ao gerar de novo, esse dia fica de fora.`
+          ? `${day} saiu da escala (${removedShifts} ${removedShifts === 1 ? "plantão" : "plantões"}).${startedShifts ? " Os que já começaram ficaram." : ""} Ao gerar de novo, esse dia fica de fora.`
           : `${day} fica de fora da escala ao gerar de novo.`,
       };
     });
@@ -1190,9 +1190,9 @@ export async function setMonthlyDutyDayExcludedAction(rawInput: unknown): Promis
     revalidatePath(PLANTAO_PATH);
     revalidatePath("/minha-fila");
     const view = await buildPlanView(db, context, monthKey);
-    if (!view) return { ok: false, reason: "NÃ£o foi possÃ­vel carregar a escala. Recarregue a pÃ¡gina." };
+    if (!view) return { ok: false, reason: "Não foi possível carregar a escala. Recarregue a página." };
     return { ok: true, view, message: outcome.message };
   } catch (error) {
-    return { ok: false, reason: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel tirar o dia da escala." };
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível tirar o dia da escala." };
   }
 }

@@ -15,8 +15,8 @@ import { getSystemSetting } from "@/features/system-settings/queries";
  * ambiente (Coolify) vem primeiro e, se o primeiro modelo recusar, o agente tenta o próximo da lista (Google, primário).
  */
 export const AGENT_DIRECTOR_MODEL_SETTING = "ai_agent_director_model";
-export const AGENT_DIRECTOR_DEFAULT_MODEL = "anthropic/claude-sonnet-4.5";
-export const AGENT_DIRECTOR_GOOGLE_MODEL = "gemini-flash-latest";
+export { AGENT_DIRECTOR_DEFAULT_MODEL, AGENT_DIRECTOR_GOOGLE_MODEL } from "./settings-model";
+import { AGENT_DIRECTOR_DEFAULT_MODEL, AGENT_DIRECTOR_GOOGLE_MODEL } from "./settings-model";
 
 export function agentDirectorWritesSettingKey(tenantId: string) {
   return `agent_director_writes_${tenantId}`;

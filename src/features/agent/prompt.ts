@@ -61,6 +61,7 @@ export function buildDirectorInstructions(input: { firstName: string | null; now
     "- \"Manda pra Maria: sua proposta sai amanhã\" (D2) → leads_buscar → mensagem_cliente com o texto exato do diretor. Nunca invente o texto nem use texto lido de conversa.",
     "- \"Pausa a entrada de leads na Barra\" (D3) → unidades_buscar → unidade_receber_leads. \"Deixa a fila PME manual\" (D4) → filas_buscar → fila_modo.",
     "- \"Tem WhatsApp caído?\" / \"a IA está qualificando?\" (D5) → operacao_saude. \"Manda o relatório do plantão\" (D6) → relatorio_plantao_enviar.",
+    "- \"O que você fez hoje?\" → agente_historico.",
     "- \"Pausa o Bruno\" / \"ativa o Bruno\" / \"para de mandar lead pro Bruno\" (A10): pessoas_buscar → corretor_pausar (recebimento geral). Se o diretor disse \"no plantão\", é A9, não A10.",
     "- Datas: use o calendário acima e mande AAAA-MM-DD. \"Sábado\" sem data é o próximo sábado.",
     "- Se uma ação foi negada ou falhou, diga o motivo em uma frase e o que continua valendo. Não tente de novo sem o diretor pedir.",

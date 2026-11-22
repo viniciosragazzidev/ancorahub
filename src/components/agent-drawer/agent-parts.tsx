@@ -160,6 +160,10 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "aviso_inicio" ? (input.desligar ? "Tirar o aviso do Início?" : `Publicar no Início: "${String(input.titulo ?? "")}"?`)
     : name === "escala_mensal_publicar" ? `Publicar a ${seatLabels.get(String(input.plano_id)) ?? "escala do mês"}?`
     : name === "escala_tirar_dia" ? (input.voltar ? `Devolver o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} à escala?` : `Tirar o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} da escala?`) : null;
+  // Falta, presença e convite: o plantão sai do cartão quando o agente já leu os plantões; senão, a regra.
+  const dutyNote = name === "plantao_marcar_falta" || name === "plantao_liberar_presenca" || name === "plantao_reenviar_convite"
+    ? (typeof input.plantao_id === "string" && seatLabels.get(input.plantao_id) ? `Plantão: ${seatLabels.get(input.plantao_id)}.` : "No plantão de agora (ou no próximo, em até 24 h).")
+    : null;
   const strongNote = name === "mensagem_cliente" ? `"${String(input.texto ?? "")}" — vai pelo WhatsApp da empresa para o cliente e não dá para desfazer.`
     : name === "conversa_devolver_ia" ? "A IA volta a responder o cliente."
     : name === "fila_modo" && input.modo === "automatic" ? "Os leads que esperam nessa fila entram na distribuição agora."
@@ -206,6 +210,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
           {ids.length > 8 ? <li>e mais {ids.length - 8}</li> : null}
         </ul>
       ) : null}
+      {dutyNote ? <p className="director-agent-card-note">{dutyNote}</p> : null}
       {noUndoNote ? <p className="director-agent-card-note">{noUndoNote}</p> : null}
       {entry?.risk.notifies && !strongNote ? <p className="director-agent-card-note">{swapLines ? "As duas pessoas recebem aviso no app." : "A pessoa recebe aviso no app."}</p> : null}
       <div className="director-agent-card-actions">

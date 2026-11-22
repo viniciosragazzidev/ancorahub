@@ -202,7 +202,12 @@ export function buildAgentTools(env: ToolEnv) {
           const short = duty.brokers.length < duty.minimumBrokers ? ` Abaixo do mínimo de ${duty.minimumBrokers}.` : "";
           return `${duty.scheduleName} (${hhmm(duty.startsAt)}–${hhmm(duty.endsAt)}): ${people}.${short}`;
         });
-        return { ok: true, message: lines.join("\n"), data: { plantoes: duties }, href: "/plantoes" };
+        return {
+          ok: true,
+          message: lines.join("\n"),
+          data: { plantoes: duties, rotulos: duties.map((duty) => ({ id: duty.scheduleId, rotulo: `${duty.scheduleName} (${hhmm(duty.startsAt)}–${hhmm(duty.endsAt)})` })) },
+          href: "/plantoes",
+        };
       },
     }),
 
@@ -1336,6 +1341,20 @@ export function buildAgentTools(env: ToolEnv) {
         const message = await backend.sendPlantaoReport();
         return { ok: true, message, href: "/settings/resultado-plantao" };
       }),
+    }),
+
+    agente_historico: tool({
+      description: "O que o agente fez a seu pedido (\"o que você fez hoje?\", \"o que mudou na escala pelo agente?\"). dias = quantos dias para trás (padrão: hoje).",
+      inputSchema: z.object({ dias: z.number().int().min(1).max(30).optional() }),
+      execute: async ({ dias }): Promise<ToolResult> => {
+        const days = dias ?? 1;
+        const since = new Date(Date.parse(`${addDays(spDateKey(backend.now()), -(days - 1))}T00:00:00-03:00`));
+        const actions = await backend.recentActions(since);
+        if (!actions.length) return { ok: true, message: days === 1 ? "Hoje eu ainda não fiz nenhuma ação a seu pedido." : `Nenhuma ação minha nos últimos ${days} dias.` };
+        const hour = (iso: string) => new Date(Date.parse(iso) - SP_OFFSET_MS).toISOString().slice(11, 16);
+        const lines = actions.slice(0, 20).map((action) => `• ${days === 1 ? hour(action.createdAt) : `${dayLabel(new Date(Date.parse(action.createdAt) - SP_OFFSET_MS).toISOString().slice(0, 10))} ${hour(action.createdAt)}`} ${action.status === "failed" ? "(não deu) " : ""}${action.undone ? "(desfeita) " : ""}${action.message.split("\n")[0]}`);
+        return { ok: true, message: `${actions.length} ${actions.length === 1 ? "ação" : "ações"}:\n${lines.join("\n")}${actions.length > 20 ? "\n…" : ""}` };
+      },
     }),
 
     corretor_pausar: tool({

@@ -17,6 +17,7 @@ import {
   Sparkles,
   ChevronDown,
   RotateCcw,
+  History,
   Bot,
   User,
 } from "lucide-react";
@@ -161,10 +162,15 @@ export function AgentDrawer() {
                   </Button>
                 }
               />
-              <DropdownMenuContent align="start" className="w-44 text-xs">
+              <DropdownMenuContent align="start" className="w-56 text-xs">
                 <DropdownMenuItem onClick={handleNewChat} className="gap-2 cursor-pointer font-medium">
                   <RotateCcw className="size-3.5" />
                   <span>Nova conversa</span>
+                </DropdownMenuItem>
+                {/* Histórico das ações do agente (plano §4.11). */}
+                <DropdownMenuItem onClick={() => { if (!isLoading) sendMessage({ text: "O que você fez hoje?" }); }} className="gap-2 cursor-pointer font-medium">
+                  <History className="size-3.5" />
+                  <span>O que o agente fez hoje</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

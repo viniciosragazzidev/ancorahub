@@ -391,6 +391,9 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
       actions.push({ ...entry, id });
       return id;
     },
+    async recentActions() {
+      return [...actions].reverse().map((action) => ({ tool: action.tool, status: action.status, message: action.message, createdAt: world.now.toISOString(), undone: Boolean(action.undone) }));
+    },
     async recorded(toolCallId) {
       const found = actions.find((action) => action.toolCallId === toolCallId);
       return found ? { id: found.id, message: found.message, status: found.status } : null;

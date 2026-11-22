@@ -657,6 +657,19 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
       }
     },
 
+    async recentActions(since) {
+      try {
+        const rows = await db.select({ tool: schema.agentActions.tool, status: schema.agentActions.status, message: schema.agentActions.message, createdAt: schema.agentActions.createdAt, undoneAt: schema.agentActions.undoneAt })
+          .from(schema.agentActions)
+          .where(and(eq(schema.agentActions.tenantId, context.tenantId), eq(schema.agentActions.userId, context.userId), gt(schema.agentActions.createdAt, since)))
+          .orderBy(desc(schema.agentActions.createdAt))
+          .limit(50);
+        return rows.map((row) => ({ tool: row.tool, status: row.status, message: row.message, createdAt: row.createdAt.toISOString(), undone: Boolean(row.undoneAt) || row.status === "undone" }));
+      } catch {
+        return [];
+      }
+    },
+
     async recorded(toolCallId) {
       try {
         const [row] = await db.select({ id: schema.agentActions.id, message: schema.agentActions.message, status: schema.agentActions.status })

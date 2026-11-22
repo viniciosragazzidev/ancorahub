@@ -158,6 +158,8 @@ export interface AgentBackend {
   sendPlantaoReport(): Promise<string>;
   /** Pausa ou retoma o recebimento geral de leads dos corretores. */
   setAvailability(brokerIds: string[], target: "available" | "paused"): Promise<void>;
+  /** O que o agente fez para este diretor desde uma data (mais recente primeiro). */
+  recentActions(since: Date): Promise<Array<{ tool: string; status: string; message: string; createdAt: string; undone: boolean }>>;
   /** Grava a trilha em agent_actions; devolve o id ou null (tabela ausente, erro). Idempotente por toolCallId. */
   record(entry: AgentActionRecord): Promise<string | null>;
   /** Resultado já gravado deste toolCallId (reenvio não executa duas vezes). */
