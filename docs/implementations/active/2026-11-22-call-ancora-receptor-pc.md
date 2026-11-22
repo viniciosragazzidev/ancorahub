@@ -1,76 +1,104 @@
-# Call Âncora: celular como receptor do computador
+# Call Âncora: celular como receptor do computador, por cabo
 
-Estudo de viabilidade e plano, 22/11/2026. Ainda sem código. Continua o plano `2026-11-19-call-ancora.md` (discador próprio, só o plano do chip, sem VoIP).
+Estudo de viabilidade e plano, 22/11/2026. Ainda sem código. Continua o plano `2026-11-19-call-ancora.md`: discador próprio, só o plano do chip, sem VoIP.
+
+Decisão do dono (22/11/2026): **a ligação entre o celular e o computador é por cabo.** Os computadores da Âncora não têm Bluetooth.
 
 ## 1. O pedido
 
-O celular Android da Âncora fica escondido atrás do computador, ligado a ele. O corretor usa um fone com microfone no computador:
+O celular Android da Âncora fica escondido atrás do computador, ligado a ele por cabo. O corretor usa um fone com microfone no computador:
 
 - ouve no fone do computador o áudio da ligação feita pelo chip do celular;
-- fala no microfone do computador e a voz vai para a ligação, ao mesmo tempo, como num VoIP;
+- fala no microfone do computador e a voz vai para a ligação, nos dois sentidos ao mesmo tempo, como num VoIP;
 - para ele, tudo acontece no CRM do computador: iniciar, atender, ver o estado e desligar.
 
-As duas formas continuam valendo: **fone no celular** (como hoje) ou **fone no computador** (novo), com troca pelo CRM.
+As duas formas continuam valendo: **fone no celular** (como hoje) ou **fone no computador** (novo).
 
 ## 2. O limite do Android que decide tudo
 
-Desde o Android 10, nenhum app comum consegue **ler** o áudio da ligação de operadora (`VOICE_CALL`, `VOICE_DOWNLINK`, `VOICE_UPLINK` exigem `CAPTURE_AUDIO_OUTPUT`, que é só de app de sistema). E **nenhum** app, nem de sistema, tem API pública para **injetar** áudio na voz que sai para o cliente: o que vai para a ligação é o que o modem recebe da rota de áudio ativa (microfone do aparelho, fone com fio, fone USB ou fone Bluetooth).
+Desde o Android 10, nenhum app comum consegue **ler** o áudio de uma ligação de operadora (`VOICE_CALL`, `VOICE_DOWNLINK` e `VOICE_UPLINK` exigem `CAPTURE_AUDIO_OUTPUT`, que só app de sistema tem). E **nenhum** app, nem de sistema, tem API pública para **colocar** áudio na voz que vai para o cliente. O que vai para a ligação é o que o modem recebe da rota de áudio ativa: o microfone do aparelho, o fone com fio, um fone USB ou um fone Bluetooth.
 
-Ser o discador padrão (o que o app já é) não muda isso: dá controle da ligação e da **rota** de áudio, não do áudio em si.
+Ser o discador padrão, o que o app já é, não muda isso. Dá controle sobre a ligação e sobre **para onde** o áudio vai, mas não sobre o áudio em si.
 
-Conclusão: a ponte não pode ser "o app pega o som e manda pela rede". Ela precisa fazer o computador **parecer um fone** para o celular, e o próprio Android leva a ligação até ele.
+Conclusão: o app não pode "pegar o som e mandar pelo cabo USB como dados". O computador precisa **parecer um fone com fio** para o celular, e o próprio Android leva a ligação até ele.
 
-## 3. Caminhos avaliados
+## 3. Caminhos por cabo avaliados
 
 | Caminho | Funciona? | Por quê |
 |---|---|---|
-| **Bluetooth HFP: o computador vira o "fone Bluetooth" do celular** (recomendado) | Sim, nos dois sentidos | É o mesmo mecanismo de um fone Bluetooth ou do som do carro. O Android manda a ligação pelo canal de voz Bluetooth (SCO) e recebe o microfone por ele. O Windows 11 já faz o papel de fone via **Vincular ao Celular (Phone Link)**, que exige Bluetooth com HFP no computador. O nosso app, como discador padrão, escolhe a rota (`ROUTE_BLUETOOTH` ou fone/aparelho). |
-| USB com placa de som USB-C + cabos de áudio até o computador | Sim, mas com gambiarra de hardware | O celular trata a placa como fone USB e manda a ligação para ela; dois cabos P2 levam o som à entrada de linha do computador e trazem o microfone de volta. Exige comprar placa e cabos, computador com entrada de linha, programa no Windows para mandar o microfone do fone para a saída do cabo, ajuste de volume (ruído e eco) e ocupa a porta de carga do celular. Fica como plano B. |
-| USB "acessório de áudio" do Android (AOA 2.0) | Não | Removido no Android 8. |
-| ADB pelo cabo (ex.: scrcpy com `voice-call-downlink`) | Só metade | Como o ADB roda com mais permissão, alguns aparelhos deixam **ouvir** a ligação no computador. Mas a voz do computador não chega ao cliente: não existe injeção no uplink. Também exige depuração USB ligada sempre. Descartado. |
-| Wi-Fi / WebRTC entre o app e o CRM no navegador | Não | Depende de o app capturar e injetar o áudio da ligação, o que o Android bloqueia (seção 2). Só com root ou app de sistema assinado pelo fabricante, fora de cogitação num aparelho corporativo comum. |
-| Caixinha Linux (Raspberry Pi) fazendo o papel de fone Bluetooth e repassando por WebRTC ao navegador | Sim, mas é compra e manutenção | Plano C, só se o Bluetooth do Windows falhar e o plano B não servir. |
-| VoIP / tronco SIP / gateway GSM | Fora | Já descartados pelo dono: custo por minuto ou equipamento e bloqueio de chip. |
+| **Cabo de áudio: a saída de fone do celular ligada às entradas e saídas de som do computador** (recomendado) | Sim, nos dois sentidos | O celular acha que tem um fone com microfone plugado e manda a ligação para ele, com o cancelamento de eco do próprio celular. O cabo leva o som do cliente até a entrada do computador, e a voz do corretor sai do computador e entra no "microfone" do celular. Não depende de app nem de permissão: é o mesmo caminho de um fone com fio. |
+| Cabo USB de dados com ADB (ex.: scrcpy com `voice-call-downlink`) | Só metade | Como o ADB roda com mais permissão, alguns aparelhos deixam **ouvir** a ligação no computador pelo USB. Mas a voz do computador não chega ao cliente, porque não existe como colocar áudio na ligação (seção 2). Também exige depuração USB ligada sempre. Descartado. |
+| Celular como "placa de som USB" do computador (modo acessório de áudio, AOA 2.0) | Não | O Android removeu esse modo na versão 8. |
+| Rede pelo cabo USB (ancoragem) e WebRTC entre o app e o CRM | Não | Esbarra no mesmo bloqueio: o app não lê nem coloca áudio na ligação. |
+| Adaptador Bluetooth USB no computador | Funcionaria | Fora pelo pedido do dono: a conexão é por cabo. Fica registrado como alternativa se o cabo der problema. |
+| VoIP, tronco SIP ou gateway GSM | Fora | Já descartados: custo por minuto ou compra de equipamento e bloqueio de chip. |
 
 ## 4. Arquitetura escolhida
 
 ```
- Fone com microfone ── Computador (Windows 11)                 Celular Android da Âncora (atrás do PC)
-                       │  Phone Link = "fone Bluetooth"  ◄── Bluetooth HFP (voz) ──►  App Call Âncora (discador padrão)
-                       │  Navegador: CRM /call-ancora                                   │  escolhe a rota: computador / celular
-                       │                                                                │  liga, atende, desliga, mudo
-                       └──────── HTTPS ──► AncoraHub (Coolify) ◄── HTTPS (já existe) ───┘
-                                           sessão, fila, comandos e estado
-                       Cabo USB do computador ao celular: só para carregar.
+                 COMPUTADOR (Windows)                                   CELULAR (atrás do computador)
+  Fone do corretor ── placa de som 1                                    App Call Âncora (discador padrão)
+  (USB ou P2)          │                                                 │
+                       │  Windows "Escutar este dispositivo"             │
+                       ├─ som do cliente: entrada (placa 2) → fone 1     │
+                       └─ voz do corretor: microfone 1 → saída (placa 2) │
+                                     placa de som 2  ◄── cabos de áudio ──►  entrada de fone do celular
+                                                                            (P2 do aparelho, ou adaptador USB-C
+                                                                             de áudio com carga)
+  Navegador: CRM /call-ancora ── HTTPS ──► AncoraHub (Coolify) ◄── HTTPS (já existe) ── App
+                                            sessão, fila, comandos e estado
 ```
 
-- **Voz:** só pelo Bluetooth, direto entre celular e Windows. O navegador e o servidor nunca tocam no áudio. Sem gravação, como já combinado.
-- **Comandos e estado:** pelo canal que já existe (`/api/call-ancora/device/*`). A web manda o comando para o servidor, o celular lê na próxima consulta (hoje a cada 1 s com ligação) e responde com o estado.
-- **Troca de saída:** o CRM tem "Ouvir no: Computador | Celular". O app aplica com `setAudioRoute` (até Android 13) ou `requestCallEndpointChange` (Android 14+), que o discador padrão pode usar. Com fone ligado no celular, a rota "Celular" usa o fone com fio; sem ele, o próprio aparelho.
-- **Queda do Bluetooth no meio da ligação:** o Android volta sozinho para o celular. O app avisa o CRM, que mostra "Fone do computador desconectado: a ligação foi para o celular", com "Tentar de novo".
+### Como o som anda
 
-### O que o computador precisa
+1. **Cliente → corretor:** o celular manda o som da ligação para a "saída de fone". O cabo leva à **entrada** (microfone ou linha) de uma placa de som do computador. O Windows repassa essa entrada para o fone do corretor com o recurso nativo **"Escutar este dispositivo"** (Propriedades do microfone > Escutar), sem instalar nada.
+2. **Corretor → cliente:** o microfone do fone do corretor é repassado, também por "Escutar este dispositivo", para a **saída** dessa mesma placa ligada ao celular. O cabo leva ao "microfone" do celular, que manda para a ligação.
 
-- Windows 11 com Bluetooth que tenha **"Telefonia mãos-livres"** (Hands-Free) no Gerenciador de Dispositivos. Notebooks quase sempre têm; desktop sem Bluetooth precisa de um adaptador USB que suporte HFP (alguns só fazem áudio estéreo e não servem). É a única compra possível, pequena e única.
-- **Phone Link** (já vem no Windows) pareado com o celular, com as chamadas ativadas. Ele exige Android 10 ou mais novo e o app "Vincular ao Windows" no celular. Gratuito, mas pede conta Microsoft. As janelas de chamada dele ficam escondidas; a tela de uso é o CRM.
-- O fone do corretor como **dispositivo de comunicação padrão** do Windows.
-- Cabo USB só de carga, e o celular sem otimização de bateria para o app (já é serviço em primeiro plano durante a ligação).
+Para isso o computador precisa de **duas saídas de som separadas**: uma ligada ao celular e outra para o fone do corretor. O jeito simples:
 
-### Permissões novas no app
+- as entradas P2 da própria placa-mãe (rosa = microfone, verde = saída) ficam ligadas ao celular;
+- o corretor usa um **fone USB**, ou um fone P2 ligado a uma **placa de som USB** simples.
 
-- `BLUETOOTH_CONNECT` (Android 12+), pedida no checklist "Preparar o celular" como novo item: **"Computador conectado por Bluetooth"**.
-- Nada de permissão especial, root ou app de sistema.
+O navegador e o servidor nunca tocam no áudio. Sem gravação, como já combinado.
+
+### O cabo no lado do celular
+
+- **Celular com entrada P2 de fone:** um cabo "divisor de fone" (P2 de 4 polos para dois P2, microfone e fone) liga direto às duas entradas do computador. A porta USB fica livre para carregar.
+- **Celular só com USB-C:** um **adaptador USB-C de áudio com carga** (saída P2 com microfone + entrada de carga) e o mesmo divisor. Sem a passagem de carga, o celular não carrega enquanto estiver ligado ao computador.
+
+### Ajustes que precisam ser feitos uma vez
+
+- **Volume:** a saída de som do computador é forte demais para um microfone de celular. Deixar o volume dessa saída baixo ou usar um cabo atenuador; o teste da fase 0 acha o nível certo.
+- **O celular reconhecer o microfone:** o celular só usa o "microfone" do cabo se detectar um fone **com microfone**. Uma saída de computador ligada direto pode ser vista como "fone sem microfone", e aí o celular volta para o microfone dele. Se isso acontecer, entra um atenuador com resistor no lugar do microfone (peça barata). **É o principal ponto a validar na fase 0.**
+- **Zumbido:** carregar o celular pela USB do próprio computador enquanto o áudio também vai ao computador pode gerar zumbido (laço de terra). Se aparecer, carregar o celular por um carregador de tomada ou usar um isolador de terra P2.
+- **Windows:** desligar os "aprimoramentos" de som e a redução automática de volume em comunicações nas duas placas.
+
+### O que precisa comprar (uma vez, por estação, sem contrato)
+
+- Cabo divisor de fone P2 (4 polos para 2) e um cabo P2–P2, ou dois.
+- Se o celular não tiver P2: adaptador USB-C de áudio com carga.
+- Se o corretor não tiver fone USB: uma placa de som USB simples.
+- Se precisar: atenuador ou isolador de terra P2.
+
+### Trocar entre "fone no computador" e "fone no celular"
+
+Com um fone com fio plugado, o Android **sempre** usa esse fone: não deixa escolher o alto-falante de ouvido do aparelho por software. Na prática:
+
+- **Fone no computador:** cabo ligado. É o modo padrão da estação.
+- **Fone no celular:** tirar o cabo e plugar o fone no celular. O app percebe a troca e avisa o CRM ("Áudio no celular").
+- **Viva-voz do celular:** pode ser escolhido pelo CRM a qualquer hora, como plano de emergência.
+
+O CRM mostra onde o áudio está, mas a troca entre computador e fone do celular é física (trocar o cabo pelo fone).
 
 ## 5. Integração com o CRM
 
-1. **Estado do áudio** no estado do celular que o CRM já lê: rota atual (`computador`, `celular`, `fone no celular`, `viva-voz`), se o computador está conectado e se está no mudo.
-2. **Comandos novos** em `control`: `route_computer`, `route_phone`, `mute`, `unmute`, `hangup`, `answer`. Hoje a rota aceita `pause`, `resume`, `skip`, `end`.
-3. **Tela `/call-ancora`** (no padrão Lite e na densidade enxuta): no cartão da ligação ativa, um seletor compacto "Ouvir no ▾ Computador / Celular", o botão de mudo e o Desligar que já existe. Selo discreto "Fone do computador conectado" ou o aviso quando cair. Troca de saída é feedback nível 1 (visual, sem som).
-4. **Preferência por corretor:** a escolha fica guardada e vale para as próximas ligações. Padrão: computador, quando estiver conectado.
-5. **Ligação recebida** (o cliente retornando para o chip): o CRM mostra "Chamada recebida" com Atender e Recusar. Para não esperar a consulta de 1 s, o celular manda o evento de tocando na hora e o CRM passa a consultar mais rápido enquanto houver chamada tocando.
-6. **Tudo que hoje é só no celular** (Pausar, "Segure para encerrar", checklist) precisa ter equivalente no CRM ou ficar resolvido na instalação, porque ninguém vai tocar no aparelho.
-7. **Laboratório** (`/dev/laboratorio`): o roteiro simulado ganha a troca de saída e a queda do Bluetooth.
-8. **Painel do diretor:** por estação, "Áudio no computador" ou "no celular" e o último aviso de queda.
+1. **Estado do áudio** no estado do celular que o CRM já lê: rota atual (`computador` = fone com fio detectado, `viva-voz`, `celular`) e se está no mudo.
+2. **Comandos novos** na rota `control`: `speaker_on`, `speaker_off`, `mute`, `unmute`, `hangup` e `answer`. Hoje ela aceita `pause`, `resume`, `skip` e `end`. O app aplica com `setAudioRoute` até o Android 13 e `requestCallEndpointChange` no 14 ou mais novo, ambos permitidos ao discador padrão.
+3. **Tela `/call-ancora`** (padrão Lite e densidade enxuta): no cartão da ligação ativa, um selo "Áudio no computador" ou "no celular", o botão de mudo e o Desligar que já existe. O viva-voz fica no menu `⋯`. Se o cabo sair no meio da ligação: "O cabo do computador saiu: a ligação foi para o celular". Troca de saída é feedback nível 1 (visual, sem som).
+4. **Ligação recebida** (o cliente retornando para o chip): o CRM mostra "Chamada recebida" com Atender e Recusar. O celular manda o evento de tocando na hora e o CRM consulta mais rápido enquanto houver chamada tocando, para o Atender não ficar atrasado com a consulta de 1 s.
+5. **O que hoje só existe no celular** (Pausar, "Segure para encerrar", checklist) precisa ter equivalente no CRM ou ficar resolvido na instalação, porque ninguém vai tocar no aparelho.
+6. **Laboratório** (`/dev/laboratorio`): o roteiro simulado ganha o selo de áudio, o mudo e o cabo saindo no meio da ligação.
+7. **Painel do diretor:** por estação, "Áudio no computador" ou "no celular".
 
 ## 5A. "Celular Call Âncora": o app vira a cara do aparelho
 
@@ -78,65 +106,66 @@ Pedido do dono (22/11/2026): ao abrir, o app ocupa o celular e impede, ou pelo m
 
 | Nível | O que trava | O que exige |
 |---|---|---|
-| **1. Launcher (tela inicial)** | O botão Início sempre volta para o Call Âncora; não há gaveta de apps | Só declarar o app como `HOME` e escolhê-lo como tela inicial. Fácil de desfazer: a barra de notificações e os Ajustes continuam abertos. |
-| **2. Fixar tela (screen pinning)** | Início e Recentes ficam travados até o gesto de desafixar | Recurso comum do Android. Quem conhece o gesto sai (pode pedir PIN para sair, mas ainda sai). |
-| **3. Modo quiosque com o app como Device Owner** (recomendado) | Barra de status, notificações, Início, Recentes e Ajustes bloqueados; só os apps da lista abrem; sem desinstalar, sem instalar outros, sem redefinir de fábrica pelo menu | O app vira "dono do dispositivo" (`DevicePolicyManager`, `startLockTask` com lista de apps permitidos). Gratuito, sem MDM pago. Exige **celular zerado e sem conta Google** na hora de ativar, por um comando ADB feito uma vez pelo computador (`dpm set-device-owner`). |
+| **1. Launcher (tela inicial)** | O botão Início sempre volta para o Call Âncora; não há gaveta de apps | Declarar o app como `HOME` e escolhê-lo como tela inicial. Fácil de desfazer: a barra de notificações e os Ajustes continuam abertos. |
+| **2. Fixar tela** | Início e Recentes ficam travados até o gesto de desafixar | Recurso comum do Android. Quem conhece o gesto sai (pode pedir PIN, mas sai). |
+| **3. Modo quiosque com o app como dono do dispositivo (Device Owner)** (recomendado) | Barra de status, notificações, Início, Recentes e Ajustes bloqueados; só os apps da lista abrem; sem desinstalar, sem instalar outros, sem redefinir de fábrica pelo menu | O app vira "dono do dispositivo" (`DevicePolicyManager`, `startLockTask` com lista de apps permitidos). Gratuito, sem MDM pago. Exige **celular zerado e sem conta Google** na hora de ativar, com um comando ADB feito uma vez pelo cabo USB (`dpm set-device-owner`). |
 
-Recomendado: **nível 3**, porque o aparelho é da Âncora e dedicado. Ganhos extras do Device Owner, úteis para o celular escondido:
+Recomendado: **nível 3**, porque o aparelho é da Âncora e dedicado. Ganhos extras para o celular escondido:
 
-- conceder sozinho as permissões do checklist (ligar, estado do telefone, notificação, Bluetooth), sem ninguém tocar na tela;
+- conceder sozinho as permissões do checklist (ligar, estado do telefone, notificação), sem ninguém tocar na tela;
 - tela sem bloqueio e sempre acesa enquanto carrega (`setKeyguardDisabled`, `STAY_ON_WHILE_PLUGGED_IN`);
-- Bluetooth sempre ligado e o app sempre aberto depois de reiniciar;
+- o app abre sozinho depois de reiniciar;
 - bloquear instalar apps, depuração USB, redefinição pelo menu e troca de discador padrão.
 
-Saída de emergência: no app, "Sair do modo Call Âncora" só com PIN do diretor (ou comando do CRM pelo diretor), para manutenção. Desfazer de vez = o próprio app remover o Device Owner, ou redefinir de fábrica.
+Saída de emergência: no app, "Sair do modo Call Âncora" só com PIN do diretor (ou comando do diretor pelo CRM), para manutenção. Desfazer de vez: o próprio app remove o modo dono, ou redefinir de fábrica.
 
 Cuidados:
-- O "Vincular ao Windows" (lado celular do Phone Link) entra na lista de apps permitidos; a conta Microsoft é configurada antes de travar.
-- Ativar o Device Owner apaga nada se o celular já estiver zerado, mas **não** funciona num celular já em uso com conta: precisa zerar antes. Atualizar o APK depois passa a ser pelo próprio app (baixando do AncoraHub) ou por ADB.
+- O modo dono **não** ativa num celular já em uso com conta: precisa zerar antes. Fazer isso na entrega do aparelho.
+- Atualizar o app depois passa a ser pelo próprio app (baixando do AncoraHub) ou por ADB pelo cabo.
 - Alguns fabricantes (Samsung, Xiaomi) têm telas próprias que escapam do quiosque em versões antigas; testar no modelo escolhido.
 
 ## 6. Riscos
 
 | Risco | Efeito | Como tratar |
 |---|---|---|
-| Phone Link e Bluetooth do Windows instáveis | Áudio cai ou não conecta | Fase 0 testa no computador real antes de qualquer código. Queda volta sozinha para o celular e o CRM avisa. |
-| Adaptador sem HFP | Só som estéreo, sem microfone | Conferir "Telefonia mãos-livres" no Gerenciador; lista de adaptadores aprovados. |
-| Qualidade do Bluetooth | CVSD em 8 kHz soa como telefone antigo; mSBC (16 kHz) soa como a ligação normal | Testar se o par celular + computador negocia mSBC. Mesmo em 8 kHz o cliente ouve normal: o limite é a própria ligação. |
-| Latência | Bluetooth soma algo como 30 a 60 ms em cada sentido sobre a ligação celular | Fica perto de um fone Bluetooth comum; medir na fase 0. |
-| Eco | O cliente ouve a própria voz | Com fone fechado, o eco é mínimo. Desligar no Windows a redução de volume em comunicação e os "aprimoramentos" do fone se atrapalharem. Viva-voz no computador fica fora. |
-| Phone Link mostrando a própria janela de chamada ou puxando chamadas que não são do Call Âncora | Confusão para o corretor | Ocultar as notificações dele; o celular é só do Call Âncora. |
-| Interferência com várias estações na mesma sala | Áudio picotado | Um par celular e computador por estação, pareamentos sem cruzar; testar com duas estações antes de escalar. |
+| Celular não reconhece o cabo como fone **com microfone** | O cliente ouve o microfone do celular, não o corretor | Fase 0 testa antes de qualquer código; se falhar, atenuador com resistor. |
+| Volume alto demais na entrada do celular | Voz estourada para o cliente | Volume baixo na saída do computador ou cabo atenuador; nível anotado no guia. |
+| Zumbido por laço de terra | Chiado na ligação | Carregar por tomada ou isolador de terra P2. |
+| Celular só USB-C sem adaptador com carga | Bateria acaba durante o dia | Comprar adaptador com passagem de carga. |
+| Eco | O cliente ouve a própria voz | O cancelamento de eco do celular trata a "saída de fone". Fone fechado do lado do corretor; desligar aprimoramentos e redução de volume no Windows. |
+| Latência | Atraso perceptível na conversa | Cabo analógico não soma atraso; o "Escutar este dispositivo" do Windows soma pouco (dezenas de ms). Medir na fase 0. |
+| Computador com uma placa de som só | Não dá para separar fone do corretor e cabo do celular | Fone USB ou placa de som USB simples. |
+| Troca para "fone no celular" é física | Não dá para trocar só pelo CRM | Aviso claro no CRM; viva-voz do celular como emergência pelo CRM. |
+| Comandos pela consulta de 1 s | Atender com atraso | Consulta mais rápida enquanto toca; trocar por SSE só se a fase 3 mostrar necessidade. |
 | Quiosque exige celular zerado | Aparelho em uso precisa ser redefinido | Ativar o quiosque na entrega do celular, antes de qualquer conta. |
-| Conta Microsoft no computador | Dependência externa (gratuita) | Usar a conta da empresa; avaliar alternativa sem Phone Link só se ele não servir. |
-| Comandos pelo polling de 1 s | Atraso perceptível em atender | Consulta mais rápida enquanto toca (item 5.5); trocar por SSE só se a fase 3 mostrar necessidade. |
-| Sessão aberta "Call Âncora limpo" mexendo nos mesmos arquivos (`CrmPanel.kt`, `MainActivity.kt`, `call-ancora-workspace.tsx`) | Conflito de merge | As fases 1 e 2 só começam depois que essa sessão juntar o trabalho em `preview/3005`. |
+| Sessão "Call Âncora limpo" mexeu nos mesmos arquivos (`CrmPanel.kt`, `MainActivity.kt`, `call-ancora-workspace.tsx`) | Conflito de merge | Começar as fases 1 e 2 a partir do `preview/3005` com o trabalho dela já juntado. |
 
 ## 7. Fases
 
 **Fase 0. Prova sem código (meia hora, no computador e celular reais).**
-Parear o celular com o Windows pelo Phone Link com chamadas ativadas, ligar pelo Call Âncora e conferir: o áudio chega ao fone do computador, a voz chega ao cliente, a qualidade, o eco e o atraso. Testar também tirar o Bluetooth no meio da ligação. Se não funcionar, decidir entre o plano B (placa USB e cabos) e o plano C (caixinha Linux) antes de seguir.
+Ligar o celular às entradas rosa e verde do computador com o divisor (e o adaptador USB-C, se precisar), corretor com fone USB, "Escutar este dispositivo" nos dois sentidos. Fazer uma ligação pelo Call Âncora e conferir: o cliente ouve o corretor (e não o microfone do celular), o corretor ouve o cliente, volume, eco, zumbido e atraso. Testar também tirar o cabo no meio da ligação. Anotar modelo do celular e peças usadas. Se o celular não reconhecer o microfone, testar com atenuador antes de seguir.
 
-**Fase 1. App Android: rota de áudio.**
-Ler as saídas disponíveis (`onCallAudioStateChanged` / `onAvailableCallEndpointsChanged`), aplicar a rota preferida no início de cada ligação, aceitar os comandos de rota e mudo, reportar a rota e as quedas, novo item no checklist com `BLUETOOTH_CONNECT`. Teste unitário da regra de escolha da rota.
+**Fase 1. App Android: estado do áudio.**
+Ler a rota (`onCallAudioStateChanged` / `onAvailableCallEndpointsChanged`), reportar ao CRM rota, mudo e cabo saindo, aceitar os comandos de viva-voz, mudo, atender e desligar. Teste unitário da regra de rota.
 
-**Fase 2. CRM: troca de saída e estado.**
-Comandos novos em `control`, campos de áudio no estado do celular, seletor "Ouvir no" e mudo no cartão da ligação, aviso de queda, preferência por corretor, roteiro do laboratório. Testes em `device-routes.test.ts`.
+**Fase 2. CRM: selo de áudio, mudo e avisos.**
+Comandos novos em `control`, campos de áudio no estado do celular, selo e mudo no cartão da ligação, viva-voz no `⋯`, aviso de cabo, roteiro do laboratório. Testes em `device-routes.test.ts`.
 
 **Fase 3. Chamada recebida pelo CRM.**
 Evento de tocando na hora, Atender e Recusar no CRM, consulta rápida enquanto toca.
 
 **Fase 3A. Celular Call Âncora (quiosque).**
-Launcher (`HOME`), `DeviceAdminReceiver` com Device Owner, `startLockTask` com lista de apps permitidos, permissões concedidas pelo próprio app, tela acesa carregando, sem bloqueio, saída com PIN do diretor. Pode ser feita em paralelo às fases 1 e 2, porque mexe em outros arquivos (manifesto, receptor novo e a tela de entrada). Testar no celular zerado do dono.
+Launcher (`HOME`), `DeviceAdminReceiver` com modo dono, `startLockTask` com lista de apps permitidos, permissões concedidas pelo próprio app, tela acesa carregando, sem bloqueio, saída com PIN do diretor. Pode correr em paralelo às fases 1 e 2, porque mexe em outros arquivos (manifesto, receptor novo e tela de entrada). Testar no celular zerado do dono.
 
 **Fase 4. Instalação por estação.**
-Guia curto (parear, Phone Link, fone padrão de comunicação, ocultar notificações, cabo de carga, bateria), status da estação no painel do diretor e teste com duas estações lado a lado.
+Guia curto com foto dos cabos (quais entradas, volume, "Escutar este dispositivo", carga), lista de peças aprovadas, status da estação no painel do diretor e teste com duas estações lado a lado.
 
 ## 8. Decisões
 
 Seguindo a opção recomendada em cada ponto:
 
-1. Ponte por Bluetooth HFP com o Windows (Phone Link) como fone. Plano B: placa USB e cabos. Plano C: caixinha Linux.
-2. Saída padrão: computador quando conectado; celular como reserva automática.
-3. Celular em modo quiosque com o app como Device Owner (nível 3), com saída por PIN do diretor.
-4. Fase 0 antes de qualquer código; as fases 1 e 2 depois da sessão "Call Âncora limpo".
+1. Ponte por **cabo de áudio** entre a saída de fone do celular e uma placa de som do computador, com o "Escutar este dispositivo" do Windows. Sem Bluetooth, sem ADB para o áudio.
+2. Fone do corretor em fone USB ou placa de som USB, separado da placa ligada ao celular.
+3. Modo padrão da estação: áudio no computador. Viva-voz do celular como emergência pelo CRM; fone no celular é troca física.
+4. Celular em modo quiosque com o app como dono do dispositivo, saída por PIN do diretor.
+5. Fase 0 antes de qualquer código.
