@@ -13,19 +13,28 @@ Produção roda no **Coolify** (VPS), em `https://crm.ancorasaude.cloud`. **Não
 - A biblioteca `ai` (Vercel AI SDK) é dependência de código do agente, não hospedagem: pode continuar
 
 ## Design System — REGRA OBRIGATÓRIA
-Todo trabalho visual DEVE seguir estritamente `docs/design-system.md`.
-Nunca criar cor, radius, spacing ou tipografia fora dos tokens definidos ali.
+Desde 20/11/2026 o Lite é a única versão da interface, inclusive para o Diretor (`[data-skin="diretor"]`). Todo trabalho visual DEVE seguir estritamente `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md` (design system "Conversa").
+- O código é a fonte da verdade dos tokens: `src/components/arc/venancor-scope.css`, `src/components/arc/foundation.css`, `src/components/arc/motion-tokens.ts` e `src/components/chat/*`
+- Brief de produto, voz, referências e decisões: `DESIGN.md` na raiz
+- `docs/design-system.md` continua valendo para densidade e padrões de página que o Lite não cobre
+- Não trabalhar no modo normal; implementar e verificar só nos caminhos Lite (`*Lite`, `isDirectorLitePageOnServer`, `useDirectorLitePage`)
+
+Nunca criar cor, radius, spacing, sombra ou tipografia fora dos tokens do Lite.
 Se algo não estiver coberto pelo design system, PARE e pergunte — não assuma.
-Exceção aprovada: quando `feature_director_lite_style` está ativa para a empresa, o modo Diretor segue `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md`, conforme a seção de exceção em `docs/design-system.md`.
 
 ### Regras não-negociáveis deste sistema específico:
-- Bordas definem containers (1px #e5e5e5), NÃO usar sombras pesadas para elevação
-- Radius: 9999px (tags/badges), 8px (botões), 12px (cards), 6px (inputs), 16px (cards grandes)
-- Inputs usam borda PRETA 1px (#000000) — exceção proposital ao padrão #e5e5e5
-- Azul #2563eb é destaque (links, ícones, métricas) — NUNCA fundo de superfície grande
-- #1e40af (Deep Sapphire) é a ÚNICA cor de CTA primário, uma vez por tela
-- Satoshi só em 36px+ (headlines). Abaixo disso, Inter sempre.
-- Nunca mais de uma cor cromática (verde/laranja/violeta) no mesmo componente
+- Tokens só abaixo de `.arc-venancor`, nunca no `:root`; camadas abertas fora da moldura (bottom sheet) recebem `className="arc-venancor"`
+- Superfícies neutras frias: canvas `--background` (#f7f7f9), cartões `--surface` (#ffffff), hover `--surface-muted`; borda translúcida `--border` (`rgb(16 16 40 / .08)`)
+- Elevação discreta: só `--shadow-resting`, `--shadow-raised` e `--shadow-floating`; nada de sombra pesada
+- Radius: `--radius-control` 9999px (botões, inputs, linhas, chips), `--radius-panel` 1.5rem (cartões, composer, menus), `--radius-surface` 1.75rem; balões 16px
+- Azul de ação `--chat-action` (`oklch(62% .2 255)`) marca a ação primária, uma por superfície; o resto é neutro
+- Índigo `--accent` (#3b2dff) só para seleção em controles Arc (switch, segmented, radio, checkbox, foco)
+- Status (`--success`, `--warning`, `--danger`) só significa status, sempre com texto; verde do WhatsApp só no que é WhatsApp
+- Nunca mais de uma cor cromática no mesmo componente
+- Tipografia: Inter (`--font-inter`) em tudo, pesos 400 e 500 apenas (nunca 600/700), escala 12/14/16/18/22/28/36, números com `tabular-nums`
+- Sem caixa alta e sem rótulo/overline acima de título
+- Alvo de toque mínimo 44px; campos com 16px no celular
+- Textos em pt-BR, frases curtas, nunca travessão (—)
 
 ## Densidade de interface — REGRA OBRIGATÓRIA
 Só o essencial fica fixo na tela; o resto vai para drawer ou menu suspenso.
