@@ -39,6 +39,13 @@ function dutyDayLabel(dateKey: string) {
   return `${WEEKDAY_SHORT[new Date(`${dateKey}T12:00:00Z`).getUTCDay()]} ${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
 }
 
+const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+/** "2026-12" → "dezembro de 2026" */
+export function monthLabel(monthKey: string) {
+  return `${MONTHS[Number(monthKey.slice(5, 7)) - 1] ?? monthKey} de ${monthKey.slice(0, 4)}`;
+}
+
 function dayLabel(dateKey: string) {
   return `${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
 }
@@ -628,6 +635,67 @@ export function buildAgentTools(env: ToolEnv) {
           message: sent.delivered
             ? `Convite de presença reenviado para ${name} (${dutyLabel(duty)}).`
             : `Convite de presença de ${name} (${dutyLabel(duty)}) entrou na fila de envio do WhatsApp.`,
+          href: "/plantoes",
+        };
+      }),
+    }),
+
+    escala_mensal_situacao: tool({
+      description:
+        "Situação da escala de um mês: rascunho ou publicada, quantos plantões e escalados, plantões abaixo do mínimo, problemas que impedem publicar. " +
+        "Use antes de publicar (dá o plano_id) e para \"como está a escala de dezembro?\". mes em AAAA-MM.",
+      inputSchema: z.object({ mes: z.string().regex(/^\d{4}-\d{2}$/, "Use AAAA-MM.") }),
+      execute: async ({ mes }): Promise<ToolResult> => {
+        const plan = await backend.monthPlan(mes);
+        const label = monthLabel(mes);
+        if (!plan) return { ok: true, message: `Não há escala de ${label}. Gere pela tela Plantões.`, href: "/plantoes", data: { plano: null } };
+        const state = plan.status === "published" ? "publicada" : "em rascunho (falta publicar)";
+        const extra = [
+          plan.belowMinimum ? `${plan.belowMinimum} plantões abaixo do mínimo` : null,
+          plan.problems.length ? `Impede publicar: ${plan.problems.join("; ")}` : null,
+          plan.replacesPublished ? "publicar substitui a escala já publicada nas datas que não terminaram" : null,
+        ].filter(Boolean).join(". ");
+        return {
+          ok: true,
+          message: `Escala de ${label}: ${state}. ${plan.occurrences} plantões, ${plan.assigned} cadeiras ocupadas, ${plan.people} pessoas.${extra ? ` ${extra}.` : ""}`,
+          href: "/plantoes",
+          data: { plano: plan, rotulos: [{ id: plan.id, rotulo: `escala de ${label}` }] },
+        };
+      },
+    }),
+
+    escala_mensal_publicar: tool({
+      description:
+        "A16: publica o rascunho da escala do mês (grava a escala, avisa todos os escalados, tira quem saiu). Não tem Desfazer. " +
+        "Use o plano_id de escala_mensal_situacao. O sistema mostra o cartão de confirmação.",
+      inputSchema: z.object({ plano_id: z.string().min(1).max(80), mes: z.string().regex(/^\d{4}-\d{2}$/) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("escala_mensal_publicar", toolCallId, input, async () => {
+        const plan = await backend.monthPlan(input.mes);
+        const label = monthLabel(input.mes);
+        if (!plan || plan.id !== input.plano_id) return fail("plano", `A escala de ${label} mudou desde a consulta.`, "Chame escala_mensal_situacao de novo.");
+        if (plan.status === "published") return { ok: true, message: `A escala de ${label} já está publicada. Nada mudou.` };
+        if (plan.problems.length) return fail("problemas", `A escala de ${label} ainda tem problemas: ${plan.problems.join("; ")}.`, "Corrija na tela Plantões antes de publicar.");
+        await backend.publishPlan(plan.id);
+        return {
+          ok: true,
+          message: `Escala de ${label} publicada: ${plan.occurrences} plantões, ${plan.people} pessoas avisadas.`,
+          href: "/plantoes",
+        };
+      }),
+    }),
+
+    escala_tirar_dia: tool({
+      description:
+        "A15: tira um dia inteiro da escala (feriado): os plantões do dia que não começaram saem e os escalados recebem aviso. " +
+        "voltar = true devolve o dia, mas só na próxima vez que a escala for gerada (as pessoas não voltam sozinhas). Data em AAAA-MM-DD.",
+      inputSchema: z.object({ data: DATE, voltar: z.boolean().optional() }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("escala_tirar_dia", toolCallId, input, async () => {
+        const seats = input.voltar ? [] : await seatsBetween(input.data, input.data);
+        const people = new Set(seats.filter((seat) => !seat.started).flatMap((seat) => seat.brokerIds));
+        const message = await backend.excludeDay(input.data.slice(0, 7), input.data, Boolean(input.voltar));
+        return {
+          ok: true,
+          message: input.voltar ? message : `${message}${people.size ? ` ${people.size} pessoas avisadas.` : ""}`,
           href: "/plantoes",
         };
       }),

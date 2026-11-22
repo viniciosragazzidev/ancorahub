@@ -101,6 +101,32 @@ describe("A7 e A8 com o agente real", { timeout: 20_000 }, () => {
     expect(confirmed.world.invites ?? []).toHaveLength(0);
   });
 
+  it("A16: lê a escala do mês (sem escrever)", async () => {
+    const { calls, backend } = await run("Como está a escala deste mês?");
+    expect(calls).toEqual(["escala_mensal_situacao"]);
+    expect(backend.actions).toHaveLength(0);
+  });
+
+  it("A16: publica o rascunho do mês que vem depois da confirmação forte", async () => {
+    const { calls, asked, world, backend } = await run("Publica a escala do mês que vem", (w) => { w.draftMonths = ["2026-12"]; });
+    expect(calls).toEqual(["escala_mensal_situacao", "escala_mensal_publicar"]);
+    expect(asked).toBe(true);
+    expect(world.draftMonths).toEqual([]);
+    expect(backend.actions[0]).toMatchObject({ tool: "escala_mensal_publicar", status: "done", undo: null });
+  });
+
+  it("A16: escala já publicada não publica de novo", async () => {
+    const { calls } = await run("Publica a escala do mês que vem");
+    expect(calls).toEqual(["escala_mensal_situacao"]);
+  });
+
+  it("A15: tira o dia 25 da escala (feriado)", async () => {
+    const { asked, world } = await run("Tira o dia 25 da escala");
+    expect(asked).toBe(true);
+    expect(world.excludedDays).toEqual(["2026-11-25"]);
+    expect(world.seats.filter((seat) => seat.dutyDate === "2026-11-25")).toHaveLength(0);
+  });
+
   it("A8: presencial sem motivo não libera e pede a nota", async () => {
     const { world, backend } = await run("Libera a presença do Bruno", (w) => { w.presence = { "s-manha:2026-11-21|u-bruno": "pending" }; });
     expect(world.presence?.["s-manha:2026-11-21|u-bruno"]).toBe("pending");

@@ -41,6 +41,8 @@ export function buildDirectorInstructions(input: { firstName: string | null; now
     "- \"De quem é a vez?\" → plantao_rodizio. \"Põe a Carla primeiro no rodízio\" / \"primeiro a Ana, depois o Bruno\" (A11): pessoas_buscar → plantao_rodizio_ordenar com primeiros na ordem dita; \"volta o rodízio pro automático\" → plantao_rodizio_ordenar com voltar_automatico.",
     "- \"A Ana vai fazer online hoje\" (A12): pessoas_buscar → plantao_modo_online (online: true; \"volta ao presencial\" = false).",
     "- \"Manda de novo o aviso de presença pra Ana\" (A13): pessoas_buscar → plantao_reenviar_convite (vai por WhatsApp; o sistema pede confirmação).",
+    "- \"Como está a escala de dezembro?\" → escala_mensal_situacao. \"Publica a escala de dezembro\" (A16): escala_mensal_situacao → escala_mensal_publicar com o plano_id (se houver problemas, diga quais e não publique).",
+    "- \"Tira o dia 25 da escala\" / \"feriado dia 25\" (A15): escala_tirar_dia com a data. \"Devolve o dia 25\" = voltar: true (avise que as pessoas não voltam sozinhas).",
     "- \"Pausa o Bruno\" / \"ativa o Bruno\" / \"para de mandar lead pro Bruno\" (A10): pessoas_buscar → corretor_pausar (recebimento geral). Se o diretor disse \"no plantão\", é A9, não A10.",
     "- Datas: use o calendário acima e mande AAAA-MM-DD. \"Sábado\" sem data é o próximo sábado.",
     "- Se uma ação foi negada ou falhou, diga o motivo em uma frase e o que continua valendo. Não tente de novo sem o diretor pedir.",

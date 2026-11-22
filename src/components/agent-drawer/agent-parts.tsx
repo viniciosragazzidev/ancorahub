@@ -44,6 +44,11 @@ export function seatLabelsFrom(parts: ReadonlyArray<{ type: string }>) {
         if (row.ocorrencia_id && row.rotulo) labels.set(row.ocorrencia_id, row.rotulo);
       }
     }
+    // Rótulos genéricos (ex.: plano da escala do mês).
+    const generic = data?.rotulos;
+    if (Array.isArray(generic)) {
+      for (const row of generic as Array<{ id?: string; rotulo?: string }>) if (row.id && row.rotulo) labels.set(row.id, row.rotulo);
+    }
     // Pessoas vistas em pessoas_buscar (cartão de pausar vários corretores).
     const people = data?.pessoas;
     if (Array.isArray(people)) {
@@ -128,12 +133,18 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
   const swapTitle = name === "plantao_passar_cadeira" ? "Passar a cadeira?" : name === "plantao_trocar_corretores" ? "Trocar os dois de plantão?"
     : name === "plantao_marcar_falta" ? `${input.falta === false ? "Desfazer a falta de" : "Marcar falta de"} ${label(input.corretor_id)}?`
     : name === "plantao_liberar_presenca" ? `Liberar a presença de ${label(input.corretor_id)}?`
-    : name === "plantao_reenviar_convite" ? `Reenviar o convite de presença para ${label(input.corretor_id)}?` : null;
-  const noUndoNote = name === "plantao_liberar_presenca" ? `Ela passa a receber leads do plantão.${typeof input.nota === "string" && input.nota ? ` Motivo: ${input.nota}.` : ""} Não tem Desfazer.` : null;
+    : name === "plantao_reenviar_convite" ? `Reenviar o convite de presença para ${label(input.corretor_id)}?`
+    : name === "escala_mensal_publicar" ? `Publicar a ${seatLabels.get(String(input.plano_id)) ?? "escala do mês"}?`
+    : name === "escala_tirar_dia" ? (input.voltar ? `Devolver o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} à escala?` : `Tirar o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} da escala?`) : null;
+  const strongNote = name === "escala_mensal_publicar"
+    ? "Grava a escala, avisa todos os escalados e tira quem saiu. Não tem Desfazer."
+    : name === "escala_tirar_dia" && !input.voltar ? "Os plantões do dia que não começaram saem e os escalados recebem aviso. Devolver o dia depois não traz as pessoas de volta." : null;
+  const noUndoNote = strongNote ?? (name === "plantao_liberar_presenca" ? `Ela passa a receber leads do plantão.${typeof input.nota === "string" && input.nota ? ` Motivo: ${input.nota}.` : ""} Não tem Desfazer.` : null);
   const confirmLabel = name === "plantao_escalar_em_vagas" ? `Escalar em ${count}` : name === "plantao_tirar_de_vagas" ? `Tirar de ${count}` : isPeople ? `${pausing ? "Pausar" : "Ativar"} ${count}`
     : name === "plantao_passar_cadeira" ? "Passar" : name === "plantao_trocar_corretores" ? "Trocar"
     : name === "plantao_marcar_falta" ? (input.falta === false ? "Desfazer falta" : "Marcar falta") : name === "plantao_liberar_presenca" ? "Liberar"
-    : name === "plantao_reenviar_convite" ? "Reenviar" : "Confirmar";
+    : name === "plantao_reenviar_convite" ? "Reenviar"
+    : name === "escala_mensal_publicar" ? "Publicar escala" : name === "escala_tirar_dia" ? (input.voltar ? "Devolver o dia" : "Tirar o dia") : "Confirmar";
   const respond = (approved: boolean) => {
     if (sent || !part.approval) return;
     feedback("tap");
@@ -155,7 +166,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
         </ul>
       ) : null}
       {noUndoNote ? <p className="director-agent-card-note">{noUndoNote}</p> : null}
-      {entry?.risk.notifies ? <p className="director-agent-card-note">{swapLines ? "As duas pessoas recebem aviso no app." : "A pessoa recebe aviso no app."}</p> : null}
+      {entry?.risk.notifies && !strongNote ? <p className="director-agent-card-note">{swapLines ? "As duas pessoas recebem aviso no app." : "A pessoa recebe aviso no app."}</p> : null}
       <div className="director-agent-card-actions">
         <button type="button" className="director-agent-confirm" onClick={() => respond(true)} disabled={Boolean(sent)} aria-busy={sent === "yes"}>
           {sent === "yes" ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}

@@ -34,6 +34,9 @@ export const LAB_PHRASES = [
   "Volta o rodízio pro automático",
   "A Carla vai fazer online hoje",
   "Manda de novo o aviso de presença pra Carla",
+  "Como está a escala deste mês?",
+  "Publica a escala do mês que vem",
+  "Tira o dia 25 da escala",
 ];
 
 function textOf(content: unknown) {
@@ -108,6 +111,33 @@ export function nextLabStep(prompt: Prompt): Step {
   if (request.includes("falta gente")) {
     if (!last) return { kind: "tool", name: "plantao_escala", input: { so_faltando_gente: true } };
     return { kind: "text", text: String(last.value?.message ?? "") };
+  }
+
+  // A15 e A16: escala do mês e feriado.
+  const monthOf = (offset: number) => {
+    const today = (system.match(/(\d{4}-\d{2})-\d{2} \(hoje\)/)?.[1] ?? "2026-11");
+    const date = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1 + offset, 1));
+    return date.toISOString().slice(0, 7);
+  };
+  if (request.includes("escala deste mês") || request.includes("escala do mês que vem") || request.includes("publica a escala")) {
+    const mes = monthOf(request.includes("que vem") ? 1 : 0);
+    const read = find("escala_mensal_situacao");
+    if (!read) return { kind: "tool", name: "escala_mensal_situacao", input: { mes } };
+    if (!request.startsWith("publica")) return { kind: "text", text: String(read.value?.message ?? "") };
+    const done = find("escala_mensal_publicar");
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    const plan = (read.value?.data as { plano?: { id: string; status: string } | null } | undefined)?.plano;
+    if (!plan) return { kind: "text", text: String(read.value?.message ?? "") };
+    if (plan.status === "published") return { kind: "text", text: "Essa escala já está publicada." };
+    return { kind: "tool", name: "escala_mensal_publicar", input: { plano_id: plan.id, mes } };
+  }
+  const dayOff = request.match(/tira o dia (\d{1,2}) da escala/);
+  if (dayOff) {
+    const done = find("escala_tirar_dia");
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    const day = dayOff[1]!.padStart(2, "0");
+    const month = monthOf(0);
+    return { kind: "tool", name: "escala_tirar_dia", input: { data: `${month}-${day}` } };
   }
 
   // A11 a A13: rodízio, online e convite de presença.

@@ -24,6 +24,10 @@ export type MemoryWorld = {
   onlineHere?: string[];
   /** Convites de presença reenviados (assignmentId). */
   invites?: string[];
+  /** Meses com rascunho por publicar (no mundo de teste os outros estão publicados). */
+  draftMonths?: string[];
+  /** Dias tirados da escala (feriado). */
+  excludedDays?: string[];
 };
 
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
@@ -125,6 +129,42 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
       if (world.failWrites) throw new Error("Falha simulada do servidor.");
       world.invites = [...(world.invites ?? []), assignmentId];
       return { delivered: true };
+    },
+    async monthPlan(monthKey) {
+      const seats = world.seats.filter((seat) => seat.dutyDate.startsWith(monthKey));
+      if (!seats.length) return null;
+      const draft = (world.draftMonths ?? []).includes(monthKey);
+      return {
+        id: `plano-${monthKey}`,
+        monthKey,
+        status: draft ? "draft" as const : "published" as const,
+        occurrences: seats.filter((seat) => !seat.ended).length,
+        assigned: seats.reduce((sum, seat) => sum + seat.brokerIds.length, 0),
+        belowMinimum: seats.filter((seat) => !seat.ended && seat.brokerIds.length < seat.minimumBrokers).length,
+        problems: [],
+        warnings: [],
+        replacesPublished: false,
+        people: new Set(seats.flatMap((seat) => seat.brokerIds)).size,
+      };
+    },
+    async publishPlan(planId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const monthKey = planId.replace("plano-", "");
+      if (!(world.draftMonths ?? []).includes(monthKey)) throw new Error("Esta proposta não está mais em rascunho.");
+      world.draftMonths = (world.draftMonths ?? []).filter((item) => item !== monthKey);
+    },
+    async excludeDay(_monthKey, dutyDate, restore) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const day = `${dutyDate.slice(8, 10)}/${dutyDate.slice(5, 7)}`;
+      if (restore) {
+        world.excludedDays = (world.excludedDays ?? []).filter((item) => item !== dutyDate);
+        return `O dia ${day} volta na próxima vez que você gerar a escala.`;
+      }
+      const onDay = world.seats.filter((seat) => seat.dutyDate === dutyDate && !seat.started);
+      for (const seat of onDay) seat.brokerIds = [];
+      world.seats = world.seats.filter((seat) => !(seat.dutyDate === dutyDate && !seat.started));
+      world.excludedDays = [...(world.excludedDays ?? []), dutyDate];
+      return `O dia ${day} saiu da escala (${onDay.length} plantões).`;
     },
     async pauseOnDuty(_scheduleId, assignmentId, paused) {
       if (world.failWrites) throw new Error("Falha simulada do servidor.");

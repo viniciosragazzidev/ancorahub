@@ -41,6 +41,23 @@ export type DutyQueueOrder = {
   manual: boolean;
 };
 
+/** Situação da escala de um mês (para publicar ou ler). */
+export type MonthPlanSummary = {
+  id: string;
+  monthKey: string;
+  status: "draft" | "published";
+  occurrences: number;
+  assigned: number;
+  belowMinimum: number;
+  /** Problemas que impedem publicar. */
+  problems: string[];
+  warnings: string[];
+  /** Publicar este rascunho substitui uma escala já publicada nas datas que não terminaram. */
+  replacesPublished: boolean;
+  /** Pessoas escaladas no rascunho (quem recebe aviso ao publicar). */
+  people: number;
+};
+
 export type AgentActionRecord = {
   toolCallId: string;
   tool: string;
@@ -80,6 +97,12 @@ export interface AgentBackend {
   setOnlineMode(scheduleId: string, assignmentId: string, online: boolean): Promise<void>;
   /** Reenvia o convite de confirmação de presença por WhatsApp. */
   sendPresenceInvite(scheduleId: string, assignmentId: string): Promise<{ delivered: boolean }>;
+  /** Última versão da escala do mês (rascunho ou publicada), ou null. */
+  monthPlan(monthKey: string): Promise<MonthPlanSummary | null>;
+  /** Publica o rascunho: grava a escala, avisa todos, tira quem saiu. */
+  publishPlan(planId: string): Promise<void>;
+  /** Tira o dia inteiro da escala (feriado) ou devolve o dia para a próxima geração. Devolve a mensagem da tela. */
+  excludeDay(monthKey: string, dutyDate: string, restore: boolean): Promise<string>;
   /** Pausa ou retoma o recebimento geral de leads dos corretores. */
   setAvailability(brokerIds: string[], target: "available" | "paused"): Promise<void>;
   /** Grava a trilha em agent_actions; devolve o id ou null (tabela ausente, erro). Idempotente por toolCallId. */

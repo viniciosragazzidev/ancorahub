@@ -82,6 +82,18 @@ export const AGENT_CATALOG = {
     name: "plantao_reenviar_convite", title: "Reenviar convite de presença", doing: "Reenviando o convite…", topic: "plantoes",
     risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["A13"],
   },
+  escala_mensal_situacao: {
+    name: "escala_mensal_situacao", title: "Escala do mês", doing: "Lendo a escala do mês…", topic: "plantoes",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["A14", "A16"],
+  },
+  escala_mensal_publicar: {
+    name: "escala_mensal_publicar", title: "Publicar a escala", doing: "Publicando a escala…", topic: "plantoes",
+    risk: { readOnly: false, notifies: true, destructive: true }, roles: DIRECTOR, confirm: "forte", covers: ["A16"],
+  },
+  escala_tirar_dia: {
+    name: "escala_tirar_dia", title: "Tirar o dia da escala", doing: "Tirando o dia da escala…", topic: "plantoes",
+    risk: { readOnly: false, notifies: true, destructive: true }, roles: DIRECTOR, confirm: "forte", covers: ["A15"],
+  },
   corretor_pausar: {
     name: "corretor_pausar", title: "Pausar recebimento", doing: "Mudando o recebimento de leads…", topic: "equipe",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: many("corretor_ids"), covers: ["A10"],

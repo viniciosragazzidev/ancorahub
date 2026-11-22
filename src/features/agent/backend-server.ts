@@ -18,6 +18,8 @@ import { getDutyQueueOrderPreviews } from "@/features/lead-distribution/duty-que
 import {
   addBrokerToPublishedOccurrenceAction,
   getMonthlyDutyPlanAction,
+  publishMonthlyDutyPlanAction,
+  setMonthlyDutyDayExcludedAction,
   removeBrokerFromPublishedOccurrenceAction,
   updateMonthlyDutyDraftAction,
 } from "@/features/lead-distribution/monthly-duty-actions";
@@ -277,6 +279,34 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
       const result = await sendDutyPresenceInviteManuallyAction(scheduleId, assignmentId);
       if (!result.ok) throw new Error(result.reason);
       return { delivered: result.delivered };
+    },
+
+    async monthPlan(monthKey) {
+      const view = await getMonthlyDutyPlanAction(monthKey);
+      if (!view) return null;
+      const people = new Set(view.occurrences.flatMap((occurrence) => occurrence.brokers.map((broker) => broker.id)));
+      return {
+        id: view.id,
+        monthKey: view.monthKey,
+        status: view.status,
+        occurrences: view.occurrences.filter((occurrence) => !occurrence.ended).length,
+        assigned: view.totalAssigned,
+        belowMinimum: typeof view.belowMinimum === "number" ? view.belowMinimum : 0,
+        problems: view.problems,
+        warnings: view.warnings,
+        replacesPublished: view.replacesPublished,
+        people: people.size,
+      };
+    },
+
+    async publishPlan(planId) {
+      await publishMonthlyDutyPlanAction(planId);
+    },
+
+    async excludeDay(monthKey, dutyDate, restore) {
+      const result = await setMonthlyDutyDayExcludedAction({ monthKey, dutyDate, restore: restore || undefined });
+      if (!result.ok) throw new Error(result.reason);
+      return result.message;
     },
 
     async setAvailability(brokerIds, target) {
