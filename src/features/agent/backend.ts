@@ -1,4 +1,4 @@
-import type { Person, SeatOccurrence } from "./types";
+import type { LeadFilter, LeadSummary, Person, SeatOccurrence } from "./types";
 
 /**
  * O que as ferramentas precisam do CRM. No servidor (`backend-server.ts`) cada método chama a consulta ou a ação
@@ -103,6 +103,17 @@ export interface AgentBackend {
   publishPlan(planId: string): Promise<void>;
   /** Tira o dia inteiro da escala (feriado) ou devolve o dia para a próxima geração. Devolve a mensagem da tela. */
   excludeDay(monthKey: string, dutyDate: string, restore: boolean): Promise<string>;
+  /** Leads no escopo do diretor (mesma regra da tela de Leads). */
+  searchLeads(filter: LeadFilter): Promise<LeadSummary[]>;
+  leadById(leadId: string): Promise<LeadSummary | null>;
+  /** Leads sem dono nas filas do plantão, do mais antigo para o mais novo. */
+  dutyAvailableLeads(scheduleId: string): Promise<LeadSummary[]>;
+  /** Dá um lead do plantão a um escalado (recusa falta e pausa). */
+  assignDutyLead(scheduleId: string, brokerId: string, leadId: string): Promise<void>;
+  /** Dá o lead a um corretor: sem dono → atribuição; com dono → reatribuição (no plantão ativo da fila, se houver). */
+  giveLead(leadId: string, brokerId: string): Promise<void>;
+  /** Tira o corretor do lead (fica em espera manual, sem dono). */
+  unassignLead(leadId: string): Promise<void>;
   /** Pausa ou retoma o recebimento geral de leads dos corretores. */
   setAvailability(brokerIds: string[], target: "available" | "paused"): Promise<void>;
   /** Grava a trilha em agent_actions; devolve o id ou null (tabela ausente, erro). Idempotente por toolCallId. */

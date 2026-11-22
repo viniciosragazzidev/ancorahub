@@ -1,5 +1,5 @@
 import type { AgentActionRecord, AgentBackend, DutyNow } from "./backend";
-import type { Person, SeatOccurrence } from "./types";
+import type { LeadSummary, Person, SeatOccurrence } from "./types";
 
 /**
  * Mundo em memória para o laboratório e os testes: a mesma interface do backend real, com as mesmas regras
@@ -28,6 +28,8 @@ export type MemoryWorld = {
   draftMonths?: string[];
   /** Dias tirados da escala (feriado). */
   excludedDays?: string[];
+  /** Leads do mundo de teste; `scheduleId` = plantão em cuja fila o lead sem dono espera. */
+  leads?: Array<LeadSummary & { scheduleId?: string | null }>;
 };
 
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
@@ -166,6 +168,58 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
       world.excludedDays = [...(world.excludedDays ?? []), dutyDate];
       return `O dia ${day} saiu da escala (${onDay.length} plantões).`;
     },
+    async searchLeads(filter) {
+      const text = filter.text?.trim().toLowerCase();
+      return (world.leads ?? [])
+        .filter((lead) => !text || lead.name.toLowerCase().includes(text) || (lead.phoneTail ?? "").includes(text))
+        .filter((lead) => !filter.withoutBroker || (!lead.brokerId && lead.distributionStatus === "unassigned"))
+        .filter((lead) => !filter.brokerId || lead.brokerId === filter.brokerId)
+        .filter((lead) => !filter.status || lead.status === filter.status)
+        .slice(0, filter.limit)
+        .map(({ scheduleId: _scheduleId, ...lead }) => ({ ...lead }));
+    },
+    async leadById(leadId) {
+      const lead = (world.leads ?? []).find((item) => item.id === leadId);
+      if (!lead) return null;
+      const { scheduleId: _scheduleId, ...rest } = lead;
+      return { ...rest };
+    },
+    async dutyAvailableLeads(scheduleId) {
+      return (world.leads ?? []).filter((lead) => lead.scheduleId === scheduleId && !lead.brokerId && lead.distributionStatus === "unassigned")
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .map(({ scheduleId: _scheduleId, ...lead }) => ({ ...lead }));
+    },
+    async assignDutyLead(scheduleId, brokerId, leadId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const duty = dutyWindows(0).find((item) => item.running && item.scheduleId === scheduleId);
+      const broker = duty?.brokers.find((item) => item.id === brokerId);
+      if (!broker) throw new Error("Corretor fora da escala.");
+      if (broker.presence === "absent") throw new Error("Corretor com falta neste plantão.");
+      if (broker.pausedHere) throw new Error("Corretor pausado neste plantão. Retome antes de atribuir.");
+      const lead = (world.leads ?? []).find((item) => item.id === leadId);
+      if (!lead || lead.brokerId || lead.scheduleId !== scheduleId) throw new Error("Lead não está disponível neste plantão.");
+      lead.brokerId = brokerId;
+      lead.brokerName = broker.name;
+      lead.distributionStatus = "assigned";
+    },
+    async giveLead(leadId, brokerId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const lead = (world.leads ?? []).find((item) => item.id === leadId);
+      if (!lead) throw new Error("Lead não encontrado.");
+      if (lead.brokerId === brokerId) throw new Error("Selecione outro corretor para reiniciar o atendimento.");
+      if (lead.status === "lost" || lead.status === "converted") throw new Error("Leads encerrados não podem ser reatribuídos.");
+      lead.brokerId = brokerId;
+      lead.brokerName = world.people.find((person) => person.id === brokerId)?.name ?? null;
+      lead.distributionStatus = "assigned";
+    },
+    async unassignLead(leadId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const lead = (world.leads ?? []).find((item) => item.id === leadId);
+      if (!lead?.brokerId) throw new Error("A atribuição deste lead não pode ser removida neste estado.");
+      lead.brokerId = null;
+      lead.brokerName = null;
+      lead.distributionStatus = "manual_hold";
+    },
     async pauseOnDuty(_scheduleId, assignmentId, paused) {
       if (world.failWrites) throw new Error("Falha simulada do servidor.");
       const set = new Set(world.pausedHere ?? []);
@@ -254,5 +308,17 @@ export function sampleWorld(now: Date): MemoryWorld {
       });
     }
   }
-  return { now, people, seats };
+  const at = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000).toISOString();
+  const lead = (id: string, name: string, extra: Partial<LeadSummary & { scheduleId: string | null }>) => ({
+    id, name, status: "new", brokerId: null, brokerName: null, queueName: "Fila PME", temperature: "warm", distributionStatus: "unassigned", createdAt: at(30), phoneTail: id.slice(-4), scheduleId: null, ...extra,
+  });
+  const leads = [
+    lead("l-0001", "Maria Souza", { scheduleId: "s-manha", createdAt: at(50), temperature: "hot" }),
+    lead("l-0002", "João Pereira", { scheduleId: "s-manha", createdAt: at(40) }),
+    lead("l-0003", "Paula Reis", { scheduleId: "s-manha", createdAt: at(20), temperature: "cold" }),
+    lead("l-0004", "Rafael Lima", { scheduleId: "s-manha", createdAt: at(10), temperature: "hot" }),
+    lead("l-0005", "Maria Clara Nunes", { brokerId: "u-carla", brokerName: "Carla Mendes", distributionStatus: "assigned", status: "in_contact", createdAt: at(300) }),
+    lead("l-0006", "Sérgio Alves", { brokerId: "u-bruno", brokerName: "Bruno Castro", distributionStatus: "assigned", status: "negotiation", createdAt: at(900) }),
+  ];
+  return { now, people, seats, leads };
 }

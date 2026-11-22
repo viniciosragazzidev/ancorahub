@@ -37,6 +37,10 @@ export const LAB_PHRASES = [
   "Como está a escala deste mês?",
   "Publica a escala do mês que vem",
   "Tira o dia 25 da escala",
+  "Quantos leads sem dono?",
+  "Passa 2 leads do plantão para a Carla",
+  "Dá o lead do Sérgio para a Carla",
+  "Tira o lead da Maria Clara da Carla",
 ];
 
 function textOf(content: unknown) {
@@ -111,6 +115,35 @@ export function nextLabStep(prompt: Prompt): Step {
   if (request.includes("falta gente")) {
     if (!last) return { kind: "tool", name: "plantao_escala", input: { so_faltando_gente: true } };
     return { kind: "text", text: String(last.value?.message ?? "") };
+  }
+
+  // Bloco B: leads.
+  if (request.includes("sem dono")) {
+    const read = find("leads_buscar");
+    return read ? { kind: "text", text: String(read.value?.message ?? "") } : { kind: "tool", name: "leads_buscar", input: { sem_dono: true } };
+  }
+  const passLeads = request.match(/^passa (\d+) leads? do plant[ãa]o para (?:a |o )?(\S+?)\??$/);
+  const giveLead = request.match(/^d[áa] o lead d[ao] (.+?) para (?:a |o )?(\S+?)\??$/);
+  const takeLead = request.match(/^tira o lead d[ao] (.+?) d[ao] (\S+?)\??$/);
+  if (passLeads || giveLead || takeLead) {
+    const people = find("pessoas_buscar");
+    const leadsFound = find("leads_buscar");
+    const personName = (passLeads ?? giveLead ?? takeLead)![2]!;
+    if (!takeLead && !people) return { kind: "tool", name: "pessoas_buscar", input: { texto: personName } };
+    const personId = ((people?.value?.data as { pessoas?: Array<{ id: string }> } | undefined)?.pessoas ?? [])[0]?.id;
+    if (passLeads) {
+      const done = find("plantao_dar_leads");
+      if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+      return { kind: "tool", name: "plantao_dar_leads", input: { corretor_id: personId, quantidade: Number(passLeads[1]) } };
+    }
+    const leadName = (giveLead ?? takeLead)![1]!;
+    if (!leadsFound) return { kind: "tool", name: "leads_buscar", input: { texto: leadName } };
+    const leadId = ((leadsFound.value?.data as { leads?: Array<{ id: string }> } | undefined)?.leads ?? [])[0]?.id;
+    if (!leadId) return { kind: "text", text: String(leadsFound.value?.message ?? "Não achei o lead.") };
+    const tool = giveLead ? "lead_dar" : "lead_tirar_corretor";
+    const done = find(tool);
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return giveLead ? { kind: "tool", name: tool, input: { lead_id: leadId, corretor_id: personId } } : { kind: "tool", name: tool, input: { lead_ids: [leadId] } };
   }
 
   // A15 e A16: escala do mês e feriado.

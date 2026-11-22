@@ -65,6 +65,30 @@ export type SeatOccurrence = {
   planId: string;
 };
 
+/** Lead como o agente vê: sem telefone inteiro nem dado sensível (só os 4 últimos dígitos). */
+export type LeadSummary = {
+  id: string;
+  name: string;
+  status: string;
+  brokerId: string | null;
+  brokerName: string | null;
+  queueName: string | null;
+  /** hot | warm | cold | null */
+  temperature: string | null;
+  /** waiting: sem dono esperando distribuição; assigned; manual_hold; offered… */
+  distributionStatus: string | null;
+  createdAt: string;
+  phoneTail: string | null;
+};
+
+export type LeadFilter = {
+  text?: string | null;
+  withoutBroker?: boolean;
+  brokerId?: string | null;
+  status?: string | null;
+  limit: number;
+};
+
 export type Person = {
   id: string;
   name: string;

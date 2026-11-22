@@ -111,7 +111,10 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
   const input = part.input ?? {};
   const level = entry ? confirmLevelFor(entry, input) : "toque";
   const isPeople = name === "corretor_pausar";
-  const ids = Array.isArray(input.ocorrencia_ids) ? (input.ocorrencia_ids as string[]) : isPeople && Array.isArray(input.corretor_ids) ? (input.corretor_ids as string[]) : [];
+  const isLeads = name === "plantao_dar_leads" || name === "lead_tirar_corretor";
+  const ids = Array.isArray(input.ocorrencia_ids) ? (input.ocorrencia_ids as string[])
+    : isPeople && Array.isArray(input.corretor_ids) ? (input.corretor_ids as string[])
+    : isLeads && Array.isArray(input.lead_ids) ? (input.lead_ids as string[]) : [];
   const [sent, setSent] = useState<"yes" | "no" | null>(null);
   const count = ids.length;
   const pausing = input.pausado === true;
@@ -134,6 +137,8 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "plantao_marcar_falta" ? `${input.falta === false ? "Desfazer a falta de" : "Marcar falta de"} ${label(input.corretor_id)}?`
     : name === "plantao_liberar_presenca" ? `Liberar a presença de ${label(input.corretor_id)}?`
     : name === "plantao_reenviar_convite" ? `Reenviar o convite de presença para ${label(input.corretor_id)}?`
+    : name === "plantao_dar_leads" ? `Passar ${ids.length || Number(input.quantidade ?? 1)} ${(ids.length || Number(input.quantidade ?? 1)) === 1 ? "lead" : "leads"} do plantão para ${label(input.corretor_id)}?${ids.length ? "" : input.criterio === "quentes" ? " (os mais quentes)" : " (os mais antigos)"}`
+    : name === "lead_tirar_corretor" ? `Tirar o corretor de ${ids.length} ${ids.length === 1 ? "lead" : "leads"}?`
     : name === "escala_mensal_publicar" ? `Publicar a ${seatLabels.get(String(input.plano_id)) ?? "escala do mês"}?`
     : name === "escala_tirar_dia" ? (input.voltar ? `Devolver o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} à escala?` : `Tirar o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} da escala?`) : null;
   const strongNote = name === "escala_mensal_publicar"
@@ -144,6 +149,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "plantao_passar_cadeira" ? "Passar" : name === "plantao_trocar_corretores" ? "Trocar"
     : name === "plantao_marcar_falta" ? (input.falta === false ? "Desfazer falta" : "Marcar falta") : name === "plantao_liberar_presenca" ? "Liberar"
     : name === "plantao_reenviar_convite" ? "Reenviar"
+    : name === "plantao_dar_leads" ? "Passar leads" : name === "lead_tirar_corretor" ? `Tirar de ${ids.length}`
     : name === "escala_mensal_publicar" ? "Publicar escala" : name === "escala_tirar_dia" ? (input.voltar ? "Devolver o dia" : "Tirar o dia") : "Confirmar";
   const respond = (approved: boolean) => {
     if (sent || !part.approval) return;
@@ -161,7 +167,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
       ) : null}
       {ids.length ? (
         <ul className="director-agent-card-list">
-          {ids.slice(0, 8).map((id) => <li key={id}>{seatLabels.get(id) ?? (isPeople ? "Corretor" : fallbackSeatLabel(id))}</li>)}
+          {ids.slice(0, 8).map((id) => <li key={id}>{seatLabels.get(id) ?? (isPeople ? "Corretor" : isLeads ? "Lead" : fallbackSeatLabel(id))}</li>)}
           {ids.length > 8 ? <li>e mais {ids.length - 8}</li> : null}
         </ul>
       ) : null}

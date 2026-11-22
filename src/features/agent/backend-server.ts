@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { upcomingShift } from "@/features/dashboard/welcome-rules";
 import { getPublishedDutyScheduleIds, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
@@ -23,11 +23,15 @@ import {
   removeBrokerFromPublishedOccurrenceAction,
   updateMonthlyDutyDraftAction,
 } from "@/features/lead-distribution/monthly-duty-actions";
+import { assignLeadToBrokerAction } from "@/features/lead-distribution/actions";
+import { assignDutyLeadToBrokerAction, getDutyAvailableLeadsAction } from "@/features/lead-distribution/duty-actions";
+import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
+import { getLeadDutyReassignmentOptions, reassignLeadAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
 import type { AgentActionRecord, AgentBackend, DutyNow } from "./backend";
-import type { Person, SeatOccurrence } from "./types";
+import type { LeadFilter, LeadSummary, Person, SeatOccurrence } from "./types";
 
 /**
  * O backend real: cada método usa a consulta ou a ação que a tela já usa. As ações chamam
@@ -144,8 +148,114 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
     }).sort((a, b) => a.dutyDate.localeCompare(b.dutyDate) || a.startsAt.localeCompare(b.startsAt) || a.scheduleName.localeCompare(b.scheduleName, "pt-BR"));
   }
 
+  const WAITING = ["queued", "unassigned", "returned_to_queue"];
+
+  async function selectLeads(where: ReturnType<typeof and>, limit: number): Promise<LeadSummary[]> {
+    const rows = await db
+      .select({
+        id: schema.leads.id,
+        name: schema.leads.nome,
+        status: schema.leads.status,
+        brokerId: schema.leads.corretorId,
+        brokerName: schema.user.name,
+        queueName: schema.leadQueues.name,
+        temperature: schema.leads.qualificationStatus,
+        distributionStatus: schema.leads.distributionStatus,
+        createdAt: schema.leads.createdAt,
+        phone: schema.leads.telefone,
+      })
+      .from(schema.leads)
+      .leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId))
+      .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
+      .where(where)
+      .orderBy(desc(schema.leads.createdAt))
+      .limit(limit);
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name?.trim() || "Lead sem nome",
+      status: String(row.status),
+      brokerId: row.brokerId,
+      brokerName: row.brokerName?.trim() || null,
+      queueName: row.queueName,
+      temperature: ["hot", "warm", "cold"].includes(row.temperature ?? "") ? row.temperature : null,
+      distributionStatus: row.distributionStatus,
+      createdAt: row.createdAt.toISOString(),
+      phoneTail: row.phone ? row.phone.replace(/\D/g, "").slice(-4) || null : null,
+    }));
+  }
+
+  function formOf(values: Record<string, string>) {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(values)) form.set(key, value);
+    return form;
+  }
+
   return {
     now: () => new Date(),
+
+    async searchLeads(filter: LeadFilter) {
+      const text = filter.text?.trim();
+      const digits = text?.replace(/\D/g, "") ?? "";
+      return selectLeads(and(
+        buildLeadScopeWhere(context),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
+        text ? (digits.length >= 4 ? sql`regexp_replace(${schema.leads.telefone}, '\\D', '', 'g') like ${`%${digits}%`}` : ilike(schema.leads.nome, `%${text}%`)) : undefined,
+        filter.withoutBroker ? and(isNull(schema.leads.corretorId), inArray(schema.leads.distributionStatus, WAITING)) : undefined,
+        filter.brokerId ? eq(schema.leads.corretorId, filter.brokerId) : undefined,
+        filter.status ? eq(schema.leads.status, filter.status as typeof schema.leads.status.enumValues[number]) : undefined,
+      ), Math.min(Math.max(filter.limit, 1), 50));
+    },
+
+    async leadById(leadId) {
+      const [lead] = await selectLeads(and(buildLeadScopeWhere(context), eq(schema.leads.id, leadId), isNull(schema.leads.deletedAt)), 1);
+      return lead ?? null;
+    },
+
+    async dutyAvailableLeads(scheduleId) {
+      const result = await getDutyAvailableLeadsAction(scheduleId);
+      if (!result.ok) throw new Error(result.reason);
+      return result.leads.map((lead) => ({
+        id: lead.id,
+        name: lead.name?.trim() || "Lead sem nome",
+        status: "new",
+        brokerId: null,
+        brokerName: null,
+        queueName: lead.queueName,
+        temperature: lead.temperature,
+        distributionStatus: "unassigned",
+        createdAt: lead.createdAt,
+        phoneTail: lead.phone ? lead.phone.replace(/\D/g, "").slice(-4) || null : null,
+      }));
+    },
+
+    async assignDutyLead(scheduleId, brokerId, leadId) {
+      const result = await assignDutyLeadToBrokerAction(scheduleId, brokerId, leadId);
+      if (!result.ok) throw new Error(result.reason);
+    },
+
+    async giveLead(leadId, brokerId) {
+      const [lead] = await db.select({ brokerId: schema.leads.corretorId }).from(schema.leads)
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+      if (!lead) throw new Error("Lead não encontrado.");
+      if (!lead.brokerId) {
+        const result = await assignLeadToBrokerAction({}, formOf({ leadId, brokerId, assignmentMode: "direct", reason: "Pelo Agente IA, a pedido do diretor" }));
+        if (result.error) throw new Error(result.error);
+        return;
+      }
+      // Fila com plantão ativo: a tela exige escolher o corretor dentro do plantão (dutyScheduleId).
+      const options = await getLeadDutyReassignmentOptions(leadId);
+      const inDuty = options.success && "brokers" in options ? (options.brokers as Array<{ id: string; scheduleId?: string }>).find((item) => item.id === brokerId) : undefined;
+      const values: Record<string, string> = { leadId, brokerId };
+      if (inDuty?.scheduleId) values.dutyScheduleId = inDuty.scheduleId;
+      const result = await reassignLeadAction({}, formOf(values));
+      if (result.error) throw new Error(result.error);
+    },
+
+    async unassignLead(leadId) {
+      const result = await removeLeadAssignmentAction({}, formOf({ leadId }));
+      if (result.error) throw new Error(result.error);
+    },
 
     async listPeople(): Promise<Person[]> {
       const rows = await db

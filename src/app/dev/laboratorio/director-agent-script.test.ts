@@ -127,6 +127,44 @@ describe("A7 e A8 com o agente real", { timeout: 20_000 }, () => {
     expect(world.seats.filter((seat) => seat.dutyDate === "2026-11-25")).toHaveLength(0);
   });
 
+  it("B9: quantos leads sem dono (leitura, sem telefone inteiro)", async () => {
+    const { calls, backend } = await run("Quantos leads sem dono?");
+    expect(calls).toEqual(["leads_buscar"]);
+    expect(backend.actions).toHaveLength(0);
+  });
+
+  it("B1: passa 2 leads do plantão para a Carla (os mais antigos), com Desfazer", async () => {
+    const { world, backend, asked } = await run("Passa 2 leads do plantão para a Carla");
+    expect(asked).toBe(false);
+    const carla = (world.leads ?? []).filter((lead) => lead.brokerId === "u-carla" && lead.scheduleId === "s-manha").map((lead) => lead.id).sort();
+    expect(carla).toEqual(["l-0001", "l-0002"]);
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "lead_tirar_corretor", input: { lead_ids: ["l-0001", "l-0002"] } });
+  });
+
+  it("B2: dá o lead do Sérgio (do Bruno) para a Carla; Desfazer devolve ao Bruno", async () => {
+    const { world, backend } = await run("Dá o lead do Sérgio para a Carla");
+    expect((world.leads ?? []).find((lead) => lead.id === "l-0006")?.brokerId).toBe("u-carla");
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "lead_dar", input: { lead_id: "l-0006", corretor_id: "u-bruno" } });
+  });
+
+  it("B3: tira o lead da Maria Clara da Carla (espera manual); Desfazer devolve", async () => {
+    const { world, backend } = await run("Tira o lead da Maria Clara da Carla");
+    const lead = (world.leads ?? []).find((item) => item.id === "l-0005");
+    expect(lead?.brokerId).toBeNull();
+    expect(lead?.distributionStatus).toBe("manual_hold");
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "plantao_devolver_leads", input: { corretor_id: "u-carla", lead_ids: ["l-0005"] } });
+  });
+
+  it("B1: corretor pausado no plantão não recebe", async () => {
+    const backend = createMemoryBackend(sampleWorld(NOW));
+    backend.world.pausedHere = ["s-manha:2026-11-21|u-carla"];
+    const tools = buildAgentTools({ backend, requestText: null, approvedByUser: () => false });
+    const execute = (tools.plantao_dar_leads as unknown as { execute: (input: unknown, options: { toolCallId: string; messages: [] }) => Promise<ToolResult> }).execute;
+    const result = await execute({ corretor_id: "u-carla", quantidade: 2 }, { toolCallId: "t-pausa", messages: [] });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("pausada");
+  });
+
   it("A8: presencial sem motivo não libera e pede a nota", async () => {
     const { world, backend } = await run("Libera a presença do Bruno", (w) => { w.presence = { "s-manha:2026-11-21|u-bruno": "pending" }; });
     expect(world.presence?.["s-manha:2026-11-21|u-bruno"]).toBe("pending");

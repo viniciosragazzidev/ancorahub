@@ -94,6 +94,35 @@ export const AGENT_CATALOG = {
     name: "escala_tirar_dia", title: "Tirar o dia da escala", doing: "Tirando o dia da escala…", topic: "plantoes",
     risk: { readOnly: false, notifies: true, destructive: true }, roles: DIRECTOR, confirm: "forte", covers: ["A15"],
   },
+  leads_buscar: {
+    name: "leads_buscar", title: "Buscar leads", doing: "Procurando leads…", topic: "leads",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["B9"],
+  },
+  lead_detalhe: {
+    name: "lead_detalhe", title: "Lead", doing: "Abrindo o lead…", topic: "leads",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["B9"],
+  },
+  plantao_leads_sem_dono: {
+    name: "plantao_leads_sem_dono", title: "Leads esperando no plantão", doing: "Vendo os leads do plantão…", topic: "distribuicao",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["B1", "B9"],
+  },
+  plantao_dar_leads: {
+    name: "plantao_dar_leads", title: "Passar leads do plantão", doing: "Passando os leads…", topic: "distribuicao",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR,
+    confirm: (input) => ((Array.isArray(input.lead_ids) ? (input.lead_ids as unknown[]).length : Number(input.quantidade ?? 1)) > 3 ? "toque" : "direto"), covers: ["B1"],
+  },
+  lead_dar: {
+    name: "lead_dar", title: "Dar o lead", doing: "Passando o lead…", topic: "distribuicao",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "direto", covers: ["B2"],
+  },
+  lead_tirar_corretor: {
+    name: "lead_tirar_corretor", title: "Tirar o lead do corretor", doing: "Tirando o lead…", topic: "distribuicao",
+    risk: { readOnly: false }, roles: DIRECTOR, confirm: many("lead_ids"), covers: ["B3"],
+  },
+  plantao_devolver_leads: {
+    name: "plantao_devolver_leads", title: "Devolver leads", doing: "Devolvendo os leads…", topic: "distribuicao",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "direto",
+  },
   corretor_pausar: {
     name: "corretor_pausar", title: "Pausar recebimento", doing: "Mudando o recebimento de leads…", topic: "equipe",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: many("corretor_ids"), covers: ["A10"],
