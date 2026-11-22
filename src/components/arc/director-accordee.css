@@ -141,10 +141,10 @@
   color: var(--foreground);
 }
 
-/* Densidade com mouse: sidebar de 216px, linhas de 28px, ícones de 16px, texto de 13px. */
+/* Densidade com mouse: sidebar de 216px, linhas de 32px (respiro pedido em 22/11/2026), ícones de 16px, texto de 13px. */
 @media (hover: hover) and (pointer: fine) {
   [data-slot="sidebar-wrapper"]:has(> .arc-venancor[data-skin="diretor"] .director-sidebar) { --sidebar-width: 13.5rem !important; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] { gap: 4px; padding: 12px 8px 4px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] { gap: 12px; padding: 16px 8px 8px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div { gap: 8px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child {
     width: 28px; min-width: 28px; height: 28px; flex-basis: 28px; padding: 3px;
@@ -153,20 +153,20 @@
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img { width: 20px; height: 20px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > div > p:first-child { font-size: 13px; font-weight: 500; letter-spacing: normal; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > div > p + p { font-size: 12px; color: var(--text-muted); }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-content"] { padding: 4px 8px; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [aria-label="Menu principal"] { gap: 2px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-content"] { padding: 8px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [aria-label="Menu principal"] { gap: 4px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"] {
-    min-height: 28px; height: 28px; gap: 8px; padding: 4px 8px 4px 6px;
+    min-height: 32px; height: 32px; gap: 8px; padding: 6px 8px 6px 6px;
     font-size: 13px; line-height: 20px;
   }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"]:active { transform: none; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-label"] { font-size: 13px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-icon"] { width: 16px; min-width: 16px; height: 16px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-icon"] svg { width: 16px; height: 16px; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] { gap: 2px; padding: 4px 8px 8px; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] :is(button, a) { min-height: 28px; font-size: 13px; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] button[data-slot="tooltip-trigger"] { height: 28px; gap: 8px; padding: 0 8px 0 6px; font-weight: 400; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar :is(.director-agent-link, .director-duty-link) { min-height: 28px; height: 28px; gap: 8px; padding: 0 8px 0 6px; font-size: 13px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] { gap: 4px; padding: 8px 8px 12px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] :is(button, a) { min-height: 32px; font-size: 13px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] button[data-slot="tooltip-trigger"] { height: 32px; gap: 8px; padding: 0 8px 0 6px; font-weight: 400; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar :is(.director-agent-link, .director-duty-link) { min-height: 32px; height: 32px; gap: 8px; padding: 0 8px 0 6px; font-size: 13px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] { min-height: 32px; font-size: 13px; }
 }
 
@@ -205,7 +205,7 @@
 
 /* Rodapé da sidebar: perfil numa linha de 32px com avatar de 24px. */
 @media (hover: hover) and (pointer: fine) {
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] { min-height: 32px; height: 32px; padding: 0 6px; border-radius: 6px; gap: 8px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] { min-height: 40px; height: 40px; padding: 0 6px; border-radius: 6px; gap: 8px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"]:hover { background: var(--ac-sidebar-active); }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] [data-slot="avatar"] { width: 24px; height: 24px; font-size: 11px; }
 }
@@ -217,7 +217,7 @@
 
 /* Sidebar, ações do topo (21/11/2026): Visão, Ver como e Área de Plantão no mesmo desenho dos itens do menu (linha de
    28px, ícone de 16px, texto de 13px, sem caixa com borda nem pílula colorida). O logo da empresa cabe inteiro. */
-.arc-venancor[data-skin="diretor"] .director-sidebar .director-super-admin-actions { gap: 2px; padding: 0; }
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-super-admin-actions { gap: 4px; padding: 0; }
 .arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"],
 .arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] {
   width: 100%;
@@ -243,7 +243,7 @@
 .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img:not([src="/icon.png"]) { width: auto; max-width: 96px; height: 24px; object-fit: contain; }
 @media (hover: hover) and (pointer: fine) {
   .arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"],
-  .arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] { height: 28px; min-height: 28px; padding: 0 8px 0 6px; font-size: 13px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] { height: 32px; min-height: 32px; padding: 0 8px 0 6px; font-size: 13px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"] > span:first-child { width: 16px; height: 16px; }
 }
 
@@ -275,3 +275,23 @@
 .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:first-child > div:not(.director-super-admin-actions) { display: none; }
 .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child:has(img:not([src="/icon.png"])) { max-width: 140px; }
 .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img:not([src="/icon.png"]) { max-width: 140px; height: 28px; }
+
+/* Atalhos do topo (22/11/2026, pedido do Vinicios): Visão, Ver como e Área de Plantão são ações, não destinos do menu.
+   Ficam num bloco próprio no desenho de cartão do diretor (fundo da superfície, borda 1px Ash, raio de 8px, respiro de
+   4px), separado do menu pelo espaço do topo. Recolhida, a sidebar mostra só os ícones, sem a caixa. */
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) .director-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) .director-shortcuts:empty { display: none; }
+.arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar .director-shortcuts,
+.arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar.director-shortcuts,
+.arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-shortcuts { padding: 0; border-color: transparent; background: transparent; }
+/* Recolhida: a Visão fica só no ícone, centrado como os itens do menu (antes sobrava "V…" cortado). */
+.arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-shortcuts .director-role-switcher [data-slot="dropdown-menu-trigger"] { justify-content: center; padding: 0; }
+.arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-shortcuts .director-role-switcher [data-slot="dropdown-menu-trigger"] > span.truncate { display: none; }

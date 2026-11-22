@@ -266,6 +266,8 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
           </div>
         </div>
 
+        {/* Atalhos (Visão, Ver como, Área de Plantão): no diretor ficam num bloco próprio, separados do menu. */}
+        <div data-slot="sidebar-shortcuts" className={directorLite ? "director-shortcuts" : "contents"}>
         {user?.isPlatformAdmin && (
           <div className={cn(
             "flex w-full min-w-0 justify-center",
@@ -310,6 +312,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
             </Tooltip>
           </TooltipProvider>
         )}
+        </div>
       </SidebarHeader>
 
       {/* Navigation */}
