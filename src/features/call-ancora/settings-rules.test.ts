@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CALL_ANCORA_DEFAULT_SETTINGS, callAncoraSettingsSchema, isWindowOpenFor, parseCallAncoraSettings, startOfTodaySaoPaulo } from "./settings-rules";
+import { CALL_ANCORA_DEFAULT_SETTINGS, callAncoraSettingsSchema, deviceHangupRules, isWindowOpenFor, parseCallAncoraSettings, startOfTodaySaoPaulo } from "./settings-rules";
 
 describe("configurações do Call Âncora", () => {
   it("usa o padrão quando não há nada salvo ou o JSON é inválido", () => {
@@ -16,6 +16,14 @@ describe("configurações do Call Âncora", () => {
     expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, leadPeriodMinAgeDays: 30, leadPeriodMaxAgeDays: 10 }).success).toBe(false);
     expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, windowStartHour: 20, windowEndHour: 8 }).success).toBe(false);
     expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, dailyContactsPerBroker: 0 }).success).toBe(false);
+  });
+
+  it("desligamento automático: padrão 22/4/25 s, faixas validadas e formato do celular", () => {
+    expect(deviceHangupRules(CALL_ANCORA_DEFAULT_SETTINGS)).toEqual({ enabled: true, ringTimeoutSec: 22, quickActiveSec: 4, voicemailAfterSec: 25 });
+    expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, ringTimeoutSeconds: 10 }).success).toBe(false);
+    expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, quickActiveSeconds: 9 }).success).toBe(false);
+    expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, voicemailAfterSeconds: 61 }).success).toBe(false);
+    expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, autoHangupEnabled: false, ringTimeoutSeconds: 30 }).success).toBe(true);
   });
 
   it("janela: segunda a sábado no horário, domingo nunca, sábado opcional", () => {

@@ -76,6 +76,14 @@ describe("API do app Android do Call Âncora", () => {
     expect(paired.pairBody).toMatchObject({ brokerFirstName: "Ana", state: { status: "active" } });
   });
 
+  it("entrega ao celular as regras de desligamento do diretor no pareamento e no estado", async () => {
+    const paired = await pairNew();
+    const rules = { enabled: true, ringTimeoutSec: 22, quickActiveSec: 4, voicemailAfterSec: 25 };
+    expect(paired.pairBody).toMatchObject({ hangup: rules });
+    const state = await (await stateGet(authed("state", paired.deviceToken))).json() as { hangup: unknown };
+    expect(state.hangup).toEqual(rules);
+  });
+
   it("recusa ticket já usado e ticket vencido", async () => {
     const session = newSession();
     expect((await pairPost(pairRequest(session.pairingToken))).status).toBe(200);
