@@ -293,6 +293,8 @@ Tarefa principal da tela mais usada: no Início do corretor, ver a próxima aç�
 - 2026-11-22: brief aprovado pelo Vinicios, inclusive a lista "Nunca parecer".
 - 2026-11-22: CLAUDE.md e AGENTS.md passam a apontar para o design system do Lite. Por quê: o Lite é a única versão.
 - 2026-11-22: partes antigas do `docs/design-system.md` (sistema "Dub") marcadas como descontinuadas; continuam valendo Product Density, assets contextuais, feedback e superfícies de marca.
+- 2026-11-22: Call Âncora do corretor (`/call-ancora`) refeito com o craft. "Com interesse" é a única ação primária depois da ligação (`LiteActionButton`); "Sem interesse" fica secundário; caixa postal, não atendeu e número errado ficam discretos. Por quê: é o resultado que vira lead, e os outros são frequentes e de menor peso.
+- 2026-11-22: no Call Âncora, ações raras vão para menus `⋯`: caixa postal durante a ligação, correção da classificação, pausar, encerrar e lista de teste. Por quê: só o essencial fica fixo na tela.
 - 2026-11-22: importação do design system para uma ferramenta de design recusada por ora. Por quê: não há Paper, pen.dev nem Figma configurado; o craft desenha em HTML a partir dos tokens do código.
 
 ## Open questions

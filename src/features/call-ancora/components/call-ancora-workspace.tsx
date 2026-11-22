@@ -409,7 +409,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
                 </motion.span>
               ) : <span />}
               <div className="flex items-center gap-3">
-                {session.current && session.status !== "ended" ? <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums text-(--text-muted)">Contato <LiteNumber value={Math.min(session.completed + 1, totalContacts)} /> de {totalContacts}</span> : null}
+                {session.current && session.status !== "ended" ? <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums text-(--text-muted)">Contato <LiteNumber value={Math.max(1, Math.min(session.countdown ? session.completed : session.completed + 1, totalContacts))} /> de {totalContacts}</span> : null}
                 {sessionMenu ? <LiteMenu label="Mais ações da sessão" items={sessionMenu} /> : null}
               </div>
             </div>
@@ -494,10 +494,10 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
                             <LiteActionButton busyLabel="Registrando…" doneLabel="Interesse registrado" keeps="A ligação continua registrada." disabled={busy} icon={<Heart className="size-4" aria-hidden="true" />} onAction={() => classify("interested")}>Com interesse</LiteActionButton>
                             <Button variant="secondary" size="lg" className="min-h-12 rounded-full" disabled={busy} onClick={() => void classify("not_interested")}><X className="size-4" aria-hidden="true" /> Sem interesse</Button>
                           </div>
-                          <div className="flex flex-wrap items-center justify-center gap-1">
-                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("voicemail")}>Caixa postal</Button>
-                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("no_answer")}>Não atendeu</Button>
-                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("wrong_number")}>Número errado</Button>
+                          <div className="flex flex-wrap items-center justify-center gap-0">
+                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full px-3" disabled={busy} onClick={() => void classify("voicemail")}>Caixa postal</Button>
+                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full px-3" disabled={busy} onClick={() => void classify("no_answer")}>Não atendeu</Button>
+                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full px-3" disabled={busy} onClick={() => void classify("wrong_number")}>Número errado</Button>
                           </div>
                         </div>
                       ) : null}
