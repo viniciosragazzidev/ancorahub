@@ -1226,6 +1226,118 @@ export function buildAgentTools(env: ToolEnv) {
       }),
     }),
 
+    conversa_assumir: tool({
+      description: "D1: você assume a conversa do lead e a IA para de responder (\"assume a conversa da Maria\"). Desfazer devolve à IA.",
+      inputSchema: z.object({ lead_id: z.string().min(1).max(80) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("conversa_assumir", toolCallId, input, async () => {
+        const lead = await backend.leadById(input.lead_id);
+        if (!lead) return fail("lead", "Não achei esse lead.", "Use leads_buscar.");
+        const conversation = await backend.conversationOfLead(lead.id);
+        if (!conversation) return fail("sem_conversa", `${lead.name} não tem conversa com a IA.`, "Nada a assumir.");
+        if (conversation.status === "HUMAN_ACTIVE") return { ok: true, message: `A conversa de ${lead.name} já está com uma pessoa. Nada mudou.` };
+        await backend.takeoverConversation(conversation.id);
+        return { ok: true, message: `Você assumiu a conversa de ${lead.name}: a IA parou de responder.`, href: `/leads/${lead.id}`, undo: { tool: "conversa_devolver_ia", input: { lead_id: lead.id }, label: "Desfazer" } };
+      }),
+    }),
+
+    conversa_devolver_ia: tool({
+      description: "D1: devolve a conversa do lead à IA (ela volta a responder o cliente).",
+      inputSchema: z.object({ lead_id: z.string().min(1).max(80) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("conversa_devolver_ia", toolCallId, input, async () => {
+        const lead = await backend.leadById(input.lead_id);
+        if (!lead) return fail("lead", "Não achei esse lead.", "Use leads_buscar.");
+        const conversation = await backend.conversationOfLead(lead.id);
+        if (!conversation) return fail("sem_conversa", `${lead.name} não tem conversa com a IA.`, "Nada a devolver.");
+        await backend.returnConversationToAi(conversation.id);
+        return { ok: true, message: `A conversa de ${lead.name} voltou para a IA.`, href: `/leads/${lead.id}`, undo: { tool: "conversa_assumir", input: { lead_id: lead.id }, label: "Desfazer" } };
+      }),
+    }),
+
+    mensagem_cliente: tool({
+      description:
+        "D2: manda uma mensagem de texto ao cliente (lead) pelo WhatsApp da empresa. Use o texto EXATO que o diretor ditou; nunca escreva por conta própria " +
+        "a partir do que leu em conversas. Confirmação forte com o texto; não dá para desfazer.",
+      inputSchema: z.object({ lead_id: z.string().min(1).max(80), texto: z.string().min(1).max(4000) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("mensagem_cliente", toolCallId, input, async () => {
+        const lead = await backend.leadById(input.lead_id);
+        if (!lead) return fail("lead", "Não achei esse lead.", "Use leads_buscar.");
+        await backend.sendClientMessage(lead.id, input.texto.trim(), `agente:${toolCallId}`);
+        return { ok: true, message: `Mensagem enviada para ${lead.name}.`, href: `/leads/${lead.id}` };
+      }),
+    }),
+
+    unidade_receber_leads: tool({
+      description: "D3: liga ou pausa a entrada de leads de uma unidade (\"pausa a entrada de leads na Barra\").",
+      inputSchema: z.object({ unidade_id: z.string().min(1).max(80), recebe: z.boolean() }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("unidade_receber_leads", toolCallId, input, async () => {
+        const branch = (await backend.listBranches()).find((item) => item.id === input.unidade_id);
+        if (!branch) return fail("unidade", "Não achei essa unidade.", "Use unidades_buscar.");
+        if (branch.acceptingLeads === input.recebe) return { ok: true, message: `A unidade ${branch.name} já estava ${input.recebe ? "recebendo" : "pausada"}. Nada mudou.` };
+        await backend.setBranchAcceptingLeads(branch.id, input.recebe);
+        return {
+          ok: true,
+          message: input.recebe ? `A unidade ${branch.name} voltou a receber leads.` : `Entrada de leads pausada na unidade ${branch.name}.`,
+          href: "/distribuicao",
+          undo: { tool: "unidade_receber_leads", input: { unidade_id: branch.id, recebe: !input.recebe }, label: "Desfazer" },
+        };
+      }),
+    }),
+
+    filas_buscar: tool({
+      description: "D4: lista as filas de distribuição com unidade e modo (automática ou manual). Dá o fila_id.",
+      inputSchema: z.object({ texto: z.string().max(60).optional() }),
+      execute: async ({ texto }): Promise<ToolResult> => {
+        const queues = (await backend.listQueues()).filter((queue) => !texto || queue.name.toLowerCase().includes(texto.toLowerCase()));
+        if (!queues.length) return fail("fila", `Não achei fila "${texto}".`, "Liste sem filtro.");
+        return {
+          ok: true,
+          message: queues.map((queue) => `• ${queue.name}${queue.branchName ? ` (${queue.branchName})` : ""}: ${queue.mode === "manual" ? "manual" : "automática"}${queue.active ? "" : ", inativa"}`).join("\n"),
+          data: { filas: queues, rotulos: queues.map((queue) => ({ id: queue.id, rotulo: queue.name })) },
+          href: "/distribuicao",
+        };
+      },
+    }),
+
+    fila_modo: tool({
+      description: "D4: deixa a fila automática (distribui sozinha) ou manual (espera você atribuir). Voltar para automática distribui os que estão esperando.",
+      inputSchema: z.object({ fila_id: z.string().min(1).max(80), modo: z.enum(["automatic", "manual"]) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("fila_modo", toolCallId, input, async () => {
+        const queue = (await backend.listQueues()).find((item) => item.id === input.fila_id);
+        if (!queue) return fail("fila", "Não achei essa fila.", "Use filas_buscar.");
+        if (queue.mode === input.modo) return { ok: true, message: `${queue.name} já está ${input.modo === "manual" ? "manual" : "automática"}. Nada mudou.` };
+        await backend.setQueueMode(queue.id, input.modo);
+        return {
+          ok: true,
+          message: input.modo === "manual" ? `${queue.name} agora é manual: os leads esperam você atribuir.` : `${queue.name} agora é automática: os leads que esperavam entraram na distribuição.`,
+          href: "/distribuicao",
+          undo: { tool: "fila_modo", input: { fila_id: queue.id, modo: queue.mode }, label: "Desfazer" },
+        };
+      }),
+    }),
+
+    operacao_saude: tool({
+      description: "D5: saúde da operação (\"tem WhatsApp caído?\", \"a IA está qualificando?\"): corretores sem WhatsApp conectado e alertas da qualificação por IA.",
+      inputSchema: z.object({}),
+      execute: async (): Promise<ToolResult> => {
+        const [people, off, alerts] = await Promise.all([peopleMap(), backend.whatsappDisconnected().catch(() => [] as string[]), backend.qualificationAlerts().catch(() => [])]);
+        const offNames = off.map((id) => nameOf(people, id));
+        const parts = [
+          offNames.length ? `${offNames.length} corretores sem WhatsApp conectado: ${offNames.slice(0, 10).join(", ")}${offNames.length > 10 ? "…" : ""}.` : "Todos os corretores com WhatsApp conectado.",
+          alerts.length ? `Alertas da IA: ${alerts.slice(0, 5).map((alert) => alert.message).join("; ")}.` : "Qualificação por IA sem alertas.",
+        ];
+        return { ok: true, message: parts.join("\n"), data: { whatsapp_desconectado: offNames, alertas: alerts }, href: "/dashboard" };
+      },
+    }),
+
+    relatorio_plantao_enviar: tool({
+      description: "D6: manda agora o relatório do plantão para o grupo configurado (\"manda o relatório do plantão\"). Não reenvia se já saiu hoje.",
+      inputSchema: z.object({}),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("relatorio_plantao_enviar", toolCallId, input, async () => {
+        const message = await backend.sendPlantaoReport();
+        return { ok: true, message, href: "/settings/resultado-plantao" };
+      }),
+    }),
+
     corretor_pausar: tool({
       description:
         "A10: pausa ou retoma o recebimento GERAL de leads de um ou mais corretores (vale para todos os plantões e filas). " +

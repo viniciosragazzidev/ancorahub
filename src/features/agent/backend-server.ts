@@ -33,6 +33,12 @@ import {
   updateTeamMemberAction,
 } from "@/app/(dashboard)/equipe/actions";
 import { sendBrokerDirectMessageAction } from "@/features/broker-workspace/broker-template-actions";
+import { returnConversationToAiAction, takeoverConversationAction } from "@/features/ai-agent/actions";
+import { getQualificationAlerts } from "@/features/ai-qualification/alerts-service";
+import { toggleAcceptingLeadsAction } from "@/features/branches/actions";
+import { setUnitQueueModeAction } from "@/features/lead-distribution/queue-mode-actions";
+import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-message";
+import { sendPlantaoReportNowAction } from "@/features/reports/plantao-report-actions";
 import { saveHomeAnnouncementAction } from "@/features/home-announcement/actions";
 import { getHomeAnnouncement } from "@/features/home-announcement/service";
 import { bulkChangeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
@@ -313,9 +319,9 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
     },
 
     async listBranches() {
-      const rows = await db.select({ id: schema.branches.id, name: schema.branches.name, status: schema.branches.status })
+      const rows = await db.select({ id: schema.branches.id, name: schema.branches.name, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads })
         .from(schema.branches).where(eq(schema.branches.tenantId, context.tenantId)).limit(200);
-      return rows.map((row) => ({ id: row.id, name: row.name, active: String(row.status) === "active" }));
+      return rows.map((row) => ({ id: row.id, name: row.name, active: String(row.status) === "active", acceptingLeads: Boolean(row.acceptingLeads) }));
     },
 
     async invite(input) {
@@ -386,6 +392,64 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
     async saveHomeAnnouncement(value) {
       const result = await saveHomeAnnouncementAction(value);
       if (!result.ok) throw new Error(result.error);
+    },
+
+    async conversationOfLead(leadId) {
+      const [row] = await db.select({ id: schema.aiConversations.id, status: schema.aiConversations.status })
+        .from(schema.aiConversations)
+        .where(and(eq(schema.aiConversations.tenantId, context.tenantId), eq(schema.aiConversations.leadId, leadId)))
+        .orderBy(desc(schema.aiConversations.updatedAt))
+        .limit(1);
+      return row ? { id: row.id, status: String(row.status) } : null;
+    },
+
+    async takeoverConversation(conversationId) {
+      const result = await takeoverConversationAction(conversationId);
+      if (!result.success) throw new Error(result.error ?? "Não foi possível assumir a conversa.");
+    },
+
+    async returnConversationToAi(conversationId) {
+      const result = await returnConversationToAiAction(conversationId);
+      if (!result.success) throw new Error(result.error ?? "Não foi possível devolver a conversa à IA.");
+    },
+
+    async sendClientMessage(leadId, body, clientMessageId) {
+      const result = await sendLeadMessageAction(leadId, body, clientMessageId);
+      if (!result.success) throw new Error(("error" in result && result.error) || "Não foi possível enviar a mensagem.");
+    },
+
+    async setBranchAcceptingLeads(branchId, accepting) {
+      const [branch] = await db.select({ acceptingLeads: schema.branches.acceptingLeads }).from(schema.branches)
+        .where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+      if (!branch) throw new Error("Unidade não encontrada.");
+      if (Boolean(branch.acceptingLeads) === accepting) return;
+      const result = await toggleAcceptingLeadsAction({}, formOf({ branchId }));
+      if (result.error) throw new Error(result.error);
+    },
+
+    async listQueues() {
+      const rows = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, branchName: schema.branches.name, mode: schema.leadQueues.assignmentMode, status: schema.leadQueues.status })
+        .from(schema.leadQueues)
+        .leftJoin(schema.branches, eq(schema.branches.id, schema.leadQueues.branchId))
+        .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt)))
+        .limit(200);
+      return rows.map((row) => ({ id: row.id, name: row.name, branchName: row.branchName, mode: row.mode === "manual" ? "manual" as const : "automatic" as const, active: row.status === "active" }));
+    },
+
+    async setQueueMode(queueId, mode) {
+      const result = await setUnitQueueModeAction({ queueId, mode });
+      if (!result.ok) throw new Error(result.reason);
+    },
+
+    async qualificationAlerts() {
+      const alerts = await getQualificationAlerts(context.tenantId);
+      return alerts.map((alert) => ({ level: String(alert.level), message: alert.message }));
+    },
+
+    async sendPlantaoReport() {
+      const result = await sendPlantaoReportNowAction();
+      if (!result.ok) throw new Error(result.error);
+      return result.message;
     },
 
     async unassignLead(leadId) {

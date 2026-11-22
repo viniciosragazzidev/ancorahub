@@ -192,6 +192,38 @@ export const AGENT_CATALOG = {
     name: "aviso_inicio", title: "Aviso no Início", doing: "Publicando o aviso…", topic: "equipe",
     risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["C6"],
   },
+  conversa_assumir: {
+    name: "conversa_assumir", title: "Assumir a conversa", doing: "Assumindo a conversa…", topic: "conversas",
+    risk: { readOnly: false }, roles: DIRECTOR, confirm: "direto", covers: ["D1"],
+  },
+  conversa_devolver_ia: {
+    name: "conversa_devolver_ia", title: "Devolver a conversa à IA", doing: "Devolvendo à IA…", topic: "conversas",
+    risk: { readOnly: false, external: false }, roles: DIRECTOR, confirm: "toque", covers: ["D1"],
+  },
+  mensagem_cliente: {
+    name: "mensagem_cliente", title: "Mensagem ao cliente", doing: "Enviando ao cliente…", topic: "conversas",
+    risk: { readOnly: false, external: true }, roles: DIRECTOR, confirm: "forte", covers: ["D2"],
+  },
+  unidade_receber_leads: {
+    name: "unidade_receber_leads", title: "Entrada de leads da unidade", doing: "Mudando a entrada de leads…", topic: "distribuicao",
+    risk: { readOnly: false }, roles: DIRECTOR, confirm: "toque", covers: ["D3"],
+  },
+  filas_buscar: {
+    name: "filas_buscar", title: "Filas", doing: "Lendo as filas…", topic: "consulta",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["D4"],
+  },
+  fila_modo: {
+    name: "fila_modo", title: "Modo da fila", doing: "Mudando o modo da fila…", topic: "distribuicao",
+    risk: { readOnly: false }, roles: DIRECTOR, confirm: "toque", covers: ["D4"],
+  },
+  operacao_saude: {
+    name: "operacao_saude", title: "Saúde da operação", doing: "Verificando WhatsApp e IA…", topic: "consulta",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["D5"],
+  },
+  relatorio_plantao_enviar: {
+    name: "relatorio_plantao_enviar", title: "Enviar o relatório do plantão", doing: "Enviando o relatório…", topic: "plantoes",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["D6"],
+  },
   corretor_pausar: {
     name: "corretor_pausar", title: "Pausar recebimento", doing: "Mudando o recebimento de leads…", topic: "equipe",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: many("corretor_ids"), covers: ["A10"],

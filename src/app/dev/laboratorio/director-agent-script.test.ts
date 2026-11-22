@@ -243,6 +243,46 @@ describe("A7 e A8 com o agente real", { timeout: 20_000 }, () => {
     expect(backend.world.messages).toHaveLength(2);
   });
 
+  it("D1: assume a conversa da Maria Clara; Desfazer devolve à IA", async () => {
+    const { world, backend } = await run("Assume a conversa da Maria Clara", (w) => { w.conversations = { "l-0005": { id: "c-5", status: "WAITING_CUSTOMER" } }; });
+    expect(world.conversations?.["l-0005"]?.status).toBe("HUMAN_ACTIVE");
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "conversa_devolver_ia", input: { lead_id: "l-0005" } });
+  });
+
+  it("D2: mensagem ao cliente só depois da confirmação forte, com o texto exato", async () => {
+    const { world, asked } = await run("Manda pra Maria Clara: sua proposta sai amanhã");
+    expect(asked).toBe(true);
+    expect(world.clientMessages).toEqual([{ leadId: "l-0005", body: "sua proposta sai amanhã" }]);
+  });
+
+  it("D2: sem o sim do diretor, nada vai ao cliente", async () => {
+    const { world, asked } = await run("Manda pra Maria Clara: sua proposta sai amanhã", undefined, false);
+    expect(asked).toBe(true);
+    expect(world.clientMessages ?? []).toHaveLength(0);
+  });
+
+  it("D3: pausa a entrada de leads na Barra; Desfazer religa", async () => {
+    const { world, backend } = await run("Pausa a entrada de leads na Barra");
+    expect(world.branches?.find((branch) => branch.id === "b-barra")?.acceptingLeads).toBe(false);
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "unidade_receber_leads", input: { recebe: true } });
+  });
+
+  it("D4: deixa a fila PME manual", async () => {
+    const { world } = await run("Deixa a fila PME manual");
+    expect(world.queues?.find((queue) => queue.id === "q-pme")?.mode).toBe("manual");
+  });
+
+  it("D5: saúde mostra quem está sem WhatsApp", async () => {
+    const { calls } = await run("Tem WhatsApp caído?", (w) => { w.whatsappOff = ["u-carla"]; });
+    expect(calls).toEqual(["operacao_saude"]);
+  });
+
+  it("D6: relatório do plantão (confirmação em um toque)", async () => {
+    const { world, asked } = await run("Manda o relatório do plantão");
+    expect(asked).toBe(true);
+    expect(world.reportsSent).toBe(1);
+  });
+
   it("A8: presencial sem motivo não libera e pede a nota", async () => {
     const { world, backend } = await run("Libera a presença do Bruno", (w) => { w.presence = { "s-manha:2026-11-21|u-bruno": "pending" }; });
     expect(world.presence?.["s-manha:2026-11-21|u-bruno"]).toBe("pending");

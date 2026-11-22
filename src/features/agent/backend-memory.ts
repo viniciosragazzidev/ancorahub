@@ -1,5 +1,5 @@
 import type { AgentActionRecord, AgentBackend, DutyNow } from "./backend";
-import type { Announcement, Branch, LeadSummary, PendingInvite, Person, SeatOccurrence } from "./types";
+import type { Announcement, Branch, LeadSummary, PendingInvite, Person, QueueInfo, SeatOccurrence } from "./types";
 
 /**
  * Mundo em memória para o laboratório e os testes: a mesma interface do backend real, com as mesmas regras
@@ -38,6 +38,11 @@ export type MemoryWorld = {
   pending?: PendingInvite[];
   messages?: Array<{ userId: string; body: string }>;
   announcement?: Announcement | null;
+  conversations?: Record<string, { id: string; status: string }>;
+  clientMessages?: Array<{ leadId: string; body: string }>;
+  queues?: QueueInfo[];
+  alerts?: Array<{ level: string; message: string }>;
+  reportsSent?: number;
 };
 
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
@@ -258,7 +263,48 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
       return world.whatsappOff ?? [];
     },
     async listBranches() {
-      return world.branches ?? [{ id: "b-centro", name: "Centro", active: true }, { id: "b-barra", name: "Barra", active: true }];
+      world.branches ??= [{ id: "b-centro", name: "Centro", active: true, acceptingLeads: true }, { id: "b-barra", name: "Barra", active: true, acceptingLeads: true }];
+      return world.branches.map((branch) => ({ ...branch }));
+    },
+    async conversationOfLead(leadId) {
+      return world.conversations?.[leadId] ?? null;
+    },
+    async takeoverConversation(conversationId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      for (const conversation of Object.values(world.conversations ?? {})) if (conversation.id === conversationId) conversation.status = "HUMAN_ACTIVE";
+    },
+    async returnConversationToAi(conversationId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      for (const conversation of Object.values(world.conversations ?? {})) if (conversation.id === conversationId) conversation.status = "WAITING_CUSTOMER";
+    },
+    async sendClientMessage(leadId, body) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.clientMessages = [...(world.clientMessages ?? []), { leadId, body }];
+    },
+    async setBranchAcceptingLeads(branchId, accepting) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.branches ??= [{ id: "b-centro", name: "Centro", active: true, acceptingLeads: true }, { id: "b-barra", name: "Barra", active: true, acceptingLeads: true }];
+      const branch = world.branches.find((item) => item.id === branchId);
+      if (!branch) throw new Error("Unidade não encontrada.");
+      branch.acceptingLeads = accepting;
+    },
+    async listQueues() {
+      world.queues ??= [{ id: "q-pme", name: "Fila PME", branchName: "Centro", mode: "automatic", active: true }, { id: "q-barra", name: "Fila Barra", branchName: "Barra", mode: "automatic", active: true }];
+      return world.queues.map((queue) => ({ ...queue }));
+    },
+    async setQueueMode(queueId, mode) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const queue = (world.queues ?? []).find((item) => item.id === queueId);
+      if (!queue) throw new Error("Fila não encontrada.");
+      queue.mode = mode;
+    },
+    async qualificationAlerts() {
+      return world.alerts ?? [];
+    },
+    async sendPlantaoReport() {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.reportsSent = (world.reportsSent ?? 0) + 1;
+      return "Relatório enviado ao grupo configurado.";
     },
     async invite(input) {
       if (world.failWrites) throw new Error("Falha simulada do servidor.");

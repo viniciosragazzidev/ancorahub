@@ -51,6 +51,12 @@ export const LAB_PHRASES = [
   "Passa a Carla para a unidade Barra",
   "Desativa o Bruno",
   "Põe no Início: plantão extra sábado",
+  "Assume a conversa da Maria Clara",
+  "Manda pra Maria Clara: sua proposta sai amanhã",
+  "Pausa a entrada de leads na Barra",
+  "Deixa a fila PME manual",
+  "Tem WhatsApp caído?",
+  "Manda o relatório do plantão",
 ];
 
 function textOf(content: unknown) {
@@ -125,6 +131,47 @@ export function nextLabStep(prompt: Prompt): Step {
   if (request.includes("falta gente")) {
     if (!last) return { kind: "tool", name: "plantao_escala", input: { so_faltando_gente: true } };
     return { kind: "text", text: String(last.value?.message ?? "") };
+  }
+
+  // Bloco D: conversas e operação.
+  if (request.includes("whatsapp caído") || request.includes("whatsapp caido")) {
+    const read = find("operacao_saude");
+    return read ? { kind: "text", text: String(read.value?.message ?? "") } : { kind: "tool", name: "operacao_saude", input: {} };
+  }
+  if (request.includes("relatório do plantão") || request.includes("relatorio do plantao")) {
+    const done = find("relatorio_plantao_enviar");
+    return done ? { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." } : { kind: "tool", name: "relatorio_plantao_enviar", input: {} };
+  }
+  const takeover = request.match(/^assume a conversa d[ao] (.+?)\??$/);
+  const clientMsg = request.match(/^manda pra (.+?): (.+)$/);
+  const pauseUnit = request.match(/^pausa a entrada de leads na (\S+?)\??$/);
+  const queueManual = request.match(/^deixa a fila (\S+) manual/);
+  if (pauseUnit) {
+    const units = find("unidades_buscar");
+    if (!units) return { kind: "tool", name: "unidades_buscar", input: { texto: pauseUnit[1] } };
+    const unitId = ((units.value?.data as { unidades?: Array<{ id: string }> } | undefined)?.unidades ?? [])[0]?.id;
+    const done = find("unidade_receber_leads");
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return unitId ? { kind: "tool", name: "unidade_receber_leads", input: { unidade_id: unitId, recebe: false } } : { kind: "text", text: "Não achei a unidade." };
+  }
+  if (queueManual) {
+    const queues = find("filas_buscar");
+    if (!queues) return { kind: "tool", name: "filas_buscar", input: { texto: queueManual[1] } };
+    const queueId = ((queues.value?.data as { filas?: Array<{ id: string }> } | undefined)?.filas ?? [])[0]?.id;
+    const done = find("fila_modo");
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return queueId ? { kind: "tool", name: "fila_modo", input: { fila_id: queueId, modo: "manual" } } : { kind: "text", text: "Não achei a fila." };
+  }
+  if (takeover || clientMsg) {
+    const leadName = (takeover ?? clientMsg)![1]!;
+    const leadsFound = find("leads_buscar");
+    if (!leadsFound) return { kind: "tool", name: "leads_buscar", input: { texto: leadName } };
+    const leadId = ((leadsFound.value?.data as { leads?: Array<{ id: string }> } | undefined)?.leads ?? [])[0]?.id;
+    if (!leadId) return { kind: "text", text: "Não achei o lead." };
+    const tool = takeover ? "conversa_assumir" : "mensagem_cliente";
+    const done = find(tool);
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return takeover ? { kind: "tool", name: tool, input: { lead_id: leadId } } : { kind: "tool", name: tool, input: { lead_id: leadId, texto: clientMsg![2] } };
   }
 
   // Bloco C: equipe.

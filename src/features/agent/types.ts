@@ -105,7 +105,9 @@ export type Person = {
   customRoleId?: string | null;
 };
 
-export type Branch = { id: string; name: string; active: boolean };
+export type Branch = { id: string; name: string; active: boolean; acceptingLeads?: boolean };
+
+export type QueueInfo = { id: string; name: string; branchName: string | null; mode: "automatic" | "manual"; active: boolean };
 
 export type PendingInvite = { id: string; name: string | null; email: string | null; status: string; expiresAt: string | null };
 

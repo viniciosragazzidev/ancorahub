@@ -148,6 +148,11 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "carteira_transferir" ? `Transferir toda a carteira de ${label(input.de_id)} para ${label(input.para_id)}?`
     : name === "fila_distribuir_sem_dono" ? "Distribuir todos os leads sem dono?"
     : name === "membro_convidar" ? `Convidar ${String(input.nome ?? "")}?`
+    : name === "conversa_devolver_ia" ? `Devolver a conversa de ${label(input.lead_id)} à IA?`
+    : name === "mensagem_cliente" ? `Mandar para ${label(input.lead_id)}?`
+    : name === "unidade_receber_leads" ? `${input.recebe ? "Voltar a receber leads na" : "Pausar a entrada de leads na"} unidade ${label(input.unidade_id)}?`
+    : name === "fila_modo" ? `Deixar ${label(input.fila_id)} ${input.modo === "manual" ? "manual" : "automática"}?`
+    : name === "relatorio_plantao_enviar" ? "Enviar o relatório do plantão ao grupo?"
     : name === "convite_revogar" ? `Revogar o convite de ${label(input.convite_id)}?`
     : name === "membro_trocar_unidade" ? `Passar ${label(input.pessoa_id)} para a unidade ${label(input.unidade_id)}?`
     : name === "membro_ativar" ? `${input.ativo ? "Ativar" : "Desativar"} o acesso de ${label(input.pessoa_id)}?`
@@ -155,7 +160,10 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "aviso_inicio" ? (input.desligar ? "Tirar o aviso do Início?" : `Publicar no Início: "${String(input.titulo ?? "")}"?`)
     : name === "escala_mensal_publicar" ? `Publicar a ${seatLabels.get(String(input.plano_id)) ?? "escala do mês"}?`
     : name === "escala_tirar_dia" ? (input.voltar ? `Devolver o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} à escala?` : `Tirar o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} da escala?`) : null;
-  const strongNote = name === "corretores_mensagem" ? `"${String(input.texto ?? "")}" — vai pelo WhatsApp e não dá para desfazer.`
+  const strongNote = name === "mensagem_cliente" ? `"${String(input.texto ?? "")}" — vai pelo WhatsApp da empresa para o cliente e não dá para desfazer.`
+    : name === "conversa_devolver_ia" ? "A IA volta a responder o cliente."
+    : name === "fila_modo" && input.modo === "automatic" ? "Os leads que esperam nessa fila entram na distribuição agora."
+    : name === "corretores_mensagem" ? `"${String(input.texto ?? "")}" — vai pelo WhatsApp e não dá para desfazer.`
     : name === "membro_convidar" ? `WhatsApp ${String(input.whatsapp ?? "")}${input.email ? `, e-mail ${String(input.email)}` : ""}, unidade ${label(input.unidade_id)}. O convite sai por WhatsApp.`
     : name === "membro_ativar" && !input.ativo ? "Desativada, a pessoa não entra no sistema nem recebe leads."
     : name === "aviso_inicio" && !input.desligar ? `${input.texto ? `${String(input.texto)} ` : ""}Todos os corretores veem no Início.`
@@ -170,6 +178,9 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "plantao_marcar_falta" ? (input.falta === false ? "Desfazer falta" : "Marcar falta") : name === "plantao_liberar_presenca" ? "Liberar"
     : name === "plantao_reenviar_convite" ? "Reenviar"
     : name === "plantao_dar_leads" ? "Passar leads" : name === "lead_mudar_etapa" ? "Mudar etapa"
+    : name === "mensagem_cliente" ? "Enviar ao cliente" : name === "conversa_devolver_ia" ? "Devolver à IA"
+    : name === "unidade_receber_leads" ? (input.recebe ? "Voltar a receber" : "Pausar entrada") : name === "fila_modo" ? "Mudar modo"
+    : name === "relatorio_plantao_enviar" ? "Enviar relatório"
     : name === "membro_convidar" ? "Convidar" : name === "convite_revogar" ? "Revogar" : name === "membro_trocar_unidade" ? "Trocar unidade"
     : name === "membro_ativar" ? (input.ativo ? "Ativar" : "Desativar") : name === "corretores_mensagem" ? `Enviar para ${ids.length}`
     : name === "aviso_inicio" ? (input.desligar ? "Tirar aviso" : "Publicar aviso")

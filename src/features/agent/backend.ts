@@ -1,4 +1,4 @@
-import type { Announcement, Branch, LeadFilter, LeadSummary, PendingInvite, Person, SeatOccurrence } from "./types";
+import type { Announcement, Branch, LeadFilter, LeadSummary, PendingInvite, Person, QueueInfo, SeatOccurrence } from "./types";
 
 /**
  * O que as ferramentas precisam do CRM. No servidor (`backend-server.ts`) cada método chama a consulta ou a ação
@@ -142,6 +142,20 @@ export interface AgentBackend {
   messageBroker(userId: string, body: string): Promise<void>;
   homeAnnouncement(): Promise<Announcement | null>;
   saveHomeAnnouncement(value: Announcement): Promise<void>;
+  /** Conversa de IA mais recente do lead (para assumir ou devolver). */
+  conversationOfLead(leadId: string): Promise<{ id: string; status: string } | null>;
+  takeoverConversation(conversationId: string): Promise<void>;
+  returnConversationToAi(conversationId: string): Promise<void>;
+  /** Mensagem de texto ao cliente pelo canal da empresa. */
+  sendClientMessage(leadId: string, body: string, clientMessageId: string): Promise<void>;
+  /** Liga ou pausa a entrada de leads de uma unidade. */
+  setBranchAcceptingLeads(branchId: string, accepting: boolean): Promise<void>;
+  listQueues(): Promise<QueueInfo[]>;
+  setQueueMode(queueId: string, mode: "automatic" | "manual"): Promise<void>;
+  /** Alertas da qualificação por IA. */
+  qualificationAlerts(): Promise<Array<{ level: string; message: string }>>;
+  /** Envia o relatório do plantão ao grupo agora. Devolve a mensagem da tela. */
+  sendPlantaoReport(): Promise<string>;
   /** Pausa ou retoma o recebimento geral de leads dos corretores. */
   setAvailability(brokerIds: string[], target: "available" | "paused"): Promise<void>;
   /** Grava a trilha em agent_actions; devolve o id ou null (tabela ausente, erro). Idempotente por toolCallId. */
