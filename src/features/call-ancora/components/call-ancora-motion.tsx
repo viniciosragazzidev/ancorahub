@@ -162,10 +162,10 @@ export function Beat({ at = "visual", children, className }: { at?: keyof typeof
 export function ConnectedMoment({ brokerFirstName }: { brokerFirstName: string }) {
   const reduce = !useMotionAllowed();
   return (
-    <section role="status" aria-live="polite" className="mx-auto flex min-h-[min(58vh,520px)] max-w-3xl flex-col items-center justify-center rounded-2xl border border-(--border) bg-(--surface) px-6 py-14 text-center">
+    <section role="status" aria-live="polite" className="mx-auto flex min-h-[min(58vh,520px)] max-w-3xl flex-col items-center justify-center rounded-(--radius-surface) border border-(--border) bg-(--surface) px-6 py-14 text-center">
       <span className="relative inline-flex">
         <motion.span
-          className="grid size-20 place-items-center rounded-2xl bg-(--success)/10 text-(--success)"
+          className="grid size-20 place-items-center rounded-full bg-(--success)/10 text-(--success)"
           initial={reduce ? { opacity: 0 } : { opacity: 0, scale: motionTokens.scale.popIn }}
           animate={{ opacity: 1, scale: 1 }}
           transition={reduce ? reducedFade : motionTokens.spring.snappy}
@@ -175,7 +175,7 @@ export function ConnectedMoment({ brokerFirstName }: { brokerFirstName: string }
         {reduce ? null : (
           <motion.span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-2xl border-2 border-(--success)"
+            className="pointer-events-none absolute inset-0 rounded-full border-2 border-(--success)"
             initial={{ opacity: motionTokens.attention.opacity, scale: 1 }}
             animate={{ opacity: 0, scale: 1.35 }}
             transition={{ duration: motionTokens.attention.duration, ease: easeStandard, delay: motionTokens.beat.text }}
@@ -193,7 +193,7 @@ export function ConnectedMoment({ brokerFirstName }: { brokerFirstName: string }
           </svg>
         </motion.span>
       </span>
-      <h2 className="mt-8 text-3xl font-semibold tracking-tight text-(--foreground)">Celular conectado</h2>
+      <h2 className="mt-8 text-3xl font-medium tracking-tight text-(--foreground)">Celular conectado</h2>
       <p className="mt-3 text-xl font-medium text-(--foreground)"><NameReveal text={`Olá, ${brokerFirstName}!`} delay={motionTokens.beat.text} /></p>
       <Beat at="after"><p className="mt-3 max-w-sm text-sm leading-6 text-(--text-secondary)">Preparando a sua fila…</p></Beat>
     </section>
@@ -306,7 +306,7 @@ export function CallAvatar({ name, status }: { name: string; status: CallStatus 
         animate={{ borderColor: status === "active" ? "var(--success)" : calling ? "var(--primary)" : "var(--border)" }}
         transition={reduce ? reducedFade : { duration: motionTokens.duration.standard, ease: easeStandard }}
       />
-      <span className="grid size-20 place-items-center rounded-full bg-(--accent-subtle) text-2xl font-semibold text-(--accent-strong)">{contactInitials(name)}</span>
+      <span className="grid size-20 place-items-center rounded-full bg-(--accent-subtle) text-2xl font-medium text-(--accent-strong)">{contactInitials(name)}</span>
     </span>
   );
 }

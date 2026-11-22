@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { ArrowRight, Check, Clock3, Headphones, Heart, Phone, PhoneCall, Radio, ScanLine, Smartphone, Sparkles, Users, X } from "lucide-react";
+import { ArrowRight, Check, Clock3, Headphones, Heart, Pause, Phone, PhoneCall, PhoneOff, Play, Radio, ScanLine, Smartphone, Sparkles, Users, X } from "lucide-react";
 
 import { Button } from "@/components/arc/button/button";
+import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import { LiteActionButton, type LiteActionOutcome } from "@/components/lite/controls/action-button";
+import { LiteMenu } from "@/components/lite/controls/menu";
 import { motionTokens } from "@/components/arc/motion-tokens";
 import { LiteAttention, LiteNumber } from "@/components/lite/motion";
 import { reducedFade } from "@/components/lite/motion/shared";
@@ -123,8 +127,10 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
   const [now, setNow] = useState(0);
   const [simulating, setSimulating] = useState(false);
   const [testListText, setTestListText] = useState("");
+  /** A primeira resposta do servidor chegou: até lá mostra o esqueleto, não a tela de início. */
+  const [loaded, setLoaded] = useState(false);
+  const [testToolsOpen, setTestToolsOpen] = useState(false);
   const pollInFlight = useRef(false);
-  const previousInterestCount = useRef(0);
   const autoStartedLabContact = useRef<string | null>(null);
 
   useEffect(() => {
@@ -147,6 +153,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
         if (!cancelled) {
           setSession(payload.session ?? null);
           setError(null);
+          setLoaded(true);
         }
       } catch (reason) {
         if (!cancelled) setError(reason instanceof Error ? reason.message : "A sessão não respondeu. Tente atualizar.");
@@ -158,12 +165,6 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
     const timer = window.setInterval(() => { void load(); }, POLL_MS);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [isLab]);
-
-  useEffect(() => {
-    const count = session?.interests.length ?? 0;
-    if (count > previousInterestCount.current) fire("confirm");
-    previousInterestCount.current = count;
-  }, [fire, session?.interests.length]);
 
   // Pareamento confirmado pelo servidor (o celular leu o QR): nível 1, uma vez por sessão.
   useEffect(() => {
@@ -211,8 +212,8 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
     }
   }, [brokerFirstName, isLab]);
 
-  const classify = useCallback(async (outcome: CallOutcome) => {
-    if (!session || session.callStatus !== "ended") return;
+  const classify = useCallback(async (outcome: CallOutcome): Promise<LiteActionOutcome> => {
+    if (!session || session.callStatus !== "ended") return { ok: false, message: "A ligação ainda não terminou." };
     setBusy(true);
     setError(null);
     if (isLab) {
@@ -227,15 +228,18 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
         return current.autoDialEnabled ? classified : advanceLabSession(classified);
       });
       setBusy(false);
-      return;
+      return { ok: true };
     }
     try {
       const response = await fetch("/api/call-ancora/session", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "classify", outcome }) });
       const payload = await response.json() as { session?: CallAncoraSnapshot; error?: string };
-      if (!response.ok || !payload.session) throw new Error(payload.error || "A classificação não foi registrada. Tente de novo.");
+      if (!response.ok || !payload.session) throw new Error(payload.error || "A classificação não foi registrada.");
       setSession(payload.session);
+      return { ok: true };
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "A classificação não foi registrada. Tente de novo.");
+      const message = reason instanceof Error ? reason.message : "A classificação não foi registrada.";
+      setError(`${message} A ligação continua registrada. Escolha o resultado de novo.`);
+      return { ok: false, message };
     } finally {
       setBusy(false);
     }
@@ -326,25 +330,39 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
   const realCallInProgress = Boolean(session?.current?.dialable) && (session?.callStatus === "dialing" || session?.callStatus === "ringing" || session?.callStatus === "active");
   const calling = session?.callStatus === "dialing" || session?.callStatus === "ringing";
 
+  const phoneReachable = !session?.phone || session.phone.reachable;
+  const paused = session?.runState === "paused";
+  const interestCount = session?.interests.length ?? 0;
+  const sessionMenu = session && session.status === "active" && !isLab ? [
+    paused
+      ? { id: "resume", label: "Retomar sessão", onSelect: () => void sendAction({ action: "run-resume" }, "Não consegui retomar a sessão.") }
+      : { id: "pause", label: "Pausar sessão", onSelect: () => void sendAction({ action: "run-pause" }, "Não consegui pausar a sessão.") },
+    ...(canUseTestList ? [{ id: "test-list", label: testToolsOpen ? "Fechar lista de teste" : "Lista de teste (ligação real)", onSelect: () => setTestToolsOpen((open) => !open) }] : []),
+    { id: "end", label: "Encerrar sessão", tone: "danger" as const, onSelect: () => void sendAction({ action: "end" }, "Não consegui encerrar a sessão.") },
+  ] : null;
+
   return (
     <main className="arc-venancor lite-page flex min-h-full flex-col gap-5 bg-(--surface) text-(--foreground)">
       <div className="w-full">
         {settingsSlot}
-        {error ? <p className="mb-5 rounded-xl border border-(--danger)/25 bg-(--danger)/5 px-4 py-3 text-sm text-(--danger)" role="alert">{error}</p> : null}
+        {error ? <p className="mx-auto mb-5 max-w-2xl rounded-(--radius-panel) border border-(--danger)/25 bg-(--danger)/5 px-4 py-3 text-sm text-(--foreground)" role="alert">{error}</p> : null}
 
-        {!session ? (
-          <section className="mx-auto flex min-h-[min(58vh,560px)] max-w-3xl flex-col items-center justify-center rounded-2xl border border-(--border) bg-(--surface) px-6 py-12 text-center md:px-12">
+        {!session && !loaded && !isLab ? (
+          <section className="mx-auto max-w-2xl rounded-(--radius-surface) border border-(--border) bg-(--surface) p-6 md:p-8" aria-label="Carregando a sessão do Call Âncora">
+            <Skeleton label="Carregando a sessão" lines={3} avatar />
+          </section>
+        ) : !session ? (
+          <section className="mx-auto flex min-h-[min(58vh,560px)] max-w-3xl flex-col items-center justify-center rounded-(--radius-surface) border border-(--border) bg-(--surface) px-6 py-12 text-center md:px-12">
             <Beat className="mb-7">
               <LiteAttention pulseKey="intro" className="rounded-full">
                 <span className="grid size-20 place-items-center rounded-full bg-(--accent-subtle) text-(--accent-strong)"><Headphones className="size-9" aria-hidden="true" /></span>
               </LiteAttention>
             </Beat>
             <Beat at="text">
-              <p className="text-xs font-semibold text-(--text-muted)">Call Âncora</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-(--foreground) md:text-4xl">Uma conversa de cada vez.</h2>
+              <h2 className="text-3xl font-medium tracking-tight text-(--foreground) md:text-4xl">Uma conversa de cada vez.</h2>
             </Beat>
             <Beat at="number">
-              <p className="mx-auto mt-4 max-w-md text-base leading-7 text-(--text-secondary)">Conecte o celular com o app Call Âncora e acompanhe a ligação, o próximo contato e os interessados nesta tela.</p>
+              <p className="mx-auto mt-4 max-w-md text-base leading-7 text-(--text-secondary)">Conecte o celular do Call Âncora. Aqui você vê com quem está falando, o próximo da fila e quem teve interesse.</p>
             </Beat>
             <Beat at="after" className="flex flex-col items-center">
               <Button className="mt-8 min-h-14 min-w-52 rounded-full px-10 text-base" size="lg" loading={busy} onClick={() => void start()}>
@@ -353,141 +371,173 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
             </Beat>
           </section>
         ) : session.status === "waiting_pairing" ? (
-          <section className="mx-auto grid max-w-4xl items-center gap-8 rounded-2xl border border-(--border) bg-(--surface) p-6 md:grid-cols-[1fr_auto] md:p-10">
+          <section className="mx-auto grid max-w-4xl items-center gap-8 rounded-(--radius-surface) border border-(--border) bg-(--surface) p-6 md:grid-cols-[1fr_auto] md:p-10">
             <div>
-              <Beat><span className="inline-flex size-12 items-center justify-center rounded-xl bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-6" aria-hidden="true" /></span></Beat>
+              <Beat><span className="inline-flex size-12 items-center justify-center rounded-full bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-6" aria-hidden="true" /></span></Beat>
               <Beat at="text">
-                <h2 className="mt-5 text-2xl font-semibold text-(--foreground)">Conecte o celular</h2>
-                <p className="mt-2 max-w-lg text-sm leading-6 text-(--text-secondary)">Abra a câmera do celular e leia este QR. O código vale por dois minutos e só pode ser usado uma vez.</p>
+                <h2 className="mt-5 text-2xl font-medium text-(--foreground)">Conecte o celular</h2>
+                <p className="mt-2 max-w-lg text-sm leading-6 text-(--text-secondary)">Abra o app Call Âncora no celular e leia este QR. Ele vale por dois minutos e só pode ser usado uma vez.</p>
               </Beat>
               <Beat at="number" className="mt-6 max-w-xs">
                 <p className="mb-2 flex items-center gap-2 text-sm text-(--text-secondary)" aria-live="off"><Clock3 className="size-4" aria-hidden="true" /> <span className="tabular-nums">{pairExpired ? "QR vencido" : `Expira em ${pairSecondsLeft} s`}</span></p>
                 <ExpiryBar ratio={pairExpired ? 0 : pairSecondsLeft / PAIR_TTL_SECONDS} />
               </Beat>
               <Beat at="after" className="mt-6 flex flex-wrap gap-3">
-                <Button className="min-h-11 rounded-full" variant="secondary" onClick={() => void start()} loading={busy}>{pairExpired ? "Gerar outro QR" : "Gerar novo QR"}</Button>
+                <Button className="min-h-11 rounded-full" variant={pairExpired ? "primary" : "secondary"} onClick={() => void start()} loading={busy}>{pairExpired ? "Gerar outro QR" : "Gerar novo QR"}</Button>
                 {isLab ? <Button className="min-h-11 rounded-full" variant="secondary" disabled={pairExpired} onClick={simulateLabPairing}><ScanLine className="size-4" aria-hidden="true" /> Simular leitura do QR</Button> : null}
               </Beat>
             </div>
             <div className="relative">
               {qrValue ? <PairingQr value={qrValue} expired={pairExpired} label="QR code de pareamento do Call Âncora" /> : <div className="grid size-64 place-items-center text-sm text-(--text-muted)">Preparando QR…</div>}
-              {pairExpired ? <span className="absolute inset-0 grid place-items-center"><span className="rounded-full border border-(--border) bg-(--surface) px-4 py-2 text-sm font-medium text-(--foreground)">Gere outro QR</span></span> : null}
+              {pairExpired ? <span className="absolute inset-0 grid place-items-center"><span className="rounded-full border border-(--border) bg-(--surface) px-4 py-2 text-sm font-medium text-(--foreground)">QR vencido</span></span> : null}
             </div>
           </section>
         ) : connectedMoment ? (
           <ConnectedMoment brokerFirstName={session.brokerFirstName} />
         ) : (
-          <>
+          <div className="mx-auto w-full max-w-2xl">
+            {/* Barra da sessão: o celular, a posição na fila e as ações raras no menu. */}
+            <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-3">
               {session.status === "active" ? (
-              <motion.span
-                className="mb-4 inline-flex min-h-9 items-center gap-2 rounded-full border border-(--success)/20 bg-(--success)/10 px-3 text-xs font-medium text-(--success)"
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: motionTokens.scale.popIn, y: -motionTokens.distance.xs }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={reduceMotion ? reducedFade : motionTokens.spring.snappy}
-              >
-                <Radio className="size-4" aria-hidden="true" /> {session.phone && !session.phone.reachable ? `Celular sem sinal com o AncoraHub há ${session.phone.staleSeconds} s` : "Celular conectado"}
-              </motion.span>
-            ) : null}
-            {session.runState === "paused" ? <p className="mb-5 rounded-xl border border-(--warning)/25 bg-(--warning)/5 px-4 py-3 text-sm text-(--foreground)" role="status">{session.pausedBy === "phone" ? "O celular pausou a sessão." : "Sessão pausada pela tela."} A ligação em andamento continua; nenhuma nova começa até retomar.</p> : null}
+                <motion.span
+                  className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-xs font-medium ${phoneReachable ? "border-(--success)/20 bg-(--success)/10 text-(--success)" : "border-(--warning)/25 bg-(--warning)/10 text-(--warning)"}`}
+                  initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: motionTokens.scale.popIn, y: -motionTokens.distance.xs }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={reduceMotion ? reducedFade : motionTokens.spring.snappy}
+                >
+                  <Radio className="size-4" aria-hidden="true" /> <span>{phoneReachable ? "Celular conectado" : `Celular sem sinal há ${session.phone?.staleSeconds ?? 0} s`}</span>
+                </motion.span>
+              ) : <span />}
+              <div className="flex items-center gap-3">
+                {session.current && session.status !== "ended" ? <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums text-(--text-muted)">Contato <LiteNumber value={Math.min(session.completed + 1, totalContacts)} /> de {totalContacts}</span> : null}
+                {sessionMenu ? <LiteMenu label="Mais ações da sessão" items={sessionMenu} /> : null}
+              </div>
+            </div>
 
-            {canUseTestList && !isLab ? (
-              <EnterInOrder index={1} className="mb-6">
-                <section className="rounded-2xl border border-(--border) bg-(--surface) p-4 md:p-5" aria-labelledby="call-ancora-test-list">
-                  <h2 id="call-ancora-test-list" className="text-sm font-semibold text-(--foreground)">Lista de teste (ligação real)</h2>
-                  <p className="mt-1 text-xs leading-5 text-(--text-secondary)">Só para administradores. Estes números são discados de verdade pelo app Android. Um por linha, nome opcional (ex.: <span className="font-mono">Ana; (21) 99999-0000</span>). Até 50. Substitui a fila desta sessão.</p>
-                  <textarea
-                    className="mt-3 min-h-28 w-full rounded-xl border border-(--border) bg-(--background) px-3 py-2 font-mono text-sm text-(--foreground)"
-                    value={testListText}
-                    onChange={(event) => setTestListText(event.target.value)}
-                    placeholder={"(21) 99999-0000\nBruno; (21) 98888-7777"}
-                    aria-label="Números da lista de teste"
-                  />
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <Button size="sm" variant="secondary" className="min-h-10 rounded-full" disabled={busy || !testListText.trim()} loading={busy} onClick={() => void applyTestList()}>Usar como fila</Button>
-                    <span className="text-xs text-(--text-muted)">{realQueue ? `Fila atual: lista de teste, ${totalContacts} números` : totalContacts === 0 ? "Fila atual: vazia" : "Fila atual: base de frios"}</span>
-                  </div>
-                </section>
-              </EnterInOrder>
+            {paused ? (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-(--radius-panel) border border-(--border) bg-(--surface-muted) px-4 py-3" role="status">
+                <p className="flex items-center gap-2 text-sm text-(--foreground)"><Pause className="size-4 text-(--text-muted)" aria-hidden="true" />{session.pausedBy === "phone" ? "O celular pausou a sessão." : "Você pausou a sessão."} A ligação em andamento continua; nenhuma nova começa.</p>
+                {!isLab ? <Button size="sm" variant="secondary" className="min-h-10 rounded-full" disabled={busy} onClick={() => void sendAction({ action: "run-resume" }, "Não consegui retomar a sessão.")}><Play className="size-4" aria-hidden="true" /> Retomar</Button> : null}
+              </div>
             ) : null}
 
-            <div className="mx-auto w-full max-w-2xl">
-              <section className="grid gap-5">
-                <EnterInOrder index={1}>
-                  <article className="relative overflow-hidden rounded-2xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow-resting) md:p-8">
-                    {session.notice ? <p className="mb-4 rounded-xl bg-(--surface-muted) px-4 py-3 text-sm text-(--foreground)" role="status">{session.notice}</p> : null}
-                    {!session.callingWindowOpen && session.queueSource === "cold_base" && session.status !== "ended" && !session.current?.dialable ? (
-                      <div className="flex flex-col items-center py-14 text-center">
-                        <span className="grid size-16 place-items-center rounded-full bg-(--surface-muted) text-(--text-muted)"><Clock3 className="size-8" aria-hidden="true" /></span>
-                        <h2 className="mt-4 text-xl font-semibold text-(--foreground)">Fora do horário de ligações</h2>
-                        <p className="mt-2 max-w-sm text-sm leading-6 text-(--text-secondary)">As ligações para os frios seguem o horário definido pelo diretor nas configurações do Call Âncora.</p>
+            {canUseTestList && !isLab && testToolsOpen ? (
+              <section className="mb-4 rounded-(--radius-panel) border border-(--border) bg-(--surface) p-4 md:p-5" aria-labelledby="call-ancora-test-list">
+                <h2 id="call-ancora-test-list" className="text-sm font-medium text-(--foreground)">Lista de teste (ligação real)</h2>
+                <p className="mt-1 text-xs leading-5 text-(--text-secondary)">Só para administradores. O app Android disca estes números de verdade. Um por linha, nome opcional (ex.: <span className="font-mono">Ana; (21) 99999-0000</span>). Até 50. Substitui a fila desta sessão.</p>
+                <textarea
+                  className="mt-3 min-h-28 w-full rounded-(--radius-panel) border border-(--border-strong) bg-(--surface) px-3 py-2 font-mono text-base text-(--foreground) md:text-sm"
+                  value={testListText}
+                  onChange={(event) => setTestListText(event.target.value)}
+                  placeholder={"(21) 99999-0000\nBruno; (21) 98888-7777"}
+                  aria-label="Números da lista de teste"
+                />
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <Button size="sm" variant="secondary" className="min-h-10 rounded-full" disabled={busy || !testListText.trim()} loading={busy} onClick={() => void applyTestList()}>Usar como fila</Button>
+                  <span className="text-xs text-(--text-muted)">{realQueue ? `Fila atual: lista de teste, ${totalContacts} números` : totalContacts === 0 ? "Fila atual: vazia" : "Fila atual: base de frios"}</span>
+                </div>
+              </section>
+            ) : null}
+
+            <section className="grid gap-4">
+              <EnterInOrder index={1}>
+                <article className="relative overflow-hidden rounded-(--radius-surface) border border-(--border) bg-(--surface) p-6 shadow-(--shadow-resting) md:p-8">
+                  {session.notice ? <p className="mb-4 rounded-(--radius-panel) bg-(--surface-muted) px-4 py-3 text-sm text-(--foreground)" role="status">{session.notice}</p> : null}
+                  {!session.callingWindowOpen && session.queueSource === "cold_base" && session.status !== "ended" && !session.current?.dialable ? (
+                    <EmptyState icon={<Clock3 aria-hidden="true" />} title="Fora do horário de ligações" description="As ligações para os frios seguem o horário que o diretor define nas configurações do Call Âncora. A fila volta sozinha quando o horário abrir." />
+                  ) : (session.total === 0 || (session.queueSource === "cold_base" && !session.current)) && session.status !== "ended" ? (
+                    <EmptyState icon={<Users aria-hidden="true" />} title="Sua fila está vazia" description="Ainda não há frios para você. Quando o diretor ligar a base de frios, os contatos aparecem aqui." />
+                  ) : session.current && session.status !== "ended" ? <>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex min-h-9 items-center gap-2 rounded-full bg-(--surface-muted) px-3 text-xs font-medium text-(--text-secondary)">
+                        <span className={`size-2 rounded-full transition-colors duration-300 ${session.callStatus === "active" ? "bg-(--success)" : calling ? "bg-(--chat-action)" : "bg-(--text-muted)"}`} aria-hidden="true" />
+                        <SwapText value={statusLabel(session.callStatus)} />
+                      </span>
+                    </div>
+                    <div className="mt-4"><QueueTrack total={totalContacts} done={session.completed} /></div>
+                    <SlideSwap swapKey={session.current.id}>
+                      <div className="mx-auto flex max-w-lg flex-col items-center pt-8 text-center md:pt-10">
+                        <CallAvatar name={session.current.name} status={session.callStatus} />
+                        <h2 className="mt-5 max-w-full text-3xl font-medium tracking-tight text-balance break-words text-(--foreground)"><NameReveal text={session.current.name} delay={motionTokens.beat.text} /></h2>
+                        <p className="mt-2 text-sm tabular-nums text-(--text-secondary)">{session.current.phone} <span className="text-(--text-muted)">{session.current.source === "test_list" ? "· lista de teste" : "· número completo só no celular"}</span></p>
                       </div>
-                    ) : (session.total === 0 || (session.queueSource === "cold_base" && !session.current)) && session.status !== "ended" ? (
-                      <div className="flex flex-col items-center py-14 text-center">
-                        <span className="grid size-16 place-items-center rounded-full bg-(--surface-muted) text-(--text-muted)"><Users className="size-8" aria-hidden="true" /></span>
-                        <h2 className="mt-4 text-xl font-semibold text-(--foreground)">Sua fila está vazia</h2>
-                        <p className="mt-2 max-w-sm text-sm leading-6 text-(--text-secondary)">Ainda não há frios na sua fila. Assim que a base de frios estiver ligada, eles aparecem aqui.</p>
-                      </div>
-                    ) : session.current && session.status !== "ended" ? <>
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="inline-flex min-h-9 items-center gap-2 rounded-full bg-(--surface-muted) px-3 text-xs font-medium text-(--text-secondary)">
-                          <span className={`size-2 rounded-full transition-colors duration-300 ${session.callStatus === "active" ? "bg-(--success)" : calling ? "bg-(--primary)" : "bg-(--text-muted)"}`} aria-hidden="true" />
-                          <SwapText value={statusLabel(session.callStatus)} />
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-(--text-muted)">Contato <LiteNumber value={Math.min(session.completed + 1, totalContacts)} /> de {totalContacts}</span>
-                      </div>
-                      <div className="mt-4"><QueueTrack total={totalContacts} done={session.completed} /></div>
-                      <SlideSwap swapKey={session.current.id}>
-                        <div className="mx-auto flex max-w-lg flex-col items-center pt-8 text-center md:pt-10">
-                          <CallAvatar name={session.current.name} status={session.callStatus} />
-                          <h2 className="mt-5 text-3xl font-semibold tracking-tight text-(--foreground)"><NameReveal text={session.current.name} delay={motionTokens.beat.text} /></h2>
-                          <p className="mt-2 text-sm tabular-nums text-(--text-secondary)">{session.current.phone} <span className="text-(--text-muted)">{session.current.source === "test_list" ? "· lista de teste" : "· base de frios, o número completo fica só no celular"}</span></p>
+                    </SlideSwap>
+                    <SlideSwap swapKey={`${session.current.id}-${session.callStatus}-${session.countdown ? "countdown" : "idle"}`} axis="y" className="mx-auto flex max-w-lg flex-col items-center pb-2 text-center">
+                      {session.callStatus === "active" ? <p className="mt-6 flex items-center gap-2 text-2xl font-medium tabular-nums text-(--foreground)" aria-live="off"><Clock3 className="size-5 text-(--success)" aria-hidden="true" /> {clock(Math.floor(Math.max(0, now - Date.parse(session.callStartedAt ?? new Date().toISOString())) / 1000))}</p> : null}
+                      {calling ? <p className="mt-6 text-sm text-(--text-secondary)">{session.callStatus === "dialing" ? "Discando pelo celular…" : "Chamando. Esperando atender…"}</p> : null}
+                      {realCallInProgress && !isLab ? (
+                        <div className="mt-5 flex items-center gap-2">
+                          <Button size="md" variant="secondary" className="min-h-11 min-w-56 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-call" }, "Não consegui pedir para o celular desligar.")}>
+                            <PhoneOff className="size-4" aria-hidden="true" /> {session.hangupRequested ? "Desligando pelo celular…" : "Desligar ligação"}
+                          </Button>
+                          <LiteMenu label="Mais ações da ligação" items={[{ id: "voicemail", label: "Caiu na caixa postal: desligar", disabled: busy || session.hangupRequested, onSelect: () => void sendAction({ action: "hangup-voicemail" }, "Não consegui pedir para o celular desligar.") }]} />
                         </div>
-                      </SlideSwap>
-                      <SlideSwap swapKey={`${session.current.id}-${session.callStatus}-${session.countdown ? "countdown" : "idle"}`} axis="y" className="mx-auto flex max-w-lg flex-col items-center pb-2 text-center">
-                        {session.callStatus === "active" ? <p className="mt-6 flex items-center gap-2 font-mono text-2xl tabular-nums text-(--foreground)" aria-live="off"><Clock3 className="size-5 text-(--success)" aria-hidden="true" /> {clock(Math.floor(Math.max(0, now - Date.parse(session.callStartedAt ?? new Date().toISOString())) / 1000))}</p> : null}
-                        {calling ? <p className="mt-6 text-sm text-(--text-secondary)">{session.callStatus === "dialing" ? "Discando pelo celular pareado…" : "Chamando. Aguardando atender…"}</p> : null}
-                        {realCallInProgress && !isLab ? <Button size="sm" variant="secondary" className="mt-4 min-h-10 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-voicemail" }, "Não consegui pedir para desligar.")}>{session.hangupRequest === "voicemail" ? "Pedindo para o celular desligar…" : "Caixa postal (desligar)"}</Button> : null}
-                        {realCallInProgress && !isLab ? <Button size="sm" variant="secondary" className="mt-2 min-h-10 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-call" }, "Não consegui pedir para desligar.")}>{session.hangupRequest === "hangup" ? "Pedindo para o celular desligar…" : "Desligar ligação"}</Button> : null}
-                        {session.callStatus === "ready" && !session.countdown ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">Pronto. Toque em Começar ligação no celular.</p> : null}
-                        {lastCallText && (session.callStatus === "ended" || session.countdown) ? <p className="mt-5 text-sm font-medium text-(--foreground)" role="status">{lastCallText}</p> : null}
-                        {session.callStatus === "ended" && !session.countdown ? <p className="mt-5 text-sm text-(--text-secondary)">Como foi a conversa?</p> : null}
-                        {session.countdown && currentOutcome && !isLab ? <div className="mt-5 w-full max-w-md text-center"><p className="text-sm text-(--text-secondary)">Classificada como <span className="font-semibold text-(--foreground)">{OUTCOME_LABEL[currentOutcome.outcome]}</span>{currentOutcome.auto ? " (automático, estimativa)" : ""}.</p><div className="mt-2 flex flex-wrap justify-center gap-2"><span className="self-center text-xs text-(--text-muted)">Corrigir:</span>{(Object.keys(OUTCOME_LABEL) as CallOutcome[]).filter((outcome) => outcome !== currentOutcome.outcome).map((outcome) => <Button key={outcome} size="sm" variant="secondary" className="min-h-9 rounded-full" disabled={busy} onClick={() => void sendAction({ action: "reclassify", outcome }, "Não consegui corrigir a classificação.")}>{OUTCOME_LABEL[outcome]}</Button>)}</div></div> : null}
-                        {session.countdown ? <div className="mt-6 flex w-full max-w-md flex-col items-center rounded-xl bg-(--surface-muted) px-4 py-3" role="status"><span className="text-xs text-(--text-secondary)">{countdownExpired ? "Ligando para o próximo" : session.countdown.paused ? "Contagem pausada" : "Próxima ligação em"}</span>{!countdownExpired && !session.countdown.paused ? <span className="mt-1 inline-flex items-baseline gap-1 text-3xl font-semibold tabular-nums text-(--foreground)"><LiteNumber value={session.countdown.remainingSeconds} /><span className="text-base font-medium text-(--text-secondary)">s</span></span> : null}</div> : null}
-                        {session.callStatus === "ended" && !session.countdown ? <div className="mt-6 grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2"><Button variant="primary" size="lg" className="min-h-12 rounded-full" disabled={busy} loading={busy} onClick={() => void classify("interested")}><Heart className="size-4" aria-hidden="true" /> Com interesse</Button><Button variant="secondary" size="lg" className="min-h-12 rounded-full" disabled={busy} onClick={() => void classify("not_interested")}><X className="size-4" aria-hidden="true" /> Sem interesse</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("voicemail")}>Caixa postal</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("no_answer")}>Não atendeu</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("wrong_number")}>Número errado</Button></div> : null}
-                      </SlideSwap>
-                    </> : (
-                      <div className="flex flex-col items-center py-16 text-center">
-                        <Beat><span className="grid size-16 place-items-center rounded-full bg-(--success)/10 text-(--success)"><Check className="size-8" aria-hidden="true" /></span></Beat>
-                        <Beat at="text"><h2 className="mt-4 text-2xl font-semibold text-(--foreground)">{session.runState === "ended" ? "Sessão encerrada" : "Fila concluída"}</h2></Beat>
-                        <Beat at="number"><p className="mt-2 text-sm text-(--text-secondary)">Inicie outra sessão quando quiser.</p></Beat>
-                        <Beat at="after"><Button className="mt-6 min-h-11 rounded-full" variant="secondary" onClick={() => void start()}>Recomeçar</Button></Beat>
-                      </div>
-                    )}
+                      ) : null}
+                      {session.callStatus === "ready" && !session.countdown ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{paused ? "Sessão pausada. Retome para continuar ligando." : "Pronto. Toque em Começar ligação no celular."}</p> : null}
+                      {lastCallText && (session.callStatus === "ended" || session.countdown) ? <p className="mt-5 text-sm font-medium text-(--foreground)" role="status">{lastCallText}</p> : null}
+                      {session.callStatus === "ended" && !session.countdown ? <p className="mt-5 text-base font-medium text-(--foreground)">Como foi a conversa?</p> : null}
+                      {session.countdown && currentOutcome && !isLab ? (
+                        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-(--text-secondary)">
+                          <span>Classificada como <span className="font-medium text-(--foreground)">{OUTCOME_LABEL[currentOutcome.outcome]}</span>{currentOutcome.auto ? " (automático, estimativa)" : ""}.</span>
+                          <LiteMenu label="Corrigir classificação" items={(Object.keys(OUTCOME_LABEL) as CallOutcome[]).filter((outcome) => outcome !== currentOutcome.outcome).map((outcome) => ({ id: outcome, label: OUTCOME_LABEL[outcome], disabled: busy, onSelect: () => void sendAction({ action: "reclassify", outcome }, "Não consegui corrigir a classificação.") }))} />
+                        </div>
+                      ) : null}
+                      {session.countdown ? (
+                        <div className="mt-5 flex min-h-20 w-full max-w-md flex-col items-center justify-center rounded-(--radius-panel) bg-(--surface-muted) px-4 py-3" role="status">
+                          <span className="text-xs text-(--text-secondary)">{countdownExpired ? "Ligando para o próximo" : session.countdown.paused ? "Contagem pausada" : "Próxima ligação em"}</span>
+                          {!countdownExpired && !session.countdown.paused ? <span className="mt-1 inline-flex items-baseline gap-1 text-3xl font-medium tabular-nums text-(--foreground)"><LiteNumber value={session.countdown.remainingSeconds} /><span className="text-base text-(--text-secondary)">s</span></span> : null}
+                        </div>
+                      ) : null}
+                      {session.callStatus === "ended" && !session.countdown ? (
+                        <div className="mt-5 flex w-full max-w-md flex-col items-stretch gap-3">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <LiteActionButton busyLabel="Registrando…" doneLabel="Interesse registrado" keeps="A ligação continua registrada." disabled={busy} icon={<Heart className="size-4" aria-hidden="true" />} onAction={() => classify("interested")}>Com interesse</LiteActionButton>
+                            <Button variant="secondary" size="lg" className="min-h-12 rounded-full" disabled={busy} onClick={() => void classify("not_interested")}><X className="size-4" aria-hidden="true" /> Sem interesse</Button>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-center gap-1">
+                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("voicemail")}>Caixa postal</Button>
+                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("no_answer")}>Não atendeu</Button>
+                            <Button variant="ghost" size="sm" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("wrong_number")}>Número errado</Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </SlideSwap>
+                  </> : (
+                    <EmptyState
+                      icon={<Check aria-hidden="true" />}
+                      title={session.runState === "ended" ? "Sessão encerrada" : "Fila concluída"}
+                      description={`${session.completed} ${session.completed === 1 ? "ligação" : "ligações"} nesta sessão, ${interestCount} com interesse. Os interessados já estão na sua carteira.`}
+                      action={<Button className="min-h-11 rounded-full" variant="primary" onClick={() => void start()}>Recomeçar</Button>}
+                    />
+                  )}
+                </article>
+              </EnterInOrder>
+
+              {session.next && session.status !== "ended" ? (
+                <EnterInOrder index={2}>
+                  <article className="relative overflow-hidden rounded-(--radius-panel) border border-(--border) bg-(--surface)">
+                    <SlideSwap swapKey={session.next.id} axis="y" className="flex items-center justify-between gap-4 px-5 py-4">
+                      <div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-(--surface-muted) text-(--text-secondary)"><ArrowRight className="size-5" aria-hidden="true" /></span><div className="min-w-0"><p className="text-xs text-(--text-muted)">Próximo contato</p><p className="mt-1 truncate text-sm font-medium text-(--foreground)">{session.next.name}</p></div></div>
+                      <span className="shrink-0 text-sm tabular-nums text-(--text-secondary)">{session.next.phone}</span>
+                    </SlideSwap>
                   </article>
                 </EnterInOrder>
+              ) : null}
 
-                {session.next ? (
-                  <EnterInOrder index={2}>
-                    <article className="relative overflow-hidden rounded-2xl border border-(--border) bg-(--surface)">
-                      <SlideSwap swapKey={session.next.id} axis="y" className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-                        <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-(--surface-muted) text-(--text-secondary)"><ArrowRight className="size-5" aria-hidden="true" /></span><div><p className="text-xs font-medium text-(--text-muted)">Próximo contato</p><p className="mt-1 text-sm font-semibold text-(--foreground)">{session.next.name}</p></div></div>
-                        <span className="text-sm tabular-nums text-(--text-secondary)">{session.next.phone}</span>
-                      </SlideSwap>
-                    </article>
-                  </EnterInOrder>
-                ) : null}
+              {interestCount > 0 && session.status !== "ended" ? (
+                <p className="flex items-center justify-center gap-2 text-sm text-(--text-secondary)" role="status"><Heart className="size-4 text-(--chat-action)" aria-hidden="true" /><span><span className="font-medium tabular-nums text-(--foreground)">{interestCount}</span> com interesse nesta sessão</span></p>
+              ) : null}
 
-                {isLab ? (
-                  <EnterInOrder index={4}>
-                    <article className="rounded-2xl border border-(--border) bg-(--surface) p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-5" aria-hidden="true" /></span><div><h3 className="font-semibold text-(--foreground)">Celular do laboratório</h3><p className="text-xs text-(--text-secondary)">Conectado à conta de {brokerFirstName}</p></div></div><Button size="md" variant="secondary" className="min-h-11 rounded-full" disabled={simulating || session.callStatus !== "ready" || (session.autoDialEnabled && session.completed > 0)} loading={simulating} onClick={() => void simulateLabCall()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? "Simulando…" : session.autoDialEnabled && session.completed > 0 ? "Começando automaticamente" : "Começar ligação"}</Button></div><div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-(--text-muted)"><span className="rounded-full bg-(--surface-muted) px-3 py-1.5">{statusLabel(session.callStatus)}</span><span>Laboratório: sem discagem real</span></div></article>
-                  </EnterInOrder>
-                ) : null}
-              </section>
-            </div>
-          </>
+              {isLab ? (
+                <EnterInOrder index={4}>
+                  <article className="rounded-(--radius-panel) border border-(--border) bg-(--surface) p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-full bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-5" aria-hidden="true" /></span><div><h3 className="font-medium text-(--foreground)">Celular do laboratório</h3><p className="text-xs text-(--text-secondary)">Conectado à conta de {brokerFirstName}</p></div></div><Button size="md" variant="secondary" className="min-h-11 rounded-full" disabled={simulating || session.callStatus !== "ready" || (session.autoDialEnabled && session.completed > 0)} loading={simulating} onClick={() => void simulateLabCall()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? "Simulando…" : session.autoDialEnabled && session.completed > 0 ? "Começando automaticamente" : "Começar ligação"}</Button></div><div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-(--text-muted)"><span className="rounded-full bg-(--surface-muted) px-3 py-1.5">{statusLabel(session.callStatus)}</span><span>Laboratório: sem discagem real</span></div></article>
+                </EnterInOrder>
+              ) : null}
+            </section>
+          </div>
         )}
 
-        {isLab ? <p className="mt-5 flex items-center gap-2 text-xs text-(--text-muted)"><Sparkles className="size-4" aria-hidden="true" /> Laboratório: sessão e celular simulados no navegador, sem chamadas ou gravações.</p> : null}
+        {isLab ? <p className="mx-auto mt-5 flex max-w-2xl items-center gap-2 text-xs text-(--text-muted)"><Sparkles className="size-4" aria-hidden="true" /> Laboratório: sessão e celular simulados no navegador, sem chamadas ou gravações.</p> : null}
       </div>
     </main>
   );
