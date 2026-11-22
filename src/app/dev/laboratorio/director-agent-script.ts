@@ -26,6 +26,9 @@ export const LAB_PHRASES = [
   "Ativa o Bruno",
   "Passa a cadeira da Carla de terça para a Ana Souza",
   "Troca a Carla de terça com o Bruno de quarta",
+  "A Carla faltou hoje",
+  "Tira a falta da Carla",
+  "Libera a presença do Bruno, ele está aqui",
 ];
 
 function textOf(content: unknown) {
@@ -100,6 +103,23 @@ export function nextLabStep(prompt: Prompt): Step {
   if (request.includes("falta gente")) {
     if (!last) return { kind: "tool", name: "plantao_escala", input: { so_faltando_gente: true } };
     return { kind: "text", text: String(last.value?.message ?? "") };
+  }
+
+  // A7 (falta) e A8 (liberar presença): o nome vem em lugares diferentes da frase.
+  const absence = request.match(/^(?:a |o )?(\S+) faltou/) ?? request.match(/^tir[ae] a falta d[ao] (\S+?)\??$/);
+  const release = request.match(/^libera a presen[çc]a d[ao] (\S+?)(?:,\s*(.+))?$/);
+  if (absence || release) {
+    const who = (absence ?? release)![1]!;
+    const people = find("pessoas_buscar");
+    if (!people) return { kind: "tool", name: "pessoas_buscar", input: { texto: who } };
+    const personId = ((people.value?.data as { pessoas?: Array<{ id: string }> } | undefined)?.pessoas ?? [])[0]?.id;
+    if (!personId) return { kind: "text", text: String(people.value?.message ?? "Não achei essa pessoa.") };
+    const tool = absence ? "plantao_marcar_falta" : "plantao_liberar_presenca";
+    const done = find(tool);
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return absence
+      ? { kind: "tool", name: tool, input: { corretor_id: personId, falta: !request.startsWith("tir") } }
+      : { kind: "tool", name: tool, input: { corretor_id: personId, ...(release![2] ? { nota: release![2] } : {}) } };
   }
 
   // A6 e A5: duas pessoas no mesmo pedido.

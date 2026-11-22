@@ -14,11 +14,41 @@ export type MemoryWorld = {
   failWrites?: boolean;
   /** Pausados só no plantão: `${ocorrencia}|${corretor}`. */
   pausedHere?: string[];
+  /** Presença por `${ocorrencia}|${corretor}` (sem registro = pendente). */
+  presence?: Record<string, "confirmed" | "pending" | "absent">;
+  /** Plantões presenciais pedem motivo para liberar sem foto. */
+  presencialNeedsNote?: boolean;
 };
 
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
   const actions: Array<AgentActionRecord & { id: string; undone?: boolean }> = [];
   let counter = 0;
+  // Plantões rodando (começou e não terminou) e, com horizonte, os que começam nas próximas horas.
+  const dutyWindows = (horizonHours: number): DutyNow[] => {
+    const names = new Map(world.people.map((person) => [person.id, person]));
+    const nowMs = world.now.getTime();
+    const startOf = (seat: SeatOccurrence) => Date.parse(`${seat.dutyDate}T${seat.startsAt.slice(0, 5)}:00-03:00`);
+    return world.seats
+      .filter((seat) => !seat.ended && (seat.started || (startOf(seat) > nowMs && startOf(seat) <= nowMs + horizonHours * 3_600_000)))
+      .map((seat) => ({
+        scheduleId: seat.scheduleId,
+        scheduleName: seat.scheduleName,
+        dutyDate: seat.dutyDate,
+        startsAt: seat.startsAt,
+        endsAt: seat.endsAt,
+        minimumBrokers: seat.minimumBrokers,
+        queueName: null,
+        running: seat.started,
+        brokers: seat.brokerIds.map((id) => ({
+          id,
+          assignmentId: `${seat.id}|${id}`,
+          name: names.get(id)?.name ?? "Corretor",
+          presence: world.presence?.[`${seat.id}|${id}`] ?? (seat.started ? "confirmed" as const : "pending" as const),
+          pausedHere: (world.pausedHere ?? []).includes(`${seat.id}|${id}`),
+          pausedGlobal: names.get(id)?.availability === "paused",
+        })),
+      }));
+  };
   return {
     world,
     actions,
@@ -31,25 +61,27 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
     },
     async dutyNow() {
       if (world.dutyNow) return world.dutyNow;
-      // Plantões que começaram e não terminaram, com quem está escalado (presença confirmada no mundo de teste).
-      const names = new Map(world.people.map((person) => [person.id, person]));
-      return world.seats.filter((seat) => seat.started && !seat.ended).map((seat) => ({
-        scheduleId: seat.scheduleId,
-        scheduleName: seat.scheduleName,
-        dutyDate: seat.dutyDate,
-        startsAt: seat.startsAt,
-        endsAt: seat.endsAt,
-        minimumBrokers: seat.minimumBrokers,
-        queueName: null,
-        brokers: seat.brokerIds.map((id) => ({
-          id,
-          assignmentId: `${seat.id}|${id}`,
-          name: names.get(id)?.name ?? "Corretor",
-          presence: "confirmed" as const,
-          pausedHere: (world.pausedHere ?? []).includes(`${seat.id}|${id}`),
-          pausedGlobal: names.get(id)?.availability === "paused",
-        })),
-      }));
+      return dutyWindows(0).filter((duty) => duty.running);
+    },
+    async dutySoon() {
+      if (world.dutyNow) return world.dutyNow;
+      return dutyWindows(24);
+    },
+    async markAbsence(_scheduleId, assignmentId, absent) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const current = world.presence?.[assignmentId] ?? "pending";
+      if (absent && current === "absent") throw new Error("Falta já registrada.");
+      if (!absent && current !== "absent") throw new Error("Não há falta para desfazer.");
+      world.presence = { ...(world.presence ?? {}), [assignmentId]: absent ? "absent" : "pending" };
+    },
+    async releasePresence(_scheduleId, assignmentId, note) {
+      if (world.failWrites) return { ok: false, reason: "Falha simulada do servidor." };
+      const seat = world.seats.find((item) => assignmentId.startsWith(`${item.id}|`));
+      if (seat?.attendanceMode === "presencial" && world.presencialNeedsNote !== false && !note) {
+        return { ok: false, reason: "Plantão presencial sem foto: escreva o motivo da liberação.", needsNote: true };
+      }
+      world.presence = { ...(world.presence ?? {}), [assignmentId]: "confirmed" };
+      return { ok: true };
     },
     async pauseOnDuty(_scheduleId, assignmentId, paused) {
       if (world.failWrites) throw new Error("Falha simulada do servidor.");

@@ -36,6 +36,8 @@ export function buildDirectorInstructions(input: { firstName: string | null; now
     "- \"Passa a cadeira da Ana de sexta para a Carla\" (A6): pessoas_buscar para as duas → plantao_escala com o corretor_id de quem sai e o dia → plantao_passar_cadeira com essa ocorrência. Se quem sai tiver mais de um plantão no dia, use escolher.",
     "- \"Troca a Ana de sexta com o Bruno de sábado\" (A5): pessoas_buscar para os dois → plantao_escala de cada um no seu dia → plantao_trocar_corretores. Se o diretor disse só um dia (\"troca a Ana com o Bruno na sexta\") e só um deles está nesse dia, é A6 (passar a cadeira).",
     "- \"Pausa a Ana no plantão\" / \"volta a Ana no plantão\" (A9): pessoas_buscar → plantao_pausar (só o plantão em andamento; ela continua escalada).",
+    "- \"A Ana faltou hoje\" / \"tira a falta da Ana\" (A7): pessoas_buscar → plantao_marcar_falta (plantão de agora ou o próximo em 24 h).",
+    "- \"Libera a presença do Bruno, ele está aqui\" (A8): pessoas_buscar → plantao_liberar_presenca. Em plantão presencial sem foto pede o motivo: use a explicação que o diretor deu (\"ele está aqui\", \"esqueceu o celular\") como nota; se não deu, pergunte em uma frase.",
     "- \"Pausa o Bruno\" / \"ativa o Bruno\" / \"para de mandar lead pro Bruno\" (A10): pessoas_buscar → corretor_pausar (recebimento geral). Se o diretor disse \"no plantão\", é A9, não A10.",
     "- Datas: use o calendário acima e mande AAAA-MM-DD. \"Sábado\" sem data é o próximo sábado.",
     "- Se uma ação foi negada ou falhou, diga o motivo em uma frase e o que continua valendo. Não tente de novo sem o diretor pedir.",

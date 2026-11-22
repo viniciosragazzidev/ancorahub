@@ -125,9 +125,13 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
           `${label(input.corretor_b_id)}: ${label(input.ocorrencia_b_id)} → ${label(input.ocorrencia_a_id)}`,
         ]
       : null;
-  const swapTitle = name === "plantao_passar_cadeira" ? "Passar a cadeira?" : name === "plantao_trocar_corretores" ? "Trocar os dois de plantão?" : null;
+  const swapTitle = name === "plantao_passar_cadeira" ? "Passar a cadeira?" : name === "plantao_trocar_corretores" ? "Trocar os dois de plantão?"
+    : name === "plantao_marcar_falta" ? `${input.falta === false ? "Desfazer a falta de" : "Marcar falta de"} ${label(input.corretor_id)}?`
+    : name === "plantao_liberar_presenca" ? `Liberar a presença de ${label(input.corretor_id)}?` : null;
+  const noUndoNote = name === "plantao_liberar_presenca" ? `Ela passa a receber leads do plantão.${typeof input.nota === "string" && input.nota ? ` Motivo: ${input.nota}.` : ""} Não tem Desfazer.` : null;
   const confirmLabel = name === "plantao_escalar_em_vagas" ? `Escalar em ${count}` : name === "plantao_tirar_de_vagas" ? `Tirar de ${count}` : isPeople ? `${pausing ? "Pausar" : "Ativar"} ${count}`
-    : name === "plantao_passar_cadeira" ? "Passar" : name === "plantao_trocar_corretores" ? "Trocar" : "Confirmar";
+    : name === "plantao_passar_cadeira" ? "Passar" : name === "plantao_trocar_corretores" ? "Trocar"
+    : name === "plantao_marcar_falta" ? (input.falta === false ? "Desfazer falta" : "Marcar falta") : name === "plantao_liberar_presenca" ? "Liberar" : "Confirmar";
   const respond = (approved: boolean) => {
     if (sent || !part.approval) return;
     feedback("tap");
@@ -148,6 +152,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
           {ids.length > 8 ? <li>e mais {ids.length - 8}</li> : null}
         </ul>
       ) : null}
+      {noUndoNote ? <p className="director-agent-card-note">{noUndoNote}</p> : null}
       {entry?.risk.notifies ? <p className="director-agent-card-note">{swapLines ? "As duas pessoas recebem aviso no app." : "A pessoa recebe aviso no app."}</p> : null}
       <div className="director-agent-card-actions">
         <button type="button" className="director-agent-confirm" onClick={() => respond(true)} disabled={Boolean(sent)} aria-busy={sent === "yes"}>

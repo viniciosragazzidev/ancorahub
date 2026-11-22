@@ -4,9 +4,9 @@ import { randomUUID } from "node:crypto";
 import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
 
 import { upcomingShift } from "@/features/dashboard/welcome-rules";
-import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
+import { getPublishedDutyScheduleIds, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 import { setBrokersAvailabilityAction } from "@/features/branches/actions";
-import { toggleDutyRosterPauseAction } from "@/features/lead-distribution/duty-actions";
+import { releaseDutyPresenceAction, setDutyAbsenceAction, toggleDutyRosterPauseAction } from "@/features/lead-distribution/duty-actions";
 import {
   addBrokerToPublishedOccurrenceAction,
   getMonthlyDutyPlanAction,
@@ -39,6 +39,100 @@ function monthKeysBetween(from: string, until: string) {
 
 export function createServerAgentBackend(context: TenantContext): AgentBackend {
   const db = getDatabase();
+
+  /**
+   * Plantões rodando agora e, com `horizonHours`, os que começam nas próximas horas, com quem está escalado
+   * (escala efetiva do dia, como no painel do diretor), presença do dia e pausas.
+   */
+  async function loadDuties(horizonHours: number): Promise<DutyNow[]> {
+    const now = new Date();
+    const schedules = await db
+      .select({
+        id: schema.unitDutySchedules.id,
+        name: schema.unitDutySchedules.name,
+        dayOfWeek: schema.unitDutySchedules.dayOfWeek,
+        startsAt: schema.unitDutySchedules.startsAt,
+        endsAt: schema.unitDutySchedules.endsAt,
+        timezone: schema.unitDutySchedules.timezone,
+        validFrom: schema.unitDutySchedules.validFrom,
+        validUntil: schema.unitDutySchedules.validUntil,
+        minimumBrokers: schema.unitDutySchedules.minimumBrokers,
+        queueName: schema.leadQueues.name,
+      })
+      .from(schema.unitDutySchedules)
+      .leftJoin(schema.leadQueues, eq(schema.leadQueues.id, schema.unitDutySchedules.queueId))
+      .where(and(
+        eq(schema.unitDutySchedules.tenantId, context.tenantId),
+        eq(schema.unitDutySchedules.status, "active"),
+        or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
+      ));
+    const limit = now.getTime() + horizonHours * 3_600_000;
+    const windows = schedules.flatMap((schedule) => {
+      const shift = upcomingShift(schedule, now, 2);
+      return shift && (shift.running || shift.start.getTime() <= limit) ? [{ schedule, shift }] : [];
+    });
+    if (!windows.length) return [];
+    const ids = windows.map((item) => item.schedule.id);
+    const dates = [...new Set(windows.map((item) => item.shift.dutyDate))];
+    const [assignments, publishedByDate, presence] = await Promise.all([
+      db.select({
+        id: schema.dutyRosterAssignments.id,
+        scheduleId: schema.dutyRosterAssignments.scheduleId,
+        brokerId: schema.dutyRosterAssignments.brokerId,
+        dutyDate: schema.dutyRosterAssignments.dutyDate,
+        pausedAt: schema.dutyRosterAssignments.pausedAt,
+      })
+        .from(schema.dutyRosterAssignments)
+        .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), inArray(schema.dutyRosterAssignments.scheduleId, ids))),
+      Promise.all(dates.map(async (date) => [date, await getPublishedDutyScheduleIds(context.tenantId, date)] as const)).then((rows) => new Map(rows)),
+      db.select({ scheduleId: schema.dutyPresenceConfirmations.scheduleId, brokerId: schema.dutyPresenceConfirmations.brokerId, dutyDate: schema.dutyPresenceConfirmations.dutyDate, status: schema.dutyPresenceConfirmations.status })
+        .from(schema.dutyPresenceConfirmations)
+        .where(and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), inArray(schema.dutyPresenceConfirmations.scheduleId, ids), inArray(schema.dutyPresenceConfirmations.dutyDate, dates))),
+    ]);
+    const brokerIds = [...new Set(assignments.map((row) => row.brokerId))];
+    const people = brokerIds.length
+      ? await db.select({ id: schema.user.id, name: schema.user.name, availability: schema.tenantMemberships.availabilityStatus })
+        .from(schema.user)
+        .innerJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.user.id), eq(schema.tenantMemberships.tenantId, context.tenantId)))
+        .where(inArray(schema.user.id, brokerIds))
+      : [];
+    const person = new Map(people.map((row) => [row.id, row]));
+    const rank = { confirmed: 4, absent: 3, pending: 2, expired: 1 } as Record<string, number>;
+    const presenceOf = new Map<string, DutyNow["brokers"][number]["presence"]>();
+    for (const row of presence) {
+      const key = `${row.scheduleId}|${row.brokerId}|${String(row.dutyDate)}`;
+      const current = presenceOf.get(key);
+      if (!current || (rank[row.status] ?? 0) > (rank[current] ?? 0)) presenceOf.set(key, row.status as DutyNow["brokers"][number]["presence"]);
+    }
+    return windows.map(({ schedule, shift }) => {
+      const rows = selectEffectiveDutyAssignments(assignments.filter((row) => row.scheduleId === schedule.id), shift.dutyDate, publishedByDate.get(shift.dutyDate) ?? null);
+      const seen = new Set<string>();
+      const brokers = rows.flatMap((row) => {
+        if (seen.has(row.brokerId)) return [];
+        seen.add(row.brokerId);
+        const who = person.get(row.brokerId);
+        return [{
+          id: row.brokerId,
+          assignmentId: row.id,
+          name: who?.name?.trim() || "Corretor",
+          presence: presenceOf.get(`${schedule.id}|${row.brokerId}|${shift.dutyDate}`) ?? "none",
+          pausedHere: Boolean(row.pausedAt),
+          pausedGlobal: who?.availability === "paused",
+        }];
+      }).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      return {
+        scheduleId: schedule.id,
+        scheduleName: schedule.name,
+        dutyDate: shift.dutyDate,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        minimumBrokers: schedule.minimumBrokers,
+        queueName: schedule.queueName,
+        running: shift.running,
+        brokers,
+      };
+    }).sort((a, b) => a.dutyDate.localeCompare(b.dutyDate) || a.startsAt.localeCompare(b.startsAt) || a.scheduleName.localeCompare(b.scheduleName, "pt-BR"));
+  }
 
   return {
     now: () => new Date(),
@@ -103,92 +197,11 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
     },
 
     async dutyNow(): Promise<DutyNow[]> {
-      const now = new Date();
-      const schedules = await db
-        .select({
-          id: schema.unitDutySchedules.id,
-          name: schema.unitDutySchedules.name,
-          dayOfWeek: schema.unitDutySchedules.dayOfWeek,
-          startsAt: schema.unitDutySchedules.startsAt,
-          endsAt: schema.unitDutySchedules.endsAt,
-          timezone: schema.unitDutySchedules.timezone,
-          validFrom: schema.unitDutySchedules.validFrom,
-          validUntil: schema.unitDutySchedules.validUntil,
-          minimumBrokers: schema.unitDutySchedules.minimumBrokers,
-          queueName: schema.leadQueues.name,
-        })
-        .from(schema.unitDutySchedules)
-        .leftJoin(schema.leadQueues, eq(schema.leadQueues.id, schema.unitDutySchedules.queueId))
-        .where(and(
-          eq(schema.unitDutySchedules.tenantId, context.tenantId),
-          eq(schema.unitDutySchedules.status, "active"),
-          or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
-        ));
-      const running = schedules.flatMap((schedule) => {
-        const shift = upcomingShift(schedule, now);
-        return shift?.running ? [{ schedule, shift }] : [];
-      });
-      if (!running.length) return [];
-      const ids = running.map((item) => item.schedule.id);
-      const dates = [...new Set(running.map((item) => item.shift.dutyDate))];
-      const today = getSaoPauloDateKey(now);
-      const [assignments, published, presence] = await Promise.all([
-        db.select({
-          id: schema.dutyRosterAssignments.id,
-          scheduleId: schema.dutyRosterAssignments.scheduleId,
-          brokerId: schema.dutyRosterAssignments.brokerId,
-          dutyDate: schema.dutyRosterAssignments.dutyDate,
-          pausedAt: schema.dutyRosterAssignments.pausedAt,
-        })
-          .from(schema.dutyRosterAssignments)
-          .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), inArray(schema.dutyRosterAssignments.scheduleId, ids))),
-        getPublishedDutyScheduleIds(context.tenantId, today),
-        db.select({ scheduleId: schema.dutyPresenceConfirmations.scheduleId, brokerId: schema.dutyPresenceConfirmations.brokerId, status: schema.dutyPresenceConfirmations.status })
-          .from(schema.dutyPresenceConfirmations)
-          .where(and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), inArray(schema.dutyPresenceConfirmations.scheduleId, ids), inArray(schema.dutyPresenceConfirmations.dutyDate, dates))),
-      ]);
-      const brokerIds = [...new Set(assignments.map((row) => row.brokerId))];
-      const people = brokerIds.length
-        ? await db.select({ id: schema.user.id, name: schema.user.name, availability: schema.tenantMemberships.availabilityStatus })
-          .from(schema.user)
-          .innerJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.user.id), eq(schema.tenantMemberships.tenantId, context.tenantId)))
-          .where(inArray(schema.user.id, brokerIds))
-        : [];
-      const person = new Map(people.map((row) => [row.id, row]));
-      const rank = { confirmed: 4, absent: 3, pending: 2, expired: 1 } as Record<string, number>;
-      const presenceOf = new Map<string, DutyNow["brokers"][number]["presence"]>();
-      for (const row of presence) {
-        const key = `${row.scheduleId}|${row.brokerId}`;
-        const current = presenceOf.get(key);
-        if (!current || (rank[row.status] ?? 0) > (rank[current] ?? 0)) presenceOf.set(key, row.status as DutyNow["brokers"][number]["presence"]);
-      }
-      return running.map(({ schedule, shift }) => {
-        const rows = selectEffectiveDutyAssignments(assignments.filter((row) => row.scheduleId === schedule.id), shift.dutyDate, published);
-        const seen = new Set<string>();
-        const brokers = rows.flatMap((row) => {
-          if (seen.has(row.brokerId)) return [];
-          seen.add(row.brokerId);
-          const who = person.get(row.brokerId);
-          return [{
-            id: row.brokerId,
-            assignmentId: row.id,
-            name: who?.name?.trim() || "Corretor",
-            presence: presenceOf.get(`${schedule.id}|${row.brokerId}`) ?? "none",
-            pausedHere: Boolean(row.pausedAt),
-            pausedGlobal: who?.availability === "paused",
-          }];
-        }).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-        return {
-          scheduleId: schedule.id,
-          scheduleName: schedule.name,
-          dutyDate: shift.dutyDate,
-          startsAt: schedule.startsAt,
-          endsAt: schedule.endsAt,
-          minimumBrokers: schedule.minimumBrokers,
-          queueName: schedule.queueName,
-          brokers,
-        };
-      }).sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.scheduleName.localeCompare(b.scheduleName, "pt-BR"));
+      return (await loadDuties(0)).filter((duty) => duty.running);
+    },
+
+    async dutySoon(): Promise<DutyNow[]> {
+      return loadDuties(24);
     },
 
     async addSeat(occurrence, brokerId, force) {
@@ -214,6 +227,15 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
     async pauseOnDuty(scheduleId, assignmentId, paused) {
       const result = await toggleDutyRosterPauseAction(scheduleId, assignmentId, paused);
       if (!result.success) throw new Error(result.error);
+    },
+
+    async markAbsence(scheduleId, assignmentId, absent) {
+      const result = await setDutyAbsenceAction(scheduleId, assignmentId, absent);
+      if (!result.ok) throw new Error(result.reason);
+    },
+
+    async releasePresence(scheduleId, assignmentId, note) {
+      return releaseDutyPresenceAction(scheduleId, assignmentId, note);
     },
 
     async setAvailability(brokerIds, target) {

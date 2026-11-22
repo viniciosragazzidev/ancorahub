@@ -58,6 +58,14 @@ export const AGENT_CATALOG = {
     name: "plantao_pausar", title: "Pausar no plantão", doing: "Mudando a pausa no plantão…", topic: "plantoes",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: "direto", covers: ["A9"],
   },
+  plantao_marcar_falta: {
+    name: "plantao_marcar_falta", title: "Marcar falta", doing: "Registrando a falta…", topic: "plantoes",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["A7"],
+  },
+  plantao_liberar_presenca: {
+    name: "plantao_liberar_presenca", title: "Liberar presença", doing: "Liberando a presença…", topic: "plantoes",
+    risk: { readOnly: false }, roles: DIRECTOR, confirm: "toque", covers: ["A8"],
+  },
   corretor_pausar: {
     name: "corretor_pausar", title: "Pausar recebimento", doing: "Mudando o recebimento de leads…", topic: "equipe",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: many("corretor_ids"), covers: ["A10"],

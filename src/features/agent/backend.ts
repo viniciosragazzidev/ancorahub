@@ -25,6 +25,8 @@ export type DutyNow = {
   endsAt: string;
   minimumBrokers: number;
   queueName: string | null;
+  /** false: começa nas próximas horas (para marcar falta ou liberar presença antes). */
+  running?: boolean;
   brokers: DutyNowBroker[];
 };
 
@@ -46,6 +48,12 @@ export interface AgentBackend {
   /** Vagas (ocorrências) da escala do mês entre duas datas AAAA-MM-DD, publicadas ou em rascunho. */
   listSeats(range: { from: string; until: string }): Promise<SeatOccurrence[]>;
   dutyNow(): Promise<DutyNow[]>;
+  /** Plantões rodando e os que começam nas próximas 24 h. */
+  dutySoon(): Promise<DutyNow[]>;
+  /** Marca ou desfaz falta na ocorrência atual ou próxima (avisa a pessoa). */
+  markAbsence(scheduleId: string, assignmentId: string, absent: boolean): Promise<void>;
+  /** Libera a presença sem o clique da pessoa. `needsNote`: presencial sem foto pede o motivo. */
+  releasePresence(scheduleId: string, assignmentId: string, note: string | null): Promise<{ ok: true } | { ok: false; reason: string; needsNote?: boolean }>;
   /** Escala na ocorrência. Lança Error com a mensagem da regra quando não pode. */
   addSeat(occurrence: SeatOccurrence, brokerId: string, force: boolean): Promise<void>;
   removeSeat(occurrence: SeatOccurrence, brokerId: string): Promise<void>;

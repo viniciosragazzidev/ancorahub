@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import type { AgentBackend, AgentActionRecord } from "./backend";
+import type { AgentBackend, AgentActionRecord, DutyNow } from "./backend";
 import { matchPeople } from "./people-match";
 import { hasFreeSeat, hhmm, matchesSeat, pickSeats, seatLabel, seatsOf, understaffed } from "./seats";
 import type { Person, SeatOccurrence, ToolResult } from "./types";
@@ -33,6 +33,12 @@ function addDays(dateKey: string, days: number) {
   return new Date(Date.parse(`${dateKey}T12:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
+const WEEKDAY_SHORT = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+function dutyDayLabel(dateKey: string) {
+  return `${WEEKDAY_SHORT[new Date(`${dateKey}T12:00:00Z`).getUTCDay()]} ${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
+}
+
 function dayLabel(dateKey: string) {
   return `${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
 }
@@ -62,6 +68,34 @@ export function buildAgentTools(env: ToolEnv) {
 
   async function seatsBetween(from: string, until: string) {
     return backend.listSeats({ from, until });
+  }
+
+  function dutyLabel(duty: DutyNow) {
+    const day = duty.running === false ? `${dutyDayLabel(duty.dutyDate)}, ` : "";
+    return `${duty.scheduleName} (${day}${hhmm(duty.startsAt)}–${hhmm(duty.endsAt)})`;
+  }
+
+  /** O plantão de agora (ou o próximo, até 24 h) em que a pessoa está escalada. Vários sem plantao_id: pede escolha. */
+  async function dutyFor(corretorId: string, plantaoId?: string) {
+    const [duties, people] = await Promise.all([backend.dutySoon(), peopleMap()]);
+    const name = people.get(corretorId)?.name ?? "Essa pessoa";
+    const mine = duties
+      .flatMap((duty) => duty.brokers.filter((broker) => broker.id === corretorId).map((broker) => ({ duty, broker })))
+      .filter((item) => !plantaoId || item.duty.scheduleId === plantaoId)
+      // O que está rodando vem antes do próximo.
+      .sort((a, b) => Number(b.duty.running !== false) - Number(a.duty.running !== false));
+    if (!mine.length) {
+      return { ok: false as const, result: fail("fora_do_plantao", `${name} não está escalada em plantão agora nem nas próximas 24 h.`, "Confira a escala com plantao_escala.") };
+    }
+    const running = mine.filter((item) => item.duty.running !== false);
+    const candidates = running.length ? running : mine;
+    if (candidates.length > 1 && !plantaoId) {
+      return {
+        ok: false as const,
+        result: fail("varios_plantoes", `${name} tem ${candidates.length} plantões: ${candidates.map((item) => dutyLabel(item.duty)).join("; ")}.`, "Pergunte qual com escolher (id = scheduleId) e chame de novo com plantao_id."),
+      };
+    }
+    return { ok: true as const, duty: candidates[0]!.duty, broker: candidates[0]!.broker, name };
   }
 
   /** Escrita com idempotência (reenvio devolve o que já foi feito) e trilha em agent_actions. */
@@ -446,6 +480,57 @@ export function buildAgentTools(env: ToolEnv) {
           href: "/plantoes",
           undo: { tool: "plantao_pausar", input: { corretor_id: input.corretor_id, pausado: !input.pausado, plantao_id: target.duty.scheduleId }, label: "Desfazer" },
         };
+      }),
+    }),
+
+    plantao_marcar_falta: tool({
+      description:
+        "A7: marca ou desfaz falta da pessoa no plantão de agora ou no próximo das próximas 24 h (\"a Ana faltou hoje\", \"tira a falta da Ana\"). " +
+        "Com falta ela não recebe lead desse plantão. A pessoa recebe aviso no app.",
+      inputSchema: z.object({
+        corretor_id: PERSON_ID,
+        falta: z.boolean().describe("true marca a falta; false desfaz."),
+        plantao_id: z.string().max(120).optional().describe("Só se ela tiver mais de um plantão nas próximas horas."),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_marcar_falta", toolCallId, input, async () => {
+        const found = await dutyFor(input.corretor_id, input.plantao_id);
+        if (!found.ok) return found.result;
+        const { duty, broker, name } = found;
+        if (input.falta && broker.presence === "absent") return { ok: true, message: `${name} já estava com falta em ${dutyLabel(duty)}. Nada mudou.` };
+        if (!input.falta && broker.presence !== "absent") return { ok: true, message: `${name} não tem falta em ${dutyLabel(duty)}. Nada mudou.` };
+        await backend.markAbsence(duty.scheduleId, broker.assignmentId, input.falta);
+        return {
+          ok: true,
+          message: input.falta
+            ? `Falta marcada: ${name}, ${dutyLabel(duty)}. Ela não recebe lead desse plantão.`
+            : `Falta desfeita: ${name}, ${dutyLabel(duty)}. Ela precisa confirmar a presença para voltar a receber.`,
+          href: "/plantoes",
+          undo: { tool: "plantao_marcar_falta", input: { corretor_id: input.corretor_id, falta: !input.falta, plantao_id: duty.scheduleId }, label: "Desfazer" },
+        };
+      }),
+    }),
+
+    plantao_liberar_presenca: tool({
+      description:
+        "A8: libera a presença da pessoa no plantão de agora ou no próximo, sem o clique dela (\"libera a presença do Bruno, ele está aqui\"). " +
+        "Plantão presencial sem foto pede o motivo (nota). Não tem Desfazer.",
+      inputSchema: z.object({
+        corretor_id: PERSON_ID,
+        nota: z.string().max(300).optional().describe("Motivo, obrigatório em plantão presencial sem foto. Use as palavras do diretor."),
+        plantao_id: z.string().max(120).optional(),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_liberar_presenca", toolCallId, input, async () => {
+        const found = await dutyFor(input.corretor_id, input.plantao_id);
+        if (!found.ok) return found.result;
+        const { duty, broker, name } = found;
+        if (broker.presence === "confirmed") return { ok: true, message: `${name} já está com presença confirmada em ${dutyLabel(duty)}. Nada mudou.` };
+        const result = await backend.releasePresence(duty.scheduleId, broker.assignmentId, input.nota?.trim() || null);
+        if (!result.ok) {
+          return result.needsNote
+            ? fail("precisa_motivo", `${dutyLabel(duty)} é presencial e ${name} não mandou a foto: preciso do motivo para liberar.`, "Pergunte o motivo ao diretor e chame de novo com nota.")
+            : fail("erro", result.reason, "Nada foi alterado.");
+        }
+        return { ok: true, message: `Presença liberada: ${name}, ${dutyLabel(duty)}. Ela já pode receber leads desse plantão.`, href: "/plantoes" };
       }),
     }),
 

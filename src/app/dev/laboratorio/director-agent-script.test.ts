@@ -24,6 +24,57 @@ async function ask(text: string, writesEnabled = true) {
   return { calls, text: await result.text, content: steps.flatMap((step) => step.content), backend };
 }
 
+describe("A7 e A8 com o agente real", { timeout: 20_000 }, () => {
+  async function run(text: string, prepare?: (world: ReturnType<typeof sampleWorld>) => void, approve = true) {
+    const world = sampleWorld(NOW);
+    prepare?.(world);
+    const backend = createMemoryBackend(world);
+    const make = () => createDirectorAgent({ model: scriptedModel(0, () => false), backend, viewer: { role: "director", viewAs: false, writesEnabled: true }, firstName: null, messages: [] });
+    const first = await make().stream({ messages: [{ role: "user", content: [{ type: "text", text }] }] });
+    const steps = await first.steps;
+    const calls = steps.flatMap((step) => step.toolCalls.map((call) => call.toolName));
+    const request = steps.flatMap((step) => step.content).find((part) => part.type === "tool-approval-request") as { approvalId: string } | undefined;
+    if (request && approve) {
+      const response = await first.response;
+      const second = await make().stream({
+        messages: [
+          { role: "user", content: [{ type: "text", text }] },
+          ...response.messages,
+          { role: "tool", content: [{ type: "tool-approval-response", approvalId: request.approvalId, approved: true }] },
+        ],
+      });
+      await second.text;
+    }
+    return { backend, world, calls, asked: Boolean(request) };
+  }
+
+  it("A7: a Carla faltou hoje (pede confirmação, marca, Desfazer tira a falta)", async () => {
+    const { world, calls, asked, backend } = await run("A Carla faltou hoje");
+    expect(calls).toEqual(["pessoas_buscar", "plantao_marcar_falta"]);
+    expect(asked).toBe(true);
+    expect(world.presence?.["s-manha:2026-11-21|u-carla"]).toBe("absent");
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "plantao_marcar_falta", input: { falta: false } });
+  });
+
+  it("A7: tirar a falta", async () => {
+    const { world } = await run("Tira a falta da Carla", (w) => { w.presence = { "s-manha:2026-11-21|u-carla": "absent" }; });
+    expect(world.presence?.["s-manha:2026-11-21|u-carla"]).toBe("pending");
+  });
+
+  it("A8: libera a presença com o motivo dito pelo diretor (sem Desfazer)", async () => {
+    const { world, backend } = await run("Libera a presença do Bruno, ele está aqui", (w) => { w.presence = { "s-manha:2026-11-21|u-bruno": "pending" }; });
+    expect(world.presence?.["s-manha:2026-11-21|u-bruno"]).toBe("confirmed");
+    expect(backend.actions[0]).toMatchObject({ tool: "plantao_liberar_presenca", status: "done", undo: null });
+  });
+
+  it("A8: presencial sem motivo não libera e pede a nota", async () => {
+    const { world, backend } = await run("Libera a presença do Bruno", (w) => { w.presence = { "s-manha:2026-11-21|u-bruno": "pending" }; });
+    expect(world.presence?.["s-manha:2026-11-21|u-bruno"]).toBe("pending");
+    expect(backend.actions[0]?.status).toBe("failed");
+    expect(backend.actions[0]?.message).toContain("preciso do motivo");
+  });
+});
+
 describe("A5 e A6 com o agente real", { timeout: 20_000 }, () => {
   async function approveAndRun(text: string) {
     // Primeiro turno para no cartão; o segundo leva o "sim" do diretor (como a gaveta faz).
