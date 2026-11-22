@@ -31,7 +31,11 @@ export async function POST(req: Request) {
     const messages = guard.messages as UIMessage[];
 
     const [resolved, writesEnabled, userInfo] = await Promise.all([
-      resolveAgentDirectorModel(),
+      resolveAgentDirectorModel((failed, error) => {
+        // Sem a chave nem o conteúdo: só qual modelo caiu e o status (ex.: 401 de chave revogada).
+        const status = (error as { statusCode?: number } | null)?.statusCode;
+        console.warn("[agent-director] modelo falhou, tentando o próximo", { model: failed, status, message: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+      }),
       isAgentDirectorWritesEnabled(context.tenantId),
       getUserDisplayInfo().catch(() => null),
     ]);
@@ -60,8 +64,14 @@ export async function POST(req: Request) {
       agent,
       uiMessages: messages,
       abortSignal: req.signal,
-      // Nunca ecoa erro de provedor ou banco para o navegador.
-      onError: () => "Não consegui responder agora. Nada foi alterado. Tente de novo.",
+      // Nunca ecoa erro de provedor ou banco para o navegador; o log do servidor guarda a causa.
+      onError: (error) => {
+        const status = (error as { statusCode?: number } | null)?.statusCode;
+        console.error("[agent-director] erro no fluxo", { models: resolved.label, status, message: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+        return status === 401 || status === 403
+          ? "A chave do provedor de IA foi recusada. Atualize a chave em Super-admin › IA. Nada foi alterado."
+          : "Não consegui responder agora. Nada foi alterado. Tente de novo.";
+      },
     });
   } catch (error) {
     console.error("[Agent Drawer Chat Error]:", error instanceof Error ? error.message.slice(0, 200) : "unknown");

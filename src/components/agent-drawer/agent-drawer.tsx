@@ -40,6 +40,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+/**
+ * O motivo que a rota mandou (403 "motor desligado", chave recusada, limite de pedidos) em vez de uma frase genérica.
+ * Texto que não parece mensagem para pessoa (pilha, JSON cru, inglês do provedor) vira a frase padrão.
+ */
+function agentErrorText(error: Error) {
+  const fallback = "Não consegui responder agora. Nada foi alterado.";
+  const raw = error.message?.trim() ?? "";
+  let text = raw;
+  try {
+    const parsed = JSON.parse(raw) as { error?: unknown };
+    if (typeof parsed.error === "string") text = parsed.error;
+  } catch {
+    /* não é JSON: usa o texto como veio */
+  }
+  return text && text.length <= 200 && /[ãçéêóõí]|Não|nada/i.test(text) && !text.includes("{") ? text : fallback;
+}
+
 export function AgentDrawer() {
   const directorLite = useArcScopeEnabled();
   const { isOpen, setIsOpen, user, shortcuts, activePrompt, setActivePrompt } = useAgentDrawer();
@@ -245,7 +262,7 @@ export function AgentDrawer() {
               {error && !isLoading ? (
                 <div className="director-agent-step is-danger" role="alert">
                   <div className="director-agent-step-body">
-                    Não consegui responder agora. Nada foi alterado.{" "}
+                    {agentErrorText(error)}{" "}
                     <button type="button" className="director-agent-link-button" onClick={() => void regenerate()}>Tentar de novo</button>
                   </div>
                 </div>
