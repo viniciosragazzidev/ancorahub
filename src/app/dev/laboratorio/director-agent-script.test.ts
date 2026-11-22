@@ -48,6 +48,27 @@ describe("roteiro do laboratório com o agente real", { timeout: 20_000 }, () =>
     expect(backend.actions).toHaveLength(0);
   });
 
+  it("A2: escalar no plantão da manhã de amanhã (um plantão só: direto)", async () => {
+    const { calls, backend } = await ask("Escala o Bruno no plantão da manhã de amanhã");
+    expect(calls).toEqual(["pessoas_buscar", "plantao_escala", "plantao_escalar_em_vagas"]);
+    expect(backend.actions).toHaveLength(1);
+    expect(backend.world.seats.find((seat) => seat.id === "s-manha:2026-11-22")?.brokerIds).toContain("u-bruno");
+  });
+
+  it("A2: dia com vários plantões e sem turno dito: pergunta qual", async () => {
+    const { calls, backend } = await ask("Escala a Carla no plantão de segunda");
+    expect(calls).toEqual(["pessoas_buscar", "plantao_escala", "escolher"]);
+    expect(backend.actions).toHaveLength(0);
+  });
+
+  it("A3: tirar do plantão de terça (ela só tem um no dia: direto, com Desfazer)", async () => {
+    const { calls, backend } = await ask("Tira a Carla do plantão de terça");
+    expect(calls).toEqual(["pessoas_buscar", "plantao_escala", "plantao_tirar_de_vagas"]);
+    expect(backend.actions[0]).toMatchObject({ tool: "plantao_tirar_de_vagas", status: "done" });
+    expect(backend.actions[0]?.undo?.tool).toBe("plantao_escalar_em_vagas");
+    expect(backend.world.seats.filter((seat) => seat.dutyDate === "2026-11-24" && seat.brokerIds.includes("u-carla"))).toHaveLength(0);
+  });
+
   it("uma cadeira só é direta e grava a trilha", async () => {
     const { calls, backend } = await ask("Dê 1 cadeira para a Carla");
     expect(calls).toContain("plantao_escalar_em_vagas");

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { AgentBackend, AgentActionRecord } from "./backend";
 import { matchPeople } from "./people-match";
-import { hasFreeSeat, hhmm, pickSeats, seatLabel, seatsOf, understaffed } from "./seats";
+import { hasFreeSeat, hhmm, matchesSeat, pickSeats, seatLabel, seatsOf, understaffed } from "./seats";
 import type { Person, SeatOccurrence, ToolResult } from "./types";
 
 /**
@@ -140,22 +140,27 @@ export function buildAgentTools(env: ToolEnv) {
 
     plantao_escala: tool({
       description:
-        "Lê a escala (plantões por data, quem está em cada um, vagas livres). Use para \"escala de sábado\", \"quantas cadeiras a Ana tem no mês?\" " +
-        "(passe corretor_id) e \"onde falta gente?\" (so_faltando_gente). Datas em AAAA-MM-DD; sem datas, os próximos 7 dias.",
+        "Lê a escala (plantões por data, quem está em cada um, vagas livres, ocorrencia_id). Use para \"escala de sábado\", \"quantas cadeiras a Ana tem no mês?\" " +
+        "(passe corretor_id), \"onde falta gente?\" (so_faltando_gente) e para achar o plantão certo antes de escalar ou tirar alguém num dia " +
+        "(de = ate = o dia; turno e plantao_texto se o diretor disse \"da manhã\", \"PME\"). Datas em AAAA-MM-DD; sem datas, os próximos 7 dias.",
       inputSchema: z.object({
         de: DATE.optional(),
         ate: DATE.optional(),
-        corretor_id: PERSON_ID.optional().describe("Id vindo de pessoas_buscar."),
+        corretor_id: PERSON_ID.optional().describe("Id vindo de pessoas_buscar: lista só os plantões dela."),
         so_faltando_gente: z.boolean().optional(),
+        turno: z.enum(["manha", "tarde", "noite"]).optional(),
+        plantao_texto: z.string().max(60).optional().describe("Parte do nome do plantão ou do tipo, ex.: Manhã, PME."),
       }),
-      execute: async ({ de, ate, corretor_id, so_faltando_gente }): Promise<ToolResult> => {
+      execute: async ({ de, ate, corretor_id, so_faltando_gente, turno, plantao_texto }): Promise<ToolResult> => {
         const today = spDateKey(backend.now());
         const from = de ?? today;
         const until = ate ?? addDays(from, 6);
         if (until < from) return fail("datas", "A data final vem antes da inicial.", "Troque de/ate.");
         if (Date.parse(until) - Date.parse(from) > 62 * DAY_MS) return fail("periodo_longo", "Período longo demais.", "Peça até 2 meses por vez.");
-        const [seats, people] = await Promise.all([seatsBetween(from, until), peopleMap()]);
-        if (!seats.length) return { ok: true, message: `Não há escala mensal para ${dayLabel(from)} a ${dayLabel(until)}.`, href: "/plantoes", data: { ocorrencias: [] } };
+        const [allSeats, people] = await Promise.all([seatsBetween(from, until), peopleMap()]);
+        if (!allSeats.length) return { ok: true, message: `Não há escala mensal para ${dayLabel(from)} a ${dayLabel(until)}.`, href: "/plantoes", data: { ocorrencias: [] } };
+        const seats = allSeats.filter((item) => matchesSeat(item, { shift: turno ?? null, text: plantao_texto ?? null }));
+        if (!seats.length) return { ok: true, message: `Nenhum plantão${plantao_texto ? ` "${plantao_texto}"` : ""}${turno ? ` de ${turno === "manha" ? "manhã" : turno}` : ""} de ${dayLabel(from)} a ${dayLabel(until)}.`, href: "/plantoes", data: { ocorrencias: [] } };
         if (corretor_id) {
           const mine = seatsOf(seats, corretor_id, backend.now());
           const name = nameOf(people, corretor_id);
@@ -300,7 +305,7 @@ export function buildAgentTools(env: ToolEnv) {
         for (const id of ids) {
           const seat = byId.get(id);
           if (!seat || !seat.brokerIds.includes(input.corretor_id)) { problems.push(`${seat ? seatLabel(seat) : dayLabel(id.slice(-10))}: não estava`); continue; }
-          if (seat.started) { problems.push(`${seatLabel(seat)}: já começou`); continue; }
+          if (seat.started) { problems.push(`${seatLabel(seat)}: já começou (para ela parar de receber agora, pause no plantão pela tela Plantões)`); continue; }
           try {
             await backend.removeSeat(seat, input.corretor_id);
             done.push(seat);

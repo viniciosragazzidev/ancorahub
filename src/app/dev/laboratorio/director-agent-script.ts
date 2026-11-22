@@ -17,6 +17,9 @@ export const LAB_PHRASES = [
   "Dê 2 cadeiras de sábado para a Carla",
   "Quantas cadeiras a Carla tem?",
   "Tire a Carla de todos os plantões das próximas 2 semanas",
+  "Escala o Bruno no plantão da manhã de amanhã",
+  "Escala a Carla no plantão de segunda",
+  "Tira a Carla do plantão de terça",
 ];
 
 function textOf(content: unknown) {
@@ -40,7 +43,28 @@ function readTurn(prompt: Prompt) {
       results.push({ toolName: part.toolName, value, denied });
     }
   }
-  return { request: request.toLowerCase(), results };
+  const system = prompt.filter((message) => message.role === "system").map((message) => textOf(message.content)).join(" ");
+  return { request: request.toLowerCase(), results, system };
+}
+
+const WEEKDAY_WORDS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+/** "amanhã", "hoje", "de sexta" → AAAA-MM-DD, pelo calendário que o prompt traz (como o modelo faria). */
+function dayAsked(request: string, system: string) {
+  const calendar = system.match(/Calendário: ([^\n]+)/)?.[1] ?? "";
+  const entries = calendar.split(";").map((item) => item.trim()).filter(Boolean);
+  const pick = (test: (entry: string) => boolean) => entries.find(test)?.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+  if (/\bamanh[ãa]/.test(request)) return pick((entry) => entry.includes("(amanhã)"));
+  if (/\bhoje\b/.test(request)) return pick((entry) => entry.includes("(hoje)"));
+  const weekday = WEEKDAY_WORDS.find((word) => request.includes(word) || request.includes(word.normalize("NFD").replace(/[̀-ͯ]/g, "")));
+  return weekday ? pick((entry) => entry.startsWith(weekday) && !entry.includes("(hoje)")) : null;
+}
+
+function shiftAsked(request: string) {
+  if (/manh[ãa]/.test(request)) return "manha";
+  if (request.includes("tarde")) return "tarde";
+  if (request.includes("noite")) return "noite";
+  return undefined;
 }
 
 const NUMBER_WORDS: Record<string, number> = { uma: 1, um: 1, duas: 2, dois: 2, tres: 3, "três": 3, quatro: 4, cinco: 5, seis: 6 };
@@ -53,7 +77,7 @@ function personAsked(request: string) {
 
 /** O roteiro: próximo passo a partir do pedido e do que já voltou. */
 export function nextLabStep(prompt: Prompt): Step {
-  const { request, results } = readTurn(prompt);
+  const { request, results, system } = readTurn(prompt);
   const last = results.at(-1);
   const find = (name: string) => [...results].reverse().find((item) => item.toolName === name);
   if (last?.denied) return { kind: "text", text: "Tudo bem, não mudei nada." };
@@ -69,14 +93,44 @@ export function nextLabStep(prompt: Prompt): Step {
 
   const name = personAsked(request);
   const people = find("pessoas_buscar");
-  const chosen = find("escolher");
+  const choices = results.filter((item) => item.toolName === "escolher").map((item) => String((item.value as { id?: string } | null)?.id ?? ""));
+  const chosenPerson = choices.find((id) => !id.includes(":"));
+  const chosenSeat = choices.find((id) => id.includes(":"));
   if (!people) return name ? { kind: "tool", name: "pessoas_buscar", input: { texto: name } } : { kind: "text", text: "De quem você está falando?" };
   const found = (people.value?.data as { pessoas?: Array<{ id: string; nome: string; unidade: string | null }>; unico?: boolean } | undefined);
   if (!people.value?.ok || !found?.pessoas?.length) return { kind: "text", text: String(people.value?.message ?? "Não achei essa pessoa.") };
-  if (!found.unico && !chosen) {
+  if (!found.unico && !chosenPerson) {
     return { kind: "tool", name: "escolher", input: { pergunta: "Qual delas?", opcoes: found.pessoas.map((person) => ({ id: person.id, rotulo: person.nome, detalhe: person.unidade ?? undefined })) } };
   }
-  const personId = chosen ? String((chosen.value as { id?: string } | null)?.id ?? "") : found.pessoas[0]!.id;
+  const personId = chosenPerson ?? found.pessoas[0]!.id;
+  const day = dayAsked(request, system);
+  const shift = shiftAsked(request);
+
+  // A2: escalar num dia. A3: tirar de um dia. Mais de um plantão no dia vira escolha.
+  const oneDay = (key: "ocorrencias" | "proximas") => {
+    const schedule = find("plantao_escala");
+    return ((schedule?.value?.data as Record<string, Array<{ ocorrencia_id: string; rotulo: string; vagas_livres?: number | null }>> | undefined)?.[key] ?? []);
+  };
+  if (/^escal[ae]\b/.test(request) && day) {
+    if (!find("plantao_escala")) return { kind: "tool", name: "plantao_escala", input: { de: day, ate: day, ...(shift ? { turno: shift } : {}) } };
+    const done = find("plantao_escalar_em_vagas");
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto. A pessoa recebe o aviso no app." : String(done.value?.message ?? "Não deu certo.") };
+    const open = oneDay("ocorrencias").filter((item) => item.vagas_livres !== 0);
+    if (!open.length) return { kind: "text", text: "Não há plantão com vaga nesse dia." };
+    const target = chosenSeat ?? (open.length === 1 ? open[0]!.ocorrencia_id : null);
+    if (!target) return { kind: "tool", name: "escolher", input: { pergunta: "Em qual plantão?", opcoes: open.slice(0, 8).map((item) => ({ id: item.ocorrencia_id, rotulo: item.rotulo })) } };
+    return { kind: "tool", name: "plantao_escalar_em_vagas", input: { corretor_id: personId, ocorrencia_ids: [target] } };
+  }
+  if (/^tir[ae]\b/.test(request) && day) {
+    if (!find("plantao_escala")) return { kind: "tool", name: "plantao_escala", input: { corretor_id: personId, de: day, ate: day, ...(shift ? { turno: shift } : {}) } };
+    const removed = find("plantao_tirar_de_vagas");
+    if (removed) return { kind: "text", text: removed.value?.ok ? "Pronto." : String(removed.value?.message ?? "") };
+    const mine = oneDay("proximas");
+    if (!mine.length) return { kind: "text", text: String(find("plantao_escala")?.value?.message ?? "Ela não tem plantão nesse dia.") };
+    const target = chosenSeat ?? (mine.length === 1 ? mine[0]!.ocorrencia_id : null);
+    if (!target) return { kind: "tool", name: "escolher", input: { pergunta: "De qual plantão?", opcoes: mine.map((item) => ({ id: item.ocorrencia_id, rotulo: item.rotulo })) } };
+    return { kind: "tool", name: "plantao_tirar_de_vagas", input: { corretor_id: personId, ocorrencia_ids: [target] } };
+  }
 
   if (request.includes("quantas cadeiras")) {
     if (last?.toolName !== "plantao_escala") return { kind: "tool", name: "plantao_escala", input: { corretor_id: personId, ate: undefined } };

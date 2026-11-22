@@ -78,6 +78,13 @@ function normalize(text: string) {
   return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+/** Filtro por turno e por parte do nome do plantão ou do tipo ("manhã", "PME"). */
+export function matchesSeat(occurrence: Pick<SeatOccurrence, "startsAt" | "scheduleName" | "typeName">, filter: { shift?: "manha" | "tarde" | "noite" | null; text?: string | null }) {
+  if (filter.shift && shiftOf(occurrence.startsAt) !== filter.shift) return false;
+  if (filter.text && !normalize(`${occurrence.scheduleName} ${occurrence.typeName ?? ""}`).includes(normalize(filter.text))) return false;
+  return true;
+}
+
 export function hasFreeSeat(occurrence: SeatOccurrence) {
   return occurrence.maximumBrokers === null || occurrence.brokerIds.length < occurrence.maximumBrokers;
 }

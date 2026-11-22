@@ -708,3 +708,12 @@ Uma por vez, cada uma entregue de ponta a ponta (ferramenta, prévia, Desfazer, 
 | D6 | Relatório do plantão agora | "Manda o relatório do plantão" | Toque |
 
 Ordem recomendada: fundação → A14 (ler escala, base de tudo) → A1 → A2 → A3 → A9/A10 → A5/A6 → A7/A8 → B1 → B2/B3 → B9/B10 → o resto de A → B → C → D.
+
+---
+
+## 13. Andamento
+
+- **21/11 · Fundação + A14 + A1** (`feat/agente-diretor-f0`, commits ce1b2bba e 4d860c12): rota no ai@7, catálogo com política central, trilha `agent_actions` (migration 0235), Desfazer por 10 min, gaveta com cartões de passo, Super-admin (chave por empresa, desligada, e modelo), laboratório "Agente IA do diretor". Dar cadeiras espalha uma por dia (mais no mesmo dia só se o diretor pedir).
+- **21/11 · A2 escalar num dia + A3 tirar de um dia**: `plantao_escala` filtra por dia, turno e nome do plantão; dia com vários plantões vira escolha ("Em qual plantão?"), só os que têm vaga; plantão que já começou não sai pela escala (o agente diz e sugere pausar). Testado com o agente real e o roteiro (29 testes) e no laboratório.
+- **Antes de usar em produção**: aplicar `drizzle/0235_agent_actions.sql`, ligar "Ações do Agente IA do diretor" na empresa (Super-admin) e conferir a chave do OpenRouter.
+- **Próximas**: A4 tirar de todas as próximas, A9/A10 pausas, A5/A6 trocas, A7/A8 falta e presença.
