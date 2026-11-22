@@ -113,6 +113,19 @@ object CrmSession {
         scope.launch { tick() }
     }
 
+    /** Feedback do contato no próprio celular; a fila segue como na classificação da web. */
+    fun classify(outcome: String) {
+        val client = api ?: return
+        scope.launch {
+            try {
+                val state = client.classify(outcome)
+                _ui.value = _ui.value.copy(state = state, message = null)
+            } catch (e: CrmException) {
+                if (e.sessionEnded) sessionEnded(e.message) else _ui.value = _ui.value.copy(message = e.message)
+            }
+        }
+    }
+
     fun togglePause() {
         val paused = _ui.value.state?.paused == true
         control(if (paused) "resume" else "pause")
@@ -247,7 +260,7 @@ object CrmSession {
             state.total == 0 -> "Ainda não há frios na sua fila. Assim que a base de frios estiver ligada, eles aparecem aqui."
             state.status == "ended" || current == null -> "Fila concluída."
             !current.dialable -> "Este contato está bloqueado para ligação. Avance a fila na tela do computador."
-            state.awaitingClassification -> "Classifique a ligação na tela do computador."
+            state.awaitingClassification -> null
             state.countdownSeconds != null -> if (state.countdownPaused) "Contagem pausada." else "Próxima ligação em ${state.countdownSeconds} s."
             else -> null
         }

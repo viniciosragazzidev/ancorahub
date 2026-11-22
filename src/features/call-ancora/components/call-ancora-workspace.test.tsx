@@ -27,6 +27,7 @@ describe("Call Âncora no laboratório", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Simular leitura do QR/ }));
     expect(await screen.findByRole("heading", { name: "Celular conectado" })).toBeTruthy();
+    expect(screen.getByLabelText("Olá, Ana!")).toBeTruthy();
     expect(fire).toHaveBeenCalledWith("confirm");
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "Marina Duarte" })).toBeTruthy(), { timeout: 3_000 });

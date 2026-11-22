@@ -193,8 +193,9 @@ export function ConnectedMoment({ brokerFirstName }: { brokerFirstName: string }
           </svg>
         </motion.span>
       </span>
-      <Beat at="text"><h2 className="mt-8 text-3xl font-semibold tracking-tight text-(--foreground)">Celular conectado</h2></Beat>
-      <Beat at="number"><p className="mt-3 max-w-sm text-sm leading-6 text-(--text-secondary)">Conectado à conta de {brokerFirstName}. Preparando a sua fila…</p></Beat>
+      <h2 className="mt-8 text-3xl font-semibold tracking-tight text-(--foreground)">Celular conectado</h2>
+      <p className="mt-3 text-xl font-medium text-(--foreground)"><NameReveal text={`Olá, ${brokerFirstName}!`} delay={motionTokens.beat.text} /></p>
+      <Beat at="after"><p className="mt-3 max-w-sm text-sm leading-6 text-(--text-secondary)">Preparando a sua fila…</p></Beat>
     </section>
   );
 }
@@ -222,6 +223,45 @@ export function QueueTrack({ total, done }: { total: number; done: number }) {
 }
 
 /** Troca no mesmo lugar com direção: o que sai vai para a esquerda, o que chega vem da direita. */
+/**
+ * Nome que chega letra por letra: cada letra sobe e desfoca para nítida, em cascata curta.
+ * O leitor de tela recebe o nome inteiro de uma vez (as letras ficam ocultas para ele).
+ */
+export function NameReveal({ text, className, delay = 0 }: { text: string; className?: string; delay?: number }) {
+  const reduce = !useMotionAllowed();
+  const words = text.split(" ");
+  if (reduce) {
+    return <motion.span className={className} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={reducedFade}>{text}</motion.span>;
+  }
+  let index = 0;
+  return (
+    <span className={className} aria-label={text}>
+      {words.map((word, wordIndex) => (
+        <span key={`${word}-${wordIndex}`} aria-hidden="true" className="inline-block whitespace-nowrap">
+          {Array.from(word).map((letter) => {
+            const at = index++;
+            return (
+              <motion.span
+                key={at}
+                className="inline-block"
+                initial={{ opacity: 0, y: "0.45em", filter: `blur(${motionTokens.blur.subtle * 2}px)` }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ ...motionTokens.spring.smooth, delay: delay + at * LETTER_STAGGER }}
+              >
+                {letter}
+              </motion.span>
+            );
+          })}
+          {wordIndex < words.length - 1 ? " " : null}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Intervalo entre letras do nome: rápido o bastante para um nome longo não passar de ~0,6 s. */
+const LETTER_STAGGER = 0.028;
+
 export function SlideSwap({ swapKey, children, className, axis = "x" }: { swapKey: string; children: ReactNode; className?: string; axis?: "x" | "y" }) {
   const reduce = !useMotionAllowed();
   const far = axis === "x" ? motionTokens.distance.sheet : motionTokens.distance.md;

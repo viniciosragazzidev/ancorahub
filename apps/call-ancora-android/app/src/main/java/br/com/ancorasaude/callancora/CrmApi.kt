@@ -159,6 +159,10 @@ class CrmApi(private val origin: String, private val token: String?) {
     suspend fun control(action: String): CrmState =
         safeParse(request("POST", "/api/call-ancora/device/control", JSONObject().put("action", action)))
 
+    /** Feedback do contato depois da ligação (Com interesse, Sem interesse...). */
+    suspend fun classify(outcome: String): CrmState =
+        safeParse(request("POST", "/api/call-ancora/device/classify", JSONObject().put("outcome", outcome)))
+
     /** Resposta fora do formato esperado vira falha temporária, nunca derruba o app. */
     private fun safeParse(json: JSONObject): CrmState = try {
         parseState(json)

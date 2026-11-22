@@ -113,8 +113,8 @@ export function CallAncoraSettingsPanel() {
             </div>
             <div className="flex items-center justify-between gap-4 rounded-xl bg-(--surface-muted) px-4 py-3">
               <div>
-                <p id="call-ancora-autodial-default" className="text-sm font-medium text-(--foreground)">Discagem automática ligada ao iniciar</p>
-                <p className="text-xs text-(--text-secondary)">O corretor ainda pode desligar na sessão dele.</p>
+                <p id="call-ancora-autodial-default" className="text-sm font-medium text-(--foreground)">Discagem automática</p>
+                <p className="text-xs text-(--text-secondary)">Depois do feedback, o celular liga para o próximo sozinho após a contagem. O corretor não muda isso.</p>
               </div>
               <Switch aria-labelledby="call-ancora-autodial-default" checked={settings.autoDialByDefault} onCheckedChange={(checked) => update("autoDialByDefault", checked)} />
             </div>
