@@ -24,6 +24,8 @@ export const LAB_PHRASES = [
   "Volta o Bruno no plantão",
   "Pausa o Bruno",
   "Ativa o Bruno",
+  "Passa a cadeira da Carla de terça para a Ana Souza",
+  "Troca a Carla de terça com o Bruno de quarta",
 ];
 
 function textOf(content: unknown) {
@@ -98,6 +100,32 @@ export function nextLabStep(prompt: Prompt): Step {
   if (request.includes("falta gente")) {
     if (!last) return { kind: "tool", name: "plantao_escala", input: { so_faltando_gente: true } };
     return { kind: "text", text: String(last.value?.message ?? "") };
+  }
+
+  // A6 e A5: duas pessoas no mesmo pedido.
+  const pass = request.match(/cadeira d[ao] (\S+) de (\S+) para (?:a |o )?(.+?)\??$/);
+  const swap = request.match(/^troca (?:a |o )?(\S+) de (\S+) com (?:a |o )?(\S+) de (\S+?)\??$/);
+  if (pass || swap) {
+    const people = results.filter((item) => item.toolName === "pessoas_buscar");
+    const schedules = results.filter((item) => item.toolName === "plantao_escala");
+    const wanted = pass ? [pass[1]!, pass[3]!] : [swap![1]!, swap![3]!];
+    if (people.length < wanted.length) return { kind: "tool", name: "pessoas_buscar", input: { texto: wanted[people.length] } };
+    const ids = people.map((item) => ((item.value?.data as { pessoas?: Array<{ id: string }> } | undefined)?.pessoas ?? [])[0]?.id);
+    if (ids.some((id) => !id)) return { kind: "text", text: "Não achei uma das pessoas." };
+    const days = pass ? [dayAsked(pass[2]!, system)] : [dayAsked(swap![2]!, system), dayAsked(swap![4]!, system)];
+    if (days.some((item) => !item)) return { kind: "text", text: "Não entendi o dia." };
+    if (schedules.length < days.length) {
+      const index = schedules.length;
+      return { kind: "tool", name: "plantao_escala", input: { corretor_id: ids[index], de: days[index], ate: days[index] } };
+    }
+    const firstSeat = (index: number) => ((schedules[index]!.value?.data as { proximas?: Array<{ ocorrencia_id: string }> } | undefined)?.proximas ?? [])[0]?.ocorrencia_id;
+    const tool = pass ? "plantao_passar_cadeira" : "plantao_trocar_corretores";
+    const done = find(tool);
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    if (!firstSeat(0) || (swap && !firstSeat(1))) return { kind: "text", text: "Não achei o plantão de uma das pessoas nesse dia." };
+    return pass
+      ? { kind: "tool", name: tool, input: { de_corretor_id: ids[0], para_corretor_id: ids[1], ocorrencia_id: firstSeat(0) } }
+      : { kind: "tool", name: tool, input: { corretor_a_id: ids[0], ocorrencia_a_id: firstSeat(0), corretor_b_id: ids[1], ocorrencia_b_id: firstSeat(1) } };
   }
 
   const name = personAsked(request);

@@ -24,6 +24,65 @@ async function ask(text: string, writesEnabled = true) {
   return { calls, text: await result.text, content: steps.flatMap((step) => step.content), backend };
 }
 
+describe("A5 e A6 com o agente real", { timeout: 20_000 }, () => {
+  async function approveAndRun(text: string) {
+    // Primeiro turno para no cartão; o segundo leva o "sim" do diretor (como a gaveta faz).
+    const backend = createMemoryBackend(sampleWorld(NOW));
+    const make = () => createDirectorAgent({ model: scriptedModel(0, () => false), backend, viewer: { role: "director", viewAs: false, writesEnabled: true }, firstName: null, messages: [] });
+    const first = await make().stream({ messages: [{ role: "user", content: [{ type: "text", text }] }] });
+    const steps = await first.steps;
+    const request = steps.flatMap((step) => step.content).find((part) => part.type === "tool-approval-request");
+    expect(request).toBeTruthy();
+    const response = await first.response;
+    const second = await make().stream({
+      messages: [
+        { role: "user", content: [{ type: "text", text }] },
+        ...response.messages,
+        { role: "tool", content: [{ type: "tool-approval-response", approvalId: (request as { approvalId: string }).approvalId, approved: true }] },
+      ],
+    });
+    await second.text;
+    return backend;
+  }
+
+  it("A6: passar a cadeira da Carla de terça para a Ana Souza", async () => {
+    const backend = await approveAndRun("Passa a cadeira da Carla de terça para a Ana Souza");
+    const seat = backend.world.seats.find((item) => item.id === "s-tarde:2026-11-24")!;
+    expect(seat.brokerIds).toContain("u-ana-souza");
+    expect(seat.brokerIds).not.toContain("u-carla");
+    expect(backend.actions[0]).toMatchObject({ tool: "plantao_passar_cadeira", approval: "auto", status: "done" });
+  });
+
+  it("A5: trocar a Carla de terça com o Bruno de quarta", async () => {
+    const backend = await approveAndRun("Troca a Carla de terça com o Bruno de quarta");
+    const terca = backend.world.seats.find((item) => item.id === "s-tarde:2026-11-24")!;
+    const quarta = backend.world.seats.find((item) => item.id === "s-online:2026-11-25")!;
+    expect(terca.brokerIds).toContain("u-bruno");
+    expect(terca.brokerIds).not.toContain("u-carla");
+    expect(quarta.brokerIds).toContain("u-carla");
+    expect(quarta.brokerIds).not.toContain("u-bruno");
+    expect(backend.actions[0]?.undo?.tool).toBe("plantao_trocar_corretores");
+  });
+
+  it("A5: falha no meio volta tudo como estava", async () => {
+    const world = sampleWorld(NOW);
+    const backend = createMemoryBackend(world);
+    const original = backend.addSeat.bind(backend);
+    let adds = 0;
+    backend.addSeat = async (occurrence, brokerId, force) => {
+      adds += 1;
+      if (adds === 2) throw new Error("Falha simulada no segundo encaixe.");
+      return original(occurrence, brokerId, force);
+    };
+    const tools = buildAgentTools({ backend, requestText: null, approvedByUser: () => true });
+    const execute = (tools.plantao_trocar_corretores as unknown as { execute: (input: unknown, options: { toolCallId: string; messages: [] }) => Promise<ToolResult> }).execute;
+    const before = JSON.stringify(world.seats.map((seat) => [seat.id, [...seat.brokerIds].sort()]));
+    const result = await execute({ corretor_a_id: "u-carla", ocorrencia_a_id: "s-tarde:2026-11-24", corretor_b_id: "u-bruno", ocorrencia_b_id: "s-online:2026-11-25" }, { toolCallId: "t-falha", messages: [] });
+    expect(result.ok).toBe(false);
+    expect(JSON.stringify(world.seats.map((seat) => [seat.id, [...seat.brokerIds].sort()]))).toBe(before);
+  });
+});
+
 describe("A4, A9 e A10 com o agente real", { timeout: 20_000 }, () => {
   it("A4: tirar de todos os plantões das próximas 2 semanas pede confirmação com a lista", async () => {
     const { calls, content, backend } = await ask("Tire a Carla de todos os plantões das próximas 2 semanas");

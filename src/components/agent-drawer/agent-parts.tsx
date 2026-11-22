@@ -115,7 +115,19 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "plantao_tirar_de_vagas" ? `Tirar de ${count} ${count === 1 ? "plantão" : "plantões"}?`
     : isPeople ? `${pausing ? "Pausar o recebimento de" : "Voltar a mandar leads para"} ${count} ${count === 1 ? "corretor" : "corretores"}?`
     : `${entry?.title ?? "Confirmar"}?`;
-  const confirmLabel = name === "plantao_escalar_em_vagas" ? `Escalar em ${count}` : name === "plantao_tirar_de_vagas" ? `Tirar de ${count}` : isPeople ? `${pausing ? "Pausar" : "Ativar"} ${count}` : "Confirmar";
+  const label = (id: unknown) => (typeof id === "string" ? seatLabels.get(id) ?? (id.includes(":") ? fallbackSeatLabel(id) : "Corretor") : "");
+  // A5 e A6: o cartão mostra quem sai de onde e quem entra.
+  const swapLines = name === "plantao_passar_cadeira"
+    ? [`${label(input.ocorrencia_id)}: sai ${label(input.de_corretor_id)}, entra ${label(input.para_corretor_id)}`]
+    : name === "plantao_trocar_corretores"
+      ? [
+          `${label(input.corretor_a_id)}: ${label(input.ocorrencia_a_id)} → ${label(input.ocorrencia_b_id)}`,
+          `${label(input.corretor_b_id)}: ${label(input.ocorrencia_b_id)} → ${label(input.ocorrencia_a_id)}`,
+        ]
+      : null;
+  const swapTitle = name === "plantao_passar_cadeira" ? "Passar a cadeira?" : name === "plantao_trocar_corretores" ? "Trocar os dois de plantão?" : null;
+  const confirmLabel = name === "plantao_escalar_em_vagas" ? `Escalar em ${count}` : name === "plantao_tirar_de_vagas" ? `Tirar de ${count}` : isPeople ? `${pausing ? "Pausar" : "Ativar"} ${count}`
+    : name === "plantao_passar_cadeira" ? "Passar" : name === "plantao_trocar_corretores" ? "Trocar" : "Confirmar";
   const respond = (approved: boolean) => {
     if (sent || !part.approval) return;
     feedback("tap");
@@ -123,15 +135,20 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     onRespond(part.approval.id, approved);
   };
   return (
-    <div className={`director-agent-card${level === "forte" ? " is-strong" : ""}`} role="group" aria-label={title}>
-      <p className="director-agent-card-title">{title}</p>
+    <div className={`director-agent-card${level === "forte" ? " is-strong" : ""}`} role="group" aria-label={swapTitle ?? title}>
+      <p className="director-agent-card-title">{swapTitle ?? title}</p>
+      {swapLines ? (
+        <ul className="director-agent-card-list">
+          {swapLines.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      ) : null}
       {ids.length ? (
         <ul className="director-agent-card-list">
           {ids.slice(0, 8).map((id) => <li key={id}>{seatLabels.get(id) ?? (isPeople ? "Corretor" : fallbackSeatLabel(id))}</li>)}
           {ids.length > 8 ? <li>e mais {ids.length - 8}</li> : null}
         </ul>
       ) : null}
-      {entry?.risk.notifies ? <p className="director-agent-card-note">A pessoa recebe aviso no app.</p> : null}
+      {entry?.risk.notifies ? <p className="director-agent-card-note">{swapLines ? "As duas pessoas recebem aviso no app." : "A pessoa recebe aviso no app."}</p> : null}
       <div className="director-agent-card-actions">
         <button type="button" className="director-agent-confirm" onClick={() => respond(true)} disabled={Boolean(sent)} aria-busy={sent === "yes"}>
           {sent === "yes" ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}

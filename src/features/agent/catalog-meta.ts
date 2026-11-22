@@ -46,6 +46,14 @@ export const AGENT_CATALOG = {
     name: "plantao_tirar_de_vagas", title: "Tirar dos plantões", doing: "Tirando da escala…", topic: "plantoes",
     risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: many("ocorrencia_ids"), covers: ["A3", "A4"],
   },
+  plantao_passar_cadeira: {
+    name: "plantao_passar_cadeira", title: "Passar a cadeira", doing: "Passando a cadeira…", topic: "plantoes",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["A6"],
+  },
+  plantao_trocar_corretores: {
+    name: "plantao_trocar_corretores", title: "Trocar de plantão", doing: "Trocando…", topic: "plantoes",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["A5"],
+  },
   plantao_pausar: {
     name: "plantao_pausar", title: "Pausar no plantão", doing: "Mudando a pausa no plantão…", topic: "plantoes",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: "direto", covers: ["A9"],

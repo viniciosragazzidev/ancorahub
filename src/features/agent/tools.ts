@@ -325,6 +325,96 @@ export function buildAgentTools(env: ToolEnv) {
       }),
     }),
 
+    plantao_passar_cadeira: tool({
+      description:
+        "A6: passa a cadeira de uma pessoa para outra no mesmo plantão (\"passa a cadeira da Ana de sexta para a Carla\"). " +
+        "Use a ocorrencia_id de plantao_escala com o corretor_id de quem sai. As duas pessoas recebem aviso no app.",
+      inputSchema: z.object({
+        de_corretor_id: PERSON_ID.describe("Quem sai."),
+        para_corretor_id: PERSON_ID.describe("Quem entra."),
+        ocorrencia_id: OCCURRENCE_ID,
+        fora_do_tipo: z.boolean().optional().describe("true só se o diretor aceitou plantão fora do tipo da unidade de quem entra."),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_passar_cadeira", toolCallId, input, async () => {
+        const [people, seats] = await Promise.all([peopleMap(), seatsBetween(input.ocorrencia_id.slice(-10), input.ocorrencia_id.slice(-10))]);
+        const from = people.get(input.de_corretor_id);
+        const to = people.get(input.para_corretor_id);
+        const seat = seats.find((item) => item.id === input.ocorrencia_id);
+        if (!from || !to) return fail("pessoa", "Não achei uma das pessoas.", "Confira com pessoas_buscar.");
+        if (to.role !== "broker" || to.status !== "active") return fail("pessoa", `${to.name} não é corretor ativo.`, "Escolha outra pessoa.");
+        if (!seat || !seat.brokerIds.includes(from.id)) return fail("nao_estava", `${from.name} não está nesse plantão.`, "Confira com plantao_escala (corretor_id de quem sai).");
+        if (seat.brokerIds.includes(to.id)) return fail("ja_estava", `${to.name} já está em ${seatLabel(seat)}.`, "Nada a passar.");
+        if (seat.started) return fail("comecou", `${seatLabel(seat)} já começou: a cadeira não muda pela escala.`, "Pause quem sai no plantão.");
+        if (!seat.allowedBrokerIds.includes(to.id) && !input.fora_do_tipo) {
+          return fail("fora_do_tipo", `A unidade de ${to.name} não participa do tipo de ${seat.scheduleName}.`, "Pergunte ao diretor se pode escalar mesmo assim (fora_do_tipo: true).");
+        }
+        await backend.removeSeat(seat, from.id);
+        try {
+          await backend.addSeat(seat, to.id, Boolean(input.fora_do_tipo));
+        } catch (error) {
+          // Não deixa a cadeira vazia: quem saía volta.
+          await backend.addSeat(seat, from.id, true).catch(() => null);
+          throw error;
+        }
+        return {
+          ok: true,
+          message: `${seatLabel(seat)}: saiu ${from.name}, entrou ${to.name}.`,
+          href: "/plantoes",
+          data: { escalado: [{ ocorrencia_id: seat.id, rotulo: seatLabel(seat) }] },
+          undo: { tool: "plantao_passar_cadeira", input: { de_corretor_id: to.id, para_corretor_id: from.id, ocorrencia_id: seat.id, fora_do_tipo: true }, label: "Desfazer" },
+        };
+      }),
+    }),
+
+    plantao_trocar_corretores: tool({
+      description:
+        "A5: troca duas pessoas de plantão (\"troca a Ana de sexta com o Bruno de sábado\"): quem estava em A vai para B e vice-versa. " +
+        "Use as ocorrencia_id de plantao_escala (com o corretor_id de cada um). As duas recebem aviso no app.",
+      inputSchema: z.object({
+        corretor_a_id: PERSON_ID,
+        ocorrencia_a_id: OCCURRENCE_ID.describe("Plantão onde a pessoa A está hoje."),
+        corretor_b_id: PERSON_ID,
+        ocorrencia_b_id: OCCURRENCE_ID.describe("Plantão onde a pessoa B está hoje."),
+        fora_do_tipo: z.boolean().optional(),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_trocar_corretores", toolCallId, input, async () => {
+        const dates = [input.ocorrencia_a_id.slice(-10), input.ocorrencia_b_id.slice(-10)].sort();
+        const [people, seats] = await Promise.all([peopleMap(), seatsBetween(dates[0]!, dates[1]!)]);
+        const a = people.get(input.corretor_a_id);
+        const b = people.get(input.corretor_b_id);
+        const seatA = seats.find((item) => item.id === input.ocorrencia_a_id);
+        const seatB = seats.find((item) => item.id === input.ocorrencia_b_id);
+        if (!a || !b) return fail("pessoa", "Não achei uma das pessoas.", "Confira com pessoas_buscar.");
+        if (!seatA || !seatA.brokerIds.includes(a.id)) return fail("nao_estava", `${a.name} não está no plantão indicado.`, "Confira com plantao_escala.");
+        if (!seatB || !seatB.brokerIds.includes(b.id)) return fail("nao_estava", `${b.name} não está no plantão indicado.`, "Confira com plantao_escala.");
+        if (seatA.id === seatB.id) return fail("mesmo_plantao", "Os dois já estão no mesmo plantão.", "Nada a trocar.");
+        if (seatB.brokerIds.includes(a.id)) return fail("ja_estava", `${a.name} já está em ${seatLabel(seatB)}.`, "Use plantao_passar_cadeira ou plantao_tirar_de_vagas.");
+        if (seatA.brokerIds.includes(b.id)) return fail("ja_estava", `${b.name} já está em ${seatLabel(seatA)}.`, "Use plantao_passar_cadeira ou plantao_tirar_de_vagas.");
+        if (seatA.started || seatB.started) return fail("comecou", "Um dos plantões já começou: a troca não muda pela escala.", "Pause no plantão quem não vai ficar.");
+        const outside = (!seatB.allowedBrokerIds.includes(a.id) || !seatA.allowedBrokerIds.includes(b.id));
+        if (outside && !input.fora_do_tipo) return fail("fora_do_tipo", "Um dos dois ficaria num plantão de tipo fora da unidade dele.", "Pergunte ao diretor se pode trocar mesmo assim (fora_do_tipo: true).");
+        const force = Boolean(input.fora_do_tipo);
+        // Ordem segura: tira os dois, põe cada um no lugar do outro; se algo falhar, volta tudo como estava.
+        const undoSteps: Array<() => Promise<unknown>> = [];
+        try {
+          await backend.removeSeat(seatA, a.id); undoSteps.push(() => backend.addSeat(seatA, a.id, true));
+          await backend.removeSeat(seatB, b.id); undoSteps.push(() => backend.addSeat(seatB, b.id, true));
+          await backend.addSeat(seatB, a.id, force); undoSteps.push(() => backend.removeSeat(seatB, a.id));
+          await backend.addSeat(seatA, b.id, force);
+        } catch (error) {
+          for (const step of undoSteps.reverse()) await step().catch(() => null);
+          throw error;
+        }
+        return {
+          ok: true,
+          message: `Trocado: ${a.name} foi para ${seatLabel(seatB)}; ${b.name} foi para ${seatLabel(seatA)}.`,
+          href: "/plantoes",
+          data: { escalado: [{ ocorrencia_id: seatA.id, rotulo: seatLabel(seatA) }, { ocorrencia_id: seatB.id, rotulo: seatLabel(seatB) }] },
+          undo: { tool: "plantao_trocar_corretores", input: { corretor_a_id: a.id, ocorrencia_a_id: seatB.id, corretor_b_id: b.id, ocorrencia_b_id: seatA.id, fora_do_tipo: true }, label: "Desfazer" },
+        };
+      }),
+    }),
+
     plantao_pausar: tool({
       description:
         "A9: pausa ou retoma a pessoa SÓ no plantão em andamento (continua escalada, para de receber lead dali). " +
