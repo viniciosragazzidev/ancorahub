@@ -290,6 +290,8 @@ Tarefa principal da tela mais usada: no Início do corretor, ver a próxima aç�
 - 2026-11-20: interface enxuta segundo a referência Jubayer. Por quê: CRM "organizado, clean, intuitivo".
 - 2026-11-21: Inter substitui Plus Jakarta Sans no Lite; a Home e a Inbox seguem a referência Accordee.
 - 2026-11-22: brief do craft acrescentado a este arquivo, mantendo o registro da impeccable acima. Por quê: as duas skills leem o `DESIGN.md`.
+- 2026-11-22: brief aprovado pelo Vinicios, inclusive a lista "Nunca parecer".
+- 2026-11-22: importação do design system para uma ferramenta de design recusada por ora. Por quê: não há Paper, pen.dev nem Figma configurado; o craft desenha em HTML a partir dos tokens do código.
 
 ## Open questions
 
@@ -297,5 +299,3 @@ Tarefa principal da tela mais usada: no Início do corretor, ver a próxima aç�
 - O CLAUDE.md ainda fala em Inter + Satoshi (36px ou mais), CTA `#1e40af`, borda `#e5e5e5` e input com borda preta. O Lite usa pílulas, azul de ação `oklch(62% .2 255)` e borda translúcida. Hoje vale o Lite; falta alinhar o CLAUDE.md e o `docs/design-system.md`.
 - Gap G1: convivem dois azuis, o de ação do chat e o índigo dos controles Arc. Unificar ou manter?
 - Gap G2: o tema escuro do Lite ainda não foi validado tela a tela.
-- (inferido) A lista "Nunca parecer" acima saiu dos docs (FEEDBACK.md, CLAUDE.md, skill interface-enxuta), não de uma conversa. Confirmar ou ajustar.
-- Ferramenta de design: não há Paper, pen.dev nem Figma configurado. O craft desenha em HTML por padrão. Importar o design system para uma ferramenta? (Pendente: é o passo de "foundations" do craft-setup.)
