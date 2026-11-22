@@ -6,6 +6,8 @@ import type { Person, SeatOccurrence } from "./types";
  */
 export type DutyNowBroker = {
   id: string;
+  /** Linha da escala (para pausar só neste plantão). */
+  assignmentId: string;
   name: string;
   /** confirmed | pending | absent | expired | none (sem registro de presença hoje) */
   presence: "confirmed" | "pending" | "absent" | "expired" | "none";
@@ -47,6 +49,10 @@ export interface AgentBackend {
   /** Escala na ocorrência. Lança Error com a mensagem da regra quando não pode. */
   addSeat(occurrence: SeatOccurrence, brokerId: string, force: boolean): Promise<void>;
   removeSeat(occurrence: SeatOccurrence, brokerId: string): Promise<void>;
+  /** Pausa ou retoma a pessoa só neste plantão (continua escalada). */
+  pauseOnDuty(scheduleId: string, assignmentId: string, paused: boolean): Promise<void>;
+  /** Pausa ou retoma o recebimento geral de leads dos corretores. */
+  setAvailability(brokerIds: string[], target: "available" | "paused"): Promise<void>;
   /** Grava a trilha em agent_actions; devolve o id ou null (tabela ausente, erro). Idempotente por toolCallId. */
   record(entry: AgentActionRecord): Promise<string | null>;
   /** Resultado já gravado deste toolCallId (reenvio não executa duas vezes). */

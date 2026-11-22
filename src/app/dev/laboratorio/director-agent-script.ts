@@ -20,6 +20,10 @@ export const LAB_PHRASES = [
   "Escala o Bruno no plantão da manhã de amanhã",
   "Escala a Carla no plantão de segunda",
   "Tira a Carla do plantão de terça",
+  "Pausa o Bruno no plantão",
+  "Volta o Bruno no plantão",
+  "Pausa o Bruno",
+  "Ativa o Bruno",
 ];
 
 function textOf(content: unknown) {
@@ -58,6 +62,11 @@ function dayAsked(request: string, system: string) {
   if (/\bhoje\b/.test(request)) return pick((entry) => entry.includes("(hoje)"));
   const weekday = WEEKDAY_WORDS.find((word) => request.includes(word) || request.includes(word.normalize("NFD").replace(/[̀-ͯ]/g, "")));
   return weekday ? pick((entry) => entry.startsWith(weekday) && !entry.includes("(hoje)")) : null;
+}
+
+function lastCalendarDay(system: string) {
+  const days = (system.match(/Calendário: ([^\n]+)/)?.[1] ?? "").match(/\d{4}-\d{2}-\d{2}/g) ?? [];
+  return days.at(-1) ?? null;
 }
 
 function shiftAsked(request: string) {
@@ -106,6 +115,18 @@ export function nextLabStep(prompt: Prompt): Step {
   const day = dayAsked(request, system);
   const shift = shiftAsked(request);
 
+  // A9 (no plantão) e A10 (geral): pausar ou voltar a receber.
+  const pausing = /^(pausa|pause|para)\b/.test(request);
+  const resuming = /^(volta|ativa|retoma|despausa)\b/.test(request);
+  if (pausing || resuming) {
+    const name = request.includes("plantão") || request.includes("plantao") ? "plantao_pausar" : "corretor_pausar";
+    const done = find(name);
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return name === "plantao_pausar"
+      ? { kind: "tool", name, input: { corretor_id: personId, pausado: pausing } }
+      : { kind: "tool", name, input: { corretor_ids: [personId], pausado: pausing } };
+  }
+
   // A2: escalar num dia. A3: tirar de um dia. Mais de um plantão no dia vira escolha.
   const oneDay = (key: "ocorrencias" | "proximas") => {
     const schedule = find("plantao_escala");
@@ -139,7 +160,7 @@ export function nextLabStep(prompt: Prompt): Step {
 
   if (request.includes("tire") || request.includes("tira")) {
     const schedule = find("plantao_escala");
-    if (!schedule) return { kind: "tool", name: "plantao_escala", input: { corretor_id: personId } };
+    if (!schedule) return { kind: "tool", name: "plantao_escala", input: { corretor_id: personId, ate: lastCalendarDay(system) ?? undefined } };
     const ids = ((schedule.value?.data as { proximas?: Array<{ ocorrencia_id: string }> } | undefined)?.proximas ?? []).map((item) => item.ocorrencia_id);
     const removed = find("plantao_tirar_de_vagas");
     if (!removed) return ids.length ? { kind: "tool", name: "plantao_tirar_de_vagas", input: { corretor_id: personId, ocorrencia_ids: ids } } : { kind: "text", text: String(schedule.value?.message ?? "") };

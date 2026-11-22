@@ -44,6 +44,11 @@ export function seatLabelsFrom(parts: ReadonlyArray<{ type: string }>) {
         if (row.ocorrencia_id && row.rotulo) labels.set(row.ocorrencia_id, row.rotulo);
       }
     }
+    // Pessoas vistas em pessoas_buscar (cartão de pausar vários corretores).
+    const people = data?.pessoas;
+    if (Array.isArray(people)) {
+      for (const row of people as Array<{ id?: string; nome?: string }>) if (row.id && row.nome) labels.set(row.id, row.nome);
+    }
   }
   return labels;
 }
@@ -100,13 +105,17 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
   const entry = catalogEntry(name);
   const input = part.input ?? {};
   const level = entry ? confirmLevelFor(entry, input) : "toque";
-  const ids = Array.isArray(input.ocorrencia_ids) ? (input.ocorrencia_ids as string[]) : [];
+  const isPeople = name === "corretor_pausar";
+  const ids = Array.isArray(input.ocorrencia_ids) ? (input.ocorrencia_ids as string[]) : isPeople && Array.isArray(input.corretor_ids) ? (input.corretor_ids as string[]) : [];
   const [sent, setSent] = useState<"yes" | "no" | null>(null);
-  const verb = name === "plantao_tirar_de_vagas" ? "Tirar" : "Escalar";
   const count = ids.length;
+  const pausing = input.pausado === true;
   const title = name === "plantao_escalar_em_vagas"
-    ? `${verb} em ${count} ${count === 1 ? "plantão" : "plantões"}?`
-    : name === "plantao_tirar_de_vagas" ? `${verb} de ${count} ${count === 1 ? "plantão" : "plantões"}?` : `${entry?.title ?? "Confirmar"}?`;
+    ? `Escalar em ${count} ${count === 1 ? "plantão" : "plantões"}?`
+    : name === "plantao_tirar_de_vagas" ? `Tirar de ${count} ${count === 1 ? "plantão" : "plantões"}?`
+    : isPeople ? `${pausing ? "Pausar o recebimento de" : "Voltar a mandar leads para"} ${count} ${count === 1 ? "corretor" : "corretores"}?`
+    : `${entry?.title ?? "Confirmar"}?`;
+  const confirmLabel = name === "plantao_escalar_em_vagas" ? `Escalar em ${count}` : name === "plantao_tirar_de_vagas" ? `Tirar de ${count}` : isPeople ? `${pausing ? "Pausar" : "Ativar"} ${count}` : "Confirmar";
   const respond = (approved: boolean) => {
     if (sent || !part.approval) return;
     feedback("tap");
@@ -118,7 +127,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
       <p className="director-agent-card-title">{title}</p>
       {ids.length ? (
         <ul className="director-agent-card-list">
-          {ids.slice(0, 8).map((id) => <li key={id}>{seatLabels.get(id) ?? fallbackSeatLabel(id)}</li>)}
+          {ids.slice(0, 8).map((id) => <li key={id}>{seatLabels.get(id) ?? (isPeople ? "Corretor" : fallbackSeatLabel(id))}</li>)}
           {ids.length > 8 ? <li>e mais {ids.length - 8}</li> : null}
         </ul>
       ) : null}
@@ -126,7 +135,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
       <div className="director-agent-card-actions">
         <button type="button" className="director-agent-confirm" onClick={() => respond(true)} disabled={Boolean(sent)} aria-busy={sent === "yes"}>
           {sent === "yes" ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
-          {name === "plantao_escalar_em_vagas" ? `Escalar em ${count}` : name === "plantao_tirar_de_vagas" ? `Tirar de ${count}` : "Confirmar"}
+          {confirmLabel}
         </button>
         <button type="button" className="director-agent-link-button" onClick={() => respond(false)} disabled={Boolean(sent)}>
           Não fazer

@@ -5,6 +5,8 @@ import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
 
 import { upcomingShift } from "@/features/dashboard/welcome-rules";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
+import { setBrokersAvailabilityAction } from "@/features/branches/actions";
+import { toggleDutyRosterPauseAction } from "@/features/lead-distribution/duty-actions";
 import {
   addBrokerToPublishedOccurrenceAction,
   getMonthlyDutyPlanAction,
@@ -132,6 +134,7 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
       const today = getSaoPauloDateKey(now);
       const [assignments, published, presence] = await Promise.all([
         db.select({
+          id: schema.dutyRosterAssignments.id,
           scheduleId: schema.dutyRosterAssignments.scheduleId,
           brokerId: schema.dutyRosterAssignments.brokerId,
           dutyDate: schema.dutyRosterAssignments.dutyDate,
@@ -168,6 +171,7 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
           const who = person.get(row.brokerId);
           return [{
             id: row.brokerId,
+            assignmentId: row.id,
             name: who?.name?.trim() || "Corretor",
             presence: presenceOf.get(`${schedule.id}|${row.brokerId}`) ?? "none",
             pausedHere: Boolean(row.pausedAt),
@@ -205,6 +209,19 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
         if (occurrence.source !== "draft" || !message.includes(NOT_PUBLISHED)) throw error;
         await updateMonthlyDutyDraftAction({ planId: occurrence.planId, occurrenceId: occurrence.id, brokerId, operation: "remove" });
       }
+    },
+
+    async pauseOnDuty(scheduleId, assignmentId, paused) {
+      const result = await toggleDutyRosterPauseAction(scheduleId, assignmentId, paused);
+      if (!result.success) throw new Error(result.error);
+    },
+
+    async setAvailability(brokerIds, target) {
+      const form = new FormData();
+      form.set("brokerIds", brokerIds.join(","));
+      form.set("target", target);
+      const result = await setBrokersAvailabilityAction({}, form);
+      if (result.error) throw new Error(result.error);
     },
 
     async record(entry: AgentActionRecord) {

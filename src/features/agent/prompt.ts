@@ -32,8 +32,12 @@ export function buildDirectorInstructions(input: { firstName: string | null; now
     "- Cadeira = vaga num plantão. \"Dê 5 cadeiras para a Ana\": pessoas_buscar → plantao_cadeiras_livres (quantidade 5, filtros só se ditos: dias, turno, modalidade, plantão, datas) → plantao_escalar_em_vagas com exatamente os ocorrencia_id achados. O sistema mostra o cartão de confirmação; não peça confirmação em texto. Por padrão é uma cadeira por dia; varias_no_mesmo_dia só se o diretor pedir.",
     "- \"Escala a Ana no plantão de sexta\" (A2): pessoas_buscar → plantao_escala com de = ate = o dia (e turno/plantao_texto se ditos: \"da manhã\", \"PME\") → plantao_escalar_em_vagas com a ocorrência. Se sobrar mais de um plantão no dia, use escolher com eles (rótulo = dia, horário e nome). Se o plantão estiver lotado, diga e ofereça outro do mesmo dia.",
     "- \"Tira o Bruno do plantão de sábado\" (A3): pessoas_buscar → plantao_escala com corretor_id, de = ate = o dia (e turno/plantao_texto se ditos) → plantao_tirar_de_vagas com o que ele tem nesse dia. Se ele tiver mais de um plantão no dia e o diretor não disse qual, use escolher. Plantão que já começou não sai pela escala: diga isso.",
+    "- \"Tira a Ana de todos os plantões até o fim do mês\" (A4): pessoas_buscar → plantao_escala com corretor_id e o período dito (sem período: os próximos 14 dias) → plantao_tirar_de_vagas com todas as ocorrências dela no período. O cartão mostra a lista; não peça confirmação em texto.",
+    "- \"Pausa a Ana no plantão\" / \"volta a Ana no plantão\" (A9): pessoas_buscar → plantao_pausar (só o plantão em andamento; ela continua escalada).",
+    "- \"Pausa o Bruno\" / \"ativa o Bruno\" / \"para de mandar lead pro Bruno\" (A10): pessoas_buscar → corretor_pausar (recebimento geral). Se o diretor disse \"no plantão\", é A9, não A10.",
     "- Datas: use o calendário acima e mande AAAA-MM-DD. \"Sábado\" sem data é o próximo sábado.",
     "- Se uma ação foi negada ou falhou, diga o motivo em uma frase e o que continua valendo. Não tente de novo sem o diretor pedir.",
+    "- O resultado de cada ação já aparece na tela, no passo. Depois de uma ação, não repita a lista: responda só \"Pronto.\" ou o que for novo (o próximo passo, o que não deu).",
     input.writesEnabled
       ? "- Ações de escrita estão liberadas."
       : "- Ações de escrita ainda NÃO estão liberadas nesta empresa: você só consulta. Se pedirem para mudar algo, explique isso e diga o que faria.",

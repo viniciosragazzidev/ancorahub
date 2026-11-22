@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { createDirectorAgent } from "@/features/agent/agent";
 import { createMemoryBackend, sampleWorld } from "@/features/agent/backend-memory";
+import { buildAgentTools } from "@/features/agent/tools";
+import type { ToolResult } from "@/features/agent/types";
 
 import { scriptedModel } from "./director-agent-script";
 
@@ -21,6 +23,42 @@ async function ask(text: string, writesEnabled = true) {
   const calls = steps.flatMap((step) => step.toolCalls.map((call) => call.toolName));
   return { calls, text: await result.text, content: steps.flatMap((step) => step.content), backend };
 }
+
+describe("A4, A9 e A10 com o agente real", { timeout: 20_000 }, () => {
+  it("A4: tirar de todos os plantões das próximas 2 semanas pede confirmação com a lista", async () => {
+    const { calls, content, backend } = await ask("Tire a Carla de todos os plantões das próximas 2 semanas");
+    expect(calls).toEqual(["pessoas_buscar", "plantao_escala", "plantao_tirar_de_vagas"]);
+    expect(content.some((part) => part.type === "tool-approval-request")).toBe(true);
+    expect(backend.actions).toHaveLength(0);
+  });
+
+  it("A9: pausa só no plantão em andamento, com Desfazer", async () => {
+    const { calls, backend, text } = await ask("Pausa o Bruno no plantão");
+    expect(calls).toEqual(["pessoas_buscar", "plantao_pausar"]);
+    expect(backend.world.pausedHere).toEqual(["s-manha:2026-11-21|u-bruno"]);
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "plantao_pausar", input: { pausado: false } });
+    expect(text).toBe("Pronto.");
+  });
+
+  it("A9: quem não está em plantão agora recebe a explicação", async () => {
+    const backend = createMemoryBackend(sampleWorld(NOW));
+    const tools = buildAgentTools({ backend, requestText: null, approvedByUser: () => false });
+    const execute = (tools.plantao_pausar as unknown as { execute: (input: unknown, options: { toolCallId: string; messages: [] }) => Promise<ToolResult> }).execute;
+    const result = await execute({ corretor_id: "u-ana-souza", pausado: true }, { toolCallId: "t1", messages: [] });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("não está em nenhum plantão");
+    expect(backend.world.pausedHere ?? []).toHaveLength(0);
+  });
+
+  it("A10: pausa e reativa o recebimento geral", async () => {
+    const paused = await ask("Pausa a Carla");
+    expect(paused.calls).toEqual(["pessoas_buscar", "corretor_pausar"]);
+    expect(paused.backend.world.people.find((person) => person.id === "u-carla")?.availability).toBe("paused");
+    const resumed = await ask("Ativa o Bruno");
+    expect(resumed.backend.world.people.find((person) => person.id === "u-bruno")?.availability).toBe("available");
+    expect(resumed.backend.actions[0]?.undo).toMatchObject({ tool: "corretor_pausar", input: { corretor_ids: ["u-bruno"], pausado: true } });
+  });
+});
 
 describe("roteiro do laboratório com o agente real", { timeout: 20_000 }, () => {
   it("plantão agora: uma leitura e a resposta", async () => {

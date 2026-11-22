@@ -12,6 +12,8 @@ export type MemoryWorld = {
   dutyNow?: DutyNow[];
   /** Falha simulada em addSeat/removeSeat (painel do laboratório). */
   failWrites?: boolean;
+  /** Pausados só no plantão: `${ocorrencia}|${corretor}`. */
+  pausedHere?: string[];
 };
 
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
@@ -28,7 +30,36 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
       return world.seats.filter((seat) => seat.dutyDate >= from && seat.dutyDate <= until).map((seat) => ({ ...seat, brokerIds: [...seat.brokerIds] }));
     },
     async dutyNow() {
-      return world.dutyNow ?? [];
+      if (world.dutyNow) return world.dutyNow;
+      // Plantões que começaram e não terminaram, com quem está escalado (presença confirmada no mundo de teste).
+      const names = new Map(world.people.map((person) => [person.id, person]));
+      return world.seats.filter((seat) => seat.started && !seat.ended).map((seat) => ({
+        scheduleId: seat.scheduleId,
+        scheduleName: seat.scheduleName,
+        dutyDate: seat.dutyDate,
+        startsAt: seat.startsAt,
+        endsAt: seat.endsAt,
+        minimumBrokers: seat.minimumBrokers,
+        queueName: null,
+        brokers: seat.brokerIds.map((id) => ({
+          id,
+          assignmentId: `${seat.id}|${id}`,
+          name: names.get(id)?.name ?? "Corretor",
+          presence: "confirmed" as const,
+          pausedHere: (world.pausedHere ?? []).includes(`${seat.id}|${id}`),
+          pausedGlobal: names.get(id)?.availability === "paused",
+        })),
+      }));
+    },
+    async pauseOnDuty(_scheduleId, assignmentId, paused) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const set = new Set(world.pausedHere ?? []);
+      if (paused) set.add(assignmentId); else set.delete(assignmentId);
+      world.pausedHere = [...set];
+    },
+    async setAvailability(brokerIds, target) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      for (const person of world.people) if (brokerIds.includes(person.id) && person.role === "broker") person.availability = target;
     },
     async addSeat(occurrence, brokerId, force) {
       if (world.failWrites) throw new Error("Falha simulada do servidor.");

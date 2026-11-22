@@ -325,6 +325,68 @@ export function buildAgentTools(env: ToolEnv) {
       }),
     }),
 
+    plantao_pausar: tool({
+      description:
+        "A9: pausa ou retoma a pessoa SÓ no plantão em andamento (continua escalada, para de receber lead dali). " +
+        "Ex.: \"pausa a Ana no plantão agora\", \"volta a Ana no plantão\". Para parar de receber em geral, use corretor_pausar.",
+      inputSchema: z.object({
+        corretor_id: PERSON_ID,
+        pausado: z.boolean().describe("true pausa; false retoma."),
+        plantao_id: z.string().max(120).optional().describe("Só se ela estiver em mais de um plantão agora (scheduleId de plantao_agora)."),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_pausar", toolCallId, input, async () => {
+        const duties = await backend.dutyNow();
+        const mine = duties.flatMap((duty) => duty.brokers.filter((broker) => broker.id === input.corretor_id).map((broker) => ({ duty, broker })))
+          .filter((item) => !input.plantao_id || item.duty.scheduleId === input.plantao_id);
+        const name = (await peopleMap()).get(input.corretor_id)?.name ?? "Essa pessoa";
+        if (!mine.length) return fail("fora_do_plantao", `${name} não está em nenhum plantão em andamento agora.`, "Para parar de receber em geral, use corretor_pausar.");
+        if (mine.length > 1 && !input.plantao_id) {
+          return fail("varios_plantoes", `${name} está em ${mine.length} plantões agora: ${mine.map((item) => item.duty.scheduleName).join(", ")}.`, "Pergunte qual com escolher (id = scheduleId) e chame de novo com plantao_id.");
+        }
+        const target = mine[0]!;
+        if (target.broker.pausedHere === input.pausado) {
+          return { ok: true, message: `${name} já estava ${input.pausado ? "pausada" : "recebendo"} no ${target.duty.scheduleName}. Nada mudou.` };
+        }
+        await backend.pauseOnDuty(target.duty.scheduleId, target.broker.assignmentId, input.pausado);
+        return {
+          ok: true,
+          message: input.pausado
+            ? `${name} pausada no ${target.duty.scheduleName} (${hhmm(target.duty.startsAt)}–${hhmm(target.duty.endsAt)}). Continua escalada, sem receber lead dali.`
+            : `${name} voltou a receber no ${target.duty.scheduleName}.`,
+          href: "/plantoes",
+          undo: { tool: "plantao_pausar", input: { corretor_id: input.corretor_id, pausado: !input.pausado, plantao_id: target.duty.scheduleId }, label: "Desfazer" },
+        };
+      }),
+    }),
+
+    corretor_pausar: tool({
+      description:
+        "A10: pausa ou retoma o recebimento GERAL de leads de um ou mais corretores (vale para todos os plantões e filas). " +
+        "Ex.: \"pausa o Bruno\", \"ativa o Bruno e a Carla\". Mais de um corretor pede confirmação (o sistema mostra o cartão).",
+      inputSchema: z.object({
+        corretor_ids: z.array(PERSON_ID).min(1).max(30),
+        pausado: z.boolean().describe("true pausa; false volta a receber."),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("corretor_pausar", toolCallId, input, async () => {
+        const people = await peopleMap();
+        const brokers = input.corretor_ids.map((id) => people.get(id)).filter((person): person is Person => Boolean(person && person.role === "broker" && person.status === "active"));
+        if (!brokers.length) return fail("pessoa", "Nenhum corretor ativo nessa lista.", "Confira com pessoas_buscar.");
+        // Só quem muda de fato entra (e só esses voltam no Desfazer).
+        const changing = brokers.filter((person) => (input.pausado ? person.availability === "available" : person.availability !== "available"));
+        const names = (list: Person[]) => list.map((person) => person.name).join(", ");
+        if (!changing.length) return { ok: true, message: `${names(brokers)} já ${brokers.length === 1 ? "estava" : "estavam"} ${input.pausado ? "pausado(s)" : "recebendo"}. Nada mudou.` };
+        await backend.setAvailability(changing.map((person) => person.id), input.pausado ? "paused" : "available");
+        return {
+          ok: true,
+          message: input.pausado
+            ? `Pausado o recebimento de leads: ${names(changing)}.`
+            : `Voltou a receber leads: ${names(changing)}.`,
+          href: "/equipe",
+          undo: { tool: "corretor_pausar", input: { corretor_ids: changing.map((person) => person.id), pausado: !input.pausado }, label: "Desfazer" },
+        };
+      }),
+    }),
+
     // Ferramenta do cliente (sem execute): a gaveta mostra as opções e devolve a escolhida (elicitation do MCP).
     escolher: tool({
       description: "Pergunta ao diretor qual opção ele quer quando há ambiguidade (ex.: duas Anas). Mostra botões; a resposta volta como { id, rotulo }.",
