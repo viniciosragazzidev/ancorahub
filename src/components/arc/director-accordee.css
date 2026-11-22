@@ -326,3 +326,17 @@
 }
 .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > .director-shortcuts,
 .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] .director-shortcuts .director-super-admin-actions { gap: 2px; }
+
+/* Sidebar recolhida (22/11/2026, pedido do Vinicios): ícones maiores, de 20px, em alvos quadrados de 40px centrados;
+   avatar com 32px. Vale para menu, atalhos do topo e rodapé. */
+@media (hover: hover) and (pointer: fine) {
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar :is([data-slot="sidebar-nav-link"], .director-shortcuts .director-role-switcher [data-slot="dropdown-menu-trigger"], .director-shortcuts .director-duty-link, .director-agent-link) {
+    width: 40px; min-width: 40px; height: 40px; min-height: 40px; margin-inline: auto; padding: 0; gap: 0; justify-content: center;
+  }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-nav-icon"] { width: 20px; min-width: 20px; height: 20px; }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar :is([data-slot="sidebar-nav-icon"] svg, .director-role-switcher svg, .director-agent-link svg) { width: 20px; height: 20px; }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar .director-duty-link > span:first-child { width: 12px; height: 12px; }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar .director-duty-link > span:first-child > span { width: 12px; height: 12px; }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] { width: 40px; height: 40px; margin-inline: auto; padding: 0; justify-content: center; }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] [data-slot="avatar"] { width: 32px; height: 32px; font-size: 13px; }
+}
