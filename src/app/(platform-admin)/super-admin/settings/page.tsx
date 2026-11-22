@@ -1739,11 +1739,11 @@ export default async function SuperAdminSettingsPage() {
                       <label className="text-sm font-semibold">Modelo do Agente IA do diretor</label>
                       <Input
                         name="agentDirectorModel"
-                        placeholder="Ex: anthropic/claude-sonnet-4.5"
+                        placeholder="Ex: openai/gpt-5-mini"
                         defaultValue={aiAgentDirectorModel}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Modelo do OpenRouter com chamada de ferramentas, usado pela gaveta Agente IA. Em branco: anthropic/claude-sonnet-4.5 quando há chave do OpenRouter; sem ela, o provedor primário.
+                        Modelo do OpenRouter com chamada de ferramentas, usado pela gaveta Agente IA. Em branco: openai/gpt-5-mini (barato e testado) quando há chave do OpenRouter; sem ela, o provedor primário.
                       </p>
                     </div>
 

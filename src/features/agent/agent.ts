@@ -62,6 +62,8 @@ export function createDirectorAgent(input: {
     // Respostas curtas bastam; sem teto, o OpenRouter reserva o custo da resposta máxima (~US$ 1 por pedido no Sonnet)
     // e recusa quando o saldo está baixo (visto em 22/11 com US$ 2 de saldo).
     maxOutputTokens: 1500,
+    // GPT-5 mini (padrão desde 22/11) pensa antes de responder; "low" basta para escolher a ferramenta e corta a espera.
+    providerOptions: { openai: { reasoningEffort: "low" } },
     onStepFinish: (step) => input.onUsage?.(step.usage ?? {}),
     toolApproval: ({ toolCall }): ToolApprovalStatus => {
       const entry = (AGENT_CATALOG as Record<string, CatalogEntry>)[toolCall.toolName];
