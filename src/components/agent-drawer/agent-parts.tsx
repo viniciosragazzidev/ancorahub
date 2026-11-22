@@ -115,7 +115,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
   const entry = catalogEntry(name);
   const input = part.input ?? {};
   const level = entry ? confirmLevelFor(entry, input) : "toque";
-  const isPeople = name === "corretor_pausar";
+  const isPeople = name === "corretor_pausar" || name === "corretores_mensagem";
   const isLeads = name === "plantao_dar_leads" || name === "lead_tirar_corretor" || name === "lead_mudar_etapa";
   const ids = Array.isArray(input.ocorrencia_ids) ? (input.ocorrencia_ids as string[])
     : isPeople && Array.isArray(input.corretor_ids) ? (input.corretor_ids as string[])
@@ -147,9 +147,19 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "lead_mudar_etapa" ? `Mudar ${ids.length} ${ids.length === 1 ? "lead" : "leads"} para ${STAGE_LABEL[String(input.etapa)] ?? String(input.etapa)}?`
     : name === "carteira_transferir" ? `Transferir toda a carteira de ${label(input.de_id)} para ${label(input.para_id)}?`
     : name === "fila_distribuir_sem_dono" ? "Distribuir todos os leads sem dono?"
+    : name === "membro_convidar" ? `Convidar ${String(input.nome ?? "")}?`
+    : name === "convite_revogar" ? `Revogar o convite de ${label(input.convite_id)}?`
+    : name === "membro_trocar_unidade" ? `Passar ${label(input.pessoa_id)} para a unidade ${label(input.unidade_id)}?`
+    : name === "membro_ativar" ? `${input.ativo ? "Ativar" : "Desativar"} o acesso de ${label(input.pessoa_id)}?`
+    : name === "corretores_mensagem" ? `Mandar por WhatsApp para ${ids.length} ${ids.length === 1 ? "corretor" : "corretores"}?`
+    : name === "aviso_inicio" ? (input.desligar ? "Tirar o aviso do Início?" : `Publicar no Início: "${String(input.titulo ?? "")}"?`)
     : name === "escala_mensal_publicar" ? `Publicar a ${seatLabels.get(String(input.plano_id)) ?? "escala do mês"}?`
     : name === "escala_tirar_dia" ? (input.voltar ? `Devolver o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} à escala?` : `Tirar o dia ${fallbackSeatLabel(`x:${String(input.data)}`)} da escala?`) : null;
-  const strongNote = name === "carteira_transferir" ? "Todos os leads abertos mudam de corretor e os dois recebem aviso. Não tem Desfazer: a carteira se mistura com a do outro."
+  const strongNote = name === "corretores_mensagem" ? `"${String(input.texto ?? "")}" — vai pelo WhatsApp e não dá para desfazer.`
+    : name === "membro_convidar" ? `WhatsApp ${String(input.whatsapp ?? "")}${input.email ? `, e-mail ${String(input.email)}` : ""}, unidade ${label(input.unidade_id)}. O convite sai por WhatsApp.`
+    : name === "membro_ativar" && !input.ativo ? "Desativada, a pessoa não entra no sistema nem recebe leads."
+    : name === "aviso_inicio" && !input.desligar ? `${input.texto ? `${String(input.texto)} ` : ""}Todos os corretores veem no Início.`
+    : name === "carteira_transferir" ? "Todos os leads abertos mudam de corretor e os dois recebem aviso. Não tem Desfazer: a carteira se mistura com a do outro."
     : name === "fila_distribuir_sem_dono" ? "Os leads sem corretor entram na distribuição agora e os corretores recebem as ofertas. Não tem Desfazer."
     : name === "escala_mensal_publicar"
     ? "Grava a escala, avisa todos os escalados e tira quem saiu. Não tem Desfazer."
@@ -160,6 +170,9 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
     : name === "plantao_marcar_falta" ? (input.falta === false ? "Desfazer falta" : "Marcar falta") : name === "plantao_liberar_presenca" ? "Liberar"
     : name === "plantao_reenviar_convite" ? "Reenviar"
     : name === "plantao_dar_leads" ? "Passar leads" : name === "lead_mudar_etapa" ? "Mudar etapa"
+    : name === "membro_convidar" ? "Convidar" : name === "convite_revogar" ? "Revogar" : name === "membro_trocar_unidade" ? "Trocar unidade"
+    : name === "membro_ativar" ? (input.ativo ? "Ativar" : "Desativar") : name === "corretores_mensagem" ? `Enviar para ${ids.length}`
+    : name === "aviso_inicio" ? (input.desligar ? "Tirar aviso" : "Publicar aviso")
     : name === "carteira_transferir" ? "Transferir carteira" : name === "fila_distribuir_sem_dono" ? "Distribuir agora" : name === "lead_tirar_corretor" ? `Tirar de ${ids.length}`
     : name === "escala_mensal_publicar" ? "Publicar escala" : name === "escala_tirar_dia" ? (input.voltar ? "Devolver o dia" : "Tirar o dia") : "Confirmar";
   const respond = (approved: boolean) => {

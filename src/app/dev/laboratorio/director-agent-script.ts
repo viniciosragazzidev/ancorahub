@@ -46,6 +46,11 @@ export const LAB_PHRASES = [
   "Anota no lead da Maria Clara que pediu proposta da Amil",
   "Distribui os leads sem dono",
   "Por que a Ana Souza não recebe lead?",
+  "Quem está pausado?",
+  "Convida o Pedro Lima, 21 99999-0000, unidade Centro",
+  "Passa a Carla para a unidade Barra",
+  "Desativa o Bruno",
+  "Põe no Início: plantão extra sábado",
 ];
 
 function textOf(content: unknown) {
@@ -120,6 +125,49 @@ export function nextLabStep(prompt: Prompt): Step {
   if (request.includes("falta gente")) {
     if (!last) return { kind: "tool", name: "plantao_escala", input: { so_faltando_gente: true } };
     return { kind: "text", text: String(last.value?.message ?? "") };
+  }
+
+  // Bloco C: equipe.
+  if (request.includes("quem está pausado") || request.includes("quem esta pausado")) {
+    const read = find("equipe_listar");
+    return read ? { kind: "text", text: String(read.value?.message ?? "") } : { kind: "tool", name: "equipe_listar", input: { situacao: "pausados" } };
+  }
+  const inviteMatch = request.match(/^convida (?:a |o )?(.+?), ([\d\s()+-]{8,}), unidade (\S+?)\??$/);
+  const unitMatch = request.match(/^passa (?:a |o )?(\S+) para a unidade (\S+?)\??$/);
+  const deactivate = request.match(/^desativa (?:a |o )?(\S+?)\??$/);
+  const notice = request.match(/^p[õo]e no in[íi]cio: (.+)$/);
+  if (inviteMatch || unitMatch) {
+    const units = find("unidades_buscar");
+    const unitName = (inviteMatch ?? unitMatch)![inviteMatch ? 3 : 2]!;
+    if (!units) return { kind: "tool", name: "unidades_buscar", input: { texto: unitName } };
+    const unitId = ((units.value?.data as { unidades?: Array<{ id: string }> } | undefined)?.unidades ?? [])[0]?.id;
+    if (!unitId) return { kind: "text", text: "Não achei a unidade." };
+    if (inviteMatch) {
+      const done = find("membro_convidar");
+      if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+      const fullName = inviteMatch[1]!.replace(/\b\w/g, (char) => char.toUpperCase());
+      return { kind: "tool", name: "membro_convidar", input: { nome: fullName, whatsapp: inviteMatch[2]!.trim(), unidade_id: unitId } };
+    }
+    const people = find("pessoas_buscar");
+    if (!people) return { kind: "tool", name: "pessoas_buscar", input: { texto: unitMatch![1] } };
+    const personId = ((people.value?.data as { pessoas?: Array<{ id: string }> } | undefined)?.pessoas ?? [])[0]?.id;
+    const done = find("membro_trocar_unidade");
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return { kind: "tool", name: "membro_trocar_unidade", input: { pessoa_id: personId, unidade_id: unitId } };
+  }
+  if (deactivate) {
+    const people = find("pessoas_buscar");
+    if (!people) return { kind: "tool", name: "pessoas_buscar", input: { texto: deactivate[1] } };
+    const personId = ((people.value?.data as { pessoas?: Array<{ id: string }> } | undefined)?.pessoas ?? [])[0]?.id;
+    const done = find("membro_ativar");
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    return { kind: "tool", name: "membro_ativar", input: { pessoa_id: personId, ativo: false } };
+  }
+  if (notice) {
+    const done = find("aviso_inicio");
+    if (done) return { kind: "text", text: done.value?.ok ? "Pronto." : "Nada mudou." };
+    const title = notice[1]!.trim();
+    return { kind: "tool", name: "aviso_inicio", input: { titulo: title.charAt(0).toUpperCase() + title.slice(1) } };
   }
 
   // Bloco B, parte 2: carteira, etapa, nota, distribuir, diagnóstico.

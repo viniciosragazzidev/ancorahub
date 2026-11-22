@@ -152,6 +152,46 @@ export const AGENT_CATALOG = {
     name: "corretor_diagnosticar", title: "Diagnóstico do corretor", doing: "Verificando por que não recebe…", topic: "consulta",
     risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["B10"],
   },
+  unidades_buscar: {
+    name: "unidades_buscar", title: "Unidades", doing: "Procurando a unidade…", topic: "consulta",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["C3"],
+  },
+  equipe_listar: {
+    name: "equipe_listar", title: "Equipe", doing: "Lendo a equipe…", topic: "equipe",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["C7"],
+  },
+  membro_convidar: {
+    name: "membro_convidar", title: "Convidar corretor", doing: "Convidando…", topic: "equipe",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["C1"],
+  },
+  convites_pendentes: {
+    name: "convites_pendentes", title: "Convites pendentes", doing: "Lendo os convites…", topic: "equipe",
+    risk: { readOnly: true }, roles: DIRECTOR, confirm: "direto", covers: ["C2"],
+  },
+  convite_reenviar: {
+    name: "convite_reenviar", title: "Reenviar convite", doing: "Reenviando o convite…", topic: "equipe",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "direto", covers: ["C2"],
+  },
+  convite_revogar: {
+    name: "convite_revogar", title: "Revogar convite", doing: "Revogando o convite…", topic: "equipe",
+    risk: { readOnly: false, destructive: true }, roles: DIRECTOR, confirm: "toque", covers: ["C2"],
+  },
+  membro_trocar_unidade: {
+    name: "membro_trocar_unidade", title: "Trocar de unidade", doing: "Trocando de unidade…", topic: "equipe",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["C3"],
+  },
+  membro_ativar: {
+    name: "membro_ativar", title: "Ativar ou desativar acesso", doing: "Mudando o acesso…", topic: "equipe",
+    risk: { readOnly: false, destructive: true }, roles: DIRECTOR, confirm: "toque", covers: ["C4"],
+  },
+  corretores_mensagem: {
+    name: "corretores_mensagem", title: "Mensagem para corretores", doing: "Enviando a mensagem…", topic: "equipe",
+    risk: { readOnly: false, notifies: true, external: true }, roles: DIRECTOR, confirm: "forte", covers: ["C5"],
+  },
+  aviso_inicio: {
+    name: "aviso_inicio", title: "Aviso no Início", doing: "Publicando o aviso…", topic: "equipe",
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: "toque", covers: ["C6"],
+  },
   corretor_pausar: {
     name: "corretor_pausar", title: "Pausar recebimento", doing: "Mudando o recebimento de leads…", topic: "equipe",
     risk: { readOnly: false }, roles: DIRECTOR, confirm: many("corretor_ids"), covers: ["A10"],

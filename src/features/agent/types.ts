@@ -99,4 +99,22 @@ export type Person = {
   availability: string;
   branchId: string | null;
   branchName: string | null;
+  /** Id da ligação com a empresa (a tela Equipe edita por ele). */
+  membershipId?: string;
+  email?: string | null;
+  customRoleId?: string | null;
+};
+
+export type Branch = { id: string; name: string; active: boolean };
+
+export type PendingInvite = { id: string; name: string | null; email: string | null; status: string; expiresAt: string | null };
+
+export type Announcement = {
+  active: boolean;
+  title: string;
+  body: string;
+  endsOn: string | null;
+  art: string;
+  tone: string;
+  button: { label: string; href: string } | null;
 };

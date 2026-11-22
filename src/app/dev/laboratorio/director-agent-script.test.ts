@@ -202,6 +202,47 @@ describe("A7 e A8 com o agente real", { timeout: 20_000 }, () => {
     expect(idle.message).toContain("não está");
   });
 
+  it("C7: quem está pausado (leitura)", async () => {
+    const { calls, backend } = await run("Quem está pausado?");
+    expect(calls).toEqual(["equipe_listar"]);
+    expect(backend.actions).toHaveLength(0);
+  });
+
+  it("C1: convida corretor com unidade; Desfazer revoga o convite", async () => {
+    const { world, asked, backend } = await run("Convida o Pedro Lima, 21 99999-0000, unidade Centro");
+    expect(asked).toBe(true);
+    expect(world.pending?.[0]).toMatchObject({ name: "Pedro Lima", status: "PENDING" });
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "convite_revogar", input: { convite_id: "conv-1" } });
+  });
+
+  it("C3: passa a Carla para a Barra; Desfazer volta ao Centro", async () => {
+    const { world, asked, backend } = await run("Passa a Carla para a unidade Barra");
+    expect(asked).toBe(true);
+    expect(world.people.find((person) => person.id === "u-carla")?.branchName).toBe("Barra");
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "membro_trocar_unidade", input: { unidade_id: "b-centro" } });
+  });
+
+  it("C4: desativa o Bruno (confirmação); Desfazer ativa", async () => {
+    const { world, backend } = await run("Desativa o Bruno");
+    expect(world.people.find((person) => person.id === "u-bruno")?.status).toBe("inactive");
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "membro_ativar", input: { ativo: true } });
+  });
+
+  it("C6: aviso no Início; Desfazer tira o aviso", async () => {
+    const { world, backend } = await run("Põe no Início: plantão extra sábado");
+    expect(world.announcement).toMatchObject({ active: true, title: "Plantão extra sábado", art: "mirando" });
+    expect(backend.actions[0]?.undo).toMatchObject({ tool: "aviso_inicio", input: { desligar: true } });
+  });
+
+  it("C5: mensagem a corretores vai para cada um (confirmação forte na política)", async () => {
+    const backend = createMemoryBackend(sampleWorld(NOW));
+    const tools = buildAgentTools({ backend, requestText: null, approvedByUser: () => true });
+    const execute = (tools.corretores_mensagem as unknown as { execute: (input: unknown, options: { toolCallId: string; messages: [] }) => Promise<ToolResult> }).execute;
+    const result = await execute({ corretor_ids: ["u-carla", "u-bruno"], texto: "Reunião às 9h" }, { toolCallId: "t-msg", messages: [] });
+    expect(result.ok).toBe(true);
+    expect(backend.world.messages).toHaveLength(2);
+  });
+
   it("A8: presencial sem motivo não libera e pede a nota", async () => {
     const { world, backend } = await run("Libera a presença do Bruno", (w) => { w.presence = { "s-manha:2026-11-21|u-bruno": "pending" }; });
     expect(world.presence?.["s-manha:2026-11-21|u-bruno"]).toBe("pending");

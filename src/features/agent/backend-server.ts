@@ -23,7 +23,18 @@ import {
   removeBrokerFromPublishedOccurrenceAction,
   updateMonthlyDutyDraftAction,
 } from "@/features/lead-distribution/monthly-duty-actions";
-import { transferLeadsAction } from "@/app/(dashboard)/equipe/actions";
+import {
+  createTeamUserAction,
+  getPendingInvitesAction,
+  resendInviteAction,
+  revokeInviteAction,
+  toggleTeamMemberStatusAction,
+  transferLeadsAction,
+  updateTeamMemberAction,
+} from "@/app/(dashboard)/equipe/actions";
+import { sendBrokerDirectMessageAction } from "@/features/broker-workspace/broker-template-actions";
+import { saveHomeAnnouncementAction } from "@/features/home-announcement/actions";
+import { getHomeAnnouncement } from "@/features/home-announcement/service";
 import { bulkChangeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { getBrokerWhatsAppStatusForContext } from "@/features/dashboard/today";
 import { assignLeadToBrokerAction, distributeAllUnassignedLeadsAction } from "@/features/lead-distribution/actions";
@@ -301,6 +312,82 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
       return status.notConnected.map((item) => item.id);
     },
 
+    async listBranches() {
+      const rows = await db.select({ id: schema.branches.id, name: schema.branches.name, status: schema.branches.status })
+        .from(schema.branches).where(eq(schema.branches.tenantId, context.tenantId)).limit(200);
+      return rows.map((row) => ({ id: row.id, name: row.name, active: String(row.status) === "active" }));
+    },
+
+    async invite(input) {
+      const result = await createTeamUserAction({}, formOf({
+        name: input.name, phone: input.phone, email: input.email ?? "", branchId: input.branchId,
+        role: "broker", jobTitle: "broker", ...(input.brokerCode ? { brokerCode: input.brokerCode } : {}),
+      }));
+      if (!result.success) throw new Error(result.error ?? "Não foi possível convidar.");
+      return { invitationId: result.invitationId ?? null, whatsappStatus: result.whatsappStatus ?? null };
+    },
+
+    async pendingInvites() {
+      const rows = await getPendingInvitesAction();
+      return (rows as Array<{ id: string; email: string | null; status: string; expiresAt: Date | string | null; name?: string | null; professionalName?: string | null }>)
+        .filter((row) => row.status === "PENDING")
+        .map((row) => ({ id: row.id, name: row.name ?? row.professionalName ?? null, email: row.email, status: row.status, expiresAt: row.expiresAt ? new Date(row.expiresAt).toISOString() : null }));
+    },
+
+    async resendInvite(invitationId) {
+      const result = await resendInviteAction({}, formOf({ invitationId }));
+      if (!result.success) throw new Error(result.error ?? "Não foi possível reenviar.");
+    },
+
+    async revokeInvite(invitationId) {
+      const result = await revokeInviteAction({}, formOf({ invitationId }));
+      if (!result.success) throw new Error(result.error ?? "Não foi possível revogar.");
+    },
+
+    async changeUnit(userId, branchId) {
+      // A tela grava todos os campos de uma vez: manda os atuais e muda só a unidade (sem isso, o cargo some).
+      const [member] = await db.select({
+        membershipId: schema.tenantMemberships.id, name: schema.user.name, email: schema.user.email,
+        role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle, customRoleId: schema.tenantMemberships.customRoleId,
+      }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, userId))).limit(1);
+      if (!member) throw new Error("Pessoa não encontrada.");
+      const result = await updateTeamMemberAction({}, formOf({
+        memberId: member.membershipId, name: member.name ?? "", email: member.email ?? "", role: String(member.role), jobTitle: member.jobTitle,
+        branchId, customRoleId: member.customRoleId ?? "__none__",
+      }));
+      if (!result.success) throw new Error(result.error ?? "Não foi possível trocar a unidade.");
+    },
+
+    async setMemberActive(userId, active) {
+      const [member] = await db.select({ membershipId: schema.tenantMemberships.id, status: schema.user.status })
+        .from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, userId))).limit(1);
+      if (!member) throw new Error("Pessoa não encontrada.");
+      const isActive = member.status === "active";
+      if (isActive === active) return;
+      const result = await toggleTeamMemberStatusAction({}, formOf({ memberId: member.membershipId }));
+      if (!result.success) throw new Error(result.error ?? "Não foi possível mudar o acesso.");
+    },
+
+    async messageBroker(userId, body) {
+      const [profile] = await db.select({ id: schema.brokerProfiles.id }).from(schema.brokerProfiles)
+        .where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.userId, userId))).limit(1);
+      if (!profile) throw new Error("Corretor sem cadastro de corretor (perfil).");
+      const result = await sendBrokerDirectMessageAction({ brokerProfileId: profile.id, body });
+      if (!result.success) throw new Error(result.error ?? "Não foi possível enviar.");
+    },
+
+    async homeAnnouncement() {
+      const current = await getHomeAnnouncement(context.tenantId);
+      return current ? { active: current.active, title: current.title, body: current.body, endsOn: current.endsOn, art: current.art, tone: current.tone, button: current.button } : null;
+    },
+
+    async saveHomeAnnouncement(value) {
+      const result = await saveHomeAnnouncementAction(value);
+      if (!result.ok) throw new Error(result.error);
+    },
+
     async unassignLead(leadId) {
       const result = await removeLeadAssignmentAction({}, formOf({ leadId }));
       if (result.error) throw new Error(result.error);
@@ -317,6 +404,9 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
           availability: schema.tenantMemberships.availabilityStatus,
           branchId: schema.tenantMemberships.branchId,
           branchName: schema.branches.name,
+          membershipId: schema.tenantMemberships.id,
+          email: schema.user.email,
+          customRoleId: schema.tenantMemberships.customRoleId,
         })
         .from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))

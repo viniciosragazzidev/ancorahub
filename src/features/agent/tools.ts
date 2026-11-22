@@ -1039,6 +1039,193 @@ export function buildAgentTools(env: ToolEnv) {
       },
     }),
 
+    unidades_buscar: tool({
+      description: "Lista as unidades (filiais) para achar o unidade_id. Ex.: { texto: \"Barra\" }.",
+      inputSchema: z.object({ texto: z.string().max(60).optional() }),
+      execute: async ({ texto }): Promise<ToolResult> => {
+        const branches = (await backend.listBranches()).filter((branch) => !texto || branch.name.toLowerCase().includes(texto.toLowerCase()));
+        if (!branches.length) return fail("unidade", `Não achei unidade "${texto}".`, "Liste sem filtro.");
+        return { ok: true, message: branches.map((branch) => `• ${branch.name}${branch.active ? "" : " (inativa)"}`).join("\n"), data: { unidades: branches, rotulos: branches.map((branch) => ({ id: branch.id, rotulo: branch.name })) } };
+      },
+    }),
+
+    equipe_listar: tool({
+      description: "C7: lista a equipe por situação: pausados, inativos, ativos ou todos, opcional por unidade e papel (\"quem está pausado?\", \"corretores da Barra\").",
+      inputSchema: z.object({
+        situacao: z.enum(["pausados", "inativos", "ativos", "todos"]).optional(),
+        unidade_id: z.string().max(80).optional(),
+        papel: z.enum(["broker", "supervisor", "manager", "director"]).optional(),
+      }),
+      execute: async (input): Promise<ToolResult> => {
+        const people = (await backend.listPeople())
+          .filter((person) => !input.papel || person.role === input.papel)
+          .filter((person) => !input.unidade_id || person.branchId === input.unidade_id)
+          .filter((person) => input.situacao === "pausados" ? person.status === "active" && person.availability !== "available"
+            : input.situacao === "inativos" ? person.status !== "active"
+            : input.situacao === "ativos" ? person.status === "active" : true);
+        if (!people.length) return { ok: true, message: "Ninguém com esse filtro.", data: { pessoas: [] }, href: "/equipe" };
+        return {
+          ok: true,
+          message: `${people.length} ${people.length === 1 ? "pessoa" : "pessoas"}:\n${people.slice(0, 30).map((person) => `• ${personLine(person)}`).join("\n")}${people.length > 30 ? "\n…" : ""}`,
+          data: { pessoas: people.map((person) => ({ id: person.id, nome: person.name, unidade: person.branchName, status: person.status, recebimento: person.availability })), rotulos: people.map((person) => ({ id: person.id, rotulo: person.name })) },
+          href: "/equipe",
+        };
+      },
+    }),
+
+    membro_convidar: tool({
+      description:
+        "C1: convida um corretor novo (cria o acesso e manda o convite por WhatsApp). Precisa de nome, WhatsApp e unidade (unidades_buscar). " +
+        "E-mail e código são opcionais. O sistema mostra os dados no cartão antes.",
+      inputSchema: z.object({
+        nome: z.string().min(2).max(120),
+        whatsapp: z.string().min(8).max(30),
+        unidade_id: z.string().min(1).max(80),
+        email: z.string().email().max(254).optional(),
+        codigo: z.string().max(40).optional(),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("membro_convidar", toolCallId, input, async () => {
+        const result = await backend.invite({ name: input.nome.trim(), phone: input.whatsapp, email: input.email ?? null, branchId: input.unidade_id, brokerCode: input.codigo ?? null });
+        const sent = result.whatsappStatus === "queued" || result.whatsappStatus === "sent";
+        return {
+          ok: true,
+          message: `Convite criado para ${input.nome.trim()}.${sent ? " O convite saiu por WhatsApp." : " O WhatsApp do convite não saiu: reenvie pela Equipe ou mande o link."}`,
+          href: "/equipe",
+          undo: result.invitationId ? { tool: "convite_revogar", input: { convite_id: result.invitationId }, label: "Desfazer" } : undefined,
+        };
+      }),
+    }),
+
+    convites_pendentes: tool({
+      description: "C2: lista os convites ainda pendentes (para reenviar ou revogar).",
+      inputSchema: z.object({}),
+      execute: async (): Promise<ToolResult> => {
+        const pending = await backend.pendingInvites();
+        if (!pending.length) return { ok: true, message: "Nenhum convite pendente.", data: { convites: [] }, href: "/equipe" };
+        return {
+          ok: true,
+          message: pending.map((item) => `• ${item.name ?? item.email ?? "Convite"}${item.expiresAt ? ` (vence ${item.expiresAt.slice(8, 10)}/${item.expiresAt.slice(5, 7)})` : ""}`).join("\n"),
+          data: { convites: pending, rotulos: pending.map((item) => ({ id: item.id, rotulo: item.name ?? item.email ?? "Convite" })) },
+          href: "/equipe",
+        };
+      },
+    }),
+
+    convite_reenviar: tool({
+      description: "C2: reenvia um convite pendente (convite_id de convites_pendentes).",
+      inputSchema: z.object({ convite_id: z.string().min(1).max(80) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("convite_reenviar", toolCallId, input, async () => {
+        await backend.resendInvite(input.convite_id);
+        return { ok: true, message: "Convite reenviado.", href: "/equipe" };
+      }),
+    }),
+
+    convite_revogar: tool({
+      description: "C2: revoga um convite pendente (o link para de funcionar).",
+      inputSchema: z.object({ convite_id: z.string().min(1).max(80) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("convite_revogar", toolCallId, input, async () => {
+        await backend.revokeInvite(input.convite_id);
+        return { ok: true, message: "Convite revogado: o link não funciona mais.", href: "/equipe" };
+      }),
+    }),
+
+    membro_trocar_unidade: tool({
+      description: "C3: passa a pessoa para outra unidade (\"passa a Ana para a Barra\"). Mantém nome, papel e cargo; a escala dela pode mudar conforme a regra da unidade.",
+      inputSchema: z.object({ pessoa_id: PERSON_ID, unidade_id: z.string().min(1).max(80) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("membro_trocar_unidade", toolCallId, input, async () => {
+        const [people, branches] = await Promise.all([peopleMap(), backend.listBranches()]);
+        const person = people.get(input.pessoa_id);
+        const branch = branches.find((item) => item.id === input.unidade_id);
+        if (!person) return fail("pessoa", "Não achei essa pessoa.", "Use pessoas_buscar.");
+        if (!branch) return fail("unidade", "Não achei essa unidade.", "Use unidades_buscar.");
+        if (person.branchId === branch.id) return { ok: true, message: `${person.name} já está na unidade ${branch.name}. Nada mudou.` };
+        await backend.changeUnit(person.id, branch.id);
+        return {
+          ok: true,
+          message: `${person.name} agora é da unidade ${branch.name}${person.branchName ? ` (era ${person.branchName})` : ""}.`,
+          href: "/equipe",
+          undo: person.branchId ? { tool: "membro_trocar_unidade", input: { pessoa_id: person.id, unidade_id: person.branchId }, label: "Desfazer" } : undefined,
+        };
+      }),
+    }),
+
+    membro_ativar: tool({
+      description: "C4: ativa ou desativa o acesso da pessoa (\"desativa o Bruno\"). Desativada, ela não entra no sistema nem recebe leads.",
+      inputSchema: z.object({ pessoa_id: PERSON_ID, ativo: z.boolean() }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("membro_ativar", toolCallId, input, async () => {
+        const person = (await peopleMap()).get(input.pessoa_id);
+        if (!person) return fail("pessoa", "Não achei essa pessoa.", "Use pessoas_buscar com incluir_inativos.");
+        if ((person.status === "active") === input.ativo) return { ok: true, message: `${person.name} já estava ${input.ativo ? "ativa" : "desativada"}. Nada mudou.` };
+        await backend.setMemberActive(person.id, input.ativo);
+        return {
+          ok: true,
+          message: input.ativo ? `Acesso de ${person.name} ativado.` : `Acesso de ${person.name} desativado: ela não entra no sistema nem recebe leads.`,
+          href: "/equipe",
+          undo: { tool: "membro_ativar", input: { pessoa_id: person.id, ativo: !input.ativo }, label: "Desfazer" },
+        };
+      }),
+    }),
+
+    corretores_mensagem: tool({
+      description:
+        "C5: manda uma mensagem por WhatsApp para um ou mais corretores da equipe (\"manda pra equipe da manhã: reunião às 9h\"). " +
+        "Use o texto exato do diretor. Confirmação forte; não dá para desfazer.",
+      inputSchema: z.object({ corretor_ids: z.array(PERSON_ID).min(1).max(50), texto: z.string().min(2).max(1000) }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("corretores_mensagem", toolCallId, input, async () => {
+        const people = await peopleMap();
+        const sent: string[] = [];
+        const problems: string[] = [];
+        for (const id of [...new Set(input.corretor_ids)]) {
+          try {
+            await backend.messageBroker(id, input.texto.trim());
+            sent.push(nameOf(people, id));
+          } catch (error) {
+            problems.push(`${nameOf(people, id)}: ${error instanceof Error ? error.message : "não foi possível"}`);
+          }
+        }
+        if (!sent.length) return fail("nada_feito", `Não enviei para ninguém. ${problems.join("; ")}.`, "Confira o WhatsApp do corretor na Equipe.");
+        return { ok: true, message: `Mensagem enviada para ${sent.join(", ")}.${problems.length ? ` Não deu: ${problems.join("; ")}.` : ""}`, href: "/equipe" };
+      }),
+    }),
+
+    aviso_inicio: tool({
+      description:
+        "C6: publica ou tira o aviso da tela Início dos corretores (\"põe no Início: plantão extra sábado\"). Título até 80 caracteres, texto até 240; " +
+        "ate em AAAA-MM-DD é o último dia no ar. desligar = true tira o aviso.",
+      inputSchema: z.object({
+        titulo: z.string().min(3).max(80).optional(),
+        texto: z.string().max(240).optional(),
+        ate: DATE.optional(),
+        desligar: z.boolean().optional(),
+      }),
+      execute: async (input, { toolCallId }): Promise<ToolResult> => write("aviso_inicio", toolCallId, input, async () => {
+        const current = await backend.homeAnnouncement();
+        if (input.desligar) {
+          if (!current?.active) return { ok: true, message: "Não há aviso no ar. Nada mudou." };
+          await backend.saveHomeAnnouncement({ ...current, active: false });
+          return { ok: true, message: `Aviso "${current.title}" saiu do Início.`, undo: { tool: "aviso_inicio", input: { titulo: current.title, texto: current.body, ate: current.endsOn ?? undefined }, label: "Desfazer" } };
+        }
+        if (!input.titulo) return fail("titulo", "Preciso do título do aviso.", "Pergunte ao diretor ou use as primeiras palavras do pedido.");
+        await backend.saveHomeAnnouncement({
+          active: true,
+          title: input.titulo.trim(),
+          body: input.texto?.trim() ?? "",
+          endsOn: input.ate ?? null,
+          art: current?.art ?? "mirando",
+          tone: current?.tone ?? "navy",
+          button: current?.button ?? null,
+        });
+        return {
+          ok: true,
+          message: `Aviso no Início: "${input.titulo.trim()}"${input.ate ? ` até ${input.ate.slice(8, 10)}/${input.ate.slice(5, 7)}` : ""}. Todos os corretores veem.`,
+          href: "/dashboard",
+          undo: current?.active
+            ? { tool: "aviso_inicio", input: { titulo: current.title, texto: current.body, ate: current.endsOn ?? undefined }, label: "Desfazer" }
+            : { tool: "aviso_inicio", input: { desligar: true }, label: "Desfazer" },
+        };
+      }),
+    }),
+
     corretor_pausar: tool({
       description:
         "A10: pausa ou retoma o recebimento GERAL de leads de um ou mais corretores (vale para todos os plantões e filas). " +

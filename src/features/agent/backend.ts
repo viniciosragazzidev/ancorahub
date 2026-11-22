@@ -1,4 +1,4 @@
-import type { LeadFilter, LeadSummary, Person, SeatOccurrence } from "./types";
+import type { Announcement, Branch, LeadFilter, LeadSummary, PendingInvite, Person, SeatOccurrence } from "./types";
 
 /**
  * O que as ferramentas precisam do CRM. No servidor (`backend-server.ts`) cada método chama a consulta ou a ação
@@ -128,6 +128,20 @@ export interface AgentBackend {
   distributeUnassigned(): Promise<string>;
   /** Ids dos corretores sem WhatsApp pessoal conectado. */
   whatsappDisconnected(): Promise<string[]>;
+  listBranches(): Promise<Branch[]>;
+  /** Convida corretor (cria acesso e manda o convite por WhatsApp). */
+  invite(input: { name: string; phone: string; email: string | null; branchId: string; brokerCode: string | null }): Promise<{ invitationId: string | null; whatsappStatus: string | null }>;
+  pendingInvites(): Promise<PendingInvite[]>;
+  resendInvite(invitationId: string): Promise<void>;
+  revokeInvite(invitationId: string): Promise<void>;
+  /** Troca a unidade da pessoa mantendo nome, e-mail, papel e cargo. */
+  changeUnit(userId: string, branchId: string): Promise<void>;
+  /** Ativa ou desativa o acesso da pessoa. */
+  setMemberActive(userId: string, active: boolean): Promise<void>;
+  /** Mensagem direta por WhatsApp a um corretor da equipe. */
+  messageBroker(userId: string, body: string): Promise<void>;
+  homeAnnouncement(): Promise<Announcement | null>;
+  saveHomeAnnouncement(value: Announcement): Promise<void>;
   /** Pausa ou retoma o recebimento geral de leads dos corretores. */
   setAvailability(brokerIds: string[], target: "available" | "paused"): Promise<void>;
   /** Grava a trilha em agent_actions; devolve o id ou null (tabela ausente, erro). Idempotente por toolCallId. */

@@ -1,5 +1,5 @@
 import type { AgentActionRecord, AgentBackend, DutyNow } from "./backend";
-import type { LeadSummary, Person, SeatOccurrence } from "./types";
+import type { Announcement, Branch, LeadSummary, PendingInvite, Person, SeatOccurrence } from "./types";
 
 /**
  * Mundo em memória para o laboratório e os testes: a mesma interface do backend real, com as mesmas regras
@@ -34,6 +34,10 @@ export type MemoryWorld = {
   tasks?: Array<{ leadId: string; title: string; dueAt: string | null; assigneeIds: string[] }>;
   offersResent?: string[];
   whatsappOff?: string[];
+  branches?: Branch[];
+  pending?: PendingInvite[];
+  messages?: Array<{ userId: string; body: string }>;
+  announcement?: Announcement | null;
 };
 
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
@@ -252,6 +256,52 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
     },
     async whatsappDisconnected() {
       return world.whatsappOff ?? [];
+    },
+    async listBranches() {
+      return world.branches ?? [{ id: "b-centro", name: "Centro", active: true }, { id: "b-barra", name: "Barra", active: true }];
+    },
+    async invite(input) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      if (world.people.some((person) => person.name.toLowerCase() === input.name.toLowerCase())) throw new Error("Já existe um acesso com este nome.");
+      const id = `conv-${(world.pending ?? []).length + 1}`;
+      world.pending = [...(world.pending ?? []), { id, name: input.name, email: input.email, status: "PENDING", expiresAt: null }];
+      return { invitationId: id, whatsappStatus: "queued" };
+    },
+    async pendingInvites() {
+      return (world.pending ?? []).filter((item) => item.status === "PENDING");
+    },
+    async resendInvite(invitationId) {
+      if (!(world.pending ?? []).some((item) => item.id === invitationId)) throw new Error("Convite ou membro não encontrado.");
+    },
+    async revokeInvite(invitationId) {
+      const item = (world.pending ?? []).find((invite) => invite.id === invitationId);
+      if (!item || item.status !== "PENDING") throw new Error("Este convite não está mais pendente.");
+      item.status = "REVOKED";
+    },
+    async changeUnit(userId, branchId) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const person = world.people.find((item) => item.id === userId);
+      const branch = (world.branches ?? [{ id: "b-centro", name: "Centro", active: true }, { id: "b-barra", name: "Barra", active: true }]).find((item) => item.id === branchId);
+      if (!person || !branch) throw new Error("Pessoa ou unidade não encontrada.");
+      person.branchId = branch.id;
+      person.branchName = branch.name;
+    },
+    async setMemberActive(userId, active) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      const person = world.people.find((item) => item.id === userId);
+      if (!person) throw new Error("Pessoa não encontrada.");
+      person.status = active ? "active" : "inactive";
+    },
+    async messageBroker(userId, body) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.messages = [...(world.messages ?? []), { userId, body }];
+    },
+    async homeAnnouncement() {
+      return world.announcement ?? null;
+    },
+    async saveHomeAnnouncement(value) {
+      if (world.failWrites) throw new Error("Falha simulada do servidor.");
+      world.announcement = value;
     },
     async unassignLead(leadId) {
       if (world.failWrites) throw new Error("Falha simulada do servidor.");
