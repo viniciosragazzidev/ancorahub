@@ -247,10 +247,18 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
           <Link
             href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"}
             onClick={() => isMobile && setOpenMobile(false)}
-            className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-sidebar-border bg-sidebar-accent p-1.5 shadow-none transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-sidebar-ring/50 hover:bg-sidebar-accent/80 active:scale-[0.96] motion-reduce:transition-none"
+            className={cn(
+              "flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-control)] border border-sidebar-border bg-sidebar-accent shadow-none transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-sidebar-ring/50 hover:bg-sidebar-accent/80 active:scale-[0.96] motion-reduce:transition-none",
+              logoUrl ? "p-1.5" : "p-0",
+            )}
             title="Âncora CRM"
           >
-            <img src={logoUrl || "/icon.png"} alt="Âncora CRM" className="size-7 object-contain" />
+            {/* Logo da empresa, se houver; senão o rosto do Capitão Âncora (identidade de 18/11), preenchendo o círculo. */}
+            {logoUrl ? (
+              <img src={logoUrl} alt="Âncora CRM" className="size-7 object-contain" />
+            ) : (
+              <img src="/mascote/2026-11-18/sasa-logo-azul.webp" alt="Âncora CRM" className="size-full rounded-full object-cover" />
+            )}
           </Link>
           <div className="min-w-0 transition-[opacity,transform,max-width] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">
             <p className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">Âncora CRM</p>
