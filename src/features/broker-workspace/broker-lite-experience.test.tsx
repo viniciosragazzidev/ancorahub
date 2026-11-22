@@ -104,7 +104,7 @@ describe("Corretor Lite experience contract", () => {
     } });
 
     expect(screen.getByRole("link", { name: /Ana/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Buscar" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Buscar" })).toBeNull();
     expect(screen.getByRole("button", { name: "Novo" })).toBeTruthy();
     expect(screen.getByRole("group", { name: "Conversas" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Leads da unidade: 2 leads aguardando/ })).toHaveAttribute("href", "/leads");
