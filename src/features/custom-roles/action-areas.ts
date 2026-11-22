@@ -76,6 +76,8 @@ const REGRAS: readonly Regra[] = [
   // Sasá agêntica (19/11): os pedidos do corretor executam as mesmas ações do chat da fila.
   ["src/features/sasa/", rota("minha-fila")],
   ["src/features/lead-distribution/", rota("distribuicao")],
+  // Agente IA do diretor (21/11): o Desfazer refaz ações de plantão e distribuição; a própria ação ainda exige diretor.
+  ["src/features/agent/", rota("distribuicao")],
   ["src/features/whatsapp-plantao-notice/", rota("distribuicao")],
   ["src/features/conversations/", rota("conversas")],
   ["src/features/browser-extension/", rota("extensao")],
