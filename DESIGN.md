@@ -201,3 +201,101 @@ Resumo primeiro; idades/preço por vida, restrições, regras, atributos da font
 - **Don't** inventar tokens, primitives, fontes, rampas cromáticas ou animações para preencher este inventário.
 - **Don't** adicionar overline decorativo acima do título da tarefa ou usar cor como substituto do estado textual.
 - **Don't** tratar dados sintéticos, Arial da fixture ou pesos locais da rota como novas decisões globais de identidade.
+
+---
+
+<!-- Brief do craft (diego3g/craft). As seções acima seguem o formato da skill impeccable e registram os tokens do cotador; as seções abaixo são o brief que todo pedido de design lê primeiro. Se este brief e o código discordarem, o código vale até o Vinicios decidir; o conflito vai para "Open questions". -->
+
+## Product
+
+AncoraHub é o CRM da Âncora Saúde para corretoras de plano de saúde. Ele cobre captação, distribuição, atendimento, cotação, documentação, venda e pós-venda. Contexto completo: [PRODUCT.md](PRODUCT.md).
+
+Quem usa:
+- **corretores**, o dia inteiro, no celular durante o plantão e no computador durante o atendimento;
+- **diretores**, que configuram a operação e decidem onde intervir;
+- **gestores** e **supervisores**, que acompanham exceções e capacidade;
+- **super-admins**, que cuidam da plataforma.
+
+Tarefa principal da tela mais usada: no Início do corretor, ver a próxima ação e resolvê-la em um toque (aceitar o lead, responder, registrar o retorno). A direção é operar o CRM conversando com a Sasá, por voz ou texto, sem formulário.
+
+## Audience and voice
+
+- **Quem lê:** corretores e diretores, que não são técnicos.
+- **Língua:** só português do Brasil. Datas no formato 14/11, horas 18h30, dinheiro R$ 450,00.
+- **Tom:** direto, curto e orientado à próxima ação. A tela abre dizendo o que fazer agora, numa frase.
+- **Assistente:** se chama Sasá (o nome Jack não é mais usado). Mascote da marca: Capitão Âncora ([MASCOTE.md](docs/design-system/MASCOTE.md)).
+- **Nunca culpa:** o prazo aparece como informação ("responda em 4:56"), não como ameaça. Erro diz a causa, o que continua valendo e oferece "Tentar de novo" ([FEEDBACK.md](docs/design-system/FEEDBACK.md)).
+
+## Mood
+
+**Palavras:** enxuto, calmo, confiável.
+
+**Nunca parecer:**
+- formulário longo;
+- grade de cartões grandes no lugar de tabela;
+- painel genérico cheio de dados;
+- sombra pesada;
+- mais de uma cor cromática no mesmo componente;
+- rótulo ou overline acima do título;
+- confete ou celebração de volume no uso diário;
+- mascote triste ou tom de culpa.
+
+## Brand
+
+- **Fonte do design system:** `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md` ("Conversa", modo Lite), com os tokens em `src/components/arc/venancor-scope.css`, `src/components/arc/foundation.css` e `src/components/chat/*`.
+- **Por que o Lite:** desde 20/11/2026 ele é a única versão da interface. O diretor também está nele, com `[data-skin="diretor"]`.
+- **Regras gerais:** [docs/design-system.md](docs/design-system.md), [FEEDBACK.md](docs/design-system/FEEDBACK.md) e a densidade descrita no CLAUDE.md.
+- **Cores:**
+  - neutros frios, canvas `#f7f7f9` e superfície `#ffffff`;
+  - azul de ação do chat `oklch(62% .2 255)` para a ação primária;
+  - índigo `#3b2dff` para seleção nos controles Arc;
+  - status success `#0f7a4d`, warning `#a15c00` e danger `#d4263a`.
+- **Tipografia:** Inter só nos pesos 400 e 500, escala 12/14/16/18/22/28/36 e números tabulares (desde 21/11/2026).
+- **Forma:** controles em pílula; painel com raio de 1.5rem; alvo de toque mínimo de 44px.
+- **Marca:** identidade oceânica e discreta. A cor-base da sidebar atual permanece. O Capitão Âncora (DEC-189) aparece no splash, no ícone do PWA e na celebração de venda.
+
+## References
+
+- **Jubayer / Ingot UI** ([análise](docs/design-system/referencias/jubayer6910.md), skill `.claude/skills/interface-enxuta`):
+  - levar: o detalhe aparece sob demanda (hover card para olhar, drawer para editar, menu `⋯` para ações raras); abas com contagem antes dos filtros; rodapé com os totais reais; uma ação primária por tela;
+  - evitar: tokens e cores dele que não cabem nos nossos.
+- **Accordee** ([análise](docs/design-system/referencias/accordee.md)):
+  - levar: Home e Inbox, lista densa de uma linha com hora em `tabular-nums`, ficha em duas colunas, Inter e o modo escuro verificado;
+  - evitar: grade de cartões em `/tasks`, porque aqui a regra é tabela.
+- **Duolingo** (modelo de feedback, [FEEDBACK.md](docs/design-system/FEEDBACK.md)):
+  - levar: níveis de 0 a 3, camadas em ritmo fixo, mascote com humor e celebração rara e verificada;
+  - evitar: culpa, celebrar volume e confete no modo normal.
+- **Arc UI / Venancor** (`src/components/arc`):
+  - levar: componentes base (Button, Input, Badge) e o escopo `.arc-venancor`;
+  - evitar: importar `foundation.css` no `:root`.
+
+## Constraints
+
+- **Telas:** celular primeiro, no plantão, e computador a partir de 1024px, com lista de 360px.
+- **Tema:** claro e escuro (o escuro ainda não foi validado tela a tela, gap G2).
+- **Acessibilidade:** contraste AA, foco visível no teclado, zoom de 200% e `prefers-reduced-motion`.
+- **Feedback:** níveis de 0 a 3. Ação frequente não tem som nem celebração. Som e vibração só via `useFeedback`. Sucesso só depois que o servidor confirma.
+- **Densidade:** lista de entidades é uma tabela (`DataTable` + `SectionCardHeader`); a linha abre um `Sheet`; ações secundárias ficam em dropdown; adicionar itens é busca + "+" (`SearchAddList`).
+- **Navegação do corretor:** Início + voltar, sem sidebar nem barra de abas. Menu "Mais" em bottom sheet.
+- **Componentes:** usar os compartilhados (`src/components/ui`, `src/components/arc`, `src/components/chat`), nunca recriar por página.
+- **Fluxos do corretor:** precisam ser testáveis em `/dev/laboratorio`.
+
+## Decisions log
+
+- 2026-10-09: design system "Conversa" no modo Lite do corretor. Por quê: próxima ação primeiro, conversa em vez de formulário.
+- 2026-11-14: feedback no padrão Duolingo vira regra do app inteiro, começando pelo Lite. Por quê: resposta consistente, sem culpa.
+- 2026-11-18: Capitão Âncora aprovado como mascote oficial (DEC-189).
+- 2026-11-19: a Sasá opera o CRM por voz ou texto; fim dos formulários; botão flutuante de segurar e falar. Por quê: menos atrito para o corretor.
+- 2026-11-20: o Lite é a única versão da interface; o modo normal não recebe mais trabalho. Por quê: é a versão que o Vinicios usa.
+- 2026-11-20: interface enxuta segundo a referência Jubayer. Por quê: CRM "organizado, clean, intuitivo".
+- 2026-11-21: Inter substitui Plus Jakarta Sans no Lite; a Home e a Inbox seguem a referência Accordee.
+- 2026-11-22: brief do craft acrescentado a este arquivo, mantendo o registro da impeccable acima. Por quê: as duas skills leem o `DESIGN.md`.
+
+## Open questions
+
+- O frontmatter e as seções da impeccable acima descrevem só o cotador, em 11/11/2026, e ainda citam Plus Jakarta Sans. O Lite usa Inter desde 21/11. Atualizar com `impeccable document` (que também regera `.impeccable/design.json`)?
+- O CLAUDE.md ainda fala em Inter + Satoshi (36px ou mais), CTA `#1e40af`, borda `#e5e5e5` e input com borda preta. O Lite usa pílulas, azul de ação `oklch(62% .2 255)` e borda translúcida. Hoje vale o Lite; falta alinhar o CLAUDE.md e o `docs/design-system.md`.
+- Gap G1: convivem dois azuis, o de ação do chat e o índigo dos controles Arc. Unificar ou manter?
+- Gap G2: o tema escuro do Lite ainda não foi validado tela a tela.
+- (inferido) A lista "Nunca parecer" acima saiu dos docs (FEEDBACK.md, CLAUDE.md, skill interface-enxuta), não de uma conversa. Confirmar ou ajustar.
+- Ferramenta de design: não há Paper, pen.dev nem Figma configurado. O craft desenha em HTML por padrão. Importar o design system para uma ferramenta? (Pendente: é o passo de "foundations" do craft-setup.)
