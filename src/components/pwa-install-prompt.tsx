@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useReducedMotion } from "motion/react";
+import { usePathname } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { FileArrowDown, ArrowSquareOut, X } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,8 @@ export function PwaInstallPrompt({ directorLiteEnabled = false }: { directorLite
   const isMobileBrowser = useIsMobileBrowser();
   const isStandalone = useIsStandalone();
   const reduceMotion = useReducedMotion();
+  // O formulário público (/formulario) é de quem ainda vai virar cliente: instalar o app não é para ele.
+  const publicPage = usePathname()?.startsWith("/formulario") ?? false;
 
   const closeCard = useCallback(() => {
     setShowCard(false);
@@ -121,7 +124,7 @@ export function PwaInstallPrompt({ directorLiteEnabled = false }: { directorLite
   }, [directorLiteEnabled]);
 
   // Se já está instalado, não mostra nada
-  if (isStandalone || (!canInstall && !(directorLiteEnabled && showCard)) || (directorLiteEnabled && !showCard)) return null;
+  if (publicPage || isStandalone || (!canInstall && !(directorLiteEnabled && showCard)) || (directorLiteEnabled && !showCard)) return null;
 
   return (
     <AnimatePresence>

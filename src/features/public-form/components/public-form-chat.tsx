@@ -152,7 +152,8 @@ function PublicFormConversation({ services, onRestart }: { services?: PublicForm
   }, []);
 
   const awaiting = formAwaiting(answers);
-  const composer = composerFor(sent ? { ...answers, confirmed: true } : answers);
+  // "Respostas enviadas" só depois que o servidor confirma; antes disso, o envio está em andamento.
+  const composer = sent ? composerFor({ ...answers, confirmed: true }) : awaiting === "done" ? { placeholder: "Enviando suas respostas…", input: undefined } : composerFor(answers);
 
   return (
     <div className={`arc-venancor ${styles.root}`}>
@@ -168,7 +169,7 @@ function PublicFormConversation({ services, onRestart }: { services?: PublicForm
         renderCustom={renderCustom}
         closePassedQuestions
         composerDisabled={sent}
-        progress={sent || awaiting === "confirm" ? null : formProgress(answers)}
+        progress={sent || awaiting === "confirm" || awaiting === "done" ? null : formProgress(answers)}
         placeholder={composer.placeholder}
         composerInput={composer.input}
       />
