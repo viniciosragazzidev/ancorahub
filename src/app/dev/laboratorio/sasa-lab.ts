@@ -1,5 +1,5 @@
 /**
- * Sasá agêntica no laboratório (fase 1, 19/11/2026): o núcleo real (`runSasaCommand`) sobre um corretor de
+ * Sasá agêntico no laboratório (fase 1, 19/11/2026): o núcleo real (`runSasaCommand`) sobre um corretor de
  * mentira; só a ação do servidor é simulada, e ela muda esse mundo (pausar, marcar, desfazer) como a real.
  */
 import type { ChatBlock, ChatServerActionName } from "@/components/chat/types";
@@ -52,7 +52,7 @@ export function labSasaWorld(now = new Date()): SasaWorld {
       active: { name: "TESTE", startsAt: at(-60), endsAt: at(300) },
       next: { name: "PME Manhã", startsAt: at(60 * 20), endsAt: at(60 * 24) },
     },
-    // Fase 5: a Júlia chegou como oferta (aceitar ou recusar pela Sasá).
+    // Fase 5: a Júlia chegou como oferta (aceitar ou recusar pelo Sasá).
     offers: [{ leadId: "lab-julia", name: "Júlia Prado", expiresAt: at(4) }],
     // Recuperação (fase 5): "quem eu recupero hoje?" lista quem está parado sem retorno.
     recover: [

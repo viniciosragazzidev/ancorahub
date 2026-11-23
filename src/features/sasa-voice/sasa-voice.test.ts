@@ -134,7 +134,7 @@ describe("a key nunca vaza", () => {
 });
 
 describe("texto da voz e voz padrão", () => {
-  it("só as falas da Sasá, sem link, dentro do teto", () => {
+  it("só as falas do Sasá, sem link, dentro do teto", () => {
     expect(sasaVoiceText([say("Pronto, marquei."), { type: "question", id: "q", prompt: "Quer mais?", choices: [] }, say("Veja https://exemplo.com")])).toBe("Pronto, marquei. Veja");
     const long = "Frase curta. ".repeat(80);
     expect(clampVoiceText(long).length).toBeLessThanOrEqual(SASA_VOICE_MAX_CHARS_PER_REPLY);

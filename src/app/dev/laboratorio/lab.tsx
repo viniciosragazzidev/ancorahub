@@ -50,7 +50,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "lead", label: "Aceitar lead" },
   { id: "venda", label: "Registrar venda" },
   { id: "sasa", label: "Sasá: pedidos por texto e voz" },
-  { id: "botao", label: "Botão da Sasá" },
+  { id: "botao", label: "Botão do Sasá" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
@@ -63,7 +63,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "accordee", label: "Estilo Accordee (Início e Conversas do diretor)" },
   { id: "agenteDiretor", label: "Agente IA do diretor (escala e cadeiras)" },
   { id: "telefone", label: "Trocar meu telefone (corretor)" },
-  { id: "vozSasa", label: "Voz da Sasá (ElevenLabs)" },
+  { id: "vozSasa", label: "Voz do Sasá (ElevenLabs)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -134,13 +134,13 @@ export function FlowLab() {
   // As boas-vindas e o tour cobririam o fluxo: no laboratório ficam como já vistos.
   useState(() => { try { window.localStorage.setItem("ancora:lite-welcome:2026-10-chat", "1"); window.localStorage.setItem(TOUR_STORAGE_KEY, "skipped"); } catch { /* ignore */ } return null; });
 
-  // Sasá agêntica: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
+  // Sasá agêntico: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
   const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"], heard: 0, offline: false, nextSpeech: null as string | null });
   // Fase 4: "Fechou a venda" no botão cai no fluxo Registrar venda já preenchido.
   const [saleDraft, setSaleDraft] = useState<SaleSpokenDraft | null>(null);
   const [nextSpeech, setNextSpeech] = useState<keyof typeof LAB_SASA_SPEECH | null>(null);
   const chooseSpeech = (key: keyof typeof LAB_SASA_SPEECH | null) => { setNextSpeech(key); sasaState.current.nextSpeech = key ? LAB_SASA_SPEECH[key] : null; };
-  // Botão da Sasá (fase 3): "Sem internet" faz o envio falhar como sem rede; voltar a internet manda a fila.
+  // Botão do Sasá (fase 3): "Sem internet" faz o envio falhar como sem rede; voltar a internet manda a fila.
   const [offline, setOffline] = useState(false);
   const setInternet = (value: boolean) => {
     sasaState.current.offline = !value;
@@ -325,7 +325,7 @@ export function FlowLab() {
         ) : flow === "vozSasa" ? (
           <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">
             <SasaVoiceSettings />
-            <p className="text-xs text-(--text-secondary)">Qualquer texto com 20 letras ou mais vale como key. Com "Servidor responde: Falha", a key é recusada e a fala falha, e a Sasá fica só no texto. Depois de conectar, abra "Sasá: pedidos por texto e voz" para ouvir as respostas.</p>
+            <p className="text-xs text-(--text-secondary)">Qualquer texto com 20 letras ou mais vale como key. Com "Servidor responde: Falha", a key é recusada e a fala falha, e o Sasá fica só no texto. Depois de conectar, abra "Sasá: pedidos por texto e voz" para ouvir as respostas.</p>
           </main>
         ) : flow === "telefone" ? (
           <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">

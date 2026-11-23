@@ -46,7 +46,7 @@ export function readSasaFix(value: string): { text: string; undo: UndoAction | n
   }
 }
 
-/** Botão da Sasá: resposta curta (só texto, talvez com Desfazer) vira toast; escolha, lista ou cartão vira folha. */
+/** Botão do Sasá: resposta curta (só texto, talvez com Desfazer) vira toast; escolha, lista ou cartão vira folha. */
 export function sasaReplyFitsToast(blocks: ChatBlock[]) {
   return blocks.length > 0 && blocks.every((block) => block.type === "assistant" || (block.type === "question" && block.choices.every((choice) => choice.id === "undo")));
 }

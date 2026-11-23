@@ -279,10 +279,10 @@ export default async function SuperAdminTenantDetailPage({
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-2xl">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-medium">IA dinâmica da Sasá</h3>
+                    <h3 className="font-medium">IA dinâmica do Sasá</h3>
                     <Badge variant={sasaDynamicAiEnabled ? "success" : "outline"}>{sasaDynamicAiEnabled ? "Ligado" : "Desligado"}</Badge>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">Responde perguntas abertas do corretor ("qual lead priorizar?", "como foi minha semana?") combinando até 4 leituras dos dados dele, em até 15 s. Desligada, a Sasá continua com as respostas diretas (comissões, vendas, plantões, agenda), sem custo de IA.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Responde perguntas abertas do corretor ("qual lead priorizar?", "como foi minha semana?") combinando até 4 leituras dos dados dele, em até 15 s. Desligada, o Sasá continua com as respostas diretas (comissões, vendas, plantões, agenda), sem custo de IA.</p>
                 </div>
                 <form action={sasaDynamicAiAction}>
                   <input name="enabled" type="hidden" value={sasaDynamicAiEnabled ? "false" : "true"} />

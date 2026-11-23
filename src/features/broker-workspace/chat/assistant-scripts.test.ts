@@ -462,7 +462,7 @@ describe("buildAncoraScript", () => {
     expect(script.blocks[0]).toMatchObject({ type: "assistant", text: expect.stringContaining("Sasá") });
     expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["sasa-first", "sasa-day", "m1"]);
     expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "local", value: "ask:Quem eu atendo primeiro agora?" });
-    expect(script.composerPlaceholder).toBe("Peça algo à Sasá");
+    expect(script.composerPlaceholder).toBe("Peça algo ao Sasá");
     expect(script.status?.tone).toBe("idle");
     expectNoEmDash([script]);
   });

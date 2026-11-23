@@ -20,7 +20,7 @@ const fields = z.object({
 });
 
 /** Prompt de domínio: ajuda o Whisper com os termos do dia do corretor. */
-const SASA_PROMPT = "Corretor de plano de saúde falando com a assistente Sasá: retorno, plantão, pausa, cotação, negociação, documentação, agenda, lead, amanhã às 10, Amil, Bradesco, SulAmérica, Unimed, Hapvida.";
+const SASA_PROMPT = "Corretor de plano de saúde falando com o assistente Sasá: retorno, plantão, pausa, cotação, negociação, documentação, agenda, lead, amanhã às 10, Amil, Bradesco, SulAmérica, Unimed, Hapvida.";
 
 type VoiceResponse = { ok: true; text: string } | { ok: false; error: string; code: string };
 
@@ -29,18 +29,18 @@ function fail(status: number, code: string, error: string) {
 }
 
 /**
- * Voz da Sasá (fase 2): o áudio é transcrito em memória e DESCARTADO (D4); só o texto fica em
+ * Voz do Sasá (fase 2): o áudio é transcrito em memória e DESCARTADO (D4); só o texto fica em
  * `sasa_commands`, ligado ao pedido pelo `clientCommandId` que a conversa envia logo depois.
  * Tenant e usuário da sessão; só corretor liberado no piloto (D8), com o consentimento de IA atual.
  */
 export async function POST(request: NextRequest) {
   const context = await getRequiredTenantContext().catch(() => null);
-  if (!context) return fail(401, "unauthorized", "Entre de novo para falar com a Sasá.");
-  if (context.role !== "broker") return fail(403, "forbidden", "A voz da Sasá é só para corretores.");
+  if (!context) return fail(401, "unauthorized", "Entre de novo para falar com o Sasá.");
+  if (context.role !== "broker") return fail(403, "forbidden", "A voz do Sasá é só para corretores.");
   const access = await brokerAiAccess(context.userId).catch(() => ({ enabled: false }));
-  if (!access.enabled) return fail(403, "disabled", "A voz da Sasá ainda não está liberada para você.");
+  if (!access.enabled) return fail(403, "disabled", "A voz do Sasá ainda não está liberada para você.");
   const consent = await readAiConsent(context.tenantId, context.userId).catch(() => ({ granted: false }));
-  if (!consent.granted) return fail(409, "consent", "Antes de falar comigo, autorize o uso da IA na conversa da Sasá.");
+  if (!consent.granted) return fail(409, "consent", "Antes de falar comigo, autorize o uso da IA na conversa do Sasá.");
 
   const form = await request.formData().catch(() => null);
   const audio = form?.get("audio");

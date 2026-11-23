@@ -64,7 +64,7 @@ export function saoPauloDay(now: Date) {
 }
 
 /**
- * O texto que vira voz: as falas da Sasá na resposta, sem link nem marcação, cortado no fim de uma frase
+ * O texto que vira voz: as falas do Sasá na resposta, sem link nem marcação, cortado no fim de uma frase
  * dentro do teto. Listas, botões e cartões ficam só na tela.
  */
 export function sasaVoiceText(blocks: readonly ChatBlock[], max = SASA_VOICE_MAX_CHARS_PER_REPLY): string {

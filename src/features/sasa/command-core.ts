@@ -1,5 +1,5 @@
 /**
- * Núcleo da Sasá agêntica (fase 1): a frase vira uma intenção tipada, o lead e a data são resolvidos aqui e
+ * Núcleo do Sasá agêntico (fase 1): a frase vira uma intenção tipada, o lead e a data são resolvidos aqui e
  * a execução usa SEMPRE uma ação que o app já tinha (`runChatServerAction`, com as checagens e a auditoria
  * dela). Nada de SQL livre nem id vindo da IA. O servidor e o laboratório usam este mesmo núcleo; só o
  * `run` muda (real ou simulado). Plano: docs/implementations/active/2026-11-19-sasa-agentica.md.
@@ -21,7 +21,7 @@ export type SasaReturn = { taskId: string; leadId: string; leadName: string; tit
 export type SasaWaiting = { leadId: string; name: string; context: string; urgent: boolean };
 export type SasaDuty = { name: string; startsAt: Date; endsAt: Date; paused?: boolean };
 
-/** O que a Sasá enxerga do corretor: carregado pelo servidor só com os dados dele (tenant e usuário da sessão). */
+/** O que o Sasá enxerga do corretor: carregado pelo servidor só com os dados dele (tenant e usuário da sessão). */
 export type SasaWorld = {
   now: Date;
   availability: "available" | "paused" | "offline";
@@ -29,7 +29,7 @@ export type SasaWorld = {
   returns: SasaReturn[];
   waiting: SasaWaiting[];
   duty: { active: SasaDuty | null; next: SasaDuty | null };
-  /** Fase 5: ofertas de lead novo esperando aceite (aceitar/recusar pela Sasá). */
+  /** Fase 5: ofertas de lead novo esperando aceite (aceitar/recusar pelo Sasá). */
   offers?: Array<{ leadId: string; name: string; expiresAt: Date }>;
   /** Recuperação (fase 5): leads da carteira parados numa etapa de negociação e sem retorno marcado. */
   recover?: Array<{ leadId: string; name: string; status: string; since: Date | null }>;
@@ -108,7 +108,7 @@ const initialsOf = (name: string) => name.trim().split(/\s+/).filter(Boolean).sl
 
 const sasaSay = (id: string, text: string): ChatBlock => ({ type: "assistant", id, text });
 
-/** O mundo da Sasá a partir dos dados do dia que o app já carrega para o corretor. */
+/** O mundo do Sasá a partir dos dados do dia que o app já carrega para o corretor. */
 export function sasaWorldOf(data: BrokerWorkspaceData, now: Date): SasaWorld {
   const waitingKinds = new Set(["new_lead", "sla_risk", "sla_overdue", "awaiting_response"]);
   return {

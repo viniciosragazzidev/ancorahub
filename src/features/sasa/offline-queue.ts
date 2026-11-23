@@ -1,5 +1,5 @@
 /**
- * Fila da Sasá sem internet (fase 3, plano §3.6): o áudio gravado sem rede fica no aparelho (IndexedDB) e é
+ * Fila do Sasá sem internet (fase 3, plano §3.6): o áudio gravado sem rede fica no aparelho (IndexedDB) e é
  * enviado quando a internet volta, com a hora da gravação. No máximo 5 áudios e 24 horas; nada executa no
  * servidor antes disso. Sem IndexedDB (aba anônima antiga, teste), a fila simplesmente não existe.
  */

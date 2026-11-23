@@ -31,7 +31,7 @@ export type ChatRailData = {
   canQuote: boolean;
   /** Waiting unit leads shown in the manager's Leads tab badge. */
   leadsBadgeCount?: number;
-  /** Avisos não lidos: contagem do sino do Início (a conversa da Sasá não mostra mais avisos desde 19/11). */
+  /** Avisos não lidos: contagem do sino do Início (a conversa do Sasá não mostra mais avisos desde 19/11). */
   unreadNotifications?: number;
   managerUnitSummary?: { leads: number; unassigned: number; activeBrokers: number; brokersWithoutWhatsApp: number; inService: number; late: number };
 };

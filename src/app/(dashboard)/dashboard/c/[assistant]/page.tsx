@@ -25,16 +25,16 @@ export default async function AssistantConversationPage({ params }: { params: Pr
   if (audience === "supervisor" && assistant !== "ancora" && !supervisorOnly) notFound();
   const definition = ASSISTANTS[assistant as AssistantId];
   if (assistant !== "ancora") redirect(definition.href);
-  // A Sasá é só para pedidos ao assistente (19/11) e só o corretor escreve: o supervisor vê os avisos em Notificações.
+  // O Sasá é só para pedidos ao assistente (19/11) e só o corretor escreve: o supervisor vê os avisos em Notificações.
   if (audience === "supervisor") redirect("/notificacoes");
   const identity = { name: definition.name, shape: definition.shape, hue: definition.hue };
 
-  // Conversa só para pedidos à Sasá (19/11): os avisos ficam em /notificacoes, aberta pelo sino do Início.
+  // Conversa só para pedidos ao Sasá (19/11): os avisos ficam em /notificacoes, aberta pelo sino do Início.
   // Pilot of the operator RAG: questions made from the material this company has.
   const access = await brokerAiAccess(context.userId).catch(() => ({ enabled: false, operatorRag: false }));
   const materialAsks = access.operatorRag ? await materialAsksOfTheDay(context.tenantId).catch(() => []) : [];
   // Lembrete fixo "WhatsApp a partir de 20/10" removido em 05/11: a conexão é pedida ao confirmar presença.
-  // Voz por ElevenLabs (teste de 23/11): só o corretor da lista vê o interruptor e ouve a Sasá.
+  // Voz por ElevenLabs (teste de 23/11): só o corretor da lista vê o interruptor e ouve o Sasá.
   const voicePilot = await isVoicePilotUser(context.role, context.userId).catch(() => false);
   return <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ now: new Date(), materialAsks })} instant agentId="ancora" canWrite voice={access.enabled} voicePilot={voicePilot} />;
 }

@@ -27,16 +27,16 @@ import type { Mention } from "./composer";
 import type { AssistantAvatarAsset, ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false, voice = false, embedded = false, voicePilot = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean; /** Segurar para falar com a Sasá (fase 2): só para quem tem a Sasá com IA liberada. */ voice?: boolean; /** Só os blocos, sem cabeçalho nem campo (folha do botão da Sasá, fase 3). */ embedded?: boolean; /** Voz por ElevenLabs (teste de 23/11): só o corretor da lista; a página confere no servidor. */ voicePilot?: boolean }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false, voice = false, embedded = false, voicePilot = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean; /** Segurar para falar com o Sasá (fase 2): só para quem tem o Sasá com IA liberada. */ voice?: boolean; /** Só os blocos, sem cabeçalho nem campo (folha do botão do Sasá, fase 3). */ embedded?: boolean; /** Voz por ElevenLabs (teste de 23/11): só o corretor da lista; a página confere no servidor. */ voicePilot?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
   // Aceite com contador (11/11): ligado, o WhatsApp abre na tela do lead depois de 30 s.
   const handoff = useAcceptHandoffEnabled();
   const lab = useDevLab();
   const fire = useFeedback();
-  // Sasá agêntica (fase 1, 19/11): o pedido roda primeiro como comando; o que não for comando segue para a IA.
+  // Sasá agêntico (fase 1, 19/11): o pedido roda primeiro como comando; o que não for comando segue para a IA.
   const agentic = agentId === "ancora";
-  // Voz da Sasá (23/11): a resposta aparece em texto e, com a voz ligada, toca depois. Nunca segura o texto.
+  // Voz do Sasá (23/11): a resposta aparece em texto e, com a voz ligada, toca depois. Nunca segura o texto.
   const sasaVoice = useSasaVoice();
   const spoken = (blocks: ChatBlock[]) => {
     if (agentic && voicePilot) void sasaVoice.speak(blocks);
@@ -61,11 +61,11 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   };
   const askAi = async (text: string, clientCommandId?: string): Promise<ChatBlock[]> => {
     if (lab?.sasa?.ask) return lab.sasa.ask(text);
-    if (lab?.sasa) return [{ type: "assistant", id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos da Sasá respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }];
+    if (lab?.sasa) return [{ type: "assistant", id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos do Sasá respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }];
     if (agentId) return (await askAssistantAction({ agentId, question: text, ...(clientCommandId ? { clientCommandId } : {}) })).blocks;
     return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Não achei isso. Tente com outras palavras ou toque em \"?\" no topo para a ajuda da tela." }];
   };
-  /** Pergunta pronta ("ask:") ou texto: comando da Sasá primeiro, IA depois. */
+  /** Pergunta pronta ("ask:") ou texto: comando do Sasá primeiro, IA depois. */
   const ask = async (text: string): Promise<ChatBlock[]> => {
     if (agentic) {
       const reply = await command({ text });

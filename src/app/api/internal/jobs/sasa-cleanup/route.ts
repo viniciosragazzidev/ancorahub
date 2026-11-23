@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Limpeza da Sasá (D5): apaga o texto dito e a resposta dos pedidos com mais de 90 dias; a linha fica como
+ * Limpeza do Sasá (D5): apaga o texto dito e a resposta dos pedidos com mais de 90 dias; a linha fica como
  * trilha (quem, quando, ferramenta, resultado). Até 5 lotes de 5.000 por rodada. Idempotente.
  * Scheduled Task do Coolify: docs/runbooks/coolify-scheduled-tasks.md.
  */

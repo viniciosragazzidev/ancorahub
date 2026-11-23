@@ -3,7 +3,7 @@
 /**
  * Laboratório: Nutrição mensal (recuperação, fase 5). As regras reais (decideNurtureTouch) sobre 4 meses simulados
  * de um lead que saiu da fila de ligação sem atender. Nada é enviado. Junto, o A/B do S2 (as duas variantes do texto)
- * e a pergunta da Sasá "quem eu recupero hoje?" respondida pela lista da carteira.
+ * e a pergunta do Sasá "quem eu recupero hoje?" respondida pela lista da carteira.
  */
 import { useMemo, useState } from "react";
 

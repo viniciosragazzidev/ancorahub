@@ -33,7 +33,7 @@ const inputSchema = z.object({
   agentId: z.enum(AGENT_IDS),
   question: z.string().trim().min(1).max(500),
   leadId: z.string().min(1).max(80).optional(),
-  /** Pedido da Sasá que não era comando (fase 1+): a linha de `sasa_commands` ganha as áreas lidas. */
+  /** Pedido do Sasá que não era comando (fase 1+): a linha de `sasa_commands` ganha as áreas lidas. */
   clientCommandId: z.string().min(8).max(80).optional(),
 });
 
@@ -132,7 +132,7 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
   const agent = AGENT_REGISTRY[input.data.agentId];
   // Sasá (19/11): responde sobre todo o ecossistema do corretor, lendo só as áreas que a pergunta pede.
   if (input.data.agentId === "ancora") {
-    // Teto de 150 por dia (D9); o pedido com id já foi contado pela Sasá.
+    // Teto de 150 por dia (D9); o pedido com id já foi contado pelo Sasá.
     if (!input.data.clientCommandId) {
       const limit = sasaLimitMessage(await sasaUsageToday(context.tenantId, context.userId));
       if (limit) return fallback(limit);

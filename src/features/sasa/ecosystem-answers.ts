@@ -1,5 +1,5 @@
 /**
- * Respostas diretas da Sasá sobre o ecossistema do corretor (19/11). Puro: recebe os fatos que as ferramentas
+ * Respostas diretas do Sasá sobre o ecossistema do corretor (19/11). Puro: recebe os fatos que as ferramentas
  * de leitura trouxeram (com os números das próprias telas) e responde as perguntas reconhecíveis sem IA
  * (grátis, instantâneo, sem inventar). O que não reconhecer devolve null e vai para a camada de IA limitada.
  * Sem acesso a uma área (ex.: Meu financeiro desligado), diz isso em vez de inventar.

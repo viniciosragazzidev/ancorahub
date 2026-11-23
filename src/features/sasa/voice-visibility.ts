@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Onde o botão da Sasá aparece (fase 3, plano §4.1). Usa os mesmos sinais que o app já tem para "não cobrir
+ * Onde o botão do Sasá aparece (fase 3, plano §4.1). Usa os mesmos sinais que o app já tem para "não cobrir
  * nada importante": `data-lead-offer` (oferta de lead com contador), `data-lite-moment` (celebração) e diálogos
  * abertos, como o anfitrião de conquistas. Qualquer superfície pode pedir para escondê-lo com `data-sasa-hide`,
  * e as pílulas flutuantes do pé da tela o empurram para cima com `data-sasa-lift`.

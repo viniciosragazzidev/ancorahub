@@ -43,7 +43,7 @@ const mascot = { shape: definition.shape, hue: definition.hue ?? 268 };
  * por vez com progresso, o mascote procura, os mais em conta chegam como cartões animados e o que
  * é denso (condições, rede, comparação) abre num painel. "Refazer" começa outra conversa.
  */
-export function CatalogQuoteGuide(props: { facets: GuideFacets; services: QuoteGuideServices; canExport?: boolean; /** O que o corretor disse à Sasá ("cotação para 3 vidas, 35, 32 e 8"); sem ele, procura o rascunho no aparelho. */ spokenDraft?: QuoteSpokenDraft | null }) {
+export function CatalogQuoteGuide(props: { facets: GuideFacets; services: QuoteGuideServices; canExport?: boolean; /** O que o corretor disse ao Sasá ("cotação para 3 vidas, 35, 32 e 8"); sem ele, procura o rascunho no aparelho. */ spokenDraft?: QuoteSpokenDraft | null }) {
   const [run, setRun] = useState(0);
   // Sasá (fase 4): o rascunho é lido uma vez, no aparelho, antes da primeira pergunta.
   const [draft, setDraft] = useState<QuoteSpokenDraft | null | undefined>(props.spokenDraft === undefined ? undefined : props.spokenDraft);

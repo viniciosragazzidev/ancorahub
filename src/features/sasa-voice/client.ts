@@ -87,7 +87,7 @@ export function stopSasaVoice() {
 }
 
 /**
- * Fala a resposta da Sasá. Nunca segura o texto: é chamada depois que os blocos já estão na tela.
+ * Fala a resposta do Sasá. Nunca segura o texto: é chamada depois que os blocos já estão na tela.
  * Devolve o motivo quando ficou só no texto (para o aviso curto).
  */
 export async function speakSasaReply(backend: SasaVoiceBackend, blocks: readonly ChatBlock[]): Promise<{ spoke: boolean; reason: string | null }> {

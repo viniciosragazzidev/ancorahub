@@ -338,7 +338,7 @@ export function ChatHome({
         </Link>
         <div className={home.headerTools} data-tour="home-tools">
           {!showWhatsAppStatus || isSupervisor || (isManager && mode !== "rail") ? null : <WhatsAppStatusButton />}
-          {/* Sino (19/11): os avisos saíram da conversa da Sasá e moram em Notificações. */}
+          {/* Sino (19/11): os avisos saíram da conversa do Sasá e moram em Notificações. */}
           {unreadNotifications === undefined || isManager ? null : (
             <Link href="/notificacoes" className={`${redesigned ? sharedPage.iconButton : styles.iconButton} ${home.bell}`} aria-label={unreadNotifications ? `Notificações, ${unreadNotifications} ${unreadNotifications === 1 ? "nova" : "novas"}` : "Notificações"}>
               <Bell size={18} strokeWidth={1.9} aria-hidden="true" />

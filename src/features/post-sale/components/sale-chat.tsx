@@ -82,7 +82,7 @@ const ContractPhaseContext = createContext<{ phase: ContractPhase | null; regist
  * Registrar venda em conversa (19/11). Três etapas no total: escolher o cliente (antes desta tela), mandar o
  * contrato (a IA lê tudo) ou responder, e confirmar. Sem formulário.
  */
-export function SaleChat(props: { lead: SaleChatLead; catalog: SaleCatalog; services: SaleChatServices; today?: Date; backHref?: string; doneHref?: string; /** O que o corretor disse à Sasá ("fechou a venda do Carlos…"); sem ele, a tela procura o rascunho guardado no aparelho. */ spokenDraft?: SaleSpokenDraft | null }) {
+export function SaleChat(props: { lead: SaleChatLead; catalog: SaleCatalog; services: SaleChatServices; today?: Date; backHref?: string; doneHref?: string; /** O que o corretor disse ao Sasá ("fechou a venda do Carlos…"); sem ele, a tela procura o rascunho guardado no aparelho. */ spokenDraft?: SaleSpokenDraft | null }) {
   const [run, setRun] = useState(0);
   // Sasá (fase 4): o rascunho é lido uma vez, no aparelho, antes da primeira pergunta.
   const [draft, setDraft] = useState<SaleSpokenDraft | null | undefined>(props.spokenDraft === undefined ? undefined : props.spokenDraft);
@@ -98,7 +98,7 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
   const router = useRouter();
   const fire = useFeedback();
   const today = useMemo(() => fixedToday ?? new Date(), [fixedToday]);
-  // O que veio da Sasá entra como resposta do corretor; a conversa só pergunta o que faltar.
+  // O que veio do Sasá entra como resposta do corretor; a conversa só pergunta o que faltar.
   const spoken = useMemo(() => (draft ? mergeSpokenSale(draft, catalog, fixedToday ?? new Date()) : null), [catalog, draft, fixedToday]);
   const [answers, setAnswers] = useState<SaleAnswers>(() => spoken?.answers ?? {});
   const answersRef = useRef<SaleAnswers>(spoken?.answers ?? {});

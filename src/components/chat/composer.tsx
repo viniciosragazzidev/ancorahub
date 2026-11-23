@@ -300,7 +300,7 @@ export function Composer({
                 className={`${styles.send} ${styles.mic}`}
                 data-recording={recording || undefined}
                 data-still={reduce || undefined}
-                aria-label={recording ? "Gravando. Solte para enviar ou deslize para a esquerda para cancelar" : sendingVoice ? "Enviando o áudio" : "Segure para falar com a Sasá"}
+                aria-label={recording ? "Gravando. Solte para enviar ou deslize para a esquerda para cancelar" : sendingVoice ? "Enviando o áudio" : "Segure para falar com o Sasá"}
                 aria-busy={sendingVoice || undefined}
                 disabled={sendingVoice}
                 onPointerDown={(event) => {

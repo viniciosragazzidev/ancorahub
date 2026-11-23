@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Fala da Sasá (voz por ElevenLabs, teste de 23/11). Mora junto do `useFeedback` porque é som: respeita a mesma
+ * Fala do Sasá (voz por ElevenLabs, teste de 23/11). Mora junto do `useFeedback` porque é som: respeita a mesma
  * preferência "Som" das configurações de acessibilidade (o mudo do app). Um áudio por vez;
  * `stopVoice` corta na hora (o corretor segurou o botão para falar de novo).
  */

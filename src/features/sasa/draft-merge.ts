@@ -1,6 +1,6 @@
 /**
- * O rascunho da Sasá virando respostas das conversas guiadas (fase 4). Reaproveita o mesmo caminho da leitura do
- * contrato (`mergeContractReading`) e as funções da cotação; só que o que foi dito à Sasá conta como informado
+ * O rascunho do Sasá virando respostas das conversas guiadas (fase 4). Reaproveita o mesmo caminho da leitura do
+ * contrato (`mergeContractReading`) e as funções da cotação; só que o que foi dito ao Sasá conta como informado
  * pelo corretor, não "do contrato" (o resumo não marca nada como lido).
  */
 import type { GuideAnswers, GuideFacets } from "@/features/global-catalog/pilot/guide/guide-flow";
