@@ -45,5 +45,8 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     // Token do dispositivo guardado criptografado.
     implementation("androidx.security:security-crypto:1.0.0")
+    // Animações do app: molas com física (troca de tela, contato chegando, contador) e transições.
+    implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
+    implementation("androidx.transition:transition:1.5.0")
     testImplementation("junit:junit:4.13.2")
 }

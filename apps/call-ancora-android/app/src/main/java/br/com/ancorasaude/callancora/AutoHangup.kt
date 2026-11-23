@@ -16,8 +16,10 @@ object HangupSettings {
     private val _config = MutableStateFlow(HangupConfig())
     val config: StateFlow<HangupConfig> = _config.asStateFlow()
     private var loaded = false
+    private var appContext: Context? = null
 
     fun load(context: Context) {
+        appContext = context.applicationContext
         if (loaded) return
         loaded = true
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -27,6 +29,16 @@ object HangupSettings {
             quickActiveSec = p.getInt("hangup_quick", HangupConfig.DEFAULT_QUICK_ACTIVE),
             voicemailAfterSec = p.getInt("hangup_late", HangupConfig.DEFAULT_VOICEMAIL_AFTER),
         ).clamped()
+    }
+
+    /**
+     * Regras definidas pelo diretor no AncoraHub (vêm junto com o estado da sessão).
+     * Só grava quando mudou; ficam guardadas para valer mesmo sem internet.
+     */
+    fun applyRemote(config: HangupConfig) {
+        if (config.clamped() == _config.value) return
+        val context = appContext
+        if (context != null) update(context, config) else _config.value = config.clamped()
     }
 
     fun update(context: Context, config: HangupConfig) {

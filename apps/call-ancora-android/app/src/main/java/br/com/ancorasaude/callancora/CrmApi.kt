@@ -159,6 +159,10 @@ class CrmApi(private val origin: String, private val token: String?) {
     suspend fun control(action: String): CrmState =
         safeParse(request("POST", "/api/call-ancora/device/control", JSONObject().put("action", action)))
 
+    /** Feedback do contato depois da ligação (Com interesse, Sem interesse...). */
+    suspend fun classify(outcome: String): CrmState =
+        safeParse(request("POST", "/api/call-ancora/device/classify", JSONObject().put("outcome", outcome)))
+
     /** Resposta fora do formato esperado vira falha temporária, nunca derruba o app. */
     private fun safeParse(json: JSONObject): CrmState = try {
         parseState(json)
@@ -190,7 +194,19 @@ class CrmApi(private val origin: String, private val token: String?) {
                     throw CrmException(parsed?.optString("error")?.ifBlank { null } ?: "O servidor respondeu $status.", status)
                 }
                 // Página HTML (servidor reiniciando num deploy): trata como falha temporária.
-                parsed ?: throw CrmException("O servidor está reiniciando.", 503)
+                val json = parsed ?: throw CrmException("O servidor está reiniciando.", 503)
+                // Regras de desligamento do diretor, quando a resposta traz.
+                json.optJSONObject("hangup")?.let { h ->
+                    HangupSettings.applyRemote(
+                        HangupConfig(
+                            enabled = h.optBoolean("enabled", true),
+                            ringTimeoutSec = h.optInt("ringTimeoutSec", HangupConfig.DEFAULT_RING_TIMEOUT),
+                            quickActiveSec = h.optInt("quickActiveSec", HangupConfig.DEFAULT_QUICK_ACTIVE),
+                            voicemailAfterSec = h.optInt("voicemailAfterSec", HangupConfig.DEFAULT_VOICEMAIL_AFTER),
+                        ),
+                    )
+                }
+                json
             } catch (e: IOException) {
                 throw CrmException("Sem conexão com o AncoraHub. Confira a internet do celular.")
             } finally {

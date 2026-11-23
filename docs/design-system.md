@@ -1,11 +1,22 @@
 # Dub — Style Reference
 > frosted link dashboard on rice paper
 
+> **Aviso, 22/11/2026.** Desde 20/11/2026 o Lite é a única versão da interface. A fonte do design system é [`docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md`](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md); o brief de produto e as decisões ficam no [`DESIGN.md`](../DESIGN.md) da raiz; as regras resumidas estão no `CLAUDE.md`.
+>
+> O sistema "Dub" descrito neste arquivo (Satoshi, CTA `#1e40af`, borda `#e5e5e5`, input com borda preta, raio de 8px nos botões) está **descontinuado**. Cada seção antiga leva uma marca. Continuam valendo:
+> - **Product Density**: só o essencial fica fixo; o resto vai para drawer ou menu;
+> - **Assets contextuais de interface**;
+> - **Feedback e movimento**, via `FEEDBACK.md`;
+> - **Exceção: superfícies de marca**: landing, login e onboarding, fora do produto logado.
+
+
 **Theme:** light, with a dark companion (Fase 2 extension — see "Dark Mode" below)
 
 Dub's visual system is a quiet, almost editorial SaaS aesthetic — a near-white canvas held together by hairline borders rather than elevation, with dense monochrome typography doing the structural work and one electric blue (#2563eb) doing the talking. Surfaces stay flat and borderless-looking at a glance, but every container carries a 1px #e5e5e5 edge that creates a printed-document feel. The personality comes from a small vocabulary of colored 'feature pill' accents (orange, green, violet) that float above the otherwise neutral palette, and from Satoshi-weight-500 display headlines that read as confident and contemporary without being loud. Components are compact and dense: 8px gaps, 12px card radius, pill-shaped tags at 9999px, and ghost controls instead of heavy filled buttons.
 
 ## Tokens — Colors
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 
 | Name | Value | Token | Role |
 |------|-------|-------|------|
@@ -39,6 +50,8 @@ Dub's visual system is a quiet, almost editorial SaaS aesthetic — a near-white
 > Added in the Fase 1 extension (docs/implementations — /dashboard and /distribuicao pilots) to cover semantic status states the original palette didn't name. Same rule applies: don't invent a new pairing without adding it here first.
 
 ## Dark Mode
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 
 Applies via the `.dark` class on `<html>` (no other toggle). **Palette replaced on 2026-09-26** by the dark theme of the reference admin panel [jubayer910/Admin-panel](https://github.com/jubayer910/Admin-panel) (MIT): a neutral grey ground instead of the earlier blue-grey, an indigo primary action and ink-over-wash status pairs. Light mode is unchanged. Two layers carry it: the shadcn variables in `src/app/globals.css` (`.dark`) and the Ds tokens in `src/styles/design-system/tokens.css` (`.dark`).
 
@@ -96,6 +109,8 @@ The Filled Dark CTA reads its text and hover from **On Primary Action** and **Pr
 
 ## Tokens — Typography
 
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
+
 ### Satoshi — Display headings — used only at 36–48px for hero and section titles. Weight 500 (medium, not bold) is the signature: headings feel confident and modern but never shout. Satoshi's geometric proportions give the type a slightly editorial, contemporary feel that Inter body text can't replicate. · `--font-satoshi`
 - **Substitute:** Inter (weight 500, letter-spacing -0.02em) or General Sans
 - **Weights:** 500
@@ -133,6 +148,8 @@ The Filled Dark CTA reads its text and hover from **On Primary Action** and **Pr
 | display | 48px | 1 | — | `--text-display` |
 
 ## Tokens — Spacing & Shapes
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 
 **Base unit:** 4px
 
@@ -192,6 +209,8 @@ The Filled Dark CTA reads its text and hover from **On Primary Action** and **Pr
 - **Element gap:** 8px
 
 ## Components
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 
 ### Ghost Nav Button
 **Role:** Navigation bar item
@@ -373,6 +392,8 @@ Not in the original spec. Icon square: 40px, 12px radius, Paper Mist background.
 
 ## Do's and Don'ts
 
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
+
 ### Do
 - Use #e5e5e5 for all container borders — 1px solid is the default structural line, not shadows
 - Reserve #1e40af (Deep Sapphire) for exactly one primary action per surface — never use it decoratively
@@ -393,6 +414,8 @@ Not in the original spec. Icon square: 40px, 12px radius, Paper Mist background.
 
 ## Surfaces
 
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
+
 | Level | Name | Value | Purpose |
 |-------|------|-------|---------|
 | 0 | Canvas | `#ffffff` | Page background — the base layer, always pure white |
@@ -401,6 +424,8 @@ Not in the original spec. Icon square: 40px, 12px radius, Paper Mist background.
 | 3 | Tinted Accent | `#dcfce7` | Decorative wash for feature highlights and 'new' badges |
 
 ## Elevation
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 
 - **Primary buttons:** `rgba(0, 0, 0, 0.05) 0px 1px 2px 0px`
 - **Elevated cards:** `rgba(0, 0, 0, 0.1) 0px 0px 0px 4px`
@@ -415,9 +440,13 @@ Assigned in the Fase 1 extension, to tokens that existed in Tokens — Shadows b
 
 ## Imagery
 
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
+
 Imagery is product-first, not lifestyle. The hero centers a large dashboard screenshot — a real product mockup with sidebar nav, data table, and floating UI elements — presented as a flat panel on the white canvas. Customer logos appear in a desaturated grayscale grid (beehiv, superpower, Chatbase, etc.) for social proof, stripped of color so the page's single blue accent stays dominant. Floating partner cards (small profile + revenue/payout tiles) drift around editorial text blocks in the lower section, giving a sense of depth without using shadows on the text itself. The dotted grid background pattern is a signature: a fine array of small dots at very low opacity creates texture and a sense of a design system / blueprint surface, reinforcing the 'modern link attribution platform' positioning. Iconography is small, outlined-to-filled, and uses the accent palette (orange tangerine, violet lavender, green mint) for feature tags. No photography, no illustrations, no 3D — the product UI IS the visual language.
 
 ## Layout
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 
 The page follows a centered, max-width contained model at approximately 1200px. The hero is a centered text stack with three floating feature pills (Affiliate Programs, Conversion Analytics, Short Links) arranged horizontally above a large product mockup. Sections stack vertically with consistent 64px gaps, alternating between white canvas and the #f5f5f5 paper mist for tonal separation. The lower section uses a z-pattern: editorial text centered in the middle third, with floating UI cards anchored at the left and right margins, creating an asymmetric, magazine-like rhythm. The logo cloud is a simple 5×2 grid centered on the page. Navigation is a minimal top bar — logo left, nav center, two-button cluster (ghost Log in + filled Sign up) right — with no sticky or mega-menu behavior. The dashboard mockup in the hero shows a classic 2-column app shell: fixed sidebar (240px-ish) + content area, establishing the product's information density for visitors before they scroll.
 
@@ -449,7 +478,11 @@ needed to act, everything else is one click away.
 
 ## Agent Prompt Guide
 
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
+
 ## Quick Color Reference
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 - Text primary: #171717
 - Text muted: #737373
 - Background: #ffffff
@@ -459,6 +492,8 @@ needed to act, everything else is one click away.
 - primary action: #000000 (filled action)
 
 ## Example Component Prompts
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 1. **Hero Feature Pill**: Transparent background, 9999px radius, 8px vertical / 16px horizontal padding. Small colored emoji-style icon (orange tangerine #ea580c for 'Short Links', violet #7c3aed for 'Conversion Analytics', green #16a34a for 'Affiliate Programs') + 14px Inter weight 500 #171717 label. No border.
 
 2. **Dashboard Card**: White (#ffffff) background, 1px #e5e5e5 border, 12px radius, 16px padding. Content inside uses 14–16px Inter weight 400 #171717. No shadow — borders define the container.
@@ -471,13 +506,19 @@ needed to act, everything else is one click away.
 
 ## Border-First Elevation Philosophy
 
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
+
 Dub deliberately uses 1px borders over shadows as the primary container-defining mechanism. The base border color is #e5e5e5 at 1px solid — used 1942 times across the system, making it the most deployed visual element. Shadows are reserved for three specific cases: (1) a barely-there 1px lift on primary buttons (rgba(0,0,0,0.05) 0px 1px 2px), (2) a 4px outer ring on elevated feature cards and product mockups to create a 'floating panel' effect, and (3) the layered 10px/4px shadow stack on hero showcase elements. The philosophy: borders create a printed-document clarity that's better for information-dense SaaS UIs, while shadows are saved for moments that need to truly pop off the page. This is the opposite of Material Design's shadow-heavy approach.
 
 ## Pill Architecture
 
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
+
 The 9999px radius is deployed 367 times — the second most common radius token. It's used for: feature category tags, status badges, notification dots, partner avatars, and pill-shaped nav elements. Combined with the 8px and 12px radii for buttons and cards, the system has a clear three-tier radius vocabulary: pills (9999px) for tags and badges, medium (8–12px) for buttons and cards, large (16px) for feature surfaces. This tight radius discipline is a key part of what makes the design feel intentional and cohesive.
 
 ## Similar Brands
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 
 - **Linear** — Same light-canvas + monochrome + single-accent approach, with similar compact density and 1px-border container treatment over heavy shadows
 - **Vercel** — Geometric sans-serif headlines at weight 500 (not bold), hairline borders, white-on-white card surfaces with 12px radius, and a restrained color palette that lets the product UI do the visual work
@@ -486,6 +527,8 @@ The 9999px radius is deployed 367 times — the second most common radius token.
 - **Raycast** — Compact information density, border-defined containers instead of shadows, pill-shaped status indicators, and a confident use of one saturated accent (blue) against near-black text
 
 ## Quick Start
+
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
 
 ### CSS Custom Properties
 
@@ -705,6 +748,8 @@ The 9999px radius is deployed 367 times — the second most common radius token.
 
 ## Exceção: modo diretor com a chave ligada
 
+> **Descontinuado em 22/11/2026.** Substituído pelo design system do Lite ([LITE_CHAT_DESIGN_SYSTEM.md](design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md)). Não usar em telas novas; fica aqui só como histórico das telas antigas.
+
 O modo diretor segue o sistema visual Lite descrito em `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md` somente quando a flag por empresa `feature_director_lite_style` está ativa. A flag nasce desligada e pode ser controlada pelo Super-admin na empresa correspondente. Com a flag desligada, o modo diretor mantém o sistema descrito neste documento. A exceção não altera o visual dos modos Lite de corretor, gestor ou supervisor, nem as regras, rotas, permissões ou dados das telas.
 
 ## Assets contextuais de interface · 28/10/2026
@@ -732,6 +777,8 @@ existente volta. Contrato vigente: docs/design-system/MASCOTE.md; decisão DEC-1
 registro: docs/implementations/active/2026-11-18-identidade-capitao-ancora.md.
 
 ## Feedback e movimento · 14/11/2026
+
+> **Atualizado em 22/11/2026.** O `docs/design-system/FEEDBACK.md` continua valendo para todo o app. A parte abaixo sobre o CTA Deep Sapphire era do modo normal, que foi descontinuado.
 
 O padrão geral de resposta a ações e eventos (camadas visual, texto, som, vibração e mascote; níveis 0 a 3; estados do botão de ação) está em `docs/design-system/FEEDBACK.md` e vale para todo o app. No modo descrito neste documento valem os níveis 0 a 2: o CTA Deep Sapphire ganha os estados enviando, confirmado e falhou, sem base sólida, sem bounce e sem confete. Plano de adoção por rota: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
 

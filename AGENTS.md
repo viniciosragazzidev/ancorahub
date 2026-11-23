@@ -49,8 +49,8 @@ preexistente nem para bloquear indiscriminadamente o trabalho em produção.
 
 - A fonte de verdade visual é `docs/ux/UX_REDESIGN_CONTRACT.md`; o próximo passo
   permitido está em `docs/ux/UX_REDESIGN_CONTROL.md`.
-- Para o modo Diretor com `feature_director_lite_style` ativa, consulte a exceção
-  aprovada em `docs/design-system.md`; os demais modos seguem as regras visuais atuais.
+- Desde 20/11/2026 o Lite é a única versão da interface: todo trabalho visual segue
+  `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md` (regras resumidas no `CLAUDE.md`).
 - Antes de uma mudança de UI, confirmar a etapa atual, o papel, a ação principal,
   os estados e a estratégia de disclosure da rota.
 - Não criar token, primitive ou variante sem registrar o gap e a decisão no controle

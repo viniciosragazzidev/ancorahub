@@ -4,6 +4,7 @@ import {
   DEVICE_UNAUTHORIZED,
   deviceAllowed,
   deviceJson,
+  deviceHangupFor,
   deviceStateBody,
 } from "@/features/call-ancora/device-api";
 import { syncColdQueue, verifyColdCurrent } from "@/features/call-ancora/cold-session";
@@ -30,5 +31,5 @@ export async function GET(request: Request) {
   }
   const snapshot = callAncoraSessionStore.getForDevice(token);
   if (!snapshot) return deviceJson({ error: DEVICE_UNAUTHORIZED }, 401);
-  return deviceJson(deviceStateBody(snapshot));
+  return deviceJson({ ...deviceStateBody(snapshot), hangup: await deviceHangupFor(token) });
 }

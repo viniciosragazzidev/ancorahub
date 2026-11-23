@@ -26,6 +26,7 @@ import { POST as pairPost } from "./pair/route";
 import { GET as stateGet } from "./state/route";
 import { POST as eventsPost } from "./events/route";
 import { POST as controlPost } from "./control/route";
+import { POST as classifyPost } from "./classify/route";
 
 let ipCounter = 0;
 const nextIp = () => `10.9.${Math.floor(ipCounter / 250)}.${(ipCounter++ % 250) + 1}`;
@@ -73,6 +74,14 @@ describe("API do app Android do Call Âncora", () => {
     expect(paired.status).toBe(200);
     expect(paired.deviceToken).toMatch(/^[A-Za-z0-9_-]{40,}$/);
     expect(paired.pairBody).toMatchObject({ brokerFirstName: "Ana", state: { status: "active" } });
+  });
+
+  it("entrega ao celular as regras de desligamento do diretor no pareamento e no estado", async () => {
+    const paired = await pairNew();
+    const rules = { enabled: true, ringTimeoutSec: 22, quickActiveSec: 4, voicemailAfterSec: 25 };
+    expect(paired.pairBody).toMatchObject({ hangup: rules });
+    const state = await (await stateGet(authed("state", paired.deviceToken))).json() as { hangup: unknown };
+    expect(state.hangup).toEqual(rules);
   });
 
   it("recusa ticket já usado e ticket vencido", async () => {
@@ -170,6 +179,25 @@ describe("API do app Android do Call Âncora", () => {
     expect(waiting).toMatchObject({ awaitingClassification: true, completed: 0, current: { id: contactId } });
     const classified = callAncoraSessionStore.classify(paired.scope, "interested");
     expect(classified?.current?.id).not.toBe(contactId);
+  });
+
+  it("o celular registra o feedback da ligação atendida e a fila segue", async () => {
+    const paired = await pairNew({ flagBypass: true });
+    callAncoraSessionStore.setTestList(paired.scope, [{ name: "Ana", phone: "+5521999990000" }, { name: "Bia", phone: "+5521977776666" }]);
+    const contactId = callAncoraSessionStore.getForBroker(paired.scope)?.current?.id ?? "";
+    // Antes da ligação terminar não há o que classificar.
+    expect((await classifyPost(authed("classify", paired.deviceToken, { outcome: "interested" }))).status).toBe(409);
+    await eventsPost(authed("events", paired.deviceToken, { contactId, event: "dialing" }));
+    await eventsPost(authed("events", paired.deviceToken, { contactId, event: "active" }));
+    await eventsPost(authed("events", paired.deviceToken, { contactId, event: "disconnected", causeCode: 3 }));
+    expect((await classifyPost(authed("classify", paired.deviceToken, { outcome: "talvez" }))).status).toBe(400);
+    const response = await classifyPost(authed("classify", paired.deviceToken, { outcome: "interested" }));
+    expect(response.status).toBe(200);
+    const body = await response.json() as { state: { completed: number; current: { id: string } } };
+    expect(body.state.completed).toBe(1);
+    expect(body.state.current.id).not.toBe(contactId);
+    expect(callAncoraSessionStore.getForBroker(paired.scope)?.interests.map((item) => item.id)).toContain(contactId);
+    expect((await classifyPost(authed("classify", "token-inexistente-0000000000000000000000000", { outcome: "interested" }))).status).toBe(401);
   });
 
   it("pausa e retoma pelo celular", async () => {

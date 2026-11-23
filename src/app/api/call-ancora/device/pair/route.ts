@@ -6,6 +6,7 @@ import {
   deviceClientIp,
   deviceJson,
   devicePairFailures,
+  deviceHangupFor,
   deviceStateBody,
   pairingAllowed,
 } from "@/features/call-ancora/device-api";
@@ -55,5 +56,6 @@ export async function POST(request: Request) {
     brokerFirstName: result.snapshot.brokerFirstName,
     sessionId: result.snapshot.sessionId,
     ...deviceStateBody(result.snapshot),
+    hangup: await deviceHangupFor(result.deviceToken),
   });
 }

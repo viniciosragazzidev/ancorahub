@@ -79,7 +79,7 @@ describe("CallAncoraMobile", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<CallAncoraMobile token="pairing-token" />);
-    expect(await screen.findByText("Discagem automática ligada")).toBeInTheDocument();
+    expect(await screen.findByText("Próximo contato")).toBeInTheDocument();
     expect(screen.getByText(/No navegador, cada ligação precisa de um toque/)).toBeInTheDocument();
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2));
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);

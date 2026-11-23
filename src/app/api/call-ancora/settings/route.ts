@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+
+import { getDatabase, schema } from "@/shared/db";
 import { requireCallAncoraDirectorAccess } from "@/features/call-ancora/director-access";
 import { readCallAncoraSettings, writeCallAncoraSettings } from "@/features/call-ancora/settings";
 import { callAncoraSettingsSchema } from "@/features/call-ancora/settings-rules";
@@ -32,7 +35,24 @@ export async function PUT(request: Request) {
     if (!parsed.success) {
       return Response.json({ error: parsed.error.issues[0]?.message ?? "Confira os valores." }, { status: 400, headers: noStore });
     }
+    const before = await readCallAncoraSettings(context.tenantId);
     await writeCallAncoraSettings(context.tenantId, parsed.data);
+    // Auditoria: quem mudou o quê (só os campos alterados, antes e depois).
+    const changed = Object.fromEntries(
+      (Object.keys(parsed.data) as (keyof typeof parsed.data)[])
+        .filter((key) => before[key] !== parsed.data[key])
+        .map((key) => [key, { antes: before[key], depois: parsed.data[key] }]),
+    );
+    if (Object.keys(changed).length) {
+      await getDatabase().insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "call_ancora_settings",
+        entidadeId: context.tenantId,
+        acao: "call_ancora_settings.updated",
+        metadata: changed,
+      }).catch((error: unknown) => console.error("Auditoria das configurações do Call Âncora falhou", error instanceof Error ? error.message : error));
+    }
     return Response.json({ settings: parsed.data }, { headers: noStore });
   } catch (error) {
     return failure(error);

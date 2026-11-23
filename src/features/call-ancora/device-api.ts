@@ -5,6 +5,8 @@ import { getFeatureFlag } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
 import { callAncoraSessionStore, toDeviceState, type CallAncoraSnapshot } from "./session-store";
+import { readCallAncoraSettings } from "./settings";
+import { deviceHangupRules } from "./settings-rules";
 
 /**
  * API do app Android (Call Âncora). Autenticação só por token de dispositivo no
@@ -43,6 +45,17 @@ export async function pairingAllowed(ticket: string) {
 
 export function deviceStateBody(snapshot: CallAncoraSnapshot) {
   return { state: toDeviceState(snapshot) };
+}
+
+/**
+ * Regras de desligamento definidas pelo diretor, para o celular aplicar. Null quando não
+ * dá para ler (o app mantém as que já tem).
+ */
+export async function deviceHangupFor(token: string) {
+  const scope = callAncoraSessionStore.scopeForDevice(token);
+  if (!scope) return null;
+  const settings = await readCallAncoraSettings(scope.tenantId).catch(() => null);
+  return settings ? deviceHangupRules(settings) : null;
 }
 
 export const DEVICE_UNAUTHORIZED = "O pareamento deste celular terminou. Leia um novo QR na tela do Call Âncora.";

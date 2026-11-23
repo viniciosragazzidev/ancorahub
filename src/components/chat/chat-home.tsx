@@ -142,9 +142,6 @@ function matches(thread: ThreadSummary, query: string) {
   return !needle || `${thread.name} ${thread.preview}`.toLocaleLowerCase("pt-BR").includes(needle);
 }
 
-function SearchIcon() {
-  return <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
-}
 function PlusIcon() {
   return <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
 }
@@ -348,7 +345,6 @@ export function ChatHome({
               {unreadNotifications ? <span className={home.bellCount} aria-hidden="true">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}
             </Link>
           )}
-          {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></ArcButton> : <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>}
           {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} aria-label="Nova ação" onClick={() => setNewOpen(true)}><PlusIcon /></ArcButton> : <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>}
         </div>
       </header>

@@ -24,6 +24,13 @@ const NUMBER_FIELDS: { key: NumberKey; label: string; hint: string; min: number;
   { key: "windowEndHour", label: "Fim das ligações", hint: "As ligações param neste horário.", min: 1, max: 24, suffix: "h" },
 ];
 
+/** Desligamento automático no celular (estimativas só por tempo). */
+const HANGUP_FIELDS: { key: NumberKey; label: string; hint: string; min: number; max: number; suffix: string }[] = [
+  { key: "ringTimeoutSeconds", label: "Tempo de toque", hint: "Sem atender depois disso, o celular desliga e marca Não atendeu.", min: 15, max: 40, suffix: "s" },
+  { key: "quickActiveSeconds", label: "Atendeu rápido demais", hint: "Atendida antes disso: provável caixa postal, o celular desliga.", min: 2, max: 8, suffix: "s" },
+  { key: "voicemailAfterSeconds", label: "Caixa postal tardia", hint: "Atendida depois disso: a operadora mandou para a caixa postal.", min: 15, max: 60, suffix: "s" },
+];
+
 /** Tela do diretor: limites e regras do Call Âncora da empresa. */
 export function CallAncoraSettingsPanel() {
   const fire = useFeedback();
@@ -113,10 +120,41 @@ export function CallAncoraSettingsPanel() {
             </div>
             <div className="flex items-center justify-between gap-4 rounded-xl bg-(--surface-muted) px-4 py-3">
               <div>
-                <p id="call-ancora-autodial-default" className="text-sm font-medium text-(--foreground)">Discagem automática ligada ao iniciar</p>
-                <p className="text-xs text-(--text-secondary)">O corretor ainda pode desligar na sessão dele.</p>
+                <p id="call-ancora-autodial-default" className="text-sm font-medium text-(--foreground)">Discagem automática</p>
+                <p className="text-xs text-(--text-secondary)">Depois do feedback, o celular liga para o próximo sozinho após a contagem. O corretor não muda isso.</p>
               </div>
               <Switch aria-labelledby="call-ancora-autodial-default" checked={settings.autoDialByDefault} onCheckedChange={(checked) => update("autoDialByDefault", checked)} />
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-(--border) p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p id="call-ancora-auto-hangup" className="text-sm font-medium text-(--foreground)">Desligar sozinho caixa postal e não atendidas</p>
+                <p className="text-xs text-(--text-secondary)">Vale para todos os celulares. São estimativas por tempo: o app não ouve a ligação.</p>
+              </div>
+              <Switch aria-labelledby="call-ancora-auto-hangup" checked={settings.autoHangupEnabled} onCheckedChange={(checked) => update("autoHangupEnabled", checked)} />
+            </div>
+            <div className={`mt-4 grid gap-4 sm:grid-cols-3 transition-opacity duration-200 ${settings.autoHangupEnabled ? "" : "opacity-50"}`}>
+              {HANGUP_FIELDS.map((field) => (
+                <label key={field.key} className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-(--foreground)">{field.label}</span>
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={field.min}
+                      max={field.max}
+                      disabled={!settings.autoHangupEnabled}
+                      value={settings[field.key]}
+                      onChange={(event) => update(field.key, Number(event.target.value))}
+                      className="min-h-11 w-24 rounded-xl border border-(--border) bg-(--background) px-3 text-sm tabular-nums text-(--foreground)"
+                    />
+                    <span className="text-sm text-(--text-secondary)">{field.suffix}</span>
+                  </span>
+                  <span className="text-xs leading-5 text-(--text-muted)">{field.hint} De {field.min} a {field.max} s.</span>
+                </label>
+              ))}
             </div>
           </div>
 

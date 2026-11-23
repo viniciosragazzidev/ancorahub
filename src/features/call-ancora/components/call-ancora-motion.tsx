@@ -162,10 +162,10 @@ export function Beat({ at = "visual", children, className }: { at?: keyof typeof
 export function ConnectedMoment({ brokerFirstName }: { brokerFirstName: string }) {
   const reduce = !useMotionAllowed();
   return (
-    <section role="status" aria-live="polite" className="mx-auto flex min-h-[min(58vh,520px)] max-w-3xl flex-col items-center justify-center rounded-2xl border border-(--border) bg-(--surface) px-6 py-14 text-center">
+    <section role="status" aria-live="polite" className="mx-auto flex min-h-[min(58vh,520px)] max-w-3xl flex-col items-center justify-center rounded-(--radius-surface) border border-(--border) bg-(--surface) px-6 py-14 text-center">
       <span className="relative inline-flex">
         <motion.span
-          className="grid size-20 place-items-center rounded-2xl bg-(--success)/10 text-(--success)"
+          className="grid size-20 place-items-center rounded-full bg-(--success)/10 text-(--success)"
           initial={reduce ? { opacity: 0 } : { opacity: 0, scale: motionTokens.scale.popIn }}
           animate={{ opacity: 1, scale: 1 }}
           transition={reduce ? reducedFade : motionTokens.spring.snappy}
@@ -175,7 +175,7 @@ export function ConnectedMoment({ brokerFirstName }: { brokerFirstName: string }
         {reduce ? null : (
           <motion.span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-2xl border-2 border-(--success)"
+            className="pointer-events-none absolute inset-0 rounded-full border-2 border-(--success)"
             initial={{ opacity: motionTokens.attention.opacity, scale: 1 }}
             animate={{ opacity: 0, scale: 1.35 }}
             transition={{ duration: motionTokens.attention.duration, ease: easeStandard, delay: motionTokens.beat.text }}
@@ -193,8 +193,9 @@ export function ConnectedMoment({ brokerFirstName }: { brokerFirstName: string }
           </svg>
         </motion.span>
       </span>
-      <Beat at="text"><h2 className="mt-8 text-3xl font-semibold tracking-tight text-(--foreground)">Celular conectado</h2></Beat>
-      <Beat at="number"><p className="mt-3 max-w-sm text-sm leading-6 text-(--text-secondary)">Conectado à conta de {brokerFirstName}. Preparando a sua fila…</p></Beat>
+      <h2 className="mt-8 text-3xl font-medium tracking-tight text-(--foreground)">Celular conectado</h2>
+      <p className="mt-3 text-xl font-medium text-(--foreground)"><NameReveal text={`Olá, ${brokerFirstName}!`} delay={motionTokens.beat.text} /></p>
+      <Beat at="after"><p className="mt-3 max-w-sm text-sm leading-6 text-(--text-secondary)">Preparando a sua fila…</p></Beat>
     </section>
   );
 }
@@ -222,6 +223,45 @@ export function QueueTrack({ total, done }: { total: number; done: number }) {
 }
 
 /** Troca no mesmo lugar com direção: o que sai vai para a esquerda, o que chega vem da direita. */
+/**
+ * Nome que chega letra por letra: cada letra sobe e desfoca para nítida, em cascata curta.
+ * O leitor de tela recebe o nome inteiro de uma vez (as letras ficam ocultas para ele).
+ */
+export function NameReveal({ text, className, delay = 0 }: { text: string; className?: string; delay?: number }) {
+  const reduce = !useMotionAllowed();
+  const words = text.split(" ");
+  if (reduce) {
+    return <motion.span className={className} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={reducedFade}>{text}</motion.span>;
+  }
+  let index = 0;
+  return (
+    <span className={className} aria-label={text}>
+      {words.map((word, wordIndex) => (
+        <span key={`${word}-${wordIndex}`} aria-hidden="true" className="inline-block whitespace-nowrap">
+          {Array.from(word).map((letter) => {
+            const at = index++;
+            return (
+              <motion.span
+                key={at}
+                className="inline-block"
+                initial={{ opacity: 0, y: "0.45em", filter: `blur(${motionTokens.blur.subtle * 2}px)` }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ ...motionTokens.spring.smooth, delay: delay + at * LETTER_STAGGER }}
+              >
+                {letter}
+              </motion.span>
+            );
+          })}
+          {wordIndex < words.length - 1 ? " " : null}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Intervalo entre letras do nome: rápido o bastante para um nome longo não passar de ~0,6 s. */
+const LETTER_STAGGER = 0.028;
+
 export function SlideSwap({ swapKey, children, className, axis = "x" }: { swapKey: string; children: ReactNode; className?: string; axis?: "x" | "y" }) {
   const reduce = !useMotionAllowed();
   const far = axis === "x" ? motionTokens.distance.sheet : motionTokens.distance.md;
@@ -266,7 +306,7 @@ export function CallAvatar({ name, status }: { name: string; status: CallStatus 
         animate={{ borderColor: status === "active" ? "var(--success)" : calling ? "var(--primary)" : "var(--border)" }}
         transition={reduce ? reducedFade : { duration: motionTokens.duration.standard, ease: easeStandard }}
       />
-      <span className="grid size-20 place-items-center rounded-full bg-(--accent-subtle) text-2xl font-semibold text-(--accent-strong)">{contactInitials(name)}</span>
+      <span className="grid size-20 place-items-center rounded-full bg-(--accent-subtle) text-2xl font-medium text-(--accent-strong)">{contactInitials(name)}</span>
     </span>
   );
 }

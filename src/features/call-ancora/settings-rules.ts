@@ -21,6 +21,14 @@ export const callAncoraSettingsSchema = z.object({
   saturdayEnabled: z.boolean(),
   /** Discagem automática já ligada ao iniciar a sessão. */
   autoDialByDefault: z.boolean(),
+  /**
+   * Desligamento automático no celular, só por tempo (o app não ouve a ligação):
+   * não atendeu depois do tempo de toque; atendeu rápido demais ou tarde demais = provável caixa postal.
+   */
+  autoHangupEnabled: z.boolean(),
+  ringTimeoutSeconds: z.number().int().min(15).max(40),
+  quickActiveSeconds: z.number().int().min(2).max(8),
+  voicemailAfterSeconds: z.number().int().min(15).max(60),
 }).refine((value) => value.leadPeriodMinAgeDays < value.leadPeriodMaxAgeDays, {
   message: "O período dos leads precisa ter o início mais antigo que o fim.",
   path: ["leadPeriodMinAgeDays"],
@@ -42,7 +50,21 @@ export const CALL_ANCORA_DEFAULT_SETTINGS: CallAncoraSettings = {
   windowEndHour: 20,
   saturdayEnabled: true,
   autoDialByDefault: false,
+  autoHangupEnabled: true,
+  ringTimeoutSeconds: 22,
+  quickActiveSeconds: 4,
+  voicemailAfterSeconds: 25,
 };
+
+/** Regras de desligamento que vão para o app Android junto com o estado da sessão. */
+export function deviceHangupRules(settings: CallAncoraSettings) {
+  return {
+    enabled: settings.autoHangupEnabled,
+    ringTimeoutSec: settings.ringTimeoutSeconds,
+    quickActiveSec: settings.quickActiveSeconds,
+    voicemailAfterSec: settings.voicemailAfterSeconds,
+  };
+}
 
 /** Lê o JSON guardado; o que estiver faltando ou inválido volta ao padrão. */
 export function parseCallAncoraSettings(raw: string | null | undefined): CallAncoraSettings {
