@@ -83,7 +83,7 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
         const result = await changeLeadStatusAction({}, form({ leadId, newStatus: status }));
         if (!result.success) return { ok: false, message: "A etapa não foi alterada. Toque de novo em alguns segundos." };
         const stage = status === "quote_sent" ? "Cotação enviada" : status === "negotiation" ? "Em negociação" : "Documentação pendente";
-        // A Sasá manda a etapa anterior: o "Desfazer" volta para ela.
+        // O Sasá manda a etapa anterior: o "Desfazer" volta para ela.
         const restorable = Boolean(previous && (RESTORABLE_STEPS as readonly string[]).includes(previous) && previous !== status);
         const undo = restorable ? { label: "Desfazer", action: { kind: "server" as const, name: "lead.restoreStep" as const, payload: { leadId, status: previous! } } } : undefined;
         if (!when) return { ok: true, message: `Pronto, etapa: ${stage}.`, undo };
@@ -93,7 +93,7 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
           : { ok: true, warning: true, message: `Etapa: ${stage}. Não consegui criar o lembrete. Tente de novo pela ficha.` };
       }
       case "lead.scheduleReturn": {
-        // `at` (hora exata, da Sasá) ou um atalho `when`; o servidor confere que o lead é do corretor.
+        // `at` (hora exata, do Sasá) ou um atalho `when`; o servidor confere que o lead é do corretor.
         const { leadId, when, at, taskId } = leadPayload.extend({ when: whenPreset.optional(), at: isoInstant.optional(), taskId: z.string().uuid().optional() })
           .refine((value) => Boolean(value.when || value.at)).parse(payload);
         const result = await scheduleReturn(leadId, at ?? when!, taskId);
@@ -138,7 +138,7 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
       case "lead.markLost": {
         const { leadId, reason, previous } = leadPayload.extend({ reason: z.enum(MOTIVOS_PERDA), previous: z.string().max(40).optional() }).parse(payload);
         const result = await changeLeadStatusAction({}, form({ leadId, newStatus: "lost", motivoPerda: reason }));
-        // Pela Sasá (fase 5) vem a etapa anterior: o "Desfazer" reabre o atendimento nela.
+        // Pelo Sasá (fase 5) vem a etapa anterior: o "Desfazer" reabre o atendimento nela.
         const reopen = previous && (RESTORABLE_STEPS as readonly string[]).includes(previous)
           ? { label: "Desfazer", action: { kind: "server" as const, name: "lead.restoreStep" as const, payload: { leadId, status: previous } } }
           : undefined;

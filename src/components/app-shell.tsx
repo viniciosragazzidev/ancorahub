@@ -89,7 +89,7 @@ export function AppShell({
   isLightBroker?: boolean;
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
-  /** Botão flutuante da Sasá (fase 3): corretor Lite com a Sasá liberada. */
+  /** Botão flutuante do Sasá (fase 3): corretor Lite com o Sasá liberada. */
   sasaVoiceEnabled?: boolean;
   journeyEnabled?: boolean;
   /** Início do corretor reorganizado (BROKER_NAV_REORG): menu Mais novo. */

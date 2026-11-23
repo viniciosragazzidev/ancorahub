@@ -61,6 +61,7 @@ export async function syncColdQueue(scope: Scope, now = new Date()) {
     rules: {
       maxAgeDays: settings.leadPeriodMaxAgeDays,
       minAgeDays: settings.leadPeriodMinAgeDays,
+      leadsFromDate: settings.leadsFromDate,
       maxAttempts: settings.maxAttemptsPerLead,
       cooldownMs: settings.attemptCooldownHours * 60 * 60_000,
     },

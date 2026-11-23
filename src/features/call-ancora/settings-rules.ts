@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+/** "2026-11-01" e é uma data que existe no calendário. */
+function isCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 /**
  * Configurações do Call Âncora por empresa (tela do diretor). Guardadas em system_settings,
  * sem tabela nova. Valores fora da faixa são recusados.
@@ -12,6 +20,11 @@ export const callAncoraSettingsSchema = z.object({
   /** Período dos leads: só frios criados entre X dias atrás (mais antigo) e Y dias atrás (mais novo). */
   leadPeriodMaxAgeDays: z.number().int().min(1).max(3650),
   leadPeriodMinAgeDays: z.number().int().min(0).max(3650),
+  /**
+   * "Só leads a partir de": data (AAAA-MM-DD, São Paulo) a partir da qual o lead entra na fila,
+   * contando desde o início do dia. Null = sem filtro. Leads mais antigos não são apagados.
+   */
+  leadsFromDate: z.string().refine(isCalendarDate, "Escolha uma data válida.").nullable(),
   /** Tentativas por lead e intervalo mínimo entre elas. */
   maxAttemptsPerLead: z.number().int().min(1).max(10),
   attemptCooldownHours: z.number().int().min(1).max(168),
@@ -44,6 +57,7 @@ export const CALL_ANCORA_DEFAULT_SETTINGS: CallAncoraSettings = {
   tenantDailyCredits: 0,
   leadPeriodMaxAgeDays: 365,
   leadPeriodMinAgeDays: 0,
+  leadsFromDate: null,
   maxAttemptsPerLead: 3,
   attemptCooldownHours: 4,
   windowStartHour: 8,
@@ -94,6 +108,24 @@ export function windowMessage(settings: CallAncoraSettings) {
 }
 
 /** Início do dia de hoje em São Paulo (para contar o uso diário). */
+/** Início do dia escolhido em São Paulo (sem horário de verão desde 2019: sempre -03:00). */
+export function leadsFromStart(date: string | null): Date | null {
+  return date && isCalendarDate(date) ? new Date(`${date}T00:00:00-03:00`) : null;
+}
+
+/**
+ * Limite inferior de criação do lead na fila: o mais recente entre "criados há no máximo X dias"
+ * e "Só leads a partir de". Null quando não há nenhum.
+ */
+export function coldCreatedAfter(rules: { maxAgeDays: number | null; leadsFromDate: string | null }, now: Date): Date | null {
+  const day = 24 * 60 * 60_000;
+  const byAge = rules.maxAgeDays === null ? null : new Date(now.getTime() - rules.maxAgeDays * day);
+  const byDate = leadsFromStart(rules.leadsFromDate);
+  if (!byAge) return byDate;
+  if (!byDate) return byAge;
+  return byDate.getTime() > byAge.getTime() ? byDate : byAge;
+}
+
 export function startOfTodaySaoPaulo(now: Date) {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
   return new Date(`${day}T00:00:00-03:00`);

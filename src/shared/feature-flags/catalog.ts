@@ -602,6 +602,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Permite configurar cotas mensais, gerar propostas automáticas e publicar escalas de plantão.",
   },
+  DUTY_SEAT_PASS: {
+    key: "feature_duty_seat_pass_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Passar o plantão: a gestão tira um corretor de um plantão e põe outro no lugar, mesmo sem escala em outro dia (publicado, rascunho e avulso). Desligada, só a troca entre dois escalados continua.",
+  },
   DUTY_INACTIVE_BROKERS: {
     key: "feature_duty_inactive_brokers_enabled",
     scope: "global",

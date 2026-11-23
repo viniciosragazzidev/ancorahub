@@ -9,7 +9,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
 import { buildDuplicateDutyScheduleValues, dutyScheduleInput, getAttendanceModeUpdate, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
-import { DEFAULT_SHIFT_SPLIT_AT, retimeAssignmentForSplit, validShiftSplit } from "./duty-shifts";
+import { DEFAULT_SHIFT_SPLIT_AT, retimeAssignmentForHours, retimeAssignmentForSplit, validShiftSplit } from "./duty-shifts";
 import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
@@ -488,6 +488,34 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         eq(schema.dutyRosterAssignments.status, "active"),
         isNull(schema.dutyRosterAssignments.dutyDate),
       ));
+      // The hours changed: the roster windows that touched the old start or end follow the new ones.
+      if (schedule.startsAt.slice(0, 5) !== parsed.data.startsAt.slice(0, 5) || schedule.endsAt.slice(0, 5) !== parsed.data.endsAt.slice(0, 5)) {
+        const roster = await tx.select({ id: schema.dutyRosterAssignments.id, startsAt: schema.dutyRosterAssignments.startsAt, endsAt: schema.dutyRosterAssignments.endsAt })
+          .from(schema.dutyRosterAssignments)
+          .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.scheduleId, schedule.id), eq(schema.dutyRosterAssignments.status, "active")));
+        const [zone] = await tx.select({ timezone: schema.unitDutySchedules.timezone }).from(schema.unitDutySchedules).where(eq(schema.unitDutySchedules.id, schedule.id));
+        const tz = zone?.timezone || "America/Sao_Paulo";
+        for (const assignment of roster) {
+          const retimed = retimeAssignmentForHours(schedule, parsed.data, assignment);
+          if (!retimed) continue;
+          await tx.update(schema.dutyRosterAssignments).set({ ...retimed, updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
+          // Presence of today on is keyed by the exact window: an extended day keeps the presence
+          // already confirmed (otherwise the broker turns "Aguardando presença" mid-plantão).
+          const oldStart = assignment.startsAt.slice(0, 5);
+          const oldEnd = assignment.endsAt.slice(0, 5);
+          if (oldStart >= oldEnd) continue;
+          await tx.execute(sql`
+            update duty_presence_confirmations
+               set shift_starts_at = ((duty_date + ${retimed.startsAt}::time) at time zone ${tz}),
+                   shift_ends_at = ((duty_date + ${retimed.endsAt}::time) at time zone ${tz}),
+                   updated_at = now()
+             where tenant_id = ${context.tenantId}
+               and assignment_id = ${assignment.id}
+               and duty_date >= (now() at time zone ${tz})::date
+               and to_char(shift_starts_at at time zone ${tz}, 'HH24:MI') = ${oldStart}
+               and to_char(shift_ends_at at time zone ${tz}, 'HH24:MI') = ${oldEnd}`);
+        }
+      }
       // The split moved (or was removed): morning brokers keep the morning,
       // afternoon brokers the afternoon, in their roster windows.
       if (formData.has("shiftSplitAt") && nextSplit !== (schedule.shiftSplitAt ?? null)) {

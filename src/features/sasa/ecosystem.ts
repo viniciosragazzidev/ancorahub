@@ -26,7 +26,7 @@ import { nameHintOf } from "./intent-rules";
 import { resolveLead } from "./resolve-entities";
 
 /**
- * Ferramentas de leitura da Sasá sobre o ecossistema do corretor (19/11). Uma por área, cada uma com a consulta
+ * Ferramentas de leitura do Sasá sobre o ecossistema do corretor (19/11). Uma por área, cada uma com a consulta
  * que a própria tela usa e o tenant, corretor e papel da sessão (nunca vindos da IA, nunca SQL livre).
  * Sem acesso a uma área, o fato diz isso (ex.: `finance.access = false`) e a resposta também.
  */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CALL_ANCORA_DEFAULT_SETTINGS, callAncoraSettingsSchema, deviceHangupRules, isWindowOpenFor, parseCallAncoraSettings, startOfTodaySaoPaulo } from "./settings-rules";
+import { CALL_ANCORA_DEFAULT_SETTINGS, callAncoraSettingsSchema, coldCreatedAfter, deviceHangupRules, isWindowOpenFor, leadsFromStart, parseCallAncoraSettings, startOfTodaySaoPaulo } from "./settings-rules";
 
 describe("configurações do Call Âncora", () => {
   it("usa o padrão quando não há nada salvo ou o JSON é inválido", () => {
@@ -16,6 +16,43 @@ describe("configurações do Call Âncora", () => {
     expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, leadPeriodMinAgeDays: 30, leadPeriodMaxAgeDays: 10 }).success).toBe(false);
     expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, windowStartHour: 20, windowEndHour: 8 }).success).toBe(false);
     expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, dailyContactsPerBroker: 0 }).success).toBe(false);
+  });
+
+  describe("Só leads a partir de", () => {
+    const now = new Date("2026-11-23T15:00:00Z");
+    const day = 24 * 60 * 60_000;
+
+    it("sem data: vale só o período em dias (comportamento de antes)", () => {
+      expect(CALL_ANCORA_DEFAULT_SETTINGS.leadsFromDate).toBeNull();
+      expect(leadsFromStart(null)).toBeNull();
+      expect(coldCreatedAfter({ maxAgeDays: 365, leadsFromDate: null }, now)?.getTime()).toBe(now.getTime() - 365 * day);
+    });
+
+    it("com data: começa à meia-noite de São Paulo e vence o período quando é mais recente", () => {
+      const from = coldCreatedAfter({ maxAgeDays: 365, leadsFromDate: "2026-11-01" }, now);
+      expect(from?.toISOString()).toBe("2026-11-01T03:00:00.000Z");
+      // Data mais antiga que o período: o período em dias continua mandando.
+      expect(coldCreatedAfter({ maxAgeDays: 30, leadsFromDate: "2025-01-01" }, now)?.getTime()).toBe(now.getTime() - 30 * day);
+    });
+
+    it("borda do dia no fuso: 23h59 do dia anterior fica fora, 00h00 entra", () => {
+      const start = leadsFromStart("2026-11-01")!.getTime();
+      const lastMinuteBefore = new Date("2026-11-01T02:59:59.999Z").getTime(); // 31/10 23:59:59 em São Paulo
+      const midnight = new Date("2026-11-01T03:00:00.000Z").getTime(); // 01/11 00:00 em São Paulo
+      expect(lastMinuteBefore >= start).toBe(false);
+      expect(midnight >= start).toBe(true);
+    });
+
+    it("recusa data que não existe e aceita vazio", () => {
+      expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, leadsFromDate: "2026-02-30" }).success).toBe(false);
+      expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, leadsFromDate: "01/11/2026" }).success).toBe(false);
+      expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, leadsFromDate: "2026-11-01" }).success).toBe(true);
+      expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, leadsFromDate: null }).success).toBe(true);
+    });
+
+    it("configuração antiga sem o campo lê como sem filtro", () => {
+      expect(parseCallAncoraSettings(JSON.stringify({ dailyContactsPerBroker: 50 })).leadsFromDate).toBeNull();
+    });
   });
 
   it("discagem automática é o padrão", () => {

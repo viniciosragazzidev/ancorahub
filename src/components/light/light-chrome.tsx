@@ -171,7 +171,7 @@ export function LightChrome({
       {audience === "broker" ? <TipHost /> : null}
       {/* Conquistas do corretor (15/11/2026): presença confirmada e WhatsApp conectado, na tela do capitão. */}
       {audience === "broker" && !viewAs.viewingAs ? <AchievementHost /> : null}
-      {/* Botão da Sasá (fase 3): segurar e falar de qualquer tela; some em conversas, folhas, oferta e celebração. */}
+      {/* Botão do Sasá (fase 3): segurar e falar de qualquer tela; some em conversas, folhas, oferta e celebração. */}
       {audience === "broker" && sasaVoiceEnabled && !viewAs.viewingAs ? <SasaVoiceButton pathname={pathname} chat={Boolean(chat)} /> : null}
       {audience === "broker" ? <Suspense fallback={null}><LiteMicroTour pathname={pathname} /></Suspense> : null}
     </LightAvailabilityProvider>

@@ -34,7 +34,7 @@ const inputSchema = z.object({
 const NOT_HANDLED: SasaReply = { handled: false, blocks: [] };
 
 /**
- * Pedido à Sasá agêntica. Tenant, usuário e papel vêm só da sessão; a IA nunca manda id.
+ * Pedido ao Sasá agêntico. Tenant, usuário e papel vêm só da sessão; a IA nunca manda id.
  * Regras primeiro (grátis); a IA só interpreta quando as regras não casam e o corretor já consentiu.
  * `handled: false` devolve a vez para a resposta por IA de sempre (askAssistantAction).
  * Cada pedido vira uma linha em `sasa_commands` (fase 2), que dá o histórico, o teto de 150 por dia (D9)
@@ -47,7 +47,7 @@ export async function sasaCommandAction(raw: { text: string; clientCommandId?: s
   try {
     const context = await getRequiredTenantContext();
     if (context.role !== "broker") return NOT_HANDLED;
-    // Piloto (D8): a mesma liberação da Sasá com IA (flag da empresa ou corretor do piloto).
+    // Piloto (D8): a mesma liberação do Sasá com IA (flag da empresa ou corretor do piloto).
     const access = await brokerAiAccess(context.userId);
     if (!access.enabled) return NOT_HANDLED;
 

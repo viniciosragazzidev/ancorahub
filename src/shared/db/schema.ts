@@ -5894,7 +5894,7 @@ export const erpIncentiveResults = pgTable("erp_incentive_results", {
 }, (table) => [index("erp_incentive_results_campaign_idx").on(table.tenantId, table.campaignId, table.createdAt)]);
 
 /**
- * Pedidos à Sasá agêntica (fase 2, 19/11/2026; migration 0233). Um por pedido (texto ou voz), único por
+ * Pedidos ao Sasá agêntico (fase 2, 19/11/2026; migration 0233). Um por pedido (texto ou voz), único por
  * corretor e `client_command_id`: o reenvio com internet ruim devolve a resposta guardada em vez de executar
  * de novo. Áudio nunca é guardado (D4); a transcrição e a resposta são apagadas depois de 90 dias (D5) pelo
  * job `/api/internal/jobs/sasa-cleanup`. Plano: docs/implementations/active/2026-11-19-sasa-agentica.md.
@@ -5932,7 +5932,7 @@ export const sasaCommands = pgTable(
 /**
  * Ações do Agente IA do diretor (21/11/2026; migration 0235). Uma linha por chamada de ferramenta de escrita: pedido,
  * entrada com ids resolvidos, aprovação, resultado e Desfazer. Única por usuário e `tool_call_id` (idempotência).
- * `request_text` é apagado depois de 90 dias pelo job de limpeza da Sasá. Plano: docs/implementations/active/2026-11-21-agente-diretor.md.
+ * `request_text` é apagado depois de 90 dias pelo job de limpeza do Sasá. Plano: docs/implementations/active/2026-11-21-agente-diretor.md.
  */
 export const agentActions = pgTable(
   "agent_actions",

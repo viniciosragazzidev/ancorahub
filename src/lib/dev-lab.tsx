@@ -33,7 +33,7 @@ export type DevLab = {
   recoveryCallQueue?: { moveHeld: () => Promise<{ ok: true; moved: number } | { ok: false; error: string }> };
   /** Recuperação (fase 3): no lugar de salvar a configuração. */
   recoverySettings?: (settings: import("@/features/lead-recovery/settings-core").RecoverySettings) => Promise<{ ok: true; settings: import("@/features/lead-recovery/settings-core").RecoverySettings } | { ok: false; error: string }>;
-  /** Sasá agêntica: no lugar de sasaCommandAction e das ações do chat (Desfazer, atalhos de data). */
+  /** Sasá agêntico: no lugar de sasaCommandAction e das ações do chat (Desfazer, atalhos de data). */
   sasa?: {
     command: (input: SasaClientCommand) => Promise<SasaReply>;
     run: (name: ChatServerActionName, payload: Record<string, string | number | boolean | null>) => Promise<SasaActionResult>;
@@ -47,7 +47,11 @@ export type DevLab = {
     ask?: (question: string) => Promise<import("@/components/chat/types").ChatBlock[]>;
     /** Fase 4: no lugar de navegar para a venda ou a cotação (o laboratório troca de fluxo). */
     open?: (open: import("@/features/sasa/drafts").SasaOpen) => void;
+    /** Voz do Sasá por ElevenLabs (teste de 23/11): conexão e fala simuladas. */
+    voice?: import("@/features/sasa-voice/client").SasaVoiceBackend;
   };
+  /** Configurações > Meu telefone (23/11): no lugar de changeOwnPhoneAction. */
+  phoneChange?: (phone: string) => Promise<import("@/features/broker-phone-change/actions").ChangeOwnPhoneState>;
   /** Agente IA do diretor (21/11): conversa num mundo em memória (modelo com roteiro) e Desfazer simulado. */
   directorAgent?: {
     transport: import("ai").ChatTransport<import("ai").UIMessage>;

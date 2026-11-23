@@ -554,7 +554,7 @@ export async function updateAiAudioTranscriptionAction(tenantId: string, formDat
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
-/** Liga ou desliga, por empresa, a IA dinâmica da Sasá (respostas abertas que combinam leituras). Ligada por padrão. */
+/** Liga ou desliga, por empresa, a IA dinâmica do Sasá (respostas abertas que combinam leituras). Ligada por padrão. */
 export async function updateSasaDynamicAiAction(tenantId: string, formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });

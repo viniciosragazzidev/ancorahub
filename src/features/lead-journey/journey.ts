@@ -1,6 +1,6 @@
 /**
  * Etapa do lead (plano de recuperação, §4): uma função pura que lê os campos que já existem e devolve a etapa,
- * o passo na régua e o próximo passo. A tela, o hover card, o funil e a Sasá leem esta mesma função.
+ * o passo na régua e o próximo passo. A tela, o hover card, o funil e o Sasá leem esta mesma função.
  * Plano: docs/implementations/active/2026-11-21-recuperacao-de-leads.md
  */
 

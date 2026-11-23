@@ -34,7 +34,7 @@ export type ChatServerActionName =
   | "lead.completeReturn"
   | "lead.cancelReturn"
   | "lead.reopenReturn"
-  /** Desfaz um retorno marcado pela Sasá (cancela o novo e reabre o que ele substituiu). */
+  /** Desfaz um retorno marcado pelo Sasá (cancela o novo e reabre o que ele substituiu). */
   | "lead.undoReturn"
   /** Desfaz uma mudança de etapa: volta à etapa anterior. */
   | "lead.restoreStep"
@@ -45,7 +45,7 @@ export type ChatServerActionName =
   | "notifications.markRead"
   | "relationship.ack"
   | "team.addBroker"
-  /** Fase 5 da Sasá: vários passos reversíveis confirmados num toque (payload `steps` em JSON, conferido no servidor). */
+  /** Fase 5 do Sasá: vários passos reversíveis confirmados num toque (payload `steps` em JSON, conferido no servidor). */
   | "sasa.plan";
 
 export type ChatChoice = {

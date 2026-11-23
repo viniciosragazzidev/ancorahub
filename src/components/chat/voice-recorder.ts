@@ -1,11 +1,12 @@
 "use client";
 
 /**
- * Gravação de voz da Sasá (fase 2, 19/11/2026): segurar grava, soltar envia, arrastar para a esquerda cancela.
+ * Gravação de voz do Sasá (fase 2, 19/11/2026): segurar grava, soltar envia, arrastar para a esquerda cancela.
  * O áudio fica só na memória do navegador até virar texto no servidor (D4: nunca é guardado).
  * Plano: docs/implementations/active/2026-11-19-sasa-agentica.md §3.2 e §4.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { stopVoice } from "@/lib/feedback/voice-playback";
 
 export const VOICE_MAX_SECONDS = 60;
 /** Toque mais curto que isso não é fala: vira a dica "Segure para falar". */
@@ -76,6 +77,8 @@ export function useVoiceRecorder(input: { onAudio: (audio: Blob, seconds: number
   }, [release]);
 
   const start = useCallback(async () => {
+    // Voz do Sasá (23/11): segurou para falar, ele para de falar na hora.
+    stopVoice();
     if (callbacks.current.simulate) {
       simulating.current = true;
       startedAt.current = Date.now();
@@ -84,7 +87,7 @@ export function useVoiceRecorder(input: { onAudio: (audio: Blob, seconds: number
       return;
     }
     if (recorder.current || !voiceSupported()) {
-      if (!voiceSupported()) callbacks.current.onError("Este navegador não grava áudio. Escreva para a Sasá.");
+      if (!voiceSupported()) callbacks.current.onError("Este navegador não grava áudio. Escreva para o Sasá.");
       return;
     }
     cancelled.current = false;
@@ -115,7 +118,7 @@ export function useVoiceRecorder(input: { onAudio: (audio: Blob, seconds: number
     } catch {
       release();
       setState({ kind: "idle" });
-      callbacks.current.onError("Libere o microfone nas configurações do navegador para falar com a Sasá.");
+      callbacks.current.onError("Libere o microfone nas configurações do navegador para falar com o Sasá.");
     }
   }, [release, stop]);
 

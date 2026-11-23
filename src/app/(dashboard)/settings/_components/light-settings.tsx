@@ -12,6 +12,7 @@ import {
   MessageCircle,
   Puzzle,
   ShieldCheck,
+  Smartphone,
   Trophy,
   User,
   type LucideIcon,
@@ -20,7 +21,7 @@ import {
 import styles from "./light-settings.module.css";
 
 export type LightSettingsSection = {
-  id: "conta" | "disponibilidade" | "whatsapp" | "seguranca" | "extensao" | "placar" | "acessibilidade" | "unidade" | "notificacoes";
+  id: "conta" | "disponibilidade" | "whatsapp" | "seguranca" | "extensao" | "placar" | "acessibilidade" | "unidade" | "notificacoes" | "telefone";
   title: string;
   description: string;
   node: ReactNode;
@@ -31,6 +32,7 @@ type SectionId = LightSettingsSection["id"];
 const SECTION_ICONS: Record<SectionId, LucideIcon> = {
   conta: User,
   unidade: Building2,
+  telefone: Smartphone,
   seguranca: ShieldCheck,
   disponibilidade: CalendarClock,
   whatsapp: MessageCircle,
@@ -42,7 +44,7 @@ const SECTION_ICONS: Record<SectionId, LucideIcon> = {
 
 // Groups of the list, like a phone settings screen. Order inside a group follows the order the page sends.
 const SECTION_GROUPS: { title: string; ids: SectionId[] }[] = [
-  { title: "Conta", ids: ["conta", "unidade", "seguranca"] },
+  { title: "Conta", ids: ["conta", "telefone", "unidade", "seguranca"] },
   { title: "Atendimento", ids: ["disponibilidade", "whatsapp", "notificacoes", "placar"] },
   { title: "Preferências", ids: ["acessibilidade", "extensao"] },
 ];

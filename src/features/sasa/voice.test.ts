@@ -6,7 +6,7 @@ import { pickVoiceMimeType, voiceClock } from "@/components/chat/voice-recorder"
 import { retentionCutoff, sasaLimitMessage, spDayStart, SASA_DAILY_COMMANDS } from "./limits";
 import { readSasaFix, sasaFixBlock, undoOf } from "./voice-client";
 
-describe("limites da Sasá", () => {
+describe("limites do Sasá", () => {
   it("conta o dia de São Paulo e a retenção de 90 dias", () => {
     expect(spDayStart(new Date("2026-11-20T01:30:00Z")).toISOString()).toBe("2026-11-19T03:00:00.000Z");
     expect(spDayStart(new Date("2026-11-20T04:00:00Z")).toISOString()).toBe("2026-11-20T03:00:00.000Z");

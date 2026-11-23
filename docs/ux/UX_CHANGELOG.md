@@ -819,3 +819,7 @@ Papel: corretor Lite; objetivo: confirmar presença no plantão ou obter o códi
 ## 2026-11-09 — Minha unidade no Lite do corretor
 
 Papel: corretor Lite; objetivo: trocar de unidade. Nova linha "Minha unidade" em Configurações com a unidade atual; a seção pergunta "Para qual unidade você quer ir?" com RadioCards em lista, um botão secundário e a confirmação em BottomSheet (único botão primário da folha) com as consequências: plantões que saem, leads que ficam, supervisão e aviso à gestão. Resultado na própria seção, sem toast. Estados: sem unidade atual, sem outra unidade, escolha, confirmação, envio, sucesso e erro. Reutiliza Arc RadioCards, Button e BottomSheet; sem novos tokens.
+
+## 2026-11-23 · Corretor troca o próprio telefone
+
+Papel: corretor Lite; objetivo: manter o celular certo sem depender da gestão. Nova linha "Meu telefone" no grupo Conta das Configurações: número atual, um campo (16px no celular, máscara enquanto digita, causa do erro logo abaixo) e `LiteActionButton` "Trocar telefone", com sucesso só depois da confirmação do servidor e "Tentar de novo" na falha. Sem token, componente ou movimento novo.

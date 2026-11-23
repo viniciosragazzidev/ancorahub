@@ -55,7 +55,7 @@ export async function interpretSasaText(input: { tenantId: string; userId: strin
     messages: [
       {
         role: "system",
-        content: `Você interpreta pedidos de um corretor de plano de saúde para a assistente Sasá. Escolha UMA ferramenta:\n${TOOL_GUIDE}\nNunca invente nome: copie o nome como o corretor disse. Em "when", copie o trecho de data e hora como foi dito (ex.: "amanhã às 10"); não calcule datas. Responda APENAS um JSON: {"tool": string, "lead"?: string, "when"?: string, "status"?: string}.`,
+        content: `Você interpreta pedidos de um corretor de plano de saúde para o assistente Sasá. Escolha UMA ferramenta:\n${TOOL_GUIDE}\nNunca invente nome: copie o nome como o corretor disse. Em "when", copie o trecho de data e hora como foi dito (ex.: "amanhã às 10"); não calcule datas. Responda APENAS um JSON: {"tool": string, "lead"?: string, "when"?: string, "status"?: string}.`,
       },
       { role: "user", content: `Agora: ${input.nowLabel}. Primeiros nomes dos leads do corretor: ${input.leadFirstNames.slice(0, 40).join(", ") || "nenhum"}.\nPEDIDO: ${input.text}` },
     ],

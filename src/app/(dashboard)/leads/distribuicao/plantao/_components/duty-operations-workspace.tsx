@@ -1,5 +1,6 @@
 "use client";
 
+import { DutyPassPicker } from "./duty-pass-picker";
 import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { toast } from "@/components/ui/sonner";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -897,6 +898,10 @@ function DutyInspector({
     });
   }
 
+  // Plantão avulso (um dia só): "Passar" tira quem está e põe outra pessoa naquele dia (23/11).
+  const passDate = schedule && isSingleDaySchedule(schedule) ? singleDutyDate(schedule) : null;
+  const [passingBrokerId, setPassingBrokerId] = useState<string | null>(null);
+
   function removeAssignment(assignment: RosterEntry) {
     const formData = new FormData();
     formData.set("assignmentId", assignment.id);
@@ -1152,6 +1157,18 @@ function DutyInspector({
                               disabled={pending}
                             />
                           ) : null}
+                          {passDate ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={`Passar o plantão de ${assignment.brokerName} para outra pessoa`}
+                              aria-expanded={passingBrokerId === assignment.brokerId}
+                              onClick={() => setPassingBrokerId(passingBrokerId === assignment.brokerId ? null : assignment.brokerId)}
+                              disabled={pending}
+                            >
+                              Passar
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1163,6 +1180,15 @@ function DutyInspector({
                           </Button>
                         </div>
                       ))}
+                      {passDate && passingBrokerId && section.entries.some((entry) => entry.brokerId === passingBrokerId) ? (
+                        <DutyPassPicker
+                          key={passingBrokerId}
+                          occurrenceId={`${schedule.id}:${passDate}`}
+                          fromBrokerId={passingBrokerId}
+                          onCancel={() => setPassingBrokerId(null)}
+                          onDone={() => { setPassingBrokerId(null); router.refresh(); }}
+                        />
+                      ) : null}
                       {!section.entries.length && (
                         <p className="rounded-[var(--radius-card)] border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
                           {section.label ? "Ninguém neste turno." : "Nenhum corretor escalado."}

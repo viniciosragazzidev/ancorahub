@@ -27,6 +27,7 @@ import { TeamListManager } from "@/features/supervisor-workspace/lead-import/tea
 import { SaleChat, type SaleChatServices } from "@/features/post-sale/components/sale-chat";
 import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-ancora-workspace";
+import { LightPhoneSection } from "@/app/(dashboard)/settings/_components/light-phone-section";
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
@@ -39,8 +40,9 @@ import { labRecoverySettings, RecoveryCadenceLab } from "./recovery-cadence-lab"
 import { NurtureLab } from "./nurture-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
+import { SasaVoiceSettings } from "@/features/sasa-voice/components/sasa-voice-settings";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -48,7 +50,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "lead", label: "Aceitar lead" },
   { id: "venda", label: "Registrar venda" },
   { id: "sasa", label: "Sasá: pedidos por texto e voz" },
-  { id: "botao", label: "Botão da Sasá" },
+  { id: "botao", label: "Botão do Sasá" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
@@ -60,6 +62,8 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "nutricao", label: "Nutrição, A/B e Sasá (recuperar)" },
   { id: "accordee", label: "Estilo Accordee (Início e Conversas do diretor)" },
   { id: "agenteDiretor", label: "Agente IA do diretor (escala e cadeiras)" },
+  { id: "telefone", label: "Trocar meu telefone (corretor)" },
+  { id: "vozSasa", label: "Voz do Sasá (ElevenLabs)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -67,6 +71,9 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
 /** Telefone que o laboratório trata como "já está no sistema". */
 const LAB_KNOWN_PHONE = "5521999990000";
+/** Trocar telefone: o número atual do corretor de mentira e um que já é de outra pessoa da empresa. */
+const LAB_BROKER_PHONE = "5571999991234";
+const LAB_TAKEN_PHONE = "5571988887777";
 const LAB_TEAM = [
   { id: "b1", name: "Ana Paula", availability: "available" },
   { id: "b2", name: "Bruno Lima", availability: "available" },
@@ -127,13 +134,13 @@ export function FlowLab() {
   // As boas-vindas e o tour cobririam o fluxo: no laboratório ficam como já vistos.
   useState(() => { try { window.localStorage.setItem("ancora:lite-welcome:2026-10-chat", "1"); window.localStorage.setItem(TOUR_STORAGE_KEY, "skipped"); } catch { /* ignore */ } return null; });
 
-  // Sasá agêntica: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
+  // Sasá agêntico: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
   const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"], heard: 0, offline: false, nextSpeech: null as string | null });
   // Fase 4: "Fechou a venda" no botão cai no fluxo Registrar venda já preenchido.
   const [saleDraft, setSaleDraft] = useState<SaleSpokenDraft | null>(null);
   const [nextSpeech, setNextSpeech] = useState<keyof typeof LAB_SASA_SPEECH | null>(null);
   const chooseSpeech = (key: keyof typeof LAB_SASA_SPEECH | null) => { setNextSpeech(key); sasaState.current.nextSpeech = key ? LAB_SASA_SPEECH[key] : null; };
-  // Botão da Sasá (fase 3): "Sem internet" faz o envio falhar como sem rede; voltar a internet manda a fila.
+  // Botão do Sasá (fase 3): "Sem internet" faz o envio falhar como sem rede; voltar a internet manda a fila.
   const [offline, setOffline] = useState(false);
   const setInternet = (value: boolean) => {
     sasaState.current.offline = !value;
@@ -166,6 +173,12 @@ export function FlowLab() {
       return { ok: true, awaitingRelease: outcome === "liberacao" && mode === "presencial" };
     },
     presenceGate: async () => ({ required: false, connected: true }),
+    phoneChange: async (phone) => {
+      await wait(delay);
+      if (outcome === "falha") return { ok: false, error: "Não consegui trocar seu telefone agora. Tente de novo em instantes." };
+      if (phone === LAB_TAKEN_PHONE) return { ok: false, error: "Esse número já está no cadastro de outra pessoa da sua corretora. Confira o número ou fale com a gestão." };
+      return { ok: true, phone };
+    },
     sale: {
       // Simula a IA lendo o contrato: familiar da Amil com titular e 2 dependentes, sem a vigência (em "falha", não lê nada).
       readContract: async () => {
@@ -266,6 +279,7 @@ export function FlowLab() {
               instant
               agentId="ancora"
               canWrite
+              voicePilot
             />
           </div>
         ) : flow === "botao" ? (
@@ -308,6 +322,16 @@ export function FlowLab() {
           <RecoveryCadenceLab />
         ) : flow === "nutricao" ? (
           <NurtureLab />
+        ) : flow === "vozSasa" ? (
+          <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+            <SasaVoiceSettings />
+            <p className="text-xs text-(--text-secondary)">Qualquer texto com 20 letras ou mais vale como key. Com "Servidor responde: Falha", a key é recusada e a fala falha, e o Sasá fica só no texto. Depois de conectar, abra "Sasá: pedidos por texto e voz" para ouvir as respostas.</p>
+          </main>
+        ) : flow === "telefone" ? (
+          <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+            <LightPhoneSection currentPhone={LAB_BROKER_PHONE} />
+            <p className="text-xs text-(--text-secondary)">(71) 98888-7777 simula um número que já é de outra pessoa da empresa.</p>
+          </main>
         ) : flow === "callAncora" ? (
           <CallAncoraWorkspace brokerFirstName="Vinicios" />
         ) : (

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 
 import { upcomingShift } from "@/features/dashboard/welcome-rules";
 import { getPublishedDutyScheduleIds, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
@@ -531,9 +531,11 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
         db.select().from(schema.unitDutySchedules).where(and(
           eq(schema.unitDutySchedules.tenantId, context.tenantId),
           eq(schema.unitDutySchedules.status, "active"),
-          sql`${schema.unitDutySchedules.validUntil} is not null`,
-          sql`${schema.unitDutySchedules.validUntil} > ${new Date(`${from}T03:00:00Z`)}`,
-          sql`${schema.unitDutySchedules.validFrom} <= ${new Date(`${until}T23:59:59-03:00`)}`,
+          // Operadores do Drizzle convertem o Date; dentro de sql`` cru o driver recusa o Date
+          // ("The string argument must be of type string") e o Passar para alguém quebrava.
+          isNotNull(schema.unitDutySchedules.validUntil),
+          gt(schema.unitDutySchedules.validUntil, new Date(`${from}T03:00:00Z`)),
+          lte(schema.unitDutySchedules.validFrom, new Date(`${until}T23:59:59-03:00`)),
         )),
         db.select({ id: schema.dutyScheduleTypes.id, name: schema.dutyScheduleTypes.name, branchIds: schema.dutyScheduleTypes.branchIds }).from(schema.dutyScheduleTypes).where(eq(schema.dutyScheduleTypes.tenantId, context.tenantId)),
         db.select({ scheduleId: schema.dutyRosterAssignments.scheduleId, brokerId: schema.dutyRosterAssignments.brokerId, dayOfWeek: schema.dutyRosterAssignments.dayOfWeek })

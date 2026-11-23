@@ -1,5 +1,5 @@
 /**
- * Rascunhos que a Sasá passa para as conversas guiadas (fase 4): "fechou a venda do Carlos, Amil S380, 3 vidas,
+ * Rascunhos que o Sasá passa para as conversas guiadas (fase 4): "fechou a venda do Carlos, Amil S380, 3 vidas,
  * 35, 32 e 8, R$ 1.290" abre o registro da venda já preenchido; "cotação para 3 vidas, 35, 32 e 8" abre a cotação
  * com as idades. O servidor só extrai números e palavras; quem casa operadora, plano e cidade é a tela, com o
  * catálogo dela. O rascunho viaja no aparelho (sessionStorage, 10 min), nunca na URL.
@@ -94,7 +94,7 @@ export function mentionedIn<T extends { name: string }>(items: readonly T[], tex
   return best;
 }
 
-/* ---------- No aparelho: guardado pela Sasá, lido uma vez pela tela ---------- */
+/* ---------- No aparelho: guardado pelo Sasá, lido uma vez pela tela ---------- */
 
 const TTL_MS = 10 * 60_000;
 const saleKey = (leadId: string) => `sasa:sale:${leadId}`;

@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 
 import type { AgentBackend, AgentActionRecord, DutyNow } from "./backend";
+import { passSeat, passWarningText, seatPassCheck } from "@/features/lead-distribution/duty-pass";
 import { matchPeople } from "./people-match";
 import { hasFreeSeat, hhmm, matchesSeat, pickSeats, seatLabel, seatsOf, understaffed } from "./seats";
 import type { LeadSummary, Person, SeatOccurrence, ToolResult } from "./types";
@@ -413,25 +414,22 @@ export function buildAgentTools(env: ToolEnv) {
         const from = people.get(input.de_corretor_id);
         const to = people.get(input.para_corretor_id);
         const seat = seats.find((item) => item.id === input.ocorrencia_id);
-        if (!from || !to) return fail("pessoa", "Não achei uma das pessoas.", "Confira com pessoas_buscar.");
-        if (to.role !== "broker" || to.status !== "active") return fail("pessoa", `${to.name} não é corretor ativo.`, "Escolha outra pessoa.");
-        if (!seat || !seat.brokerIds.includes(from.id)) return fail("nao_estava", `${from.name} não está nesse plantão.`, "Confira com plantao_escala (corretor_id de quem sai).");
-        if (seat.brokerIds.includes(to.id)) return fail("ja_estava", `${to.name} já está em ${seatLabel(seat)}.`, "Nada a passar.");
-        if (seat.started) return fail("comecou", `${seatLabel(seat)} já começou: a cadeira não muda pela escala.`, "Pause quem sai no plantão.");
-        if (!seat.allowedBrokerIds.includes(to.id) && !input.fora_do_tipo) {
-          return fail("fora_do_tipo", `A unidade de ${to.name} não participa do tipo de ${seat.scheduleName}.`, "Pergunte ao diretor se pode escalar mesmo assim (fora_do_tipo: true).");
+        // Mesma regra da tela de Plantões (duty-pass): recusa o que não tem volta, avisa o resto.
+        const check = seatPassCheck({ seat: seat ?? null, from: from ?? null, to: to ?? null, sameDaySeats: seats });
+        if (!check.ok) {
+          const next = { pessoa: "Confira com pessoas_buscar.", nao_estava: "Confira com plantao_escala (corretor_id de quem sai).", ja_estava: "Nada a passar.", comecou: "Pause quem sai no plantão.", terminou: "Nada a passar." }[check.code];
+          return fail(check.code, check.reason, next);
         }
-        await backend.removeSeat(seat, from.id);
-        try {
-          await backend.addSeat(seat, to.id, Boolean(input.fora_do_tipo));
-        } catch (error) {
-          // Não deixa a cadeira vazia: quem saía volta.
-          await backend.addSeat(seat, from.id, true).catch(() => null);
-          throw error;
+        if (!seat || !from || !to) return fail("pessoa", "Não achei uma das pessoas.", "Confira com pessoas_buscar.");
+        if (check.warnings.includes("fora_do_tipo") && !input.fora_do_tipo) {
+          return fail("fora_do_tipo", passWarningText("fora_do_tipo", to.name, seat), "Pergunte ao diretor se pode escalar mesmo assim (fora_do_tipo: true).");
         }
+        await passSeat(backend, seat, from.id, to.id, Boolean(input.fora_do_tipo));
+        const clash = check.warnings.includes("mesmo_horario") ? passWarningText("mesmo_horario", to.name, seat, check.overlapping) : undefined;
         return {
           ok: true,
-          message: `${seatLabel(seat)}: saiu ${from.name}, entrou ${to.name}.`,
+          message: `${seatLabel(seat)}: saiu ${from.name}, entrou ${to.name}.${clash ? ` Atenção: ${clash}` : ""}`,
+          warning: clash,
           href: "/plantoes",
           data: { escalado: [{ ocorrencia_id: seat.id, rotulo: seatLabel(seat) }] },
           undo: { tool: "plantao_passar_cadeira", input: { de_corretor_id: to.id, para_corretor_id: from.id, ocorrencia_id: seat.id, fora_do_tipo: true }, label: "Desfazer" },

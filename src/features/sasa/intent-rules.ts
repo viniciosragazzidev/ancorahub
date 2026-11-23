@@ -1,5 +1,5 @@
 /**
- * Atalho por regras da Sasá agêntica (fase 1): as frases mais comuns viram uma intenção tipada sem chamar
+ * Atalho por regras do Sasá agêntico (fase 1): as frases mais comuns viram uma intenção tipada sem chamar
  * a IA (custo zero, funciona com a IA fora). O que não casar aqui vai para o interpretador por IA.
  * Plano: docs/implementations/active/2026-11-19-sasa-agentica.md §2 e §3.1.
  */
@@ -42,7 +42,7 @@ export const SASA_TOOLS: readonly SasaTool[] = ["duty.next", "duty.pause", "duty
 /** Pedidos que escrevem a partir de uma descrição: em forma de pergunta, viram leitura (resposta pelo ecossistema). */
 const WRITES_FROM_DESCRIPTION = new Set<SasaTool>(["lead.note", "sale.start", "lead.stage", "quote.start", "lead.lost", "lead.decline", "message.draft"]);
 
-/** Pedido tipado da frase, ou null (pergunta geral, que a Sasá responde lendo os dados do corretor). */
+/** Pedido tipado da frase, ou null (pergunta geral, que o Sasá responde lendo os dados do corretor). */
 export function classifySasaText(input: string): SasaIntent | null {
   const intent = classifyRaw(input);
   if (intent && WRITES_FROM_DESCRIPTION.has(intent.tool) && looksLikeQuestion(input)) return null;

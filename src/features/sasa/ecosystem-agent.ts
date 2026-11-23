@@ -1,5 +1,5 @@
 /**
- * Camada de IA dinâmica e limitada da Sasá (19/11): para perguntas que não casam com uma resposta direta
+ * Camada de IA dinâmica e limitada do Sasá (19/11): para perguntas que não casam com uma resposta direta
  * ("qual lead devo priorizar?", "como foi minha semana?"), a IA combina as ferramentas de leitura em vários passos.
  * Limites (pedido do usuário): só leitura do próprio corretor, até 4 leituras e 1 resposta, ~15 s no total; ao
  * estourar, devolve o que tem e diz o que faltou. Sem inventar: só afirma o que veio das leituras. Fora do CRM do
@@ -22,7 +22,7 @@ export type AgentStep = z.infer<typeof agentStepSchema>;
 export type AgentMessage = { role: "system" | "user" | "assistant"; content: string };
 
 export const SASA_AGENT_SYSTEM = [
-  "Você é a Sasá, assistente do corretor de plano de saúde no CRM AncoraHub. Responda em português do Brasil, em tom de colega, em até 4 frases curtas. Nunca use travessão.",
+  "Você é o Sasá, assistente do corretor de plano de saúde no CRM AncoraHub. Responda em português do Brasil, em tom de colega, em até 4 frases curtas. Nunca use travessão.",
   "Você só enxerga os dados do próprio corretor, lidos pelas ferramentas abaixo. Use somente o que veio em RESULTADO. Se faltar dado, diga que não sabe; se a ferramenta disser que não há acesso, diga que ele não tem acesso. Nunca invente número, nome ou data.",
   "Nunca informe preço, carência ou cobertura de plano, e nunca prometa nada em nome da empresa.",
   "Se a pergunta não for sobre o trabalho do corretor no CRM, recuse com educação e diga o que você consegue fazer (leads, carteira, plantões, agenda, desempenho, comissões, vendas, cotações, avisos).",

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { FileArrowDown, Loader2Icon, Plus, Sparkle, Trash, Warning, X } from "@/components/huge-icons";
+import { ArrowRight, FileArrowDown, Loader2Icon, Plus, Sparkle, Trash, Warning, X } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,6 +14,7 @@ import { AppSelect } from "@/components/ui/select";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSectionLabel, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { plantaoDone, plantaoFailed, plantaoTap } from "./plantao-feedback";
+import { DutyPassPicker } from "./duty-pass-picker";
 import {
   generateMonthlyDutyPlanAction,
   getMonthlyDutyPlanAction,
@@ -190,6 +191,8 @@ export function MonthlyDutyPlanner({
   const [editingBroker, setEditingBroker] = useState<string | null>(null);
   const [confirmForce, setConfirmForce] = useState<null | { title: string; message: string; onConfirm: () => void }>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null);
+  // "Passar para alguém" (23/11): a cadeira de quem vai para outra pessoa.
+  const [passing, setPassing] = useState<{ occurrenceId: string; brokerId: string } | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
   // "Tirar dia da escala": o dia esperando confirmação.
@@ -830,6 +833,11 @@ export function MonthlyDutyPlanner({
                                     {broker.pending ? <span className="text-warning">· convite pendente</span> : null}
                                     {!filterBranch && broker.branchName ? <span className="text-muted-foreground">· {broker.branchName}</span> : null}
                                     {editable && broker.origin !== "weekly" && !occurrence.started ? (
+                                      <button type="button" aria-label={`Passar o plantão de ${broker.name} em ${occurrence.scheduleName}, ${dateLabel(date)}, para outra pessoa`} aria-expanded={passing?.occurrenceId === occurrence.id && passing.brokerId === broker.id} disabled={pending} onClick={() => { setAddingTo(null); setPassing(passing?.occurrenceId === occurrence.id && passing.brokerId === broker.id ? null : { occurrenceId: occurrence.id, brokerId: broker.id }); }} className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50">
+                                        <ArrowRight className="size-3" />
+                                      </button>
+                                    ) : null}
+                                    {editable && broker.origin !== "weekly" && !occurrence.started ? (
                                       <button type="button" aria-label={`Remover ${broker.name} de ${occurrence.scheduleName} em ${dateLabel(date)}`} disabled={pending} onClick={() => editDraft(occurrence.id, broker.id, "remove")} className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50">
                                         {busyKey === `remove:${occurrence.id}:${broker.id}` ? <Loader2Icon className="size-3 animate-spin" /> : <X className="size-3" />}
                                       </button>
@@ -840,12 +848,20 @@ export function MonthlyDutyPlanner({
                                 {!shown.length ? <li className="text-xs text-muted-foreground">{filterBranch && occurrence.brokers.length ? "Ninguém desta unidade" : "Ninguém escalado"}</li> : null}
                                 {editable && !full ? (
                                   <li>
-                                    <button type="button" onClick={() => setAddingTo(addingTo === occurrence.id ? null : occurrence.id)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:text-foreground">
+                                    <button type="button" onClick={() => { setPassing(null); setAddingTo(addingTo === occurrence.id ? null : occurrence.id); }} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:text-foreground">
                                       <Plus className="size-3" /> Adicionar
                                     </button>
                                   </li>
                                 ) : null}
                               </ul>
+                              {editable && passing?.occurrenceId === occurrence.id ? (
+                                <div className="mt-2">
+                                  <DutyPassPicker key={passing.brokerId} occurrenceId={occurrence.id} fromBrokerId={passing.brokerId} onCancel={() => setPassing(null)} onDone={() => {
+                                    setPassing(null);
+                                    void getMonthlyDutyPlanAction(month).then((view) => { if (view) setPlan(view); }, () => null);
+                                  }} />
+                                </div>
+                              ) : null}
                               {editable && addingTo === occurrence.id ? (
                                 <div className="mt-2">
                                   <SearchAddList

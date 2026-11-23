@@ -10,8 +10,8 @@ import type { SasaReply } from "./command-core";
 import { retentionCutoff, spDayStart, type SasaUsage } from "./limits";
 
 /**
- * Gravação dos pedidos à Sasá em `sasa_commands` (migration 0233). Tudo aqui é tolerante à tabela
- * ausente: sem a migration, a Sasá continua respondendo, só sem histórico, teto e idempotência.
+ * Gravação dos pedidos ao Sasá em `sasa_commands` (migration 0233). Tudo aqui é tolerante à tabela
+ * ausente: sem a migration, o Sasá continua respondendo, só sem histórico, teto e idempotência.
  */
 function tableMissing(error: unknown) {
   const text = error instanceof Error ? `${error.message} ${(error as { cause?: { message?: string } }).cause?.message ?? ""}` : String(error);

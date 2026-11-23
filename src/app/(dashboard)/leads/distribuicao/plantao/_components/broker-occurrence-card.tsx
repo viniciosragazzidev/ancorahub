@@ -285,7 +285,10 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
       <Button type="button" size="sm" variant={absent ? "outline" : "destructive"} disabled={saving} onClick={changeAbsence}>{absent ? "Desfazer falta" : "Marcar falta"}</Button>
     </div>}>
       {swapDone ? <DutySwapDoneNotice result={swapDone} /> : null}
-      {swapOpen ? <DutySwapPicker assignmentId={assignmentId} onCancel={() => setSwapOpen(false)} onSwapped={(result) => {
+      {swapOpen ? <DutySwapPicker assignmentId={assignmentId} onCancel={() => setSwapOpen(false)} onPassed={() => {
+        setSwapOpen(false);
+        router.refresh();
+      }} onSwapped={(result) => {
         setSwapOpen(false);
         setSwapDone(result);
         plantaoDone(`Troca feita entre ${result.source.brokerName} e ${result.target.brokerName}.`);

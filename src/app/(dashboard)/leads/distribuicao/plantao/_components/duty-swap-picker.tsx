@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { MagnifyingGlass } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { Input } from "@/components/ui/input";
 import { longDutyDate, shortDutyDate, swapCandidateMatches, whatsappStatusLabel, type SwapCandidate } from "@/features/lead-distribution/duty-swap";
 import { listDutySwapCandidatesAction, swapDutyAssignmentsAction, type DutySwapResult, type DutySwapSourceView } from "@/features/lead-distribution/duty-swap-actions";
 import { cn } from "@/lib/utils";
+import { DutyPassPicker, type DutyPassDone } from "./duty-pass-picker";
 
 type Done = Extract<DutySwapResult, { ok: true }>;
 
@@ -18,11 +20,16 @@ const time = (value: string) => value.slice(0, 5);
  * "Efetuar troca" inside the broker drawer: pick a broker of a future plantão of the
  * published escala, confirm, and both swap places. Shows whether each WhatsApp went out.
  */
-export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
+export function DutySwapPicker({ assignmentId, onCancel, onSwapped, onPassed }: {
   assignmentId: string;
   onCancel: () => void;
   onSwapped: (result: Done) => void;
+  /** "Passar para alguém" (23/11): depois de passar ou desfazer. */
+  onPassed?: (result: DutyPassDone | null) => void;
 }) {
+  const [mode, setMode] = useState<"swap" | "pass">("swap");
+  // Chave do Super-admin: desligada, só a troca entre dois escalados.
+  const [passEnabled, setPassEnabled] = useState(false);
   const [loading, startLoading] = useTransition();
   const [saving, startSaving] = useTransition();
   const [source, setSource] = useState<DutySwapSourceView | null>(null);
@@ -37,6 +44,7 @@ export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
       if (result.ok) {
         setSource(result.source);
         setCandidates(result.candidates);
+        setPassEnabled(result.passEnabled);
       } else setError(result.reason);
     });
   }, [assignmentId]);
@@ -61,19 +69,32 @@ export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold">Efetuar troca</h3>
-          <p className="text-xs text-muted-foreground">
+          {mode === "swap" ? <p className="text-xs text-muted-foreground">
             {source
               ? `${source.brokerName} está em ${source.scheduleName}, ${longDutyDate(source.dutyDate)}, das ${time(source.startsAt)} às ${time(source.endsAt)}. Escolha com quem trocar.`
               : "Escolha um corretor de um plantão futuro (escala publicada ou plantão de um dia só)."}
-          </p>
+          </p> : null}
         </div>
         <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={onCancel}>Fechar</Button>
       </div>
 
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {passEnabled && source ? (
+        <DsSegmentedControl
+          aria-label="Tipo de troca"
+          options={[{ value: "swap", label: "Trocar com alguém" }, { value: "pass", label: "Passar para alguém" }] as const}
+          value={mode}
+          onValueChange={(value) => { setMode(value); setChosen(null); }}
+        />
+      ) : null}
+
+      {mode === "pass" && source ? (
+        <DutyPassPicker embedded occurrenceId={`${source.scheduleId}:${source.dutyDate}`} fromBrokerId={source.brokerId} onCancel={onCancel} onDone={(result) => onPassed?.(result)} />
+      ) : null}
+
+      {mode === "swap" && error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {loading && !candidates ? <p className="text-sm text-muted-foreground">Carregando plantões…</p> : null}
 
-      {chosen && source ? (
+      {mode === "swap" && chosen && source ? (
         <div role="alert" className="grid gap-2 rounded-lg border border-warning/50 bg-background p-3 text-sm">
           <p>
             Trocar <strong className="font-medium">{source.brokerName}</strong> e <strong className="font-medium">{chosen.brokerName}</strong>?
@@ -90,7 +111,7 @@ export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
         </div>
       ) : null}
 
-      {candidates && !chosen ? (
+      {mode === "swap" && candidates && !chosen ? (
         <>
           <label className="relative block">
             <span className="sr-only">Buscar por corretor, código, plantão ou data</span>

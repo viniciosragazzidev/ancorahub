@@ -29,7 +29,8 @@ async function loadAllSettings() {
     .from(schema.systemSettings)
     // Job leases, heartbeats and per-occurrence manual queues are runtime state, not settings.
     // Call Âncora: estado das sessões de ligação (sobrevive a deploy), também não é configuração.
-    .where(sql`${schema.systemSettings.key} not like 'lease:%' and ${schema.systemSettings.key} not like 'heartbeat:%' and ${schema.systemSettings.key} not like 'manual-queue:%' and ${schema.systemSettings.key} not like 'call-ancora-runtime:%'`));
+    // Voz do Sasá (23/11): key do ElevenLabs criptografada e uso do dia ficam fora do cache e das listas.
+    .where(sql`${schema.systemSettings.key} not like 'lease:%' and ${schema.systemSettings.key} not like 'heartbeat:%' and ${schema.systemSettings.key} not like 'manual-queue:%' and ${schema.systemSettings.key} not like 'call-ancora-runtime:%' and ${schema.systemSettings.key} not like 'sasa-voice%'`));
 }
 
 export function invalidateSystemSettingsCache() {

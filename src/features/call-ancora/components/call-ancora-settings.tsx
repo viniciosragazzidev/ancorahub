@@ -4,14 +4,17 @@ import { useEffect, useState } from "react";
 import { Settings2 } from "lucide-react";
 
 import { Button } from "@/components/arc/button/button";
+import { LiteActionButton, type LiteActionOutcome } from "@/components/lite/controls/action-button";
 import { Switch } from "@/components/arc/switch/switch";
-import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import type { CallAncoraSettings } from "../settings-rules";
 
 type NumberKey = {
   [K in keyof CallAncoraSettings]: CallAncoraSettings[K] extends number ? K : never;
 }[keyof CallAncoraSettings];
+
+/** "2026-11-01" vira "01/11/2026". */
+const formatDate = (value: string) => value.split("-").reverse().join("/");
 
 const NUMBER_FIELDS: { key: NumberKey; label: string; hint: string; min: number; max: number; suffix: string }[] = [
   { key: "dailyContactsPerBroker", label: "Contatos por corretor por dia", hint: "Cada ligação classificada conta um contato.", min: 1, max: 1000, suffix: "contatos" },
@@ -33,44 +36,47 @@ const HANGUP_FIELDS: { key: NumberKey; label: string; hint: string; min: number;
 
 /** Tela do diretor: limites e regras do Call Âncora da empresa. */
 export function CallAncoraSettingsPanel() {
-  const fire = useFeedback();
   const [settings, setSettings] = useState<CallAncoraSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  /** Frios que ficam fora só pela data de início; null quando a contagem não veio. */
+  const [outsideByDate, setOutsideByDate] = useState<number | null>(null);
+  /** A contagem mostrada vale para a data salva; editar a data esconde até salvar de novo. */
+  const [savedFromDate, setSavedFromDate] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/call-ancora/settings", { cache: "no-store" })
       .then(async (response) => {
-        const payload = await response.json() as { settings?: CallAncoraSettings; error?: string };
+        const payload = await response.json() as { settings?: CallAncoraSettings; outsideByDate?: number | null; error?: string };
         if (!response.ok || !payload.settings) throw new Error(payload.error || "Não foi possível carregar as configurações.");
-        if (!cancelled) setSettings(payload.settings);
+        if (!cancelled) {
+          setSettings(payload.settings);
+          setOutsideByDate(payload.outsideByDate ?? null);
+          setSavedFromDate(payload.settings.leadsFromDate);
+        }
       })
       .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Não foi possível carregar as configurações."); });
     return () => { cancelled = true; };
   }, []);
 
   const update = <K extends keyof CallAncoraSettings>(key: K, value: CallAncoraSettings[K]) => {
-    setSaved(false);
     setSettings((current) => (current ? { ...current, [key]: value } : current));
   };
 
-  const save = async () => {
-    if (!settings) return;
-    setSaving(true);
+  /** Salvar (LiteActionButton): "Salvas" só depois que o servidor confirma; a falha mostra a causa no botão. */
+  const save = async (): Promise<LiteActionOutcome> => {
+    if (!settings) return { ok: false, message: "As configurações ainda não carregaram." };
     setError(null);
     try {
       const response = await fetch("/api/call-ancora/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
-      const payload = await response.json() as { settings?: CallAncoraSettings; error?: string };
-      if (!response.ok || !payload.settings) throw new Error(payload.error || "Não foi possível salvar.");
+      const payload = await response.json().catch(() => null) as { settings?: CallAncoraSettings; outsideByDate?: number | null; error?: string } | null;
+      if (!response.ok || !payload?.settings) throw new Error(payload?.error || "Não foi possível salvar.");
       setSettings(payload.settings);
-      setSaved(true);
-      fire("confirm");
+      setOutsideByDate(payload.outsideByDate ?? null);
+      setSavedFromDate(payload.settings.leadsFromDate);
+      return { ok: true };
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Não foi possível salvar.");
-    } finally {
-      setSaving(false);
+      return { ok: false, message: reason instanceof Error ? reason.message : "Não foi possível salvar." };
     }
   };
 
@@ -108,6 +114,26 @@ export function CallAncoraSettingsPanel() {
                 <span className="text-xs leading-5 text-(--text-muted)">{field.hint}</span>
               </label>
             ))}
+          </div>
+
+          <div className="mt-5 flex flex-col gap-1">
+            <label htmlFor="call-ancora-leads-from" className="text-sm font-medium text-(--foreground)">Só leads a partir de</label>
+            <span className="flex flex-wrap items-center gap-2">
+              <input
+                id="call-ancora-leads-from"
+                type="date"
+                value={settings.leadsFromDate ?? ""}
+                onChange={(event) => update("leadsFromDate", event.target.value || null)}
+                className="min-h-11 rounded-xl border border-(--border) bg-(--background) px-3 text-base tabular-nums text-(--foreground) md:text-sm"
+              />
+              {settings.leadsFromDate ? <Button variant="ghost" size="sm" className="min-h-11 rounded-full px-3" onClick={() => update("leadsFromDate", null)}>Sem data</Button> : null}
+            </span>
+            <span className="text-xs leading-5 text-(--text-muted)">Leads criados antes desta data, no horário de São Paulo, ficam fora da fila. Eles não são apagados. Vazio: sem filtro.</span>
+            {settings.leadsFromDate && settings.leadsFromDate === savedFromDate && outsideByDate !== null ? (
+              <span className="text-xs leading-5 text-(--text-secondary)" role="status">
+                <span className="font-medium tabular-nums text-(--foreground)">{outsideByDate}</span> {outsideByDate === 1 ? "frio fica fora" : "frios ficam fora"} da fila por ser de antes de {formatDate(settings.leadsFromDate)}.
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-3">
@@ -159,8 +185,7 @@ export function CallAncoraSettingsPanel() {
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <Button className="min-h-11 rounded-full" loading={saving} disabled={saving} onClick={() => void save()}>Salvar configurações</Button>
-            {saved ? <span className="text-sm text-(--success)" role="status">Configurações salvas.</span> : null}
+            <LiteActionButton size="sm" busyLabel="Salvando…" doneLabel="Configurações salvas" keeps="As configurações anteriores continuam valendo." onAction={save}>Salvar configurações</LiteActionButton>
           </div>
         </>
       )}

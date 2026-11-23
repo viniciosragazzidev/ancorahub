@@ -828,11 +828,11 @@ function materialChoices(asks: SasaMaterialAsk[] | undefined): ChatChoice[] {
   return (asks ?? []).slice(0, 3).map((ask) => ({ id: ask.id, label: ask.label, hint: "Material das operadoras", reply: ask.question, action: { kind: "local", value: `${SASA_ASK_PREFIX}${ask.question}` } }));
 }
 
-/** Prévia da linha da Sasá no Início: a conversa é só para pedidos (19/11). */
+/** Prévia da linha do Sasá no Início: a conversa é só para pedidos (19/11). */
 export const SASA_THREAD_PREVIEW = "Peça o que precisar, por texto ou áudio.";
 
 /**
- * A conversa da Sasá (19/11/2026): só para pedidos ao assistente. Os avisos e notificações moraram aqui até
+ * A conversa do Sasá (19/11/2026): só para pedidos ao assistente. Os avisos e notificações moraram aqui até
  * 19/11; agora ficam na área de Notificações (/notificacoes, sino do Início). Plano: 2026-11-19-sasa-agentica.md.
  */
 export function buildAncoraScript(input: { now: Date; materialAsks?: SasaMaterialAsk[] }): ChatScript {
@@ -840,12 +840,12 @@ export function buildAncoraScript(input: { now: Date; materialAsks?: SasaMateria
   return {
     blocks: [
       assistantMessage("ancora-intro", vary([
-        "Oi, aqui é a Sasá. Me diga o que você precisa, por texto ou áudio, e eu cuido dos seus leads, plantão, retornos e meta.",
-        "Oi, aqui é a Sasá. Peça o que precisar sobre seus leads, plantão, retornos e meta: eu resolvo por aqui.",
+        "Oi, aqui é o Sasá. Me diga o que você precisa, por texto ou áudio, e eu cuido dos seus leads, plantão, retornos e meta.",
+        "Oi, aqui é o Sasá. Peça o que precisar sobre seus leads, plantão, retornos e meta: eu resolvo por aqui.",
       ], input.now, 3)),
       question("ancora-choice", "Quer começar por uma destas?", [...SASA_ASKS, ...materials]),
     ],
-    composerPlaceholder: "Peça algo à Sasá",
-    status: { label: "Pronta para ajudar", tone: "idle" },
+    composerPlaceholder: "Peça algo ao Sasá",
+    status: { label: "Pronto para ajudar", tone: "idle" },
   };
 }

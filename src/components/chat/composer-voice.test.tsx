@@ -23,8 +23,8 @@ describe("Composer: segurar para falar", () => {
   it("segurar grava, soltar transcreve e envia o texto como voz", async () => {
     const voice = vi.fn(async () => ({ ok: true as const, text: "pausa meu plantão" }));
     const onSend = vi.fn();
-    render(wrap(<Composer placeholder="Peça algo à Sasá" voice={voice} onSend={onSend} />));
-    const mic = screen.getByRole("button", { name: "Segure para falar com a Sasá" });
+    render(wrap(<Composer placeholder="Peça algo ao Sasá" voice={voice} onSend={onSend} />));
+    const mic = screen.getByRole("button", { name: "Segure para falar com o Sasá" });
     fireEvent.pointerDown(mic, { button: 0, clientX: 300, pointerId: 1 });
     expect(await screen.findByText("Deslize para a esquerda para cancelar")).toBeTruthy();
     await hold(550);
@@ -37,7 +37,7 @@ describe("Composer: segurar para falar", () => {
   it("arrastar para a esquerda cancela sem enviar", async () => {
     const voice = vi.fn();
     render(wrap(<Composer voice={voice} onSend={vi.fn()} />));
-    const mic = screen.getByRole("button", { name: "Segure para falar com a Sasá" });
+    const mic = screen.getByRole("button", { name: "Segure para falar com o Sasá" });
     fireEvent.pointerDown(mic, { button: 0, clientX: 300, pointerId: 1 });
     await hold(550);
     fireEvent.pointerMove(mic, { clientX: 200, pointerId: 1 });
@@ -45,13 +45,13 @@ describe("Composer: segurar para falar", () => {
     fireEvent.pointerUp(mic, { clientX: 200, pointerId: 1 });
     await hold(20);
     expect(voice).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Segure para falar com a Sasá" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Segure para falar com o Sasá" })).toBeTruthy();
   });
 
   it("toque rápido explica que é para segurar; falha mostra a causa", async () => {
     const voice = vi.fn(async () => ({ ok: false as const, error: "Não consegui entender o áudio. Tente de novo ou escreva." }));
     render(wrap(<Composer voice={voice} onSend={vi.fn()} />));
-    const mic = screen.getByRole("button", { name: "Segure para falar com a Sasá" });
+    const mic = screen.getByRole("button", { name: "Segure para falar com o Sasá" });
     fireEvent.pointerDown(mic, { button: 0, clientX: 300, pointerId: 1 });
     fireEvent.pointerUp(mic, { clientX: 300, pointerId: 1 });
     expect(await screen.findByText("Segure o microfone enquanto fala.")).toBeTruthy();
@@ -66,6 +66,6 @@ describe("Composer: segurar para falar", () => {
     rerender(wrap(<Composer voice={vi.fn()} onSend={vi.fn()} draft={{ text: "marca retorno com o Pedro amanhã às 10", key: 1 }} />));
     expect(await screen.findByDisplayValue("marca retorno com o Pedro amanhã às 10")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Enviar" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Segure para falar com a Sasá" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Segure para falar com o Sasá" })).toBeNull();
   });
 });

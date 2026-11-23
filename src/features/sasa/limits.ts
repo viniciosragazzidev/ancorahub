@@ -1,10 +1,10 @@
 /**
- * Teto diário da Sasá (D9): 150 pedidos e 20 minutos de áudio por corretor, contados no dia de São Paulo.
+ * Teto diário do Sasá (D9): 150 pedidos e 20 minutos de áudio por corretor, contados no dia de São Paulo.
  * Limpeza (D5): transcrição e resposta apagadas depois de 90 dias. Puro e testável.
  */
 export const SASA_DAILY_COMMANDS = 150;
 export const SASA_DAILY_AUDIO_SECONDS = 20 * 60;
-/** Uma nota de voz da Sasá tem no máximo 60 s; o arquivo, no máximo 2 MB. */
+/** Uma nota de voz do Sasá tem no máximo 60 s; o arquivo, no máximo 2 MB. */
 export const SASA_VOICE_MAX_SECONDS = 60;
 export const SASA_VOICE_MAX_BYTES = 2 * 1024 * 1024;
 export const SASA_RETENTION_DAYS = 90;

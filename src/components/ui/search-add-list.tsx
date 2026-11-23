@@ -31,6 +31,8 @@ export function SearchAddList({
   disabled,
   maxResults = 30,
   toolbar,
+  actionLabel = "Adicionar",
+  actionIcon,
 }: {
   items: SearchAddItem[];
   onAdd: (item: SearchAddItem) => void;
@@ -41,6 +43,10 @@ export function SearchAddList({
   maxResults?: number;
   /** Controls next to the input (e.g. an "only active" switch). */
   toolbar?: ReactNode;
+  /** Verbo do botão de cada linha, lido pelo leitor de tela ("Adicionar", "Passar para"). */
+  actionLabel?: string;
+  /** Ícone do botão de cada linha (padrão: +). */
+  actionIcon?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const results = useMemo(() => {
@@ -88,12 +94,12 @@ export function SearchAddList({
                     size="icon-sm"
                     variant="outline"
                     className="shrink-0"
-                    aria-label={`Adicionar ${item.label}`}
-                    title={`Adicionar ${item.label}`}
+                    aria-label={`${actionLabel} ${item.label}`}
+                    title={`${actionLabel} ${item.label}`}
                     disabled={disabled || Boolean(addingId)}
                     onClick={() => onAdd(item)}
                   >
-                    {addingId === item.id ? <Loader2Icon className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                    {addingId === item.id ? <Loader2Icon className="size-4 animate-spin" /> : actionIcon ?? <Plus className="size-4" />}
                   </Button>
                 </li>
               ))}

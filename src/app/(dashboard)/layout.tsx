@@ -78,7 +78,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const brokerMyWalletPromise = context.role === "broker"
     ? isBrokerMyWalletEnabled().catch(() => false)
     : Promise.resolve(false);
-  // Botão flutuante da Sasá (fase 3): mesma liberação da Sasá com IA (piloto ou flag da empresa).
+  // Botão flutuante do Sasá (fase 3): mesma liberação do Sasá com IA (piloto ou flag da empresa).
   const sasaVoicePromise = context.role === "broker"
     ? brokerAiAccess(context.userId).then((access) => access.enabled).catch(() => false)
     : Promise.resolve(false);

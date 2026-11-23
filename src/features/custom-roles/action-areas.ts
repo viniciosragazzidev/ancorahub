@@ -33,6 +33,7 @@ const REGRAS: readonly Regra[] = [
   ["src/features/broker-availability/", livre],
   // A própria pessoa troca a unidade dela no perfil (Configurações > Unidade).
   ["src/features/broker-unit-change/", livre],
+  ["src/features/broker-phone-change/", livre],
   // Tela de teste só em desenvolvimento: a ação recusa fora de NODE_ENV=development.
   ["src/app/dev/", livre],
   ["src/app/(dashboard)/notificacoes/", livre],
@@ -73,8 +74,10 @@ const REGRAS: readonly Regra[] = [
   ["src/features/carteira/", rota("minha-fila")],
   // Carteira de clientes: contato do corretor e clientes anteriores ficam na área Clientes.
   ["src/features/customers/", rota("clientes")],
-  // Sasá agêntica (19/11): os pedidos do corretor executam as mesmas ações do chat da fila.
+  // Sasá agêntico (19/11): os pedidos do corretor executam as mesmas ações do chat da fila.
   ["src/features/sasa/", rota("minha-fila")],
+  // Voz do Sasá (teste de 23/11): a ação confere de novo a lista de quem testa.
+  ["src/features/sasa-voice/", rota("minha-fila")],
   ["src/features/lead-distribution/", rota("distribuicao")],
   // Agente IA do diretor (21/11): o Desfazer refaz ações de plantão e distribuição; a própria ação ainda exige diretor.
   ["src/features/agent/", rota("distribuicao")],

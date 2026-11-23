@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Botão flutuante da Sasá (fase 3, 19/11/2026): em todo o Lite do corretor, segurar grava, soltar envia, arrastar
+ * Botão flutuante do Sasá (fase 3, 19/11/2026): em todo o Lite do corretor, segurar grava, soltar envia, arrastar
  * para a esquerda cancela, sem abrir a conversa. A resposta vem num toast com uma ação (Desfazer) ou, quando
  * pede escolha ou mostra uma lista, numa folha curta com os mesmos blocos da conversa.
  * Sem internet, o áudio espera no aparelho e sai quando a conexão volta (regra dos 30 min no servidor).
@@ -16,6 +16,7 @@ import BottomSheet from "@/components/arc/bottom-sheet/bottom-sheet";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
 import { sasaCommandAction } from "@/features/sasa/command-action";
+import { useSasaVoice } from "@/features/sasa-voice/client";
 import { isOfflineError, sasaQueue, type SasaQueued } from "@/features/sasa/offline-queue";
 import { keepSasaOpen } from "@/features/sasa/drafts";
 import { sasaReplyFitsToast, transcribeSasaVoice, undoOf } from "@/features/sasa/voice-client";
@@ -58,6 +59,8 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
 
   const refreshQueued = useCallback(() => { void sasaQueue.list().then((items) => setQueued(items.length)); }, []);
   const say = useCallback((text: string, tone: Toast["tone"] = "info", heard: string | null = null, undo: Undo | null = null) => setToast({ id: Date.now(), heard, text, tone, undo }), []);
+  // Voz do Sasá (teste de 23/11): só fala para quem conectou o ElevenLabs; o estado é lido na primeira resposta.
+  const { speak } = useSasaVoice();
 
   const present = useCallback((heard: string, blocks: ChatBlock[]) => {
     if (sasaReplyFitsToast(blocks)) {
@@ -98,9 +101,13 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
         : lab?.sasa?.ask
           ? await lab.sasa.ask(heard.text)
           : lab?.sasa
-          ? [{ type: "assistant" as const, id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos da Sasá respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }]
+          ? [{ type: "assistant" as const, id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos do Sasá respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }]
           : (await askAssistantAction({ agentId: "ancora", question: heard.text, clientCommandId: item.id })).blocks;
       present(heard.text, blocks);
+      // Texto primeiro; a voz vem depois. Se o ElevenLabs falhar, o aviso diz por que ficou só no texto.
+      void speak(blocks).then((result) => {
+        if (result.reason) setToast((current) => (current ? { ...current, text: `${current.text} (Só texto: ${result.reason}.)` } : current));
+      });
     } catch (error) {
       if (isOfflineError(error, !isOffline())) {
         if (!fromQueue) {
@@ -120,7 +127,7 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
     }
     // `recorder` é estável o bastante: done só volta o estado para o repouso.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [command, fire, lab, present, refreshQueued, router, say, transcribe]);
+  }, [command, fire, lab, present, refreshQueued, router, say, speak, transcribe]);
 
   const recorder = useVoiceRecorder({
     simulate: Boolean(lab?.sasa?.simulateMic),
@@ -163,7 +170,7 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
     setToast((current) => (current ? { ...current, undo: null } : current));
     const result = await runServer(action.name, action.payload).catch(() => ({ ok: false, message: "" }));
     feedbackOnResult(action.name, result, fire);
-    say(result.ok ? "Desfeito. Ficou como estava antes." : "Não consegui desfazer. Abra a conversa da Sasá e tente de novo.", result.ok ? "info" : "error");
+    say(result.ok ? "Desfeito. Ficou como estava antes." : "Não consegui desfazer. Abra a conversa do Sasá e tente de novo.", result.ok ? "info" : "error");
   };
 
   const routeHidden = sasaVoiceRouteHidden(pathname, chat);
@@ -171,8 +178,8 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
   const show = !routeHidden && (recording || sending || !surface.hidden) && !sheet;
   const label = recording
     ? "Gravando. Solte para enviar ou deslize para a esquerda para cancelar"
-    : sending ? "Enviando o áudio para a Sasá"
-      : `Segure para falar com a Sasá${queued ? `. ${queued === 1 ? "1 áudio esperando" : `${queued} áudios esperando`} a internet` : ""}`;
+    : sending ? "Enviando o áudio para o Sasá"
+      : `Segure para falar com o Sasá${queued ? `. ${queued === 1 ? "1 áudio esperando" : `${queued} áudios esperando`} a internet` : ""}`;
 
   return (
     <>
