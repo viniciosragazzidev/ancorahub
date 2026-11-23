@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { assignmentShift, dutyShifts, retimeAssignmentForSplit, validShiftSplit, worksInShift } from "./duty-shifts";
+import { assignmentShift, dutyShifts, retimeAssignmentForHours, retimeAssignmentForSplit, validShiftSplit, worksInShift } from "./duty-shifts";
+
+describe("roster windows follow the plantão hours", () => {
+  it("extends a broker who had the whole old window (09:00-12:00 to 09:00-18:00)", () => {
+    expect(retimeAssignmentForHours({ startsAt: "09:00", endsAt: "12:00" }, { startsAt: "09:00", endsAt: "18:00" }, { startsAt: "09:00", endsAt: "12:00" }))
+      .toEqual({ startsAt: "09:00", endsAt: "18:00" });
+  });
+
+  it("moves only the edge each broker touched", () => {
+    const before = { startsAt: "09:00", endsAt: "18:00" };
+    const after = { startsAt: "08:00", endsAt: "19:00" };
+    expect(retimeAssignmentForHours(before, after, { startsAt: "09:00", endsAt: "13:30" })).toEqual({ startsAt: "08:00", endsAt: "13:30" });
+    expect(retimeAssignmentForHours(before, after, { startsAt: "13:30", endsAt: "18:00" })).toEqual({ startsAt: "13:30", endsAt: "19:00" });
+    expect(retimeAssignmentForHours(before, after, { startsAt: "10:00", endsAt: "12:00" })).toBeNull();
+  });
+
+  it("never leaves an empty window", () => {
+    expect(retimeAssignmentForHours({ startsAt: "09:00", endsAt: "18:00" }, { startsAt: "14:00", endsAt: "18:00" }, { startsAt: "09:00", endsAt: "13:30" })).toBeNull();
+  });
+});
 import { getDutyLeadShift, groupDutyLeadsByShift } from "./duty-leads-shift-groups";
 
 const plantao = { startsAt: "09:00", endsAt: "18:00", shiftSplitAt: "13:30" };

@@ -68,3 +68,21 @@ export function retimeAssignmentForSplit(
   if (!nextSplit) return { startsAt: start, endsAt: end };
   return wasMorning ? { startsAt: start, endsAt: nextSplit } : { startsAt: nextSplit, endsAt: end };
 }
+
+/**
+ * The roster window after the plantão's hours change (23/11: a plantão of 09:00–12:00 extended to
+ * 18:00 left its broker at 09:00–12:00, "Indisponível" all afternoon). Who started at the old start
+ * follows the new start, who ended at the old end follows the new end; a window in the middle stays.
+ */
+export function retimeAssignmentForHours(
+  previous: { startsAt: string; endsAt: string },
+  next: { startsAt: string; endsAt: string },
+  assignment: { startsAt: string; endsAt: string },
+): { startsAt: string; endsAt: string } | null {
+  const current = { startsAt: hhmm(assignment.startsAt), endsAt: hhmm(assignment.endsAt) };
+  const startsAt = current.startsAt === hhmm(previous.startsAt) ? hhmm(next.startsAt) : current.startsAt;
+  const endsAt = current.endsAt === hhmm(previous.endsAt) ? hhmm(next.endsAt) : current.endsAt;
+  if (startsAt === current.startsAt && endsAt === current.endsAt) return null;
+  if (startsAt >= endsAt) return null;
+  return { startsAt, endsAt };
+}
