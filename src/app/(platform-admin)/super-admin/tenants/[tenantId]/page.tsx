@@ -127,7 +127,7 @@ export default async function SuperAdminTenantDetailPage({
   const dutyShiftReminderEnabled = settingMap.get(dutyShiftReminderSettingKey(tenant.id)) === "true";
   const aiAudioEnabled = settingMap.get(aiAudioTranscriptionSettingKey(tenant.id)) === "true";
   const sasaDynamicAiEnabled = settingMap.get(sasaDynamicAiSettingKey(tenant.id)) !== "false";
-  const agentWritesEnabled = settingMap.get(agentDirectorWritesSettingKey(tenant.id)) === "true";
+  const agentWritesEnabled = settingMap.get(agentDirectorWritesSettingKey(tenant.id)) !== "false";
   const customerWaitingObserving = parseCustomerWaitingMode(settingMap.get(customerWaitingSettingKey(tenant.id))) === "observe";
   const contextAnalysisTenantKey = qualificationContextAnalysisSettingKeys(tenant.id).tenant;
   const contextAnalysisTenantEnabled = settingMap.get(contextAnalysisTenantKey) !== "false";

@@ -8,7 +8,8 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 
 /**
  * Chaves do agente do diretor (plano §5.3 e D3/D6):
- * - `agent_director_writes_<tenantId>`: ações de escrita por empresa, desligadas por padrão até o piloto (Super-admin).
+ * - `agent_director_writes_<tenantId>`: ações de escrita por empresa. Ligadas por padrão desde 23/11 (antes só com "true",
+ *   e nenhuma empresa tinha sido ligada: o agente recusava escalar no plantão). "false" no Super-admin desliga.
  * - `ai_agent_director_model`: modelo do OpenRouter para o agente (tool calling). Em branco: Claude Sonnet pelo OpenRouter.
  *
  * 22/11: a chave do OpenRouter salva no Super-admin estava revogada (401) e derrubava o agente. Agora a chave do
@@ -23,7 +24,7 @@ export function agentDirectorWritesSettingKey(tenantId: string) {
 }
 
 export async function isAgentDirectorWritesEnabled(tenantId: string) {
-  return (await getSystemSetting(agentDirectorWritesSettingKey(tenantId)).catch(() => null)) === "true";
+  return (await getSystemSetting(agentDirectorWritesSettingKey(tenantId)).catch(() => null)) !== "false";
 }
 
 type Candidate = { model: LanguageModelV4; label: string };
