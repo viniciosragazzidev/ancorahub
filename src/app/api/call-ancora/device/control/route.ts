@@ -15,14 +15,14 @@ import { callAncoraSessionStore } from "@/features/call-ancora/session-store";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** App Android: pausar, retomar ou pular o contato atual. */
+/** App Android: começar, pausar, retomar, pular o contato atual ou encerrar. */
 export async function POST(request: Request) {
   const token = bearerToken(request);
   if (!token) return deviceJson({ error: DEVICE_UNAUTHORIZED }, 401);
   // Depois de um deploy/reinício, traz a sessão guardada de volta antes de responder.
   await ensureDeviceLoaded(token);
   if (!(await deviceAllowed(token))) return deviceJson({ error: DEVICE_DISABLED }, 403);
-  const parsed = z.object({ action: z.enum(["pause", "resume", "skip", "end"]) }).safeParse(await request.json().catch(() => null));
+  const parsed = z.object({ action: z.enum(["pause", "resume", "skip", "end", "start"]) }).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return deviceJson({ error: "Essa ação não é válida." }, 400);
   if (!callAncoraSessionStore.deviceHeartbeat(token)) return deviceJson({ error: DEVICE_UNAUTHORIZED }, 401);
   const snapshot = callAncoraSessionStore.deviceControl(token, parsed.data.action);

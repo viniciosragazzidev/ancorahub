@@ -16,6 +16,7 @@ const patchSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reclassify"), outcome: z.enum(["interested", "not_interested", "no_answer", "voicemail", "wrong_number"]) }),
   z.object({ action: z.literal("hangup-voicemail") }),
   z.object({ action: z.literal("hangup-call") }),
+  z.object({ action: z.literal("start-calls") }),
   z.object({ action: z.literal("run-pause") }),
   z.object({ action: z.literal("run-resume") }),
   z.object({ action: z.literal("end") }),
@@ -92,6 +93,8 @@ export async function PATCH(request: Request) {
         ? callAncoraSessionStore.requestHangup(scope, "voicemail")
       : parsed.data.action === "hangup-call"
         ? callAncoraSessionStore.requestHangup(scope, "hangup")
+      : parsed.data.action === "start-calls"
+        ? callAncoraSessionStore.startCallsForBroker(scope)
       : parsed.data.action === "run-pause"
         ? callAncoraSessionStore.pauseRunForBroker(scope)
       : parsed.data.action === "run-resume"

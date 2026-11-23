@@ -200,6 +200,35 @@ describe("API do app Android do Call Âncora", () => {
     expect((await classifyPost(authed("classify", "token-inexistente-0000000000000000000000000", { outcome: "interested" }))).status).toBe(401);
   });
 
+  it("começar pela tela do corretor: o celular recebe started e a pausa da tela segura a fila", async () => {
+    const paired = await pairNew({ flagBypass: true });
+    callAncoraSessionStore.setTestList(paired.scope, [{ name: "Ana", phone: "+5521999990000" }, { name: "Bia", phone: "+5521977776666" }]);
+    const before = await (await stateGet(authed("state", paired.deviceToken))).json() as { state: { started: boolean } };
+    expect(before.state.started).toBe(false);
+
+    expect(callAncoraSessionStore.startCallsForBroker(paired.scope)?.callsStarted).toBe(true);
+    const after = await (await stateGet(authed("state", paired.deviceToken))).json() as { state: { started: boolean; paused: boolean } };
+    expect(after.state).toMatchObject({ started: true, paused: false });
+
+    // Pausa pela tela: o celular vê pausado e a discagem é recusada; "Começar" de novo retoma.
+    callAncoraSessionStore.pauseRunForBroker(paired.scope);
+    const contactId = callAncoraSessionStore.getForBroker(paired.scope)?.current?.id ?? "";
+    expect((await eventsPost(authed("events", paired.deviceToken, { contactId, event: "dialing" }))).status).toBe(409);
+    expect(callAncoraSessionStore.startCallsForBroker(paired.scope)?.runState).toBe("running");
+  });
+
+  it("começar pelo celular também marca a sessão como iniciada", async () => {
+    const paired = await pairNew();
+    const started = await (await controlPost(authed("control", paired.deviceToken, { action: "start" }))).json() as { state: { started: boolean } };
+    expect(started.state.started).toBe(true);
+    expect(callAncoraSessionStore.getForBroker(paired.scope)?.callsStarted).toBe(true);
+  });
+
+  it("começar exige celular pareado", () => {
+    const session = newSession();
+    expect(callAncoraSessionStore.startCallsForBroker(session.scope)).toBeNull();
+  });
+
   it("pausa e retoma pelo celular", async () => {
     const paired = await pairNew();
     const paused = await (await controlPost(authed("control", paired.deviceToken, { action: "pause" }))).json() as { state: { paused: boolean } };
