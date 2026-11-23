@@ -259,3 +259,9 @@ Em `/call-ancora`, acima das configurações, o diretor (ou admin/dev) vê o "Pa
 - "Pausar"/"Retomar" visíveis na barra da sessão (LiteActionButton `tone="secondary"`, variante nova do componente-base para ação de apoio). Pausa segura a fila e a contagem; a ligação em andamento continua.
 - Discagem automática agora vem ligada por padrão (`autoDialByDefault: true`). Empresa que já salvou "desligada" nas configurações continua como o diretor deixou.
 - Feedback só para ligação atendida: a tela pede "Como foi a conversa?" só com `awaitingClassification` (não atendida e caixa postal já são classificadas sozinhas e seguem para a contagem). No laboratório, o 2º contato não atende para mostrar isso.
+
+### Só leads a partir de uma data (23/11/2026)
+
+- Configuração opcional "Só leads a partir de" (`leadsFromDate`, AAAA-MM-DD) no mesmo JSON `call_ancora_settings:<tenant>`; sem migration. Vazio = sem filtro.
+- O filtro vale no servidor, na montagem da fila (`fetchColdCandidates`): o limite inferior de `leads.created_at` é o mais recente entre "criados há no máximo X dias" e o início do dia escolhido em São Paulo (`coldCreatedAfter`). Leads mais antigos não são apagados nem alterados.
+- A tela do diretor mostra quantos frios elegíveis ficam fora só por causa da data (`countColdOutsideByDate`, mesma base da fila sem telefone validado), depois de salvar. Salvar passou a usar `LiteActionButton`.

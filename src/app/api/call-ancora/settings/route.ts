@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { requireCallAncoraDirectorAccess } from "@/features/call-ancora/director-access";
 import { readCallAncoraSettings, writeCallAncoraSettings } from "@/features/call-ancora/settings";
-import { callAncoraSettingsSchema } from "@/features/call-ancora/settings-rules";
+import { countColdOutsideByDate } from "@/features/call-ancora/cold-base";
+import { callAncoraSettingsSchema, type CallAncoraSettings } from "@/features/call-ancora/settings-rules";
 import { AuthenticationError } from "@/shared/auth/errors";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +18,27 @@ function failure(error: unknown) {
   return Response.json({ error: "Não foi possível carregar as configurações. Tente novamente." }, { status: 500, headers: noStore });
 }
 
+/** Frios que ficam fora só pela data de início (null quando a contagem falha; a tela segue sem ela). */
+async function outsideByDate(tenantId: string, settings: CallAncoraSettings) {
+  if (!settings.leadsFromDate) return 0;
+  return countColdOutsideByDate({
+    tenantId,
+    rules: {
+      maxAgeDays: settings.leadPeriodMaxAgeDays,
+      minAgeDays: settings.leadPeriodMinAgeDays,
+      maxAttempts: settings.maxAttemptsPerLead,
+      cooldownMs: settings.attemptCooldownHours * 60 * 60_000,
+      leadsFromDate: settings.leadsFromDate,
+    },
+  }).catch(() => null);
+}
+
 export async function GET() {
   try {
     const context = await requireCallAncoraDirectorAccess();
     if (!context) return Response.json({ error: "Só o diretor configura o Call Âncora." }, { status: 403, headers: noStore });
-    return Response.json({ settings: await readCallAncoraSettings(context.tenantId) }, { headers: noStore });
+    const settings = await readCallAncoraSettings(context.tenantId);
+    return Response.json({ settings, outsideByDate: await outsideByDate(context.tenantId, settings) }, { headers: noStore });
   } catch (error) {
     return failure(error);
   }
@@ -53,7 +70,7 @@ export async function PUT(request: Request) {
         metadata: changed,
       }).catch((error: unknown) => console.error("Auditoria das configurações do Call Âncora falhou", error instanceof Error ? error.message : error));
     }
-    return Response.json({ settings: parsed.data }, { headers: noStore });
+    return Response.json({ settings: parsed.data, outsideByDate: await outsideByDate(context.tenantId, parsed.data) }, { headers: noStore });
   } catch (error) {
     return failure(error);
   }

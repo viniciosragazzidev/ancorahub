@@ -5,6 +5,7 @@ import { and, asc, eq, isNull, notInArray, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 
 import type { CallAncoraContact } from "./contacts";
+import { coldCreatedAfter, leadsFromStart } from "./settings-rules";
 import { normalizeBrPhone } from "./test-list";
 
 /**
@@ -47,6 +48,69 @@ export async function isColdLeadStillFree(tenantId: string, leadId: string): Pro
   return Boolean(lead);
 }
 
+type ColdRules = {
+  maxAgeDays: number;
+  minAgeDays: number;
+  maxAttempts: number;
+  cooldownMs: number;
+  /** "Só leads a partir de" (AAAA-MM-DD, São Paulo). Null ou ausente = sem filtro. */
+  leadsFromDate?: string | null;
+};
+
+/** Condições da base de frios, sem o período de criação (comuns à fila e à contagem). */
+function coldPoolConditions(input: { tenantId: string; now: Date; rules?: ColdRules; recoveryQueueFirst?: boolean }) {
+  const cooldownSince = new Date(input.now.getTime() - (input.rules?.cooldownMs ?? COLD_ATTEMPT_COOLDOWN_MS));
+  const maxAttempts = input.rules?.maxAttempts ?? COLD_MAX_ATTEMPTS;
+  return [
+    eq(schema.leads.tenantId, input.tenantId),
+    input.recoveryQueueFirst
+      ? sql`(${schema.leads.qualificationStatus} = 'cold' or ${schema.leads.qualificationDetails}->'recovery'->>'state' = 'call_queue')`
+      : eq(schema.leads.qualificationStatus, "cold"),
+    // Nutrição, momento ruim e "Não contatar" (marcas da recuperação) ficam fora da base.
+    sql`coalesce(${schema.leads.qualificationDetails}->'recovery'->>'state', '') not in ('nurture', 'bad_moment', 'do_not_contact')`,
+    isNull(schema.leads.corretorId),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
+    isNull(schema.leads.distributionRemovedAt),
+    notInArray(schema.leads.status, ["lost", "converted"]),
+    sql`not exists (
+      select 1 from ${schema.leadInteractions} i
+      where i.lead_id = ${schema.leads.id}
+        and i.metadata->>'source' = ${CALL_ANCORA_SOURCE}
+        and (i.metadata->>'outcome' = 'wrong_number' or i.created_at > ${cooldownSince.toISOString()}::timestamptz)
+    )`,
+    sql`${callAncoraAttempts(schema.leads.id)} < ${maxAttempts}`,
+    // Pedido de parar ou número errado já registrados na conversa da IA.
+    sql`not exists (
+      select 1 from ${schema.aiConversations} c
+      where c.lead_id = ${schema.leads.id} and (c.opt_out_at is not null or c.wrong_number_at is not null)
+    )`,
+  ];
+}
+
+/**
+ * Quantos frios elegíveis ficam fora da fila só por causa de "Só leads a partir de"
+ * (estão dentro do período em dias, mas foram criados antes da data). 0 sem data.
+ */
+export async function countColdOutsideByDate(input: { tenantId: string; now?: Date; rules: ColdRules }): Promise<number> {
+  const from = leadsFromStart(input.rules.leadsFromDate ?? null);
+  if (!from) return 0;
+  const now = input.now ?? new Date();
+  const day = 24 * 60 * 60_000;
+  const byAge = new Date(now.getTime() - input.rules.maxAgeDays * day);
+  const createdBefore = input.rules.minAgeDays > 0 ? new Date(now.getTime() - input.rules.minAgeDays * day) : null;
+  const [row] = await getDatabase()
+    .select({ total: sql<number>`count(*)::int` })
+    .from(schema.leads)
+    .where(and(
+      ...coldPoolConditions({ tenantId: input.tenantId, now, rules: input.rules }),
+      sql`${schema.leads.createdAt} >= ${byAge.toISOString()}::timestamptz`,
+      sql`${schema.leads.createdAt} < ${from.toISOString()}::timestamptz`,
+      createdBefore ? sql`${schema.leads.createdAt} <= ${createdBefore.toISOString()}::timestamptz` : undefined,
+    ));
+  return Number(row?.total ?? 0);
+}
+
 /** Página de frios elegíveis, do mais antigo para o mais novo. */
 export async function fetchColdCandidates(input: {
   tenantId: string;
@@ -54,7 +118,7 @@ export async function fetchColdCandidates(input: {
   limit?: number;
   now?: Date;
   /** Regras da tela do diretor (período dos leads, tentativas, intervalo). Sem elas, o padrão. */
-  rules?: { maxAgeDays: number; minAgeDays: number; maxAttempts: number; cooldownMs: number };
+  rules?: ColdRules;
   /**
    * Recuperação, fase 4 (fila "Sem resposta" ligada): a fila de ligação vem primeiro, pela pontuação (A4 antes de
    * D1), e entra mesmo sem estar fria (quem parou no meio). O resto da base de frios segue depois, como hoje.
@@ -63,40 +127,17 @@ export async function fetchColdCandidates(input: {
 }): Promise<CallAncoraContact[]> {
   const now = input.now ?? new Date();
   const rules = input.rules;
-  const cooldownSince = new Date(now.getTime() - (rules?.cooldownMs ?? COLD_ATTEMPT_COOLDOWN_MS));
-  const maxAttempts = rules?.maxAttempts ?? COLD_MAX_ATTEMPTS;
   const day = 24 * 60 * 60_000;
-  const createdAfter = rules ? new Date(now.getTime() - rules.maxAgeDays * day) : null;
+  // Período em dias e "Só leads a partir de": vale o limite mais recente dos dois.
+  const createdAfter = rules ? coldCreatedAfter({ maxAgeDays: rules.maxAgeDays, leadsFromDate: rules.leadsFromDate ?? null }, now) : null;
   const createdBefore = rules && rules.minAgeDays > 0 ? new Date(now.getTime() - rules.minAgeDays * day) : null;
   const limit = input.limit ?? COLD_PAGE_SIZE;
   const rows = await getDatabase()
     .select({ id: schema.leads.id, nome: schema.leads.nome, telefone: schema.leads.telefone })
     .from(schema.leads)
     .where(and(
-      eq(schema.leads.tenantId, input.tenantId),
-      input.recoveryQueueFirst
-        ? sql`(${schema.leads.qualificationStatus} = 'cold' or ${schema.leads.qualificationDetails}->'recovery'->>'state' = 'call_queue')`
-        : eq(schema.leads.qualificationStatus, "cold"),
-      // Nutrição, momento ruim e "Não contatar" (marcas da recuperação) ficam fora da base.
-      sql`coalesce(${schema.leads.qualificationDetails}->'recovery'->>'state', '') not in ('nurture', 'bad_moment', 'do_not_contact')`,
-      isNull(schema.leads.corretorId),
-      isNull(schema.leads.deletedAt),
-      isNull(schema.leads.archivedAt),
-      isNull(schema.leads.distributionRemovedAt),
-      notInArray(schema.leads.status, ["lost", "converted"]),
+      ...coldPoolConditions({ tenantId: input.tenantId, now, rules, recoveryQueueFirst: input.recoveryQueueFirst }),
       input.excludeLeadIds.length ? notInArray(schema.leads.id, input.excludeLeadIds) : undefined,
-      sql`not exists (
-        select 1 from ${schema.leadInteractions} i
-        where i.lead_id = ${schema.leads.id}
-          and i.metadata->>'source' = ${CALL_ANCORA_SOURCE}
-          and (i.metadata->>'outcome' = 'wrong_number' or i.created_at > ${cooldownSince.toISOString()}::timestamptz)
-      )`,
-      sql`${callAncoraAttempts(schema.leads.id)} < ${maxAttempts}`,
-      // Pedido de parar ou número errado já registrados na conversa da IA.
-      sql`not exists (
-        select 1 from ${schema.aiConversations} c
-        where c.lead_id = ${schema.leads.id} and (c.opt_out_at is not null or c.wrong_number_at is not null)
-      )`,
       createdAfter ? sql`${schema.leads.createdAt} >= ${createdAfter.toISOString()}::timestamptz` : undefined,
       createdBefore ? sql`${schema.leads.createdAt} <= ${createdBefore.toISOString()}::timestamptz` : undefined,
     ))
