@@ -12,7 +12,7 @@ import { charsLeftToday, isElderlyMaleVoice, orderVoices, SASA_VOICE_MAX_CHARS_P
 import styles from "./sasa-voice.module.css";
 
 /**
- * Voz da Sasá (teste de 23/11, só o Vinicios): conectar a key do ElevenLabs, escolher a voz, testar e desligar.
+ * Voz do Sasá (teste de 23/11, só o Vinicios): conectar a key do ElevenLabs, escolher a voz, testar e desligar.
  * A key é digitada aqui e vai direto para o servidor, que a guarda criptografada; a tela só volta a ver os 4 últimos
  * caracteres. Feedback nível 1 pelo LiteActionButton: sucesso só depois do servidor, erro com a causa e o que vale.
  */
@@ -36,7 +36,7 @@ export function SasaVoiceSettings() {
   }, [backend, state?.connected, voices.length]);
 
   if (!state) return <section className={`arc-venancor ${styles.card}`} aria-busy="true"><p className={styles.sub}>Carregando…</p></section>;
-  if (!state.allowed) return <section className={`arc-venancor ${styles.card}`}><p className={styles.sub}>A voz da Sasá ainda não está liberada para você.</p></section>;
+  if (!state.allowed || !state.canManage) return <section className={`arc-venancor ${styles.card}`}><p className={styles.sub}>Só o diretor conecta e configura a voz do Sasá.</p></section>;
 
   const askingKey = !state.connected || changing;
   const typed = apiKey.trim();
@@ -88,7 +88,7 @@ export function SasaVoiceSettings() {
           <p className={styles.sub}>
             {state.connected
               ? <>Conectada com a key terminada em <span className={styles.numbers}>{state.keyLast4}</span>.</>
-              : "Cole a API key da sua conta do ElevenLabs. Ela fica guardada criptografada no servidor e não aparece de novo."}
+              : "Cole a API key da conta do ElevenLabs da empresa. Ela fica guardada criptografada no servidor e não aparece de novo."}
           </p>
         </div>
 
@@ -131,7 +131,7 @@ export function SasaVoiceSettings() {
           <div className={styles.switchRow}>
             <div>
               <h2 id="voice-reply-heading" className={styles.title}>Sasá responde por voz</h2>
-              <p className={styles.sub}>O texto continua aparecendo. Segurar o botão para falar corta a voz.</p>
+              <p className={styles.sub}>No teste, só o corretor Vinicios Ragazzi ouve. Ele também pode desligar para ele no topo da conversa do Sasá. O texto continua aparecendo.</p>
             </div>
             <Switch
               aria-label="Sasá responde por voz"

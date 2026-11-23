@@ -34,7 +34,6 @@ import { LightWhatsappSection } from "./_components/light-whatsapp-section";
 import { LightUnitSection } from "./_components/light-unit-section";
 import { LightPhoneSection } from "./_components/light-phone-section";
 import { SasaVoiceSettings } from "@/features/sasa-voice/components/sasa-voice-settings";
-import { isVoicePilotUser } from "@/features/sasa-voice/store";
 import { getOwnBrokerPhone } from "@/features/broker-phone-change/queries";
 import { formatBrazilMobile } from "@/features/broker-phone-change/phone-rules";
 import { getOwnUnitChangeOptions } from "@/features/broker-unit-change/queries";
@@ -182,18 +181,12 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const phoneSections: LightSettingsSection[] = ownPhone
       ? [{ id: "telefone", title: "Meu telefone", description: ownPhone.phone ? formatBrazilMobile(ownPhone.phone) : "Sem celular no cadastro", node: <LightPhoneSection currentPhone={ownPhone.phone || null} /> }]
       : [];
-    // Voz da Sasá (teste de 23/11): só o corretor da lista vê a seção; as ações conferem de novo.
-    const voicePilot = await isVoicePilotUser(context.role, context.userId).catch(() => false);
-    const voiceSections: LightSettingsSection[] = voicePilot
-      ? [{ id: "voz-sasa", title: "Voz da Sasá", description: "Respostas por voz com a sua conta do ElevenLabs", node: <SasaVoiceSettings /> }]
-      : [];
     return (
       <LightSettings
         sections={[
           ...rankingSections,
           { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: account },
           ...phoneSections,
-          ...voiceSections,
           ...unitSections,
           {
             id: "disponibilidade",
@@ -242,7 +235,11 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
       seguranca: { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityLite enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
       extensao: extensionPilot ? { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLite /> } : undefined,
     };
-    const sections = tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section));
+    // Voz do Sasá (teste de 23/11): a key do ElevenLabs é da empresa e só o diretor conecta; as ações conferem de novo.
+    const voiceSection: SettingsLiteSection | null = context.role === "director"
+      ? { id: "voz-sasa", title: "Voz do Sasá", description: "Respostas por voz com a conta do ElevenLabs da empresa", node: <SasaVoiceSettings /> }
+      : null;
+    const sections = [...tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section)), ...(voiceSection ? [voiceSection] : [])];
     return (
       <>
         <DashboardHeader breadcrumb="Administração" title="Configurações" />

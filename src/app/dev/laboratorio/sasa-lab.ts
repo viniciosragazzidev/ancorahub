@@ -266,11 +266,11 @@ export function labVoiceAudio(seconds = 0.5): Blob {
 type LabVoice = { key: string | null; voiceId: string | null; voiceName: string | null; enabled: boolean; usedToday: number };
 
 /**
- * Voz da Sasá no laboratório (teste de 23/11): conectar, trocar a voz, testar e desconectar como no servidor, sem
+ * Voz do Sasá no laboratório (teste de 23/11): conectar, trocar a voz, testar e desconectar como no servidor, sem
  * chamar o ElevenLabs. "Servidor responde: Falha" faz a key ser recusada e a fala falhar (fica só o texto).
  */
 export function createLabVoice(voice: LabVoice, options: { delay: number; outcome: LabOutcome }): SasaVoiceBackend {
-  const stateOf = (): SasaVoiceState => ({ allowed: true, connected: Boolean(voice.key), keyLast4: voice.key ? keyLast4(voice.key) : null, voiceId: voice.voiceId, voiceName: voice.voiceName, enabled: voice.enabled, usedToday: voice.usedToday, dailyLimit: SASA_VOICE_DAILY_CHARS });
+  const stateOf = (): SasaVoiceState => ({ allowed: true, canManage: true, companyEnabled: Boolean(voice.key) && voice.enabled, connected: Boolean(voice.key), keyLast4: voice.key ? keyLast4(voice.key) : null, voiceId: voice.voiceId, voiceName: voice.voiceName, enabled: voice.enabled, usedToday: voice.usedToday, dailyLimit: SASA_VOICE_DAILY_CHARS });
   const failing = () => options.outcome === "falha";
   return {
     state: async () => { await wait(Math.min(options.delay, 300)); return stateOf(); },

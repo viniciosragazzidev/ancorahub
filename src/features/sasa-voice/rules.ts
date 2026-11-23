@@ -1,7 +1,7 @@
 /**
- * Voz da Sasá por ElevenLabs (23/11/2026): versão de teste só para o corretor Vinicios Ragazzi. Regras puras,
+ * Voz do Sasá por ElevenLabs (23/11/2026): versão de teste só para o corretor Vinicios Ragazzi. Regras puras,
  * usadas pelo servidor, pela tela e pelo laboratório. A key do ElevenLabs nunca passa por aqui.
- * Plano: docs/implementations/active/2026-11-19-sasa-agentica.md (Voz da Sasá).
+ * Plano: docs/implementations/active/2026-11-19-sasa-agentica.md (Voz do Sasá).
  */
 import type { ChatBlock } from "@/components/chat/types";
 
@@ -23,7 +23,7 @@ export function isSasaVoicePilot(role: string | null | undefined, userId: string
 export const SASA_VOICE_MAX_CHARS_PER_REPLY = 500;
 export const SASA_VOICE_DAILY_CHARS = 8_000;
 
-export const SASA_VOICE_TEST_TEXT = "Oi, aqui é a Sasá. É assim que eu vou te responder.";
+export const SASA_VOICE_TEST_TEXT = "Oi, aqui é o Sasá. É assim que eu vou te responder.";
 
 /** Metadados que a API do ElevenLabs devolve em `labels` (idade, gênero, sotaque), quando a voz os tem. */
 export type SasaVoiceOption = { id: string; name: string; language: string | null; gender?: string | null; age?: string | null; accent?: string | null };
@@ -34,10 +34,16 @@ export type SasaVoiceOption = { id: string; name: string; language: string | nul
  */
 export const SASA_VOICE_SETTINGS = { stability: 0.65, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 0.9 } as const;
 
-/** O que o navegador recebe: nunca a key, só os 4 últimos caracteres. */
+/**
+ * O que o navegador recebe: nunca a key, só os 4 últimos caracteres.
+ * Desde 23/11 a key é da empresa e só o diretor conecta (`canManage`); o corretor do teste só ouve e liga ou
+ * desliga para ele (`enabled`). `companyEnabled` é o interruptor do diretor.
+ */
 export type SasaVoiceState = {
   allowed: boolean;
+  canManage: boolean;
   connected: boolean;
+  companyEnabled: boolean;
   keyLast4: string | null;
   voiceId: string | null;
   voiceName: string | null;
@@ -46,7 +52,7 @@ export type SasaVoiceState = {
   dailyLimit: number;
 };
 
-export const SASA_VOICE_OFF: SasaVoiceState = { allowed: false, connected: false, keyLast4: null, voiceId: null, voiceName: null, enabled: false, usedToday: 0, dailyLimit: SASA_VOICE_DAILY_CHARS };
+export const SASA_VOICE_OFF: SasaVoiceState = { allowed: false, canManage: false, connected: false, companyEnabled: false, keyLast4: null, voiceId: null, voiceName: null, enabled: false, usedToday: 0, dailyLimit: SASA_VOICE_DAILY_CHARS };
 
 export function keyLast4(apiKey: string) {
   return apiKey.trim().slice(-4);

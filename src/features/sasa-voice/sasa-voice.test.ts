@@ -7,6 +7,7 @@ import type { ChatBlock } from "@/components/chat/types";
 
 const KEY = "chave-de-teste-elevenlabs-0123WXYZ";
 const VINICIOS = "ebed87f7-b4f3-41c1-8e92-d234fa5a1ce1";
+const DIRETOR = "diretor-1";
 
 // Banco de mentira: só a tabela system_settings, por chave.
 const rows = new Map<string, string>();
@@ -26,7 +27,7 @@ vi.mock("@/shared/db", () => {
 });
 vi.mock("drizzle-orm", () => ({ eq: (_column: unknown, value: string) => ({ value }) }));
 
-import { connectSasaVoiceAction, disconnectSasaVoiceAction, getSasaVoiceStateAction } from "./actions";
+import { connectSasaVoiceAction, disconnectSasaVoiceAction, getSasaVoiceStateAction, setSasaVoiceEnabledAction } from "./actions";
 import { resetSasaVoiceForTests, speakSasaReply, type SasaVoiceBackend } from "./client";
 import { ElevenLabsError, listElevenLabsVoices, streamElevenLabsSpeech } from "./elevenlabs";
 import { clampVoiceText, isElderlyMaleVoice, isSasaVoicePilot, orderVoices, pickDefaultVoice, sasaVoiceText, SASA_VOICE_MAX_CHARS_PER_REPLY, type SasaVoiceState } from "./rules";
@@ -35,7 +36,7 @@ const say = (text: string): ChatBlock => ({ type: "assistant", id: text, text })
 
 beforeEach(() => {
   rows.clear();
-  Object.assign(session, { userId: VINICIOS, role: "broker" });
+  Object.assign(session, { userId: DIRETOR, role: "director" });
   process.env.SASA_VOICE_KEY_ENCRYPTION_KEY = randomBytes(32).toString("base64");
 });
 afterEach(() => { vi.unstubAllGlobals(); resetSasaVoiceForTests(); });
@@ -46,7 +47,10 @@ function elevenLabsOk() {
   return fetchMock;
 }
 
-describe("liberação: só o corretor Vinicios Ragazzi", () => {
+const asBroker = (userId = VINICIOS) => Object.assign(session, { userId, role: "broker" });
+const asDirector = () => Object.assign(session, { userId: DIRETOR, role: "director" });
+
+describe("liberação: o diretor conecta, só o corretor Vinicios Ragazzi ouve", () => {
   it("só ele, e só como corretor", () => {
     expect(isSasaVoicePilot("broker", VINICIOS)).toBe(true);
     expect(isSasaVoicePilot("director", VINICIOS)).toBe(false);
@@ -55,12 +59,37 @@ describe("liberação: só o corretor Vinicios Ragazzi", () => {
   });
 
   it("outro corretor recebe tudo desligado e não consegue conectar", async () => {
-    session.userId = "outro-corretor";
+    asBroker("outro-corretor");
     expect(await getSasaVoiceStateAction()).toMatchObject({ allowed: false, connected: false });
     const fetchMock = elevenLabsOk();
-    expect(await connectSasaVoiceAction(KEY)).toEqual({ ok: false, error: "A voz da Sasá ainda não está liberada para você." });
+    expect(await connectSasaVoiceAction(KEY)).toEqual({ ok: false, error: "Só o diretor conecta e configura a voz do Sasá." });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(rows.size).toBe(0);
+  });
+
+  it("o corretor do teste não conecta: só ouve e liga ou desliga para ele", async () => {
+    asBroker();
+    elevenLabsOk();
+    expect(await connectSasaVoiceAction(KEY)).toEqual({ ok: false, error: "Só o diretor conecta e configura a voz do Sasá." });
+    asDirector();
+    await connectSasaVoiceAction(KEY);
+    asBroker();
+    const state = await getSasaVoiceStateAction();
+    expect(state).toMatchObject({ allowed: true, canManage: false, connected: true, companyEnabled: true, enabled: true, keyLast4: "WXYZ" });
+    expect(JSON.stringify(state)).not.toContain(KEY);
+    const off = await setSasaVoiceEnabledAction(false);
+    expect(off).toMatchObject({ ok: true, state: { enabled: false, companyEnabled: true } });
+    // Desligar para ele não desliga para a empresa.
+    asDirector();
+    expect(await getSasaVoiceStateAction()).toMatchObject({ canManage: true, enabled: true });
+  });
+
+  it("diretor desligou: o corretor não ouve mesmo com a preferência ligada", async () => {
+    elevenLabsOk();
+    await connectSasaVoiceAction(KEY);
+    await setSasaVoiceEnabledAction(false);
+    asBroker();
+    expect(await getSasaVoiceStateAction()).toMatchObject({ companyEnabled: false, enabled: false });
   });
 });
 
@@ -144,7 +173,7 @@ describe("texto da voz e voz padrão", () => {
 });
 
 describe("falha do ElevenLabs: fica só o texto", () => {
-  const on: SasaVoiceState = { allowed: true, connected: true, keyLast4: "WXYZ", voiceId: "pt-1", voiceName: "Ana", enabled: true, usedToday: 0, dailyLimit: 8000 };
+  const on: SasaVoiceState = { allowed: true, canManage: false, companyEnabled: true, connected: true, keyLast4: "WXYZ", voiceId: "pt-1", voiceName: "Ana", enabled: true, usedToday: 0, dailyLimit: 8000 };
   const backend = (speak: SasaVoiceBackend["speak"], state = on): SasaVoiceBackend => ({
     state: async () => state, connect: vi.fn(), voices: vi.fn(), choose: vi.fn(), setEnabled: vi.fn(), disconnect: vi.fn(), speak,
   });

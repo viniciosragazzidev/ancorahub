@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Voz da Sasá no aparelho (teste de 23/11). Um estado só para a conversa, o botão flutuante e a tela de conexão:
- * a Sasá responde em texto primeiro; depois, se a voz está ligada, o servidor gera o áudio e ele toca.
+ * Voz do Sasá no aparelho (teste de 23/11). Um estado só para a conversa, o botão flutuante e a tela de conexão:
+ * o Sasá responde em texto primeiro; depois, se a voz está ligada, o servidor gera o áudio e ele toca.
  * Se o ElevenLabs falhar, fica só o texto, com o motivo curto. O laboratório troca o servidor por um simulado.
  */
 import { useCallback, useEffect, useSyncExternalStore } from "react";

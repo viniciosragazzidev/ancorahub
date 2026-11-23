@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { ElevenLabsError, streamElevenLabsSpeech } from "@/features/sasa-voice/elevenlabs";
 import { charsLeftToday, clampVoiceText, SASA_VOICE_TEST_TEXT, voiceFailureReason } from "@/features/sasa-voice/rules";
-import { addVoiceUsage, decryptVoiceKey, isVoicePilotUser, readVoiceConfig, voiceUsageToday } from "@/features/sasa-voice/store";
+import { addVoiceUsage, decryptVoiceKey, readListenPref, readVoiceConfig, voiceRoleOf, voiceUsageToday } from "@/features/sasa-voice/store";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 export const runtime = "nodejs";
@@ -18,18 +18,24 @@ function fail(status: number, reason: string) {
 }
 
 /**
- * Voz da Sasá (teste de 23/11, só o Vinicios): o texto da resposta vira MP3 no ElevenLabs e o áudio é repassado por
- * streaming. A key é decifrada só aqui, no servidor, e nunca volta ao navegador. Teto por resposta e por dia.
+ * Voz do Sasá (teste de 23/11): o texto da resposta vira MP3 no ElevenLabs e o áudio é repassado por streaming.
+ * Ouve: o corretor do teste (Vinicios), com a voz ligada pelo diretor e por ele. O diretor só usa o "Testar voz".
+ * A key é da empresa, decifrada só aqui, no servidor, e nunca volta ao navegador. Teto por resposta e por dia.
  */
 export async function POST(request: NextRequest) {
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return fail(401, "entre de novo");
-  if (!(await isVoicePilotUser(context.role, context.userId).catch(() => false))) return fail(403, "voz não liberada");
+  const role = await voiceRoleOf(context.role, context.userId).catch(() => null);
+  if (!role) return fail(403, "voz não liberada");
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return fail(400, "pedido inválido");
-  const config = await readVoiceConfig(context.tenantId, context.userId).catch(() => null);
+  if (role === "manage" && !parsed.data.test) return fail(403, "o diretor só testa a voz");
+  const config = await readVoiceConfig(context.tenantId).catch(() => null);
   if (!config?.voiceId) return fail(409, "a voz não está conectada");
-  if (!config.enabled && !parsed.data.test) return fail(409, "a voz está desligada");
+  if (!parsed.data.test) {
+    if (!config.enabled) return fail(409, "a voz está desligada pelo diretor");
+    if (!(await readListenPref(context.tenantId, context.userId).catch(() => true))) return fail(409, "a voz está desligada");
+  }
 
   const text = clampVoiceText(parsed.data.test ? SASA_VOICE_TEST_TEXT : parsed.data.text ?? "");
   if (!text) return fail(400, "nada para falar");

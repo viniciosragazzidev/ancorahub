@@ -3,7 +3,7 @@ import "server-only";
 import { SASA_VOICE_SETTINGS, SASA_VOICE_TEST_TEXT, type SasaVoiceOption } from "./rules";
 
 /**
- * Cliente mínimo do ElevenLabs (voz da Sasá, teste de 23/11). A key só entra no cabeçalho `xi-api-key`; nenhum
+ * Cliente mínimo do ElevenLabs (Voz do Sasá, teste de 23/11). A key só entra no cabeçalho `xi-api-key`; nenhum
  * erro, log ou retorno carrega a key ou o corpo da resposta do ElevenLabs, só o status HTTP.
  */
 const BASE = "https://api.elevenlabs.io/v1";
