@@ -60,8 +60,12 @@ export type SeatOccurrence = {
   allowedBrokerIds: string[];
   started: boolean;
   ended: boolean;
-  /** "published": já vale; "draft": só no rascunho do mês (falta publicar). */
-  source: "published" | "draft";
+  /**
+   * "published": já vale; "draft": só no rascunho do mês (falta publicar);
+   * "avulso": plantão de um dia criado fora da escala mensal (escala semanal do plantão, sem plano).
+   */
+  source: "published" | "draft" | "avulso";
+  /** Plano mensal (vazio no avulso). */
   planId: string;
 };
 

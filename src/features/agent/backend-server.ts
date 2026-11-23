@@ -23,6 +23,8 @@ import {
   removeBrokerFromPublishedOccurrenceAction,
   updateMonthlyDutyDraftAction,
 } from "@/features/lead-distribution/monthly-duty-actions";
+import { createRosterAssignmentAction, removeRosterAssignmentAction } from "@/features/lead-distribution/roster-actions";
+import { standaloneSeats } from "./seats";
 import {
   createTeamUserAction,
   getPendingInvitesAction,
@@ -516,7 +518,50 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
           if (!previous || (previous.source === "draft" && seat.source === "published")) byId.set(seat.id, seat);
         }
       }
-      return [...byId.values()];
+      // Plantões avulsos (um dia, fora da escala mensal): a escala mensal não os traz.
+      const sp = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+      const part = (type: string) => sp.find((item) => item.type === type)?.value ?? "00";
+      const spKey = (value: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
+      const [schedules, typeRows, roster, people] = await Promise.all([
+        db.select().from(schema.unitDutySchedules).where(and(
+          eq(schema.unitDutySchedules.tenantId, context.tenantId),
+          eq(schema.unitDutySchedules.status, "active"),
+          sql`${schema.unitDutySchedules.validUntil} is not null`,
+          sql`${schema.unitDutySchedules.validUntil} > ${new Date(`${from}T03:00:00Z`)}`,
+          sql`${schema.unitDutySchedules.validFrom} <= ${new Date(`${until}T23:59:59-03:00`)}`,
+        )),
+        db.select({ id: schema.dutyScheduleTypes.id, name: schema.dutyScheduleTypes.name, branchIds: schema.dutyScheduleTypes.branchIds }).from(schema.dutyScheduleTypes).where(eq(schema.dutyScheduleTypes.tenantId, context.tenantId)),
+        db.select({ scheduleId: schema.dutyRosterAssignments.scheduleId, brokerId: schema.dutyRosterAssignments.brokerId, dayOfWeek: schema.dutyRosterAssignments.dayOfWeek })
+          .from(schema.dutyRosterAssignments)
+          .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), isNull(schema.dutyRosterAssignments.dutyDate))),
+        this.listPeople(),
+      ]);
+      const typeById = new Map(typeRows.map((row) => [row.id, row]));
+      const extra = standaloneSeats({
+        schedules: schedules.map((row) => ({
+          id: row.id,
+          name: row.name,
+          dayOfWeek: row.dayOfWeek,
+          startsAt: row.startsAt,
+          endsAt: row.endsAt,
+          typeId: row.typeId ?? null,
+          typeName: row.typeId ? typeById.get(row.typeId)?.name ?? null : null,
+          typeBranchIds: row.typeId ? typeById.get(row.typeId)?.branchIds ?? [] : [],
+          attendanceMode: (row.attendanceMode as "online" | "presencial" | null) ?? null,
+          minimumBrokers: row.minimumBrokers,
+          maximumBrokers: row.maximumBrokers ?? null,
+          validFrom: spKey(row.validFrom),
+          validUntil: row.validUntil ? spKey(row.validUntil) : null,
+        })),
+        roster,
+        brokers: people.filter((person) => person.role === "broker" && person.status === "active").map((person) => ({ id: person.id, branchId: person.branchId ?? null })),
+        coveredIds: new Set(byId.keys()),
+        from,
+        until,
+        today: `${part("year")}-${part("month")}-${part("day")}`,
+        nowTime: `${part("hour")}:${part("minute")}`,
+      });
+      return [...byId.values(), ...extra];
     },
 
     async dutyNow(): Promise<DutyNow[]> {
@@ -528,6 +573,18 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
     },
 
     async addSeat(occurrence, brokerId, force) {
+      if (occurrence.source === "avulso") {
+        // Avulso vive na escala semanal do plantão (o mesmo caminho da tela de Plantões).
+        const form = new FormData();
+        form.set("scheduleId", occurrence.scheduleId);
+        form.set("brokerId", brokerId);
+        form.set("dayOfWeek", String(new Date(`${occurrence.dutyDate}T12:00:00Z`).getUTCDay()));
+        form.set("startsAt", occurrence.startsAt.slice(0, 5));
+        form.set("endsAt", occurrence.endsAt.slice(0, 5));
+        const result = await createRosterAssignmentAction({}, form);
+        if (result.error) throw new Error(result.error);
+        return;
+      }
       try {
         await addBrokerToPublishedOccurrenceAction({ occurrenceId: occurrence.id, brokerId, force: force || undefined });
       } catch (error) {
@@ -538,6 +595,21 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
     },
 
     async removeSeat(occurrence, brokerId) {
+      if (occurrence.source === "avulso") {
+        const [row] = await db.select({ id: schema.dutyRosterAssignments.id }).from(schema.dutyRosterAssignments).where(and(
+          eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+          eq(schema.dutyRosterAssignments.scheduleId, occurrence.scheduleId),
+          eq(schema.dutyRosterAssignments.brokerId, brokerId),
+          eq(schema.dutyRosterAssignments.status, "active"),
+          isNull(schema.dutyRosterAssignments.dutyDate),
+        )).limit(1);
+        if (!row) throw new Error("Essa pessoa não está nesse plantão.");
+        const form = new FormData();
+        form.set("assignmentId", row.id);
+        const result = await removeRosterAssignmentAction({}, form);
+        if (result.error) throw new Error(result.error);
+        return;
+      }
       try {
         await removeBrokerFromPublishedOccurrenceAction({ occurrenceId: occurrence.id, brokerId });
       } catch (error) {

@@ -137,3 +137,90 @@ export function seatsOf(occurrences: readonly SeatOccurrence[], brokerId: string
 export function understaffed(occurrences: readonly SeatOccurrence[]) {
   return occurrences.filter((occurrence) => !occurrence.ended && occurrence.brokerIds.length < occurrence.minimumBrokers);
 }
+
+/**
+ * Plantão avulso (23/11): plantão de um dia criado direto em Plantões, fora da escala mensal publicada. A escala
+ * mensal não o traz, então a busca de vagas não o via ("não achei vaga" com 3 horários vazios no Plantão Niterói).
+ * Só entra plantão com validade de até 2 dias: o plantão semanal fixo é molde da escala mensal e não vira vaga aqui.
+ */
+export type StandaloneSchedule = {
+  id: string;
+  name: string;
+  dayOfWeek: number;
+  startsAt: string;
+  endsAt: string;
+  typeId: string | null;
+  typeName: string | null;
+  /** Unidades do tipo (vazio = todas). */
+  typeBranchIds: string[];
+  attendanceMode: "online" | "presencial" | null;
+  minimumBrokers: number;
+  maximumBrokers: number | null;
+  /** AAAA-MM-DD em São Paulo; validUntil exclusivo. */
+  validFrom: string;
+  validUntil: string | null;
+};
+
+const STANDALONE_MAX_DAYS = 2;
+
+function daysBetween(from: string, until: string) {
+  return Math.round((Date.parse(`${until}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+}
+
+function addDay(day: string) {
+  return new Date(Date.parse(`${day}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+export function isStandaloneSchedule(schedule: Pick<StandaloneSchedule, "validFrom" | "validUntil">) {
+  return Boolean(schedule.validUntil) && daysBetween(schedule.validFrom, schedule.validUntil!) <= STANDALONE_MAX_DAYS;
+}
+
+export function standaloneSeats(input: {
+  schedules: readonly StandaloneSchedule[];
+  /** Escala semanal ativa (sem data) dos plantões. */
+  roster: ReadonlyArray<{ scheduleId: string; brokerId: string; dayOfWeek: number }>;
+  /** Corretores ativos e a unidade de cada um. */
+  brokers: ReadonlyArray<{ id: string; branchId: string | null }>;
+  /** Ocorrências que a escala mensal já traz (não duplica). */
+  coveredIds: ReadonlySet<string>;
+  from: string;
+  until: string;
+  /** AAAA-MM-DD e HH:MM de agora em São Paulo. */
+  today: string;
+  nowTime: string;
+}): SeatOccurrence[] {
+  const seats: SeatOccurrence[] = [];
+  for (const schedule of input.schedules) {
+    if (!isStandaloneSchedule(schedule)) continue;
+    for (let day = schedule.validFrom; day < schedule.validUntil! && day <= input.until; day = addDay(day)) {
+      if (day < input.from || weekdayOf(day) !== schedule.dayOfWeek) continue;
+      const id = `${schedule.id}:${day}`;
+      if (input.coveredIds.has(id)) continue;
+      const crossesMidnight = minutes(schedule.endsAt) <= minutes(schedule.startsAt);
+      const ended = day < input.today || (day === input.today && !crossesMidnight && minutes(input.nowTime) >= minutes(schedule.endsAt));
+      seats.push({
+        id,
+        scheduleId: schedule.id,
+        scheduleName: schedule.name,
+        dutyDate: day,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        typeId: schedule.typeId,
+        typeName: schedule.typeName,
+        attendanceMode: schedule.attendanceMode,
+        maximumBrokers: schedule.maximumBrokers,
+        minimumBrokers: schedule.minimumBrokers,
+        brokerIds: input.roster.filter((row) => row.scheduleId === schedule.id && row.dayOfWeek === schedule.dayOfWeek).map((row) => row.brokerId),
+        allowedBrokerIds: input.brokers
+          .filter((broker) => !schedule.typeBranchIds.length || (broker.branchId !== null && schedule.typeBranchIds.includes(broker.branchId)))
+          .map((broker) => broker.id),
+        // Avulso aceita corretor com o plantão já em andamento (a escala semanal não trava o horário corrido).
+        started: false,
+        ended,
+        source: "avulso",
+        planId: "",
+      });
+    }
+  }
+  return seats;
+}
