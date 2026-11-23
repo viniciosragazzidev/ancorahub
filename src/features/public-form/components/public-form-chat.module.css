@@ -1,0 +1,8 @@
+/* Formulário público (23/11): mesmos tokens da venda em conversa (sale-chat.module.css) e do Lite. */
+.root { display: contents; }
+
+.done { display: grid; justify-items: center; gap: 8px; padding: 20px 16px; border-radius: var(--radius-panel); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-resting); text-align: center; }
+.doneTitle { margin: 0; font-size: var(--text-lg); font-weight: 500; letter-spacing: -0.01em; color: var(--success); }
+.doneText { margin: 0; max-width: 320px; font-size: var(--text-sm); line-height: 1.5; color: var(--text-secondary); }
+
+.trap { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }

@@ -70,6 +70,7 @@ export function Composer({
   working = false,
   disabled = false,
   mentions = BROKER_MENTIONS,
+  mentionsEnabled = true,
   onSend,
   onMention,
   onStop,
@@ -85,6 +86,8 @@ export function Composer({
   working?: boolean;
   disabled?: boolean;
   mentions?: Mention[];
+  /** false: "@" é só texto (o formulário público não tem atalhos nem leads). */
+  mentionsEnabled?: boolean;
   onSend: (text: string, meta?: { clientMessageId?: string; voice?: boolean }) => void | Promise<void>;
   onMention?: (mention: Mention) => void;
   onStop?: () => void;
@@ -148,7 +151,7 @@ export function Composer({
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const menuId = useId();
-  const query = /(^|\s)@([\p{L}\w]*)$/u.exec(text)?.[2] ?? null;
+  const query = mentionsEnabled ? /(^|\s)@([\p{L}\w]*)$/u.exec(text)?.[2] ?? null : null;
   // Live shortcuts and leads, loaded the first time the @ menu opens (assistants stay local).
   const [live, setLive] = useState<Mention[] | null>(null);
   const menuWanted = query !== null;

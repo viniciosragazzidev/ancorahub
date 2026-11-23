@@ -66,6 +66,7 @@ function numberLabel(value: number) {
 function sourceLabel(value: string) {
   const labels: Record<string, string> = {
     landing_page: "Página de captura",
+    formulario: "Formulário do site",
     website: "Site",
     manual: "Cadastro manual",
     webhook: "Integração",

@@ -72,6 +72,8 @@ export function ChatScreen({
   renderCustom,
   localWorkingLabel,
   closePassedQuestions = false,
+  mentions = true,
+  backButton = true,
 }: {
   identity: Identity;
   /**
@@ -124,6 +126,10 @@ export function ChatScreen({
    * another reply) closes, so an old option can never overwrite a later answer.
    */
   closePassedQuestions?: boolean;
+  /** false: o "@" do campo não abre atalhos nem leads (formulário público, sem login). */
+  mentions?: boolean;
+  /** false: sem o botão Voltar no cabeçalho (página pública aberta por link, sem app para voltar). */
+  backButton?: boolean;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -427,7 +433,7 @@ export function ChatScreen({
     <div className={`${styles.root} ${embedded ? styles.screenEmbedded : fill ? styles.screenFill : styles.screen}`}>
       {embedded ? null : <header className={styles.header}>
         {/* History first (never stacks a new entry, so back never loops between two screens); parent when opened from outside. */}
-        {fill ? null : <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => goBackInApp(router, backHref)}>
+        {fill || !backButton ? null : <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => goBackInApp(router, backHref)}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>}
         <div className={styles.headerIdentity}>
@@ -483,6 +489,7 @@ export function ChatScreen({
           await sendFree(message.id, text, meta?.voice);
         }}
         onMention={mention}
+        mentionsEnabled={mentions}
       />}
     </div>
   );

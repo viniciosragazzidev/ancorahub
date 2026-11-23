@@ -42,6 +42,10 @@ export type CreateLeadFromWebhookSyncInput = {
    * (e.g. a WhatsApp number with its own automation in the Business app).
    */
   skipAiQualification?: boolean;
+  /** Answers the lead page already reads (cidade, bairro, idades, qtdVidas, tipoPlano): the public form (/formulario). */
+  formData?: Record<string, string>;
+  /** How many people, when the form knows it. */
+  livesCount?: number | null;
   leadSource?: {
     channel: string;
     externalId: string;
@@ -75,7 +79,10 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   }
 
   const data = parsed.data;
-  const metaLeadType = input.leadSource?.channel === "meta_lead_ads" ? input.leadSource.leadType : undefined;
+  // Only sources that ask it (the Meta form, our public form) set the lead type; PJ/PME goes to the PME queue.
+  const metaLeadType = input.leadSource?.channel === "meta_lead_ads" || input.leadSource?.channel === "formulario" ? input.leadSource.leadType : undefined;
+  const formData = input.formData && Object.keys(input.formData).length ? input.formData : null;
+  const livesCount = typeof input.livesCount === "number" && Number.isInteger(input.livesCount) && input.livesCount > 0 ? input.livesCount : null;
   if (data.website && data.website.trim().length > 0) return { success: true, leadId: "honeypot-discarded", duplicate: false };
 
   let branchId: string | null = input.branchId;
@@ -191,6 +198,9 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
           nome: normalizedName || undefined,
           email: normalizedEmail || undefined,
           ...(metaLeadType ? { tipo: metaLeadType } : {}),
+          // The new answers fill the lead; what it already had and the form does not ask stays.
+          ...(formData ? { formData: sql`coalesce(${schema.leads.formData}, '{}'::jsonb) || ${JSON.stringify(formData)}::jsonb` } : {}),
+          ...(livesCount ? { livesCount } : {}),
           ...(input.leadSource ? {
             sourceChannel: existingLead.sourceChannel ?? input.leadSource.channel,
             sourceCampaign: existingLead.sourceCampaign ?? input.leadSource.campaign ?? null,
@@ -215,7 +225,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
           : eq(schema.leads.id, existingLead.id));
 
       const newCampaign = input.leadSource?.campaign ?? null;
-      if (input.leadSource && (redistribute || (newCampaign && newCampaign !== existingLead.metaCampaignId))) {
+      // The public form always leaves a note: its answers just changed on the lead.
+      if (input.leadSource && (redistribute || input.leadSource.channel === "formulario" || (newCampaign && newCampaign !== existingLead.metaCampaignId))) {
         const [newQueue] = queueId ? await tx.select({ name: schema.leadQueues.name }).from(schema.leadQueues).where(eq(schema.leadQueues.id, queueId)).limit(1) : [];
         const campaignLabel = typeof newMetadata?.campaignName === "string" ? newMetadata.campaignName : newCampaign;
         const where = staleOwnerId
@@ -254,6 +265,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     await tx.insert(schema.leads).values({
       id: leadId, tenantId, branchId, queueId, corretorId: null, nome: normalizedName, telefone: normalizedPhone, email: normalizedEmail,
       ...(metaLeadType ? { tipo: metaLeadType } : {}),
+      ...(formData ? { formData } : {}),
+      ...(livesCount ? { livesCount } : {}),
       // "IA Desativada": the AI neither starts nor answers this lead's messages.
       ...(skipAi ? { qualificationStatus: "ia_disabled" } : {}),
       origem: "webhook", distributionOrigin: "landing-page", status: "new", distributionStatus: distStatus,

@@ -332,6 +332,7 @@ const SOURCE_CHANNEL_LABELS: Record<string, string> = {
   indicacao: "Indicação",
   referral: "Indicação",
   landing_page: "Site / Orgânico",
+  formulario: "Formulário do site",
 };
 
 function buildFonteLabel(sourceChannel: string | null, sourceCampaign: string | null, origem: string) {

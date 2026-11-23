@@ -192,6 +192,7 @@ const SOURCE_CHANNEL_LABELS: Record<string, string> = {
   indicacao: "Indicação",
   referral: "Indicação",
   landing_page: "Site",
+  formulario: "Formulário do site",
 };
 
 /** Origem do contato a partir do lead. `null` quando não há dado (o cabeçalho omite). */

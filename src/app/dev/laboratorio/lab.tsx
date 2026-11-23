@@ -28,6 +28,7 @@ import { SaleChat, type SaleChatServices } from "@/features/post-sale/components
 import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-ancora-workspace";
 import { LightPhoneSection } from "@/app/(dashboard)/settings/_components/light-phone-section";
+import { PublicFormChat } from "@/features/public-form/components/public-form-chat";
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
@@ -42,7 +43,7 @@ import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, 
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 import { SasaVoiceSettings } from "@/features/sasa-voice/components/sasa-voice-settings";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa" | "formulario";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -64,6 +65,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "agenteDiretor", label: "Agente IA do diretor (escala e cadeiras)" },
   { id: "telefone", label: "Trocar meu telefone (corretor)" },
   { id: "vozSasa", label: "Voz do Sasá (ElevenLabs)" },
+  { id: "formulario", label: "Formulário público (/formulario)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -173,6 +175,13 @@ export function FlowLab() {
       return { ok: true, awaitingRelease: outcome === "liberacao" && mode === "presencial" };
     },
     presenceGate: async () => ({ required: false, connected: true }),
+    publicForm: {
+      // Simula o POST /api/public/formulario: em "falha", o servidor fica fora como numa queda de rede.
+      submit: async () => {
+        await wait(delay);
+        return outcome === "falha" ? { ok: false, error: "Não consegui enviar agora. Tente de novo em instantes.", retryable: true } : { ok: true };
+      },
+    },
     phoneChange: async (phone) => {
       await wait(delay);
       if (outcome === "falha") return { ok: false, error: "Não consegui trocar seu telefone agora. Tente de novo em instantes." };
@@ -269,6 +278,8 @@ export function FlowLab() {
               now: { title: "Agora", emptyText: "Você está em dia.", items: [{ id: "offer-l1", title: "Carla Mendes", detail: "Plano PME, 6 vidas. Oferta para você.", actionLabel: "Aceitar e chamar no WhatsApp", href: "/dev/laboratorio", acceptLeadId: "l1", expiresAt: inMinutes(4), tone: "urgent" }] },
             }}
           />
+        ) : flow === "formulario" ? (
+          <PublicFormChat />
         ) : flow === "venda" ? (
           <SaleChat lead={LAB_SALE_LEAD} catalog={LAB_SALE_CATALOG} services={lab.sale!} backHref="/dev/laboratorio" doneHref="/dev/laboratorio" spokenDraft={saleDraft} />
         ) : flow === "sasa" ? (

@@ -53,7 +53,7 @@ export function leadStatusLabel(status: string) {
 
 export function sourceLabel(value: string) {
   const labels: Record<string, string> = {
-    meta_lead_ads: "Meta (anúncios)", landing_page: "Página de captura", website: "Site", manual: "Cadastro manual",
+    meta_lead_ads: "Meta (anúncios)", landing_page: "Página de captura", formulario: "Formulário do site", website: "Site", manual: "Cadastro manual",
     webhook: "Integração", facebook: "Facebook", instagram: "Instagram", meta: "Meta", whatsapp: "WhatsApp",
     referral: "Indicação", __unknown__: "Origem não identificada",
   };

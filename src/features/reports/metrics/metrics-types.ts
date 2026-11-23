@@ -105,6 +105,7 @@ export interface LeadTimelinePoint {
 
 const SOURCE_LABELS: Record<string, string> = {
   landing_page: "Landing Page",
+  formulario: "Formulário do site",
   meta_lead_ads: "Meta Lead Ads",
   manual: "Cadastro manual",
   webhook: "Webhook",

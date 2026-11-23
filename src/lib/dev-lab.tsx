@@ -52,6 +52,8 @@ export type DevLab = {
   };
   /** Configurações > Meu telefone (23/11): no lugar de changeOwnPhoneAction. */
   phoneChange?: (phone: string) => Promise<import("@/features/broker-phone-change/actions").ChangeOwnPhoneState>;
+  /** Formulário público (/formulario, 23/11): no lugar do POST /api/public/formulario. */
+  publicForm?: { submit: (submission: import("@/features/public-form/form-flow").PublicFormSubmission) => Promise<import("@/features/public-form/form-flow").PublicFormResult> };
   /** Agente IA do diretor (21/11): conversa num mundo em memória (modelo com roteiro) e Desfazer simulado. */
   directorAgent?: {
     transport: import("ai").ChatTransport<import("ai").UIMessage>;
