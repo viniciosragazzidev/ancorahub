@@ -17,10 +17,11 @@ export function plantaoTap() {
 }
 
 /** Sucesso confirmado pelo servidor. `milestone` só para a escala publicada. */
-export function plantaoDone(message: string, options: { milestone?: boolean } = {}) {
+export function plantaoDone(message: string, options: { milestone?: boolean; undo?: () => void } = {}) {
   if (options.milestone) fireFeedback("milestone", { budgetKey: "escala-mes" });
   else fireFeedback("confirm");
-  toast.success(message);
+  if (options.undo) toast.success(message, { action: { label: "Desfazer", onClick: options.undo } });
+  else toast.success(message);
 }
 
 /** Falha: causa legível + o que continua valendo + "Tentar de novo" quando houver como refazer. */

@@ -8,10 +8,12 @@ import { SearchAddList } from "@/components/ui/search-add-list";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   addBrokerToPublishedOccurrenceAction,
+  getMonthlyDutyPlanAction,
   removeBrokerFromPublishedOccurrenceAction,
   type MonthlyDutyPlanView,
 } from "@/features/lead-distribution/monthly-duty-actions";
 
+import { DutyPassPicker } from "./duty-pass-picker";
 import type { PlanOccurrence } from "./plantao-occurrence";
 
 type Broker = { id: string; name: string; internalCode: string | null; branchId: string | null };
@@ -41,6 +43,14 @@ export function PlantaoOccurrenceSheet({
   const [pending, startTransition] = useTransition();
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [confirmOutside, setConfirmOutside] = useState<Broker | null>(null);
+  // "Passar para alguém" (23/11): o escalado cuja cadeira vai para outra pessoa.
+  const [passingId, setPassingId] = useState<string | null>(null);
+
+  /** Depois de passar (ou desfazer): a escala do mês volta do servidor. */
+  function reload() {
+    setPassingId(null);
+    void getMonthlyDutyPlanAction(occurrence.dutyDate.slice(0, 7)).then((view) => { if (view) onChanged(view); }, () => null);
+  }
 
   const escalated = new Set(occurrence.brokers.map((item) => item.id));
   const candidates = brokers
@@ -111,16 +121,20 @@ export function PlantaoOccurrenceSheet({
                           <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfirmRemoveId(null)}>Cancelar</Button>
                         </span>
                       ) : (
-                        <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfirmRemoveId(item.id)}>Tirar do plantão</Button>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <Button size="sm" variant="ghost" disabled={pending} onClick={() => setPassingId(passingId === item.id ? null : item.id)} aria-expanded={passingId === item.id}>Passar</Button>
+                          <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfirmRemoveId(item.id)}>Tirar do plantão</Button>
+                        </span>
                       )
                     ) : null}
                   </li>
                 ))}
               </ul>
             ) : <p className="text-sm text-muted-foreground">Ninguém escalado ainda.</p>}
+            {passingId && canRemove ? <DutyPassPicker key={passingId} occurrenceId={occurrence.id} fromBrokerId={passingId} onCancel={() => setPassingId(null)} onDone={reload} /> : null}
           </section>
 
-          {!occurrence.ended ? (
+          {!occurrence.ended && !passingId ? (
             <section className="grid gap-2">
               <h3 className="text-sm font-medium">Escalar corretor</h3>
               {confirmOutside ? (

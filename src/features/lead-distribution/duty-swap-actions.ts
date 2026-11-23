@@ -2,6 +2,7 @@
 
 import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
 import { MANAGER_SCOPE_ERROR } from "./manager-unit-scope";
 import { randomUUID } from "node:crypto";
@@ -138,11 +139,11 @@ async function brokerAlreadyOn(db: Executor, tenantId: string, brokerId: string,
   return rows.map(toSwapSlot).some((row) => rowCoversDate(row, slot.scheduleId, dutyDate));
 }
 
-export type DutySwapSourceView = { brokerName: string; scheduleName: string; dutyDate: string; startsAt: string; endsAt: string };
+export type DutySwapSourceView = { brokerId: string; scheduleId: string; brokerName: string; scheduleName: string; dutyDate: string; startsAt: string; endsAt: string };
 
 /** Future slots (published, or one-time weekly) the broker of `assignmentId` can swap with (picker of "Efetuar troca"). */
 export async function listDutySwapCandidatesAction(assignmentId: string): Promise<
-  { ok: true; source: DutySwapSourceView; candidates: SwapCandidate[] } | { ok: false; reason: string }
+  { ok: true; source: DutySwapSourceView; candidates: SwapCandidate[]; passEnabled: boolean } | { ok: false; reason: string }
 > {
   try {
     const id = z.string().min(1).max(120).parse(assignmentId);
@@ -201,8 +202,9 @@ export async function listDutySwapCandidatesAction(assignmentId: string): Promis
     const candidates = selectSwapCandidates(sourceRow, inScope, actor, now).filter((candidate) => brokers.get(candidate.brokerId)?.eligible);
     return {
       ok: true,
-      source: { brokerName: sourceRow.brokerName, scheduleName: sourceRow.scheduleName, dutyDate: source.dutyDate, startsAt: source.startsAt, endsAt: source.endsAt },
+      source: { brokerId: sourceRow.brokerId, scheduleId: sourceRow.scheduleId, brokerName: sourceRow.brokerName, scheduleName: sourceRow.scheduleName, dutyDate: source.dutyDate, startsAt: source.startsAt, endsAt: source.endsAt },
       candidates,
+      passEnabled: (await getFeatureFlag(FEATURE_FLAGS.DUTY_SEAT_PASS).catch(() => "false")) === "true",
     };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível carregar os plantões para a troca." };
