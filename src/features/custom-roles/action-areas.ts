@@ -33,6 +33,7 @@ const REGRAS: readonly Regra[] = [
   ["src/features/broker-availability/", livre],
   // A própria pessoa troca a unidade dela no perfil (Configurações > Unidade).
   ["src/features/broker-unit-change/", livre],
+  ["src/features/broker-phone-change/", livre],
   // Tela de teste só em desenvolvimento: a ação recusa fora de NODE_ENV=development.
   ["src/app/dev/", livre],
   ["src/app/(dashboard)/notificacoes/", livre],

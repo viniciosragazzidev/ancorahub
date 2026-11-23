@@ -27,6 +27,7 @@ import { TeamListManager } from "@/features/supervisor-workspace/lead-import/tea
 import { SaleChat, type SaleChatServices } from "@/features/post-sale/components/sale-chat";
 import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-ancora-workspace";
+import { LightPhoneSection } from "@/app/(dashboard)/settings/_components/light-phone-section";
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
@@ -40,7 +41,7 @@ import { NurtureLab } from "./nurture-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -60,6 +61,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "nutricao", label: "Nutrição, A/B e Sasá (recuperar)" },
   { id: "accordee", label: "Estilo Accordee (Início e Conversas do diretor)" },
   { id: "agenteDiretor", label: "Agente IA do diretor (escala e cadeiras)" },
+  { id: "telefone", label: "Trocar meu telefone (corretor)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -67,6 +69,9 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
 /** Telefone que o laboratório trata como "já está no sistema". */
 const LAB_KNOWN_PHONE = "5521999990000";
+/** Trocar telefone: o número atual do corretor de mentira e um que já é de outra pessoa da empresa. */
+const LAB_BROKER_PHONE = "5571999991234";
+const LAB_TAKEN_PHONE = "5571988887777";
 const LAB_TEAM = [
   { id: "b1", name: "Ana Paula", availability: "available" },
   { id: "b2", name: "Bruno Lima", availability: "available" },
@@ -166,6 +171,12 @@ export function FlowLab() {
       return { ok: true, awaitingRelease: outcome === "liberacao" && mode === "presencial" };
     },
     presenceGate: async () => ({ required: false, connected: true }),
+    phoneChange: async (phone) => {
+      await wait(delay);
+      if (outcome === "falha") return { ok: false, error: "Não consegui trocar seu telefone agora. Tente de novo em instantes." };
+      if (phone === LAB_TAKEN_PHONE) return { ok: false, error: "Esse número já está no cadastro de outra pessoa da sua corretora. Confira o número ou fale com a gestão." };
+      return { ok: true, phone };
+    },
     sale: {
       // Simula a IA lendo o contrato: familiar da Amil com titular e 2 dependentes, sem a vigência (em "falha", não lê nada).
       readContract: async () => {
@@ -308,6 +319,11 @@ export function FlowLab() {
           <RecoveryCadenceLab />
         ) : flow === "nutricao" ? (
           <NurtureLab />
+        ) : flow === "telefone" ? (
+          <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+            <LightPhoneSection currentPhone={LAB_BROKER_PHONE} />
+            <p className="text-xs text-(--text-secondary)">(71) 98888-7777 simula um número que já é de outra pessoa da empresa.</p>
+          </main>
         ) : flow === "callAncora" ? (
           <CallAncoraWorkspace brokerFirstName="Vinicios" />
         ) : (

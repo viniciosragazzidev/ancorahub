@@ -48,6 +48,8 @@ export type DevLab = {
     /** Fase 4: no lugar de navegar para a venda ou a cotação (o laboratório troca de fluxo). */
     open?: (open: import("@/features/sasa/drafts").SasaOpen) => void;
   };
+  /** Configurações > Meu telefone (23/11): no lugar de changeOwnPhoneAction. */
+  phoneChange?: (phone: string) => Promise<import("@/features/broker-phone-change/actions").ChangeOwnPhoneState>;
   /** Agente IA do diretor (21/11): conversa num mundo em memória (modelo com roteiro) e Desfazer simulado. */
   directorAgent?: {
     transport: import("ai").ChatTransport<import("ai").UIMessage>;

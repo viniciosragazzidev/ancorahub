@@ -1,5 +1,9 @@
 # Histórico de Funcionalidades Adicionadas (Features Log)
 
+## 23/11/2026 - Corretor troca o próprio telefone
+
+- Em Configurações > Meu telefone (Lite), o corretor digita o celular novo e troca. O servidor valida o celular brasileiro (DDD existente, 9 depois do DDD), grava como 55 + DDD + 9 dígitos e recusa número que já é de outra pessoa da empresa, comparando também cadastros antigos sem 55 ou sem o 9. A troca fica no log de auditoria (`broker_profile / alterou_telefone_proprio`, com o número antigo e o novo) e aparece em /integridade. Nenhuma mensagem é enviada ao número novo. Avisos de lead, plantão, recuperação de senha, OpenWA, WAHA e Call Âncora já leem `broker_profiles.phone` na hora. Testável em /dev/laboratorio > "Trocar meu telefone". Sem migration.
+
 ## 19/11/2026 - MVP visual do Call Âncora
 
 - Entrada no Lite e na navegação normal para quem tem acesso, rota `/call-ancora` com pareamento por QR de uso único, ligação simulada, cronômetro, próximo contato, classificação e interessados. `/call-ancora/celular` mostra contato fictício, link `tel:` e simulação; `/dev/laboratorio` demonstra o fluxo sem pareamento. Estado temporário em memória, sem gravar no CRM e sem criar leads. `CALL_ANCORA_VISUAL` começa desligada; corretores só recebem acesso quando o Super-admin liga a flag, enquanto admins ativos da plataforma e desenvolvimento podem abrir a demonstração. Não inclui base de frios nem discagem real automática. Registro: `docs/implementations/active/2026-11-19-call-ancora.md`.

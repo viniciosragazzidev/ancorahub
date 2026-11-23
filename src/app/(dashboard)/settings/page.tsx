@@ -32,6 +32,9 @@ import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightSettings } from "./_components/light-settings";
 import { LightWhatsappSection } from "./_components/light-whatsapp-section";
 import { LightUnitSection } from "./_components/light-unit-section";
+import { LightPhoneSection } from "./_components/light-phone-section";
+import { getOwnBrokerPhone } from "@/features/broker-phone-change/queries";
+import { formatBrazilMobile } from "@/features/broker-phone-change/phone-rules";
 import { getOwnUnitChangeOptions } from "@/features/broker-unit-change/queries";
 
 import { RelatedActions } from "@/components/related-actions";
@@ -172,11 +175,17 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const unitSections: LightSettingsSection[] = unitChange
       ? [{ id: "unidade", title: "Minha unidade", description: unitChange.current?.name ?? "Você ainda não está em uma unidade", node: <LightUnitSection {...unitChange} /> }]
       : [];
+    // Meu telefone (23/11): o corretor troca o próprio celular; a action confere tudo de novo.
+    const ownPhone = await getOwnBrokerPhone(context);
+    const phoneSections: LightSettingsSection[] = ownPhone
+      ? [{ id: "telefone", title: "Meu telefone", description: ownPhone.phone ? formatBrazilMobile(ownPhone.phone) : "Sem celular no cadastro", node: <LightPhoneSection currentPhone={ownPhone.phone || null} /> }]
+      : [];
     return (
       <LightSettings
         sections={[
           ...rankingSections,
           { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: account },
+          ...phoneSections,
           ...unitSections,
           {
             id: "disponibilidade",

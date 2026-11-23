@@ -33,6 +33,8 @@ const ACTION_LABELS: Record<string, string> = {
   assign: "Atribuição",
   login: "Login",
   export: "Exportação",
+  alterou_telefone_proprio: "Trocou o próprio telefone",
+  alterou_unidade_propria: "Trocou a própria unidade",
 };
 
 const loggedAt = liteDateFormatter({ dateStyle: "short", timeStyle: "short" });
