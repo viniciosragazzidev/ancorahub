@@ -114,6 +114,9 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
   const userName = user?.name ?? "Usuário";
   const userRole = user?.role ?? "";
   const roleKey = user?.roleKey ?? null;
+  // Diretor vê a Área de Plantão sempre (23/11: a Taina, diretora com cargo "Plantões", ficou sem o botão). Antes dependia
+  // de isCurrentUserOnDuty no navegador; se a chamada falhava (aba de antes de um deploy, rede), o botão sumia calado.
+  const showDutyArea = roleKey === "director" || (onDuty && roleKey !== "manager");
   const isPlantaoActive =
     (pathname.startsWith("/distribuicao") && pathname.includes("view=plantao")) ||
     pathname.startsWith("/leads/distribuicao/plantao");
@@ -283,7 +286,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
         )}
 
         {/* Live Duty Pulse Indicator */}
-        {onDuty && roleKey !== "manager" && (
+        {showDutyArea && (
           <TooltipProvider delay={150}>
             <Tooltip>
               <TooltipTrigger
