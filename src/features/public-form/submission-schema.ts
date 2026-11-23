@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { CNPJ_QUALIFIERS, CPF_QUALIFIERS, parseBrazilianMobile, parseName, parsePlace, type PublicFormSubmission } from "./form-flow";
+import { parseBrazilianMobile, parseLocality, parseName, type PublicFormSubmission } from "./form-flow";
 
 /**
- * O envio do /formulario conferido no servidor com as mesmas regras da conversa: nome, bairro e cidade,
- * celular brasileiro com DDD e as opções que existem em cada ramo. Nada além do que a tela manda.
+ * O envio do /formulario conferido no servidor com as mesmas regras da conversa: nome, cidade, bairro
+ * e celular brasileiro com DDD. Nada além do que a tela manda.
  */
 export const publicFormSubmissionSchema = z.object({
   kind: z.enum(["cpf", "cnpj"]),
@@ -15,7 +15,6 @@ export const publicFormSubmissionSchema = z.object({
   neighborhood: z.string().max(200),
   city: z.string().max(200),
   currentPlan: z.enum(["tem_plano", "sem_plano"]),
-  qualifier: z.string().max(40),
   phone: z.string().max(40),
   website: z.string().max(500).optional().default(""),
   idempotencyKey: z.string().regex(/^[a-zA-Z0-9_-]{8,64}$/),
@@ -23,26 +22,28 @@ export const publicFormSubmissionSchema = z.object({
 
 export type ParsedSubmission = { ok: true; data: PublicFormSubmission } | { ok: false; error: string };
 
+const INCOMPLETE = "Algumas respostas chegaram incompletas. Recarregue a página e responda de novo.";
+
 export function parsePublicFormSubmission(payload: unknown): ParsedSubmission {
   const parsed = publicFormSubmissionSchema.safeParse(payload);
-  if (!parsed.success) return { ok: false, error: "Algumas respostas chegaram incompletas. Recarregue a página e responda de novo." };
+  if (!parsed.success) return { ok: false, error: INCOMPLETE };
   const data = parsed.data;
   const name = parseName(data.name);
   if ("error" in name) return { ok: false, error: name.error };
-  const place = parsePlace(`${data.neighborhood}, ${data.city}`);
-  if ("error" in place) return { ok: false, error: place.error };
+  const city = parseLocality(data.city, "cidade");
+  if ("error" in city) return { ok: false, error: city.error };
+  const neighborhood = parseLocality(data.neighborhood, "bairro");
+  if ("error" in neighborhood) return { ok: false, error: neighborhood.error };
   const phone = parseBrazilianMobile(data.phone);
   if ("error" in phone) return { ok: false, error: phone.error };
-  const qualifiers = data.kind === "cnpj" ? CNPJ_QUALIFIERS : CPF_QUALIFIERS;
-  if (!qualifiers.some((option) => option.id === data.qualifier)) return { ok: false, error: "Algumas respostas chegaram incompletas. Recarregue a página e responda de novo." };
   return {
     ok: true,
     data: {
       ...data,
       name: name.name,
       people: data.people.replace(/[<>{}[\]\\]/g, ""),
-      neighborhood: data.neighborhood.trim().replace(/\s+/g, " ").replace(/[<>{}[\]\\]/g, ""),
-      city: data.city.trim().replace(/\s+/g, " ").replace(/[<>{}[\]\\]/g, ""),
+      neighborhood: neighborhood.value,
+      city: city.value,
       phone: phone.phone,
       website: data.website ?? "",
     },

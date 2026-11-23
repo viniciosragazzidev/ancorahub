@@ -2,8 +2,9 @@ import type { ChatBlock, ChatChoice, ChatProgress } from "@/components/chat/type
 
 /**
  * Formulário público de qualificação (/formulario, 23/11/2026): a mesma conversa passo a passo da
- * Cotação e da venda no Lite, para quem chega pelo link. No máximo 7 passos, e o primeiro decide o
- * ramo (CPF ou CNPJ). Puro: a tela guarda as respostas e pergunta aqui o que vem depois; o servidor
+ * Cotação e da venda no Lite, para quem chega pelo link. Sete passos, uma coisa por vez: CPF ou CNPJ
+ * (decide o ramo), idade ou vidas, cidade (com opções para tocar), bairro, plano atual, nome e o
+ * WhatsApp por último. Puro: a tela guarda as respostas e pergunta aqui o que vem depois; o servidor
  * usa as mesmas validações.
  */
 
@@ -12,28 +13,26 @@ export type CurrentPlan = "tem_plano" | "sem_plano";
 
 export type FormAnswers = {
   kind?: FormKind;
-  name?: string;
   /** O que a pessoa tocou ou escreveu sobre quem entra no plano ("19 a 29 anos", "35, 32 e 8 anos", "3 a 9 pessoas"). */
   people?: string;
   /** Idades digitadas (CPF), quando ela escreveu em vez de tocar numa faixa. */
   ages?: number[];
   /** Quantas pessoas, quando dá para saber. */
   lives?: number | null;
-  neighborhood?: string;
   city?: string;
+  neighborhood?: string;
   currentPlan?: CurrentPlan;
-  /** A pergunta própria de cada ramo: quando contratar (CPF) ou o CNPJ (CNPJ). */
-  qualifier?: string;
+  name?: string;
   /** Celular em dígitos com o 55 ("5521999990000"). */
   phone?: string;
   /** A pessoa conferiu o número e tocou em Enviar. */
   confirmed?: boolean;
 };
 
-export type FormStep = "kind" | "name" | "people" | "place" | "plan" | "qualifier" | "phone";
+export type FormStep = "kind" | "people" | "city" | "neighborhood" | "plan" | "name" | "phone";
 export type FormAwaiting = FormStep | "confirm" | "done";
 
-export const FORM_STEPS: readonly FormStep[] = ["kind", "name", "people", "place", "plan", "qualifier", "phone"];
+export const FORM_STEPS: readonly FormStep[] = ["kind", "people", "city", "neighborhood", "plan", "name", "phone"];
 export const FORM_TOTAL_STEPS = FORM_STEPS.length;
 
 export const KIND_LABEL: Record<FormKind, string> = { cpf: "Para mim ou minha família (CPF)", cnpj: "Para minha empresa (CNPJ)" };
@@ -41,6 +40,8 @@ export const CURRENT_PLAN_LABEL: Record<CurrentPlan, string> = {
   tem_plano: "Já possuo plano, mas quero saber se estou pagando caro",
   sem_plano: "Não tenho um plano",
 };
+/** Cidades para tocar (onde a Âncora mais atende); qualquer outra a pessoa escreve. */
+export const QUICK_CITIES = ["Rio de Janeiro", "Niterói", "São Gonçalo", "Duque de Caxias", "Nova Iguaçu"] as const;
 
 type Option = { id: string; label: string; lives?: number | null };
 
@@ -58,36 +59,17 @@ const CNPJ_LIFE_BANDS: Option[] = [
   { id: "10-29", label: "10 a 29 pessoas", lives: null },
   { id: "30+", label: "30 pessoas ou mais", lives: null },
 ];
-export const CPF_QUALIFIERS: Option[] = [
-  { id: "agora", label: "O quanto antes" },
-  { id: "30-dias", label: "Nos próximos 30 dias" },
-  { id: "pesquisando", label: "Só estou pesquisando" },
-];
-export const CNPJ_QUALIFIERS: Option[] = [
-  { id: "mei", label: "Sim, sou MEI" },
-  { id: "me-epp", label: "Sim, ME, EPP ou outro" },
-  { id: "abrindo", label: "Ainda estou abrindo" },
-];
 
 export function peopleOptions(kind: FormKind) {
   return kind === "cnpj" ? CNPJ_LIFE_BANDS : CPF_AGE_BANDS;
 }
-export function qualifierOptions(kind: FormKind) {
-  return kind === "cnpj" ? CNPJ_QUALIFIERS : CPF_QUALIFIERS;
-}
-export function qualifierQuestion(kind: FormKind) {
-  return kind === "cnpj" ? "Sua empresa tem CNPJ ativo?" : "Quando você quer contratar?";
-}
-export function qualifierLabel(kind: FormKind, id: string | undefined) {
-  return qualifierOptions(kind).find((option) => option.id === id)?.label ?? null;
-}
 
 // ─── Validações (as mesmas no navegador e no servidor) ─────────────────────
 
-const clean = (value: string) => value.normalize("NFC").replace(/\s+/g, " ").trim();
+const clean = (value: string) => value.normalize("NFC").replace(/\s+/g, " ").trim().replace(/[<>{}[\]\\]/g, "");
 
 export function parseName(raw: string): { name: string } | { error: string } {
-  const name = clean(raw).replace(/[<>{}[\]\\]/g, "");
+  const name = clean(raw);
   if (name.length < 2 || !/\p{L}/u.test(name)) return { error: "Me diga seu nome, por favor. Ex.: Maria Souza" };
   if (name.length > 80) return { error: "Esse nome ficou muito longo. Pode escrever só o nome e o sobrenome." };
   if (/\d{4,}/.test(name)) return { error: "Parece um número. Me diga seu nome, por favor." };
@@ -113,17 +95,13 @@ export function parsePeopleText(kind: FormKind, raw: string): { people: string; 
   return { people: joinAges(numbers), ages: numbers, lives: numbers.length };
 }
 
-/** "Icaraí, Niterói" (ou com hífen, barra ou " em "): bairro e cidade. */
-export function parsePlace(raw: string): { neighborhood: string; city: string } | { error: string } {
-  const parts = clean(raw).replace(/[<>{}[\]\\]/g, "").split(/\s*,\s*|\s+-\s+|\s*\/\s*|\s+em\s+/i).map((part) => part.trim()).filter(Boolean);
-  if (parts.length < 2) return { error: "Me diga o bairro e a cidade, separados por vírgula. Ex.: Icaraí, Niterói" };
-  const neighborhood = parts[0]!;
-  const city = parts.slice(1).join(", ");
-  if (neighborhood.length < 2 || city.length < 2 || !/\p{L}/u.test(neighborhood) || !/\p{L}/u.test(city)) {
-    return { error: "Me diga o bairro e a cidade, separados por vírgula. Ex.: Icaraí, Niterói" };
-  }
-  if (neighborhood.length > 80 || city.length > 80) return { error: "Ficou muito longo. Escreva só o bairro e a cidade. Ex.: Icaraí, Niterói" };
-  return { neighborhood, city };
+/** Um nome de lugar (cidade ou bairro): letras, de 2 a 80 caracteres. */
+export function parseLocality(raw: string, what: "cidade" | "bairro"): { value: string } | { error: string } {
+  const value = clean(raw).replace(/[.,;]+$/, "");
+  const example = what === "cidade" ? "Ex.: Niterói" : "Ex.: Icaraí";
+  if (value.length < 2 || !/\p{L}/u.test(value)) return { error: `Me diga ${what === "cidade" ? "a cidade" : "o bairro"}, por favor. ${example}` };
+  if (value.length > 80) return { error: `Ficou muito longo. Escreva só ${what === "cidade" ? "a cidade" : "o bairro"}. ${example}` };
+  return { value };
 }
 
 const VALID_DDD = new Set([
@@ -137,6 +115,7 @@ export function parseBrazilianMobile(raw: string): { phone: string } | { error: 
   let digits = raw.replace(/\D/g, "");
   if (digits.length === 13 && digits.startsWith("55")) digits = digits.slice(2);
   if (digits.length === 12 && digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length === 10) return { error: "Esse número não parece de celular. Escreva o celular com DDD. Ex.: 21 99999-0000" };
   if (digits.length !== 11) return { error: "Escreva o celular com DDD, só os números. Ex.: 21 99999-0000" };
   const ddd = Number(digits.slice(0, 2));
   const number = digits.slice(2);
@@ -155,11 +134,11 @@ export function formatMobile(phone: string) {
 
 export function formAwaiting(answers: FormAnswers): FormAwaiting {
   if (!answers.kind) return "kind";
-  if (!answers.name) return "name";
   if (!answers.people) return "people";
-  if (!answers.city || !answers.neighborhood) return "place";
+  if (!answers.city) return "city";
+  if (!answers.neighborhood) return "neighborhood";
   if (!answers.currentPlan) return "plan";
-  if (!answers.qualifier) return "qualifier";
+  if (!answers.name) return "name";
   if (!answers.phone) return "phone";
   return answers.confirmed ? "done" : "confirm";
 }
@@ -170,7 +149,7 @@ export function formProgress(answers: FormAnswers): ChatProgress {
   return { title: "Suas respostas", done: index < 0 ? FORM_TOTAL_STEPS : index, total: FORM_TOTAL_STEPS };
 }
 
-/** "field:value" → [field, value]. */
+/** "field:value" → [field, value]; o valor pode ter ":". */
 export function splitFormChoice(raw: string): [string, string] {
   const at = raw.indexOf(":");
   return at < 0 ? [raw, ""] : [raw.slice(0, at), raw.slice(at + 1)];
@@ -192,10 +171,10 @@ export function applyFormChoice(answers: FormAnswers, value: string): FormAnswer
       const option = peopleOptions(answers.kind!).find((item) => item.id === raw);
       return option ? { ...answers, people: option.label, ages: undefined, lives: option.lives ?? null } : null;
     }
+    case "city":
+      return (QUICK_CITIES as readonly string[]).includes(raw) ? { ...answers, city: raw } : null;
     case "plan":
       return raw === "tem_plano" || raw === "sem_plano" ? { ...answers, currentPlan: raw } : null;
-    case "qualifier":
-      return qualifierOptions(answers.kind!).some((item) => item.id === raw) ? { ...answers, qualifier: raw } : null;
     case "confirm":
       return { ...answers, confirmed: true };
     default:
@@ -213,17 +192,21 @@ export function applyFormText(answers: FormAnswers, text: string): { answers: Fo
       if (/\b(cpf|eu|mim|familia|pessoa fisica)\b/.test(folded)) return { answers: { ...answers, kind: "cpf" } };
       return { error: "Toque numa das opções acima: CPF para você ou sua família, CNPJ para a sua empresa." };
     }
-    case "name": {
-      const parsed = parseName(text);
-      return "error" in parsed ? parsed : { answers: { ...answers, name: parsed.name } };
-    }
     case "people": {
       const parsed = parsePeopleText(answers.kind!, text);
       return "error" in parsed ? parsed : { answers: { ...answers, people: parsed.people, ages: parsed.ages, lives: parsed.lives } };
     }
-    case "place": {
-      const parsed = parsePlace(text);
-      return "error" in parsed ? parsed : { answers: { ...answers, ...parsed } };
+    case "city": {
+      const parsed = parseLocality(text, "cidade");
+      return "error" in parsed ? parsed : { answers: { ...answers, city: parsed.value } };
+    }
+    case "neighborhood": {
+      const parsed = parseLocality(text, "bairro");
+      return "error" in parsed ? parsed : { answers: { ...answers, neighborhood: parsed.value } };
+    }
+    case "name": {
+      const parsed = parseName(text);
+      return "error" in parsed ? parsed : { answers: { ...answers, name: parsed.name } };
     }
     case "phone":
     case "confirm": {
@@ -232,7 +215,6 @@ export function applyFormText(answers: FormAnswers, text: string): { answers: Fo
       return "error" in parsed ? parsed : { answers: { ...answers, phone: parsed.phone, confirmed: false } };
     }
     case "plan":
-    case "qualifier":
       return { error: "Toque numa das opções acima para seguir." };
     default:
       return { error: "Suas respostas já foram enviadas." };
@@ -242,7 +224,7 @@ export function applyFormText(answers: FormAnswers, text: string): { answers: Fo
 /** Abertura da conversa. */
 export function introBlocks(): ChatBlock[] {
   return [
-    { type: "assistant", id: "a-intro", text: "Oi! São no máximo 7 perguntas rápidas para um corretor da Âncora achar o plano de saúde certo para você." },
+    { type: "assistant", id: "a-intro", text: "Oi! São 7 perguntas rápidas para um corretor da Âncora achar o plano de saúde certo para você." },
     ...nextFormBlocks({}, 0),
   ];
 }
@@ -257,32 +239,33 @@ export function nextFormBlocks(answers: FormAnswers, round: number): ChatBlock[]
         type: "question", id: id("q-kind"), prompt: "Para quem é o plano?",
         choices: (["cpf", "cnpj"] as const).map((value) => ({ id: `kind-${value}`, label: KIND_LABEL[value], action: local("kind", value) })),
       }];
-    case "name":
-      return [{ type: "assistant", id: id("a-name"), text: kind === "cnpj" ? "Ótimo. Qual o seu nome?" : "Ótimo. Como você se chama?" }];
     case "people": {
       const choices: ChatChoice[] = peopleOptions(kind).map((option) => ({ id: `people-${option.id}`, label: option.label, action: local("people", option.id) }));
       return [{
         type: "question", id: id("q-people"),
         prompt: kind === "cnpj"
-          ? `Prazer, ${firstName(answers.name)}. Quantas pessoas vão entrar no plano da empresa?`
-          : `Prazer, ${firstName(answers.name)}. Qual a idade de quem vai no plano? Se forem mais pessoas, escreva as idades aqui embaixo.`,
+          ? "Quantas pessoas vão entrar no plano da empresa?"
+          : "Qual a idade de quem vai no plano? Se forem mais pessoas, escreva as idades aqui embaixo.",
         choices,
       }];
     }
-    case "place":
-      return [{ type: "assistant", id: id("a-place"), text: kind === "cnpj" ? "Em qual bairro e cidade fica a empresa? Ex.: Centro, Niterói" : "Em qual bairro e cidade você mora? Ex.: Icaraí, Niterói" }];
+    case "city":
+      return [{
+        type: "question", id: id("q-city"),
+        prompt: kind === "cnpj" ? "Em qual cidade fica a empresa? Toque ou escreva aqui embaixo." : "Em qual cidade você mora? Toque ou escreva aqui embaixo.",
+        choices: QUICK_CITIES.map((city) => ({ id: `city-${city}`, label: city, action: local("city", city) })),
+      }];
+    case "neighborhood":
+      return [{ type: "assistant", id: id("a-neighborhood"), text: kind === "cnpj" ? `E o bairro da empresa em ${answers.city}?` : `E em qual bairro de ${answers.city}?` }];
     case "plan":
       return [{
         type: "question", id: id("q-plan"), prompt: "Você já tem plano de saúde?",
         choices: (["tem_plano", "sem_plano"] as const).map((value) => ({ id: `plan-${value}`, label: CURRENT_PLAN_LABEL[value], action: local("plan", value) })),
       }];
-    case "qualifier":
-      return [{
-        type: "question", id: id("q-qualifier"), prompt: qualifierQuestion(kind),
-        choices: qualifierOptions(kind).map((option) => ({ id: `qualifier-${option.id}`, label: option.label, action: local("qualifier", option.id) })),
-      }];
+    case "name":
+      return [{ type: "assistant", id: id("a-name"), text: "Quase lá. Como você se chama?" }];
     case "phone":
-      return [{ type: "assistant", id: id("a-phone"), text: "Última pergunta. Qual o seu WhatsApp com DDD? É por ele que o corretor vai falar com você." }];
+      return [{ type: "assistant", id: id("a-phone"), text: `Prazer, ${firstName(answers.name)}. Última pergunta: qual o seu WhatsApp com DDD? É por ele que o corretor vai falar com você.` }];
     case "confirm":
       return [{
         type: "question", id: id("q-confirm"), prompt: `Confere o seu WhatsApp: ${formatMobile(answers.phone!)}. Posso enviar?`,
@@ -299,11 +282,12 @@ export function nextFormBlocks(answers: FormAnswers, round: number): ChatBlock[]
 /** Placeholder e teclado do campo para a pergunta em aberto. */
 export function composerFor(answers: FormAnswers): { placeholder?: string; input?: { inputMode?: "text" | "numeric"; label?: string } } {
   switch (formAwaiting(answers)) {
-    case "name": return { placeholder: "Ex.: Maria Souza", input: { label: "Seu nome" } };
     case "people": return answers.kind === "cnpj"
       ? { placeholder: "Ou escreva o número. Ex.: 4", input: { inputMode: "numeric", label: "Quantas pessoas vão entrar no plano" } }
       : { placeholder: "Ou escreva as idades. Ex.: 35, 32 e 8", input: { label: "Idades de quem vai no plano" } };
-    case "place": return { placeholder: "Ex.: Icaraí, Niterói", input: { label: "Bairro e cidade" } };
+    case "city": return { placeholder: "Ou escreva a cidade. Ex.: Maricá", input: { label: "Cidade" } };
+    case "neighborhood": return { placeholder: "Ex.: Icaraí", input: { label: "Bairro" } };
+    case "name": return { placeholder: "Ex.: Maria Souza", input: { label: "Seu nome" } };
     case "phone": return { placeholder: "Ex.: 21 99999-0000", input: { inputMode: "numeric", label: "Seu WhatsApp com DDD" } };
     case "confirm": return { placeholder: "Ou escreva outro número", input: { inputMode: "numeric", label: "Seu WhatsApp com DDD" } };
     case "done": return { placeholder: "Respostas enviadas" };
@@ -322,7 +306,6 @@ export type PublicFormSubmission = {
   neighborhood: string;
   city: string;
   currentPlan: CurrentPlan;
-  qualifier: string;
   phone: string;
   /** Honeypot: escondido de quem usa a tela; robô preenche. */
   website: string;
@@ -333,10 +316,10 @@ export type PublicFormSubmission = {
 export type PublicFormResult = { ok: true } | { ok: false; error: string; retryable: boolean };
 
 export function toSubmission(answers: FormAnswers, idempotencyKey: string, website = ""): PublicFormSubmission | null {
-  if (!answers.kind || !answers.name || !answers.people || !answers.neighborhood || !answers.city || !answers.currentPlan || !answers.qualifier || !answers.phone) return null;
+  if (!answers.kind || !answers.name || !answers.people || !answers.neighborhood || !answers.city || !answers.currentPlan || !answers.phone) return null;
   return {
     kind: answers.kind, name: answers.name, people: answers.people, ages: answers.ages ?? null, lives: answers.lives ?? null,
-    neighborhood: answers.neighborhood, city: answers.city, currentPlan: answers.currentPlan, qualifier: answers.qualifier,
+    neighborhood: answers.neighborhood, city: answers.city, currentPlan: answers.currentPlan,
     phone: answers.phone, website, idempotencyKey,
   };
 }
@@ -353,7 +336,6 @@ export function submissionToLeadData(submission: PublicFormSubmission) {
   const formAnswers = [
     `Para quem: ${cnpj ? "Empresa (CNPJ)" : "Pessoa física (CPF)"}`,
     `Plano atual: ${CURRENT_PLAN_LABEL[submission.currentPlan]}`,
-    `${qualifierQuestion(submission.kind).replace(/\?$/, "")}: ${qualifierLabel(submission.kind, submission.qualifier) ?? submission.qualifier}`,
   ];
   return { formData, formAnswers, leadType: cnpj ? ("PME" as const) : ("PF" as const), livesCount: submission.lives };
 }

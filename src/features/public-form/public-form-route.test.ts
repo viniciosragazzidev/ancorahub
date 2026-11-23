@@ -26,7 +26,7 @@ import type { PublicFormSubmission } from "./form-flow";
 
 const cpf: PublicFormSubmission = {
   kind: "cpf", name: "Maria Souza", people: "30 a 39 anos", ages: null, lives: 1, neighborhood: "Icaraí", city: "Niterói",
-  currentPlan: "sem_plano", qualifier: "agora", phone: "5521998765432", website: "", idempotencyKey: "chave-abcdef12",
+  currentPlan: "sem_plano", phone: "5521998765432", website: "", idempotencyKey: "chave-abcdef12",
 };
 const meta = { requestId: "req-1", userAgent: null, receivedAt: new Date("2026-11-23T12:00:00Z") };
 const credential = { credentialId: "cred-1", tenantId: "tenant-1", branchId: "branch-1", createdBy: "user-1", tenantStatus: "active" };
@@ -63,7 +63,7 @@ describe("receivePublicForm", () => {
   });
 
   it("CNPJ entra como PME direto na fila PME da fila PF", async () => {
-    await receivePublicForm({ ...cpf, kind: "cnpj", people: "3 a 9 pessoas", lives: null, qualifier: "mei" }, meta);
+    await receivePublicForm({ ...cpf, kind: "cnpj", people: "3 a 9 pessoas", lives: null }, meta);
     expect(state.resolvePme).toHaveBeenCalledWith("tenant-1", "q-pf");
     expect(state.createLead).toHaveBeenCalledWith(expect.objectContaining({
       queueId: "q-pme",
