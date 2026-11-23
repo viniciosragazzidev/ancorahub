@@ -736,6 +736,8 @@ export function buildAgentTools(env: ToolEnv) {
     leads_buscar: tool({
       description:
         "B9: acha leads por nome ou pelos últimos dígitos do telefone, ou lista os sem dono, os de um corretor ou de uma etapa. " +
+        "Filtra também pela DATA DE ATRIBUIÇÃO (quando o lead chegou ao corretor): \"quais leads foram para o Marcos hoje?\" = corretor_id + atribuido_de = atribuido_ate = hoje; " +
+        "devolve a lista com a hora de chegada, a etapa, a fila e o total. Responda com essa lista; nunca diga que não consegue ver a data de atribuição. " +
         "Use antes de agir sobre um lead (dá o lead_id). Vários com o mesmo nome: use escolher. Nunca mostra o telefone inteiro.",
       inputSchema: z.object({
         texto: z.string().max(80).optional().describe("Nome ou 4+ dígitos do telefone."),
@@ -743,8 +745,38 @@ export function buildAgentTools(env: ToolEnv) {
         corretor_id: PERSON_ID.optional(),
         etapa: z.enum(["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"]).optional(),
         limite: z.number().int().min(1).max(30).optional(),
+        atribuido_de: DATE.optional().describe("Chegou ao corretor a partir deste dia (AAAA-MM-DD, São Paulo)."),
+        atribuido_ate: DATE.optional().describe("Chegou ao corretor até este dia, inclusive."),
       }),
       execute: async (input): Promise<ToolResult> => {
+        const byAssignment = Boolean(input.atribuido_de || input.atribuido_ate);
+        if (byAssignment) {
+          // Lista completa (até 200) para dar o total certo; mostra até `limite` linhas (padrão 30).
+          const leads = await backend.searchLeads({ text: input.texto, brokerId: input.corretor_id, status: input.etapa, assignedFrom: input.atribuido_de ?? null, assignedUntil: input.atribuido_ate ?? null, limit: 200 });
+          const de = input.atribuido_de ?? input.atribuido_ate!;
+          const ate = input.atribuido_ate ?? input.atribuido_de!;
+          const period = de === ate ? dayLabel(de) : `${dayLabel(de)} a ${dayLabel(ate)}`;
+          const owner = input.corretor_id ? leads[0]?.brokerName ?? null : null;
+          const href = input.corretor_id ? `/leads?corretor=${encodeURIComponent(input.corretor_id)}` : "/leads";
+          if (!leads.length) return { ok: true, message: `Nenhum lead chegou${input.corretor_id ? " para essa pessoa" : ""} em ${period}.`, data: { leads: [], total: 0 }, href };
+          const shown = leads.slice(0, input.limite ?? 30);
+          const line = (lead: LeadSummary) => {
+            const at = lead.assignedAt ? new Date(Date.parse(lead.assignedAt) - 3 * 3_600_000).toISOString() : null;
+            const when = at ? (de === ate ? at.slice(11, 16) : `${at.slice(8, 10)}/${at.slice(5, 7)} ${at.slice(11, 16)}`) : null;
+            return `• ${[when, `${lead.name}${lead.phoneTail ? ` (…${lead.phoneTail})` : ""}`, stageLabel(lead.status), input.corretor_id ? null : lead.brokerName, lead.queueName].filter(Boolean).join(" · ")}`;
+          };
+          const head = `${leads.length} ${leads.length === 1 ? "lead chegou" : "leads chegaram"}${owner ? ` para ${owner}` : ""} em ${period}${leads.length > shown.length ? ` (mostrando ${shown.length})` : ""}:`;
+          return {
+            ok: true,
+            message: [head, ...shown.map(line)].join("\n"),
+            data: {
+              total: leads.length,
+              leads: shown.map((lead) => ({ id: lead.id, nome: lead.name, chegou: lead.assignedAt, etapa: stageLabel(lead.status), corretor: lead.brokerName, fila: lead.queueName })),
+              rotulos: shown.map((lead) => ({ id: lead.id, rotulo: lead.name })),
+            },
+            href,
+          };
+        }
         const leads = await backend.searchLeads({ text: input.texto, withoutBroker: input.sem_dono, brokerId: input.corretor_id, status: input.etapa, limit: input.limite ?? 10 });
         if (!leads.length) return { ok: true, message: input.texto ? `Não achei lead "${input.texto}".` : "Nenhum lead com esse filtro.", data: { leads: [] }, href: "/leads" };
         return {

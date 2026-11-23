@@ -83,6 +83,8 @@ export type LeadSummary = {
   distributionStatus: string | null;
   createdAt: string;
   phoneTail: string | null;
+  /** Quando chegou ao corretor atual (ISO); null sem corretor. */
+  assignedAt?: string | null;
 };
 
 export type LeadFilter = {
@@ -90,6 +92,9 @@ export type LeadFilter = {
   withoutBroker?: boolean;
   brokerId?: string | null;
   status?: string | null;
+  /** Chegou ao corretor (data de atribuição) entre estes dias, AAAA-MM-DD em São Paulo, inclusive. */
+  assignedFrom?: string | null;
+  assignedUntil?: string | null;
   limit: number;
 };
 

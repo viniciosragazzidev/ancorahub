@@ -45,6 +45,11 @@ export type MemoryWorld = {
   reportsSent?: number;
 };
 
+/** Dia em São Paulo (UTC-3) de um instante ISO. */
+function spDay(iso: string) {
+  return new Date(Date.parse(iso) - 3 * 3_600_000).toISOString().slice(0, 10);
+}
+
 export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world: MemoryWorld; actions: Array<AgentActionRecord & { id: string; undone?: boolean }> } {
   const actions: Array<AgentActionRecord & { id: string; undone?: boolean }> = [];
   let counter = 0;
@@ -188,6 +193,9 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
         .filter((lead) => !filter.withoutBroker || (!lead.brokerId && lead.distributionStatus === "unassigned"))
         .filter((lead) => !filter.brokerId || lead.brokerId === filter.brokerId)
         .filter((lead) => !filter.status || lead.status === filter.status)
+        .filter((lead) => !filter.assignedFrom || (lead.assignedAt != null && spDay(lead.assignedAt) >= filter.assignedFrom))
+        .filter((lead) => !filter.assignedUntil || (lead.assignedAt != null && spDay(lead.assignedAt) <= filter.assignedUntil))
+        .sort((a, b) => (filter.assignedFrom || filter.assignedUntil ? (b.assignedAt ?? "").localeCompare(a.assignedAt ?? "") : 0))
         .slice(0, filter.limit)
         .map(({ scheduleId: _scheduleId, ...lead }) => ({ ...lead }));
     },

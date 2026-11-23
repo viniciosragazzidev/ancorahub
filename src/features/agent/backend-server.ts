@@ -174,7 +174,7 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
 
   const WAITING = ["queued", "unassigned", "returned_to_queue"];
 
-  async function selectLeads(where: ReturnType<typeof and>, limit: number): Promise<LeadSummary[]> {
+  async function selectLeads(where: ReturnType<typeof and>, limit: number, order: "created" | "assigned" = "created"): Promise<LeadSummary[]> {
     const rows = await db
       .select({
         id: schema.leads.id,
@@ -186,13 +186,14 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
         temperature: schema.leads.qualificationStatus,
         distributionStatus: schema.leads.distributionStatus,
         createdAt: schema.leads.createdAt,
+        assignedAt: schema.leads.assignedAt,
         phone: schema.leads.telefone,
       })
       .from(schema.leads)
       .leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId))
       .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
       .where(where)
-      .orderBy(desc(schema.leads.createdAt))
+      .orderBy(order === "assigned" ? desc(schema.leads.assignedAt) : desc(schema.leads.createdAt))
       .limit(limit);
     return rows.map((row) => ({
       id: row.id,
@@ -204,6 +205,7 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
       temperature: ["hot", "warm", "cold"].includes(row.temperature ?? "") ? row.temperature : null,
       distributionStatus: row.distributionStatus,
       createdAt: row.createdAt.toISOString(),
+      assignedAt: row.assignedAt?.toISOString() ?? null,
       phoneTail: row.phone ? row.phone.replace(/\D/g, "").slice(-4) || null : null,
     }));
   }
@@ -228,7 +230,10 @@ export function createServerAgentBackend(context: TenantContext): AgentBackend {
         filter.withoutBroker ? and(isNull(schema.leads.corretorId), inArray(schema.leads.distributionStatus, WAITING)) : undefined,
         filter.brokerId ? eq(schema.leads.corretorId, filter.brokerId) : undefined,
         filter.status ? eq(schema.leads.status, filter.status as typeof schema.leads.status.enumValues[number]) : undefined,
-      ), Math.min(Math.max(filter.limit, 1), 50));
+        // Dia em São Paulo (UTC-3, sem horário de verão desde 2019).
+        filter.assignedFrom ? sql`${schema.leads.assignedAt} >= ${new Date(`${filter.assignedFrom}T00:00:00-03:00`)}` : undefined,
+        filter.assignedUntil ? sql`${schema.leads.assignedAt} < ${new Date(Date.parse(`${filter.assignedUntil}T00:00:00-03:00`) + 86_400_000)}` : undefined,
+      ), Math.min(Math.max(filter.limit, 1), 200), filter.assignedFrom || filter.assignedUntil ? "assigned" : "created");
     },
 
     async leadById(leadId) {
