@@ -40,8 +40,9 @@ import { labRecoverySettings, RecoveryCadenceLab } from "./recovery-cadence-lab"
 import { NurtureLab } from "./nurture-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
+import { SasaVoiceSettings } from "@/features/sasa-voice/components/sasa-voice-settings";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -62,6 +63,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "accordee", label: "Estilo Accordee (Início e Conversas do diretor)" },
   { id: "agenteDiretor", label: "Agente IA do diretor (escala e cadeiras)" },
   { id: "telefone", label: "Trocar meu telefone (corretor)" },
+  { id: "vozSasa", label: "Voz da Sasá (ElevenLabs)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -277,6 +279,7 @@ export function FlowLab() {
               instant
               agentId="ancora"
               canWrite
+              voicePilot
             />
           </div>
         ) : flow === "botao" ? (
@@ -319,6 +322,11 @@ export function FlowLab() {
           <RecoveryCadenceLab />
         ) : flow === "nutricao" ? (
           <NurtureLab />
+        ) : flow === "vozSasa" ? (
+          <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">
+            <SasaVoiceSettings />
+            <p className="text-xs text-(--text-secondary)">Qualquer texto com 20 letras ou mais vale como key. Com "Servidor responde: Falha", a key é recusada e a fala falha, e a Sasá fica só no texto. Depois de conectar, abra "Sasá: pedidos por texto e voz" para ouvir as respostas.</p>
+          </main>
         ) : flow === "telefone" ? (
           <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">
             <LightPhoneSection currentPhone={LAB_BROKER_PHONE} />

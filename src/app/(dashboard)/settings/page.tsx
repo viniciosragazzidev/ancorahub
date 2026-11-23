@@ -33,6 +33,8 @@ import { LightSettings } from "./_components/light-settings";
 import { LightWhatsappSection } from "./_components/light-whatsapp-section";
 import { LightUnitSection } from "./_components/light-unit-section";
 import { LightPhoneSection } from "./_components/light-phone-section";
+import { SasaVoiceSettings } from "@/features/sasa-voice/components/sasa-voice-settings";
+import { isVoicePilotUser } from "@/features/sasa-voice/store";
 import { getOwnBrokerPhone } from "@/features/broker-phone-change/queries";
 import { formatBrazilMobile } from "@/features/broker-phone-change/phone-rules";
 import { getOwnUnitChangeOptions } from "@/features/broker-unit-change/queries";
@@ -180,12 +182,18 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const phoneSections: LightSettingsSection[] = ownPhone
       ? [{ id: "telefone", title: "Meu telefone", description: ownPhone.phone ? formatBrazilMobile(ownPhone.phone) : "Sem celular no cadastro", node: <LightPhoneSection currentPhone={ownPhone.phone || null} /> }]
       : [];
+    // Voz da Sasá (teste de 23/11): só o corretor da lista vê a seção; as ações conferem de novo.
+    const voicePilot = await isVoicePilotUser(context.role, context.userId).catch(() => false);
+    const voiceSections: LightSettingsSection[] = voicePilot
+      ? [{ id: "voz-sasa", title: "Voz da Sasá", description: "Respostas por voz com a sua conta do ElevenLabs", node: <SasaVoiceSettings /> }]
+      : [];
     return (
       <LightSettings
         sections={[
           ...rankingSections,
           { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: account },
           ...phoneSections,
+          ...voiceSections,
           ...unitSections,
           {
             id: "disponibilidade",

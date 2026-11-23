@@ -11,6 +11,8 @@ import { runSasaAgentLoop } from "@/features/sasa/ecosystem-agent";
 import { answerFromFacts, factsToLines, leadLookupBlocks, type SasaFacts } from "@/features/sasa/ecosystem-answers";
 import { resolveLead } from "@/features/sasa/resolve-entities";
 import type { DevLab } from "@/lib/dev-lab";
+import type { SasaVoiceBackend } from "@/features/sasa-voice/client";
+import { charsLeftToday, clampVoiceText, keyLast4, pickDefaultVoice, SASA_VOICE_DAILY_CHARS, SASA_VOICE_TEST_TEXT, type SasaVoiceOption, type SasaVoiceState } from "@/features/sasa-voice/rules";
 
 /** O que o "microfone" do laboratório ouve, em ordem: o segundo vem com a hora errada, para testar o Corrigir. */
 export const LAB_SASA_VOICE = [
@@ -237,7 +239,66 @@ export function labSasaPhrasesBlock(): ChatBlock {
 
 const PRESET_MINUTES: Record<string, number> = { today: 60, tomorrow: 60 * 24, in_2_days: 60 * 48, in_3_days: 60 * 72 };
 
-export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["returns"]; heard?: number; offline?: boolean; nextSpeech?: string | null }, options: { delay: number; outcome: LabOutcome }): NonNullable<DevLab["sasa"]> {
+/** Vozes de mentira do laboratório (a padrão é a pt-BR, como no servidor). */
+export const LAB_VOICES: SasaVoiceOption[] = [
+  { id: "lab-en", name: "Rachel (simulada)", language: "en" },
+  { id: "lab-pt", name: "Sasá Brasil (simulada)", language: "pt-BR" },
+];
+
+/** Um bipe curto em WAV no lugar do MP3 do ElevenLabs (o laboratório não chama a API). */
+export function labVoiceAudio(seconds = 0.5): Blob {
+  const rate = 22_050;
+  const samples = Math.round(rate * seconds);
+  const buffer = new ArrayBuffer(44 + samples * 2);
+  const view = new DataView(buffer);
+  const text = (offset: number, value: string) => { for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i)); };
+  text(0, "RIFF"); view.setUint32(4, 36 + samples * 2, true); text(8, "WAVE"); text(12, "fmt ");
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, "data"); view.setUint32(40, samples * 2, true);
+  for (let i = 0; i < samples; i += 1) {
+    const fade = Math.min(1, i / 600, (samples - i) / 600);
+    view.setInt16(44 + i * 2, Math.round(Math.sin((2 * Math.PI * 520 * i) / rate) * 0.25 * fade * 32767), true);
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+type LabVoice = { key: string | null; voiceId: string | null; voiceName: string | null; enabled: boolean; usedToday: number };
+
+/**
+ * Voz da Sasá no laboratório (teste de 23/11): conectar, trocar a voz, testar e desconectar como no servidor, sem
+ * chamar o ElevenLabs. "Servidor responde: Falha" faz a key ser recusada e a fala falhar (fica só o texto).
+ */
+export function createLabVoice(voice: LabVoice, options: { delay: number; outcome: LabOutcome }): SasaVoiceBackend {
+  const stateOf = (): SasaVoiceState => ({ allowed: true, connected: Boolean(voice.key), keyLast4: voice.key ? keyLast4(voice.key) : null, voiceId: voice.voiceId, voiceName: voice.voiceName, enabled: voice.enabled, usedToday: voice.usedToday, dailyLimit: SASA_VOICE_DAILY_CHARS });
+  const failing = () => options.outcome === "falha";
+  return {
+    state: async () => { await wait(Math.min(options.delay, 300)); return stateOf(); },
+    connect: async (apiKey) => {
+      await wait(options.delay);
+      if (apiKey.trim().length < 20) return { ok: false, error: "Cole a key inteira do ElevenLabs." };
+      if (failing()) return { ok: false, error: "Não consegui falar com o ElevenLabs: a key do ElevenLabs foi recusada." };
+      const picked = LAB_VOICES.find((item) => item.id === voice.voiceId) ?? pickDefaultVoice(LAB_VOICES)!;
+      Object.assign(voice, { key: apiKey.trim(), voiceId: picked.id, voiceName: picked.name });
+      return { ok: true, state: stateOf(), voices: LAB_VOICES };
+    },
+    voices: async () => { await wait(Math.min(options.delay, 300)); return voice.key ? { ok: true, state: stateOf(), voices: LAB_VOICES } : { ok: false, error: "Conecte a key do ElevenLabs primeiro." }; },
+    choose: async ({ voiceId, voiceName }) => { await wait(Math.min(options.delay, 300)); Object.assign(voice, { voiceId, voiceName }); return { ok: true, state: stateOf() }; },
+    setEnabled: async (enabled) => { await wait(Math.min(options.delay, 300)); voice.enabled = enabled; return { ok: true, state: stateOf() }; },
+    disconnect: async () => { await wait(options.delay); if (failing()) return { ok: false, error: "Não consegui desconectar agora. A key continua guardada." }; Object.assign(voice, { key: null, voiceId: null, voiceName: null }); return { ok: true, state: stateOf() }; },
+    speak: async ({ text, test }) => {
+      await wait(options.delay);
+      if (!voice.key) return { ok: false, reason: "a voz não está conectada" };
+      const spoken = clampVoiceText(test ? SASA_VOICE_TEST_TEXT : text ?? "");
+      if (charsLeftToday(voice.usedToday) < spoken.length) return { ok: false, reason: "acabou a cota de voz de hoje" };
+      if (failing()) return { ok: false, reason: "o ElevenLabs está fora do ar (simulado)" };
+      voice.usedToday += spoken.length;
+      return { ok: true, audio: labVoiceAudio(Math.min(2, 0.3 + spoken.length / 200)) };
+    },
+  };
+}
+
+export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["returns"]; heard?: number; offline?: boolean; nextSpeech?: string | null; voice?: LabVoice }, options: { delay: number; outcome: LabOutcome }): NonNullable<DevLab["sasa"]> {
+  state.voice ??= { key: null, voiceId: null, voiceName: null, enabled: true, usedToday: 0 };
   const run = async (name: ChatServerActionName, raw: Record<string, string | number | boolean | null>): Promise<SasaActionResult> => {
     await wait(options.delay);
     if (options.outcome === "falha") return { ok: false, message: "O servidor recusou (simulado). Nada foi alterado." };
@@ -314,6 +375,7 @@ export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["retu
   };
   return {
     run,
+    voice: createLabVoice(state.voice, options),
     ask: async (question: string) => { await wait(Math.min(options.delay, 600)); return labSasaAsk(question, state.world); },
     simulateMic: true,
     get offline() { return Boolean(state.offline); },

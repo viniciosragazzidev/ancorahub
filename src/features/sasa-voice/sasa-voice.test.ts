@@ -1,0 +1,150 @@
+// @vitest-environment jsdom
+import { randomBytes } from "node:crypto";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { ChatBlock } from "@/components/chat/types";
+
+const KEY = "chave-de-teste-elevenlabs-0123WXYZ";
+const VINICIOS = "ebed87f7-b4f3-41c1-8e92-d234fa5a1ce1";
+
+// Banco de mentira: só a tabela system_settings, por chave.
+const rows = new Map<string, string>();
+const session = { tenantId: "t1", userId: VINICIOS, role: "broker" as string, jobTitle: null };
+vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: async () => session }));
+vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: async () => undefined }));
+vi.mock("@/shared/db", () => {
+  const keyOf = (condition: unknown) => (condition as { value: string }).value;
+  return {
+    schema: { systemSettings: { key: "key", value: "value" } },
+    getDatabase: () => ({
+      select: () => ({ from: () => ({ where: (condition: unknown) => ({ limit: async () => { const value = rows.get(keyOf(condition)); return value === undefined ? [] : [{ value }]; } }) }) }),
+      insert: () => ({ values: (row: { key: string; value: string }) => ({ onConflictDoUpdate: async () => { rows.set(row.key, row.value); } }) }),
+      delete: () => ({ where: async (condition: unknown) => { rows.delete(keyOf(condition)); } }),
+    }),
+  };
+});
+vi.mock("drizzle-orm", () => ({ eq: (_column: unknown, value: string) => ({ value }) }));
+
+import { connectSasaVoiceAction, disconnectSasaVoiceAction, getSasaVoiceStateAction } from "./actions";
+import { resetSasaVoiceForTests, speakSasaReply, type SasaVoiceBackend } from "./client";
+import { ElevenLabsError, listElevenLabsVoices } from "./elevenlabs";
+import { clampVoiceText, isSasaVoicePilot, pickDefaultVoice, sasaVoiceText, SASA_VOICE_MAX_CHARS_PER_REPLY, type SasaVoiceState } from "./rules";
+
+const say = (text: string): ChatBlock => ({ type: "assistant", id: text, text });
+
+beforeEach(() => {
+  rows.clear();
+  Object.assign(session, { userId: VINICIOS, role: "broker" });
+  process.env.SASA_VOICE_KEY_ENCRYPTION_KEY = randomBytes(32).toString("base64");
+});
+afterEach(() => { vi.unstubAllGlobals(); resetSasaVoiceForTests(); });
+
+function elevenLabsOk() {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ voices: [{ voice_id: "en-1", name: "Rachel", labels: { language: "en" } }, { voice_id: "pt-1", name: "Ana", labels: { accent: "brazilian" } }] }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+describe("liberação: só o corretor Vinicios Ragazzi", () => {
+  it("só ele, e só como corretor", () => {
+    expect(isSasaVoicePilot("broker", VINICIOS)).toBe(true);
+    expect(isSasaVoicePilot("director", VINICIOS)).toBe(false);
+    expect(isSasaVoicePilot("broker", "outro-corretor")).toBe(false);
+    expect(isSasaVoicePilot("broker", "outro-corretor", "a, outro-corretor")).toBe(true);
+  });
+
+  it("outro corretor recebe tudo desligado e não consegue conectar", async () => {
+    session.userId = "outro-corretor";
+    expect(await getSasaVoiceStateAction()).toMatchObject({ allowed: false, connected: false });
+    const fetchMock = elevenLabsOk();
+    expect(await connectSasaVoiceAction(KEY)).toEqual({ ok: false, error: "A voz da Sasá ainda não está liberada para você." });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(rows.size).toBe(0);
+  });
+});
+
+describe("a key nunca vaza", () => {
+  it("conecta, guarda criptografada e devolve só os 4 últimos", async () => {
+    const fetchMock = elevenLabsOk();
+    const result = await connectSasaVoiceAction(KEY);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state).toMatchObject({ connected: true, keyLast4: "WXYZ", voiceId: "pt-1", voiceName: "Ana", enabled: true });
+    expect(JSON.stringify(result)).not.toContain(KEY);
+    // No banco: só o texto cifrado.
+    expect([...rows.values()].join("")).not.toContain(KEY);
+    // A key só vai no cabeçalho do ElevenLabs.
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).not.toContain(KEY);
+    expect((init.headers as Record<string, string>)["xi-api-key"]).toBe(KEY);
+    // Estado lido de novo: nada da key nem do cifrado.
+    const state = await getSasaVoiceStateAction();
+    expect(JSON.stringify(state)).not.toContain(KEY);
+    expect(Object.keys(state)).not.toContain("keyCiphertext");
+  });
+
+  it("erro do ElevenLabs não carrega a key nem o corpo da resposta", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(`invalid key ${KEY}`, { status: 401 })));
+    const error = await listElevenLabsVoices(KEY).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ElevenLabsError);
+    expect(String((error as Error).message)).not.toContain(KEY);
+    const result = await connectSasaVoiceAction(KEY);
+    expect(result).toEqual({ ok: false, error: "Não consegui falar com o ElevenLabs: a key do ElevenLabs foi recusada." });
+    expect(rows.size).toBe(0);
+  });
+
+  it("desconectar apaga a key", async () => {
+    elevenLabsOk();
+    await connectSasaVoiceAction(KEY);
+    expect(rows.size).toBe(1);
+    const result = await disconnectSasaVoiceAction();
+    expect(result).toMatchObject({ ok: true, state: { connected: false, keyLast4: null } });
+    expect(rows.size).toBe(0);
+  });
+});
+
+describe("texto da voz e voz padrão", () => {
+  it("só as falas da Sasá, sem link, dentro do teto", () => {
+    expect(sasaVoiceText([say("Pronto, marquei."), { type: "question", id: "q", prompt: "Quer mais?", choices: [] }, say("Veja https://exemplo.com")])).toBe("Pronto, marquei. Veja");
+    const long = "Frase curta. ".repeat(80);
+    expect(clampVoiceText(long).length).toBeLessThanOrEqual(SASA_VOICE_MAX_CHARS_PER_REPLY);
+  });
+
+  it("escolhe a voz pt-BR", () => {
+    expect(pickDefaultVoice([{ id: "a", name: "A", language: "en" }, { id: "b", name: "B", language: "pt-BR" }])?.id).toBe("b");
+  });
+});
+
+describe("falha do ElevenLabs: fica só o texto", () => {
+  const on: SasaVoiceState = { allowed: true, connected: true, keyLast4: "WXYZ", voiceId: "pt-1", voiceName: "Ana", enabled: true, usedToday: 0, dailyLimit: 8000 };
+  const backend = (speak: SasaVoiceBackend["speak"], state = on): SasaVoiceBackend => ({
+    state: async () => state, connect: vi.fn(), voices: vi.fn(), choose: vi.fn(), setEnabled: vi.fn(), disconnect: vi.fn(), speak,
+  });
+
+  it("devolve o motivo curto e não toca nada", async () => {
+    const speak = vi.fn(async () => ({ ok: false as const, reason: "os créditos ou o limite do ElevenLabs acabaram" }));
+    const blocks = [say("Pronto, marquei o retorno.")];
+    const result = await speakSasaReply(backend(speak), blocks);
+    expect(result).toEqual({ spoke: false, reason: "os créditos ou o limite do ElevenLabs acabaram" });
+    expect(speak).toHaveBeenCalledWith({ text: "Pronto, marquei o retorno." });
+    // Os blocos (o texto) não mudam.
+    expect(blocks).toEqual([say("Pronto, marquei o retorno.")]);
+  });
+
+  it("voz desligada ou não conectada: nem chama o servidor", async () => {
+    const speak = vi.fn();
+    expect(await speakSasaReply(backend(speak, { ...on, enabled: false }), [say("Oi")])).toEqual({ spoke: false, reason: null });
+    resetSasaVoiceForTests();
+    expect(await speakSasaReply(backend(speak, { ...on, connected: false }), [say("Oi")])).toEqual({ spoke: false, reason: null });
+    expect(speak).not.toHaveBeenCalled();
+  });
+
+  it("som do app desligado: não gera a voz", async () => {
+    window.localStorage.setItem("ancora:a11y", JSON.stringify({ sound: false }));
+    const speak = vi.fn();
+    expect((await speakSasaReply(backend(speak), [say("Oi")])).reason).toBe("o som do app está desligado");
+    expect(speak).not.toHaveBeenCalled();
+    window.localStorage.clear();
+  });
+});

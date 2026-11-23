@@ -11,6 +11,8 @@ import type { AgentId } from "@/features/ai-gateway/agents";
 import { ASSISTANTS, SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 import { readSasaPick, SASA_DROP_VALUE, type SasaClientCommand } from "@/features/sasa/command-core";
 import { sasaCommandAction } from "@/features/sasa/command-action";
+import { useSasaVoice } from "@/features/sasa-voice/client";
+import { SasaVoiceHeader, SasaVoiceNotice } from "@/features/sasa-voice/components/sasa-voice-header";
 import { readSasaFix, sasaFixBlock, transcribeSasaVoice } from "@/features/sasa/voice-client";
 import { keepSasaOpen } from "@/features/sasa/drafts";
 import { useDevLab } from "@/lib/dev-lab";
@@ -25,7 +27,7 @@ import type { Mention } from "./composer";
 import type { AssistantAvatarAsset, ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false, voice = false, embedded = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean; /** Segurar para falar com a Sasá (fase 2): só para quem tem a Sasá com IA liberada. */ voice?: boolean; /** Só os blocos, sem cabeçalho nem campo (folha do botão da Sasá, fase 3). */ embedded?: boolean }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false, voice = false, embedded = false, voicePilot = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean; /** Segurar para falar com a Sasá (fase 2): só para quem tem a Sasá com IA liberada. */ voice?: boolean; /** Só os blocos, sem cabeçalho nem campo (folha do botão da Sasá, fase 3). */ embedded?: boolean; /** Voz por ElevenLabs (teste de 23/11): só o corretor da lista; a página confere no servidor. */ voicePilot?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
   // Aceite com contador (11/11): ligado, o WhatsApp abre na tela do lead depois de 30 s.
@@ -34,6 +36,12 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   const fire = useFeedback();
   // Sasá agêntica (fase 1, 19/11): o pedido roda primeiro como comando; o que não for comando segue para a IA.
   const agentic = agentId === "ancora";
+  // Voz da Sasá (23/11): a resposta aparece em texto e, com a voz ligada, toca depois. Nunca segura o texto.
+  const sasaVoice = useSasaVoice();
+  const spoken = (blocks: ChatBlock[]) => {
+    if (agentic && voicePilot) void sasaVoice.speak(blocks);
+    return blocks;
+  };
   // "Corrigir o que eu ouvi": o texto transcrito volta para o campo.
   const [draft, setDraft] = useState<{ text: string; key: number } | null>(null);
   const transcribe = agentic && canWrite && (voice || Boolean(lab?.sasa?.transcribe)) ? (lab?.sasa?.transcribe ?? transcribeSasaVoice) : undefined;
@@ -61,9 +69,9 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   const ask = async (text: string): Promise<ChatBlock[]> => {
     if (agentic) {
       const reply = await command({ text });
-      if (reply.handled) return reply.blocks;
+      if (reply.handled) return spoken(reply.blocks);
     }
-    return askAi(text);
+    return spoken(await askAi(text));
   };
   return (
     <ChatScreen
@@ -95,8 +103,8 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
       backHref="/dashboard"
       script={script}
       instant={instant}
-      headerAction={headerAction}
-      topNotice={topNotice}
+      headerAction={headerAction ?? (agentic && voicePilot ? <SasaVoiceHeader /> : undefined)}
+      topNotice={topNotice ?? (agentic && voicePilot ? <SasaVoiceNotice /> : undefined)}
       runAction={async (action) => {
         // Accepting opens the client's WhatsApp in the same tap: the tab opens before the await (popup blockers).
         const handoffAccept = handoff && action.name === "lead.accept";
@@ -143,8 +151,8 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
           const reply = await command({ text, clientCommandId: meta?.clientMessageId ?? null, origin: meta?.voice ? "voice" : "text" });
           // Voz: o que foi entendido sempre pode ser corrigido (desfazendo o que foi feito).
           const withFix = (blocks: ChatBlock[]) => (meta?.voice ? [...blocks, sasaFixBlock(text, blocks, String(Date.now()))] : blocks);
-          if (reply.handled) return withFix(reply.blocks);
-          if (lab?.sasa || meta?.voice) return withFix(await askAi(text, meta?.clientMessageId));
+          if (reply.handled) return spoken(withFix(reply.blocks));
+          if (lab?.sasa || meta?.voice) return spoken(withFix(await askAi(text, meta?.clientMessageId)));
         }
         // "Onde fica?" answered from the app catalog first: instant, free and always right.
         const where = bestAssistMatch(text, assist?.capabilities ?? {});
@@ -155,7 +163,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
             { type: "button", id: `where-go-${stamp}`, label: where.kind === "action" ? "Me leva lá" : `Abrir ${where.title}`, href: where.href },
           ];
         }
-        return askAi(text, meta?.clientMessageId);
+        return spoken(await askAi(text, meta?.clientMessageId));
       }}
     />
   );

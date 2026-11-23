@@ -433,3 +433,16 @@ Tabela original, para referência:
 | D8 | Quem testa primeiro | piloto por corretor (`broker_ai_pilot_user_ids`) / empresa inteira | **Piloto por corretor**, depois flag por empresa |
 | D9 | Teto diário por corretor | 50 / 150 / sem teto | **150 comandos e 20 min de áudio** |
 | D10 | Supervisor Lite | junto / fase separada | **Fase separada** (escopo de equipe pede regras próprias) |
+
+## Voz da Sasá por ElevenLabs (teste de 23/11, só o corretor Vinicios Ragazzi)
+
+Pedido: "Adicione uma versão de teste somente para o corretor Vinicios Ragazzi onde eu conecto a key do elevenlabs e o sasa me responda também por voz".
+
+- **Liberação**: `src/features/sasa-voice/rules.ts`, lista fixa com o vínculo de corretor dele (`ebed87f7-…`, o mesmo de `quote-availability.ts`) mais a lista extra `sasa_voice_pilot_user_ids` em `system_settings` (vazia). Só papel corretor. Nenhum outro corretor vê a seção, o interruptor ou chama o ElevenLabs; toda ação e a rota conferem de novo.
+- **Onde conecta**: Configurações → Voz da Sasá (`/settings?tab=voz-sasa`), ou o ícone de alto-falante no topo da conversa da Sasá. Cola a API key, a tela lista as vozes da conta dele (padrão: a primeira pt-BR), e tem Testar voz, Trocar key, Desconectar e o interruptor "Sasá responde por voz".
+- **Key**: validada no ElevenLabs antes de gravar, guardada criptografada (AES-256-GCM, mesmo formato dos tokens do WhatsApp) em `system_settings` com o prefixo `sasa-voice:`, fora do cache e das listas de configurações. Chave de criptografia: `SASA_VOICE_KEY_ENCRYPTION_KEY` no Coolify (base64 de 32 bytes) ou, sem ela, a `META_WHATSAPP_TOKEN_ENCRYPTION_KEY` que já existe. O navegador só vê os 4 últimos caracteres; erros e logs levam só o status HTTP. Desconectar apaga a linha. Sem migration.
+- **Fala**: a resposta aparece em texto; depois, com a voz ligada, `POST /api/sasa/fala` gera o MP3 no ElevenLabs (`eleven_flash_v2_5`, streaming repassado) e toca na conversa e no botão flutuante. Respeita a preferência "Som" do app (`voice-playback.ts`, ao lado do `useFeedback`), para na hora quando ele segura o botão para falar e tem "Parar" no aviso da conversa.
+- **Limites**: até 500 caracteres por resposta (corta no fim da frase; o resto fica só no texto) e 8.000 por dia. Falha do ElevenLabs, cota ou som desligado: fica só o texto, com o motivo curto ("Só texto: os créditos ou o limite do ElevenLabs acabaram").
+- **Laboratório**: fluxo "Voz da Sasá (ElevenLabs)" com conexão simulada (qualquer texto de 20 letras vale como key) e "Sasá: pedidos por texto e voz" falando com um bipe no lugar da voz. "Servidor responde: Falha" recusa a key e faz a fala cair para o texto.
+- Testes: `src/features/sasa-voice/sasa-voice.test.ts` (só ele, key que nunca vaza, desconectar apaga, volta para o texto).
+- **Pendente**: ouvir no aparelho com a key real; reprodução começa quando o MP3 chega inteiro (o servidor repassa em streaming, o navegador espera o arquivo).

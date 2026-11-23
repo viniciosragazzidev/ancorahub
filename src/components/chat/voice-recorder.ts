@@ -6,6 +6,7 @@
  * Plano: docs/implementations/active/2026-11-19-sasa-agentica.md §3.2 e §4.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { stopVoice } from "@/lib/feedback/voice-playback";
 
 export const VOICE_MAX_SECONDS = 60;
 /** Toque mais curto que isso não é fala: vira a dica "Segure para falar". */
@@ -76,6 +77,8 @@ export function useVoiceRecorder(input: { onAudio: (audio: Blob, seconds: number
   }, [release]);
 
   const start = useCallback(async () => {
+    // Voz da Sasá (23/11): segurou para falar, ela para de falar na hora.
+    stopVoice();
     if (callbacks.current.simulate) {
       simulating.current = true;
       startedAt.current = Date.now();
