@@ -8,7 +8,7 @@ import { LiteSelect } from "@/components/lite/controls/select";
 import { playVoice } from "@/lib/feedback/voice-playback";
 
 import { loadSasaVoice, setSasaVoiceState, stopSasaVoice, useSasaVoice } from "../client";
-import { charsLeftToday, SASA_VOICE_MAX_CHARS_PER_REPLY, type SasaVoiceOption } from "../rules";
+import { charsLeftToday, isElderlyMaleVoice, orderVoices, SASA_VOICE_MAX_CHARS_PER_REPLY, type SasaVoiceOption } from "../rules";
 import styles from "./sasa-voice.module.css";
 
 /**
@@ -72,6 +72,13 @@ export function SasaVoiceSettings() {
   }
 
   const left = charsLeftToday(state.usedToday, state.dailyLimit);
+  // Padrão pedido em 23/11: um senhor idoso. Sem nenhum na conta, a tela avisa e ele escolhe.
+  const ordered = orderVoices(voices, state.voiceId);
+  const noElderly = voices.length > 0 && !voices.some(isElderlyMaleVoice);
+  const voiceLabel = (item: SasaVoiceOption) => {
+    const details = [isElderlyMaleVoice(item) ? "senhor idoso" : null, item.language].filter(Boolean);
+    return details.length ? `${item.name} (${details.join(", ")})` : item.name;
+  };
 
   return (
     <div className="arc-venancor flex flex-col gap-4">
@@ -137,7 +144,7 @@ export function SasaVoiceSettings() {
             label="Voz"
             value={state.voiceId ?? ""}
             placeholder={voices.length ? "Escolha uma voz" : "Carregando vozes…"}
-            options={voices.map((item) => ({ value: item.id, label: item.language ? `${item.name} (${item.language})` : item.name }))}
+            options={ordered.map((item) => ({ value: item.id, label: voiceLabel(item) }))}
             onChange={async (voiceId) => {
               const picked = voices.find((item) => item.id === voiceId);
               if (!picked) return;
@@ -146,6 +153,10 @@ export function SasaVoiceSettings() {
               else void loadSasaVoice(backend, true);
             }}
           />
+
+          {noElderly ? (
+            <p className={styles.hint} role="status">Não achei uma voz de senhor idoso na sua conta do ElevenLabs. Escolha uma na lista ou adicione uma pela biblioteca de vozes do ElevenLabs.</p>
+          ) : null}
 
           <div className={styles.row}>
             <LiteActionButton key={`test-${round}-${state.voiceId}`} busyLabel="Gerando a voz…" doneLabel="Voz testada" errorFallback="Não consegui testar a voz." onAction={test}>

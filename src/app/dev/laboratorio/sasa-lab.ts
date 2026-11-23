@@ -239,10 +239,11 @@ export function labSasaPhrasesBlock(): ChatBlock {
 
 const PRESET_MINUTES: Record<string, number> = { today: 60, tomorrow: 60 * 24, in_2_days: 60 * 48, in_3_days: 60 * 72 };
 
-/** Vozes de mentira do laboratório (a padrão é a pt-BR, como no servidor). */
+/** Vozes de mentira do laboratório (a padrão é o senhor idoso pt-BR, como no servidor). */
 export const LAB_VOICES: SasaVoiceOption[] = [
-  { id: "lab-en", name: "Rachel (simulada)", language: "en" },
-  { id: "lab-pt", name: "Sasá Brasil (simulada)", language: "pt-BR" },
+  { id: "lab-en", name: "Rachel (simulada)", language: "en", gender: "female", age: "young" },
+  { id: "lab-pt", name: "Sasá Brasil (simulada)", language: "pt-BR", gender: "female", age: "middle_aged" },
+  { id: "lab-senhor", name: "Seu Antônio (simulada)", language: "pt-BR", gender: "male", age: "old", accent: "brazilian" },
 ];
 
 /** Um bipe curto em WAV no lugar do MP3 do ElevenLabs (o laboratório não chama a API). */

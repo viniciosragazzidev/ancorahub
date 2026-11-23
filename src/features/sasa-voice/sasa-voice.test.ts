@@ -28,8 +28,8 @@ vi.mock("drizzle-orm", () => ({ eq: (_column: unknown, value: string) => ({ valu
 
 import { connectSasaVoiceAction, disconnectSasaVoiceAction, getSasaVoiceStateAction } from "./actions";
 import { resetSasaVoiceForTests, speakSasaReply, type SasaVoiceBackend } from "./client";
-import { ElevenLabsError, listElevenLabsVoices } from "./elevenlabs";
-import { clampVoiceText, isSasaVoicePilot, pickDefaultVoice, sasaVoiceText, SASA_VOICE_MAX_CHARS_PER_REPLY, type SasaVoiceState } from "./rules";
+import { ElevenLabsError, listElevenLabsVoices, streamElevenLabsSpeech } from "./elevenlabs";
+import { clampVoiceText, isElderlyMaleVoice, isSasaVoicePilot, orderVoices, pickDefaultVoice, sasaVoiceText, SASA_VOICE_MAX_CHARS_PER_REPLY, type SasaVoiceState } from "./rules";
 
 const say = (text: string): ChatBlock => ({ type: "assistant", id: text, text });
 
@@ -111,8 +111,35 @@ describe("texto da voz e voz padrão", () => {
     expect(clampVoiceText(long).length).toBeLessThanOrEqual(SASA_VOICE_MAX_CHARS_PER_REPLY);
   });
 
-  it("escolhe a voz pt-BR", () => {
+  it("sem voz idosa na conta, escolhe a pt-BR", () => {
     expect(pickDefaultVoice([{ id: "a", name: "A", language: "en" }, { id: "b", name: "B", language: "pt-BR" }])?.id).toBe("b");
+  });
+
+  it("padrão é o senhor idoso: pt-BR primeiro, depois o idoso de qualquer sotaque", () => {
+    const voices = [
+      { id: "ana", name: "Ana", language: "pt-BR", gender: "female", age: "young" },
+      { id: "bill", name: "Bill", language: "en", gender: "male", age: "old", accent: "american" },
+      { id: "antonio", name: "Antônio", language: "pt-BR", gender: "male", age: "old", accent: "brazilian" },
+      { id: "dona", name: "Dona", language: "en", gender: "female", age: "old" },
+    ];
+    expect(pickDefaultVoice(voices)?.id).toBe("antonio");
+    expect(pickDefaultVoice(voices.filter((voice) => voice.id !== "antonio"))?.id).toBe("bill");
+    expect(isElderlyMaleVoice(voices[3]!)).toBe(false);
+    expect(orderVoices(voices, "ana").map((voice) => voice.id)).toEqual(["ana", "bill", "antonio", "dona"]);
+  });
+
+  it("fala com o modelo multilíngue, mais estável e um pouco mais lenta", async () => {
+    const fetchMock = vi.fn(async () => new Response("mp3", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await streamElevenLabsSpeech(KEY, "bill", "Oi");
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body).toMatchObject({ model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.65, speed: 0.9 } });
+  });
+
+  it("conectar escolhe o senhor idoso da conta", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ voices: [{ voice_id: "ana", name: "Ana", labels: { accent: "brazilian", gender: "female" } }, { voice_id: "bill", name: "Bill", labels: { gender: "male", age: "old", accent: "american" } }] }), { status: 200 })));
+    const result = await connectSasaVoiceAction(KEY);
+    expect(result.ok && result.state.voiceId).toBe("bill");
   });
 });
 

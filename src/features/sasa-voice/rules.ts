@@ -23,9 +23,16 @@ export function isSasaVoicePilot(role: string | null | undefined, userId: string
 export const SASA_VOICE_MAX_CHARS_PER_REPLY = 500;
 export const SASA_VOICE_DAILY_CHARS = 8_000;
 
-export const SASA_VOICE_TEST_TEXT = "Oi, eu sou a Sasá. É assim que eu vou te responder.";
+export const SASA_VOICE_TEST_TEXT = "Oi, aqui é a Sasá. É assim que eu vou te responder.";
 
-export type SasaVoiceOption = { id: string; name: string; language: string | null };
+/** Metadados que a API do ElevenLabs devolve em `labels` (idade, gênero, sotaque), quando a voz os tem. */
+export type SasaVoiceOption = { id: string; name: string; language: string | null; gender?: string | null; age?: string | null; accent?: string | null };
+
+/**
+ * Tom de "senhor calmo" (pedido de 23/11: "voz de idade, senhor velho"): estabilidade um pouco mais alta e fala um
+ * pouco mais lenta. `speed` vai de 0,7 a 1,2 no ElevenLabs.
+ */
+export const SASA_VOICE_SETTINGS = { stability: 0.65, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 0.9 } as const;
 
 /** O que o navegador recebe: nunca a key, só os 4 últimos caracteres. */
 export type SasaVoiceState = {
@@ -79,13 +86,32 @@ export function charsLeftToday(usedToday: number, daily = SASA_VOICE_DAILY_CHARS
   return Math.max(0, daily - usedToday);
 }
 
-/** Voz padrão: a primeira em português do Brasil; sem ela, a primeira em português; sem nenhuma, a primeira. */
+const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
+const isBrazilian = (voice: SasaVoiceOption) => /pt[-_]br|brazil/.test(`${lower(voice.language)} ${lower(voice.accent)}`);
+
+/** Voz masculina idosa pelos metadados do ElevenLabs (`age`: "old"/"elderly"; `gender`: "male"). */
+export function isElderlyMaleVoice(voice: SasaVoiceOption) {
+  return /\b(old|elderly|senior)\b/.test(lower(voice.age)) && /\bmale\b/.test(lower(voice.gender)) && !/female/.test(lower(voice.gender));
+}
+
+/**
+ * Voz padrão (23/11): um senhor idoso, de preferência com sotaque brasileiro; sem pt-BR idosa, o senhor idoso que
+ * houver (o modelo multilíngue faz ele falar português). Sem voz idosa na conta: a primeira pt-BR, depois a primeira
+ * em português, depois a primeira; a tela avisa e pede para ele escolher.
+ */
 export function pickDefaultVoice(voices: readonly SasaVoiceOption[]): SasaVoiceOption | null {
-  const lang = (voice: SasaVoiceOption) => (voice.language ?? "").toLowerCase();
-  return voices.find((voice) => /pt[-_]br|brazil/.test(lang(voice)))
-    ?? voices.find((voice) => /^pt|portug/.test(lang(voice)))
+  return voices.find((voice) => isElderlyMaleVoice(voice) && isBrazilian(voice))
+    ?? voices.find(isElderlyMaleVoice)
+    ?? voices.find(isBrazilian)
+    ?? voices.find((voice) => /^pt|portug/.test(lower(voice.language)))
     ?? voices[0]
     ?? null;
+}
+
+/** A voz escolhida primeiro na lista; depois as de senhor idoso; o resto como veio. */
+export function orderVoices(voices: readonly SasaVoiceOption[], selectedId: string | null): SasaVoiceOption[] {
+  const rank = (voice: SasaVoiceOption) => (voice.id === selectedId ? 0 : isElderlyMaleVoice(voice) ? 1 : 2);
+  return [...voices].sort((a, b) => rank(a) - rank(b));
 }
 
 /** Motivo curto para o corretor quando o ElevenLabs não responde (fica só o texto). */
