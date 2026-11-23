@@ -11,6 +11,9 @@ import { Building2, Lock, Mail, MessageCircle, Phone, Share2, UserPlus } from "l
 import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { PUBLIC_FORM_CHANNEL_ID, PUBLIC_FORM_ORIGIN_LABEL } from "@/features/public-form/channel";
+import type { PublicFormAnswerRow } from "@/features/public-form/lead-answers";
+
 import { liteStageLabel } from "../lite-stage-labels";
 import styles from "./director-lite-lead-detail.module.css";
 
@@ -70,6 +73,8 @@ export type DirectorLiteLeadDetailProps = {
     beneficiaryRaw: string | null;
   }>;
   formData: Record<string, string | null>;
+  /** Respostas do /formulario, quando o lead veio dele. */
+  publicFormAnswers?: PublicFormAnswerRow[] | null;
   canSeePersonalData: boolean;
   shouldMask: boolean;
   /** Papel de quem vê: diretor, gestor e supervisor abrem o perfil do corretor pelo nome. */
@@ -125,7 +130,8 @@ function Section({ title, description, children, tone }: { title: string; descri
 export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
   const { lead, meta, qualification, formData, canSeePersonalData, shouldMask, maskedPhone, maskedEmail, stageRank, slots, viewerRole } = props;
   const owner = lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} viewerRole={viewerRole} /> : "Aguardando distribuição";
-  const origin = lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook");
+  const fromPublicForm = lead.sourceChannel === PUBLIC_FORM_CHANNEL_ID;
+  const origin = fromPublicForm ? PUBLIC_FORM_ORIGIN_LABEL : lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook");
   const phone = canSeePersonalData
     ? <a className={styles.link} href={`tel:${lead.telefone.replace(/\D/g, "")}`}>{lead.telefone}</a>
     : maskedPhone;
@@ -138,7 +144,7 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
       ? "Perda por demora de resposta"
       : "Lead encerrado sem venda";
   const lossBadge = lead.lossCategory === "unattended_sla" ? "Estouro de SLA" : lead.lossCategory === "response_delay" ? "Atraso no atendimento" : "Lead perdido";
-  const showMeta = lead.origem === "webhook" || Boolean(lead.sourceCampaign) || Boolean(lead.metaCampaignId);
+  const showMeta = !fromPublicForm && (lead.origem === "webhook" || Boolean(lead.sourceCampaign) || Boolean(lead.metaCampaignId));
   const beneficiaryNames: Record<string, string> = { titular: "você", conjuge: "cônjuge", filho: "filho", pai_mae: "pai/mãe", neto: "neto", outro: "outra pessoa" };
   const beneficiaryEntries = qualification.beneficiaries ?? [];
   const beneficiaryAges = beneficiaryEntries.map((beneficiary) => beneficiary.age).filter((age): age is number => age !== null);
@@ -219,6 +225,15 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
               <Section title="Qualificação por agente de IA" description="Ideal para leads antigos ou importados. Dispara o template oficial de qualificação no WhatsApp.">
                 <div className={styles.cardAction}>{slots.startQualification}</div>
               </Section>
+
+              {props.publicFormAnswers?.length ? (
+                <Section title="Respostas do formulário" description="O que a pessoa respondeu no formulário do site.">
+                  <dl className={styles.fields}>
+                    {props.publicFormAnswers.map((row) => <Field key={row.label} label={row.label}>{row.value}</Field>)}
+                    <Field label="Enviado em"><span className={styles.numeric}>{shortDateTime.format(lead.capturedAt ?? lead.createdAt)}</span></Field>
+                  </dl>
+                </Section>
+              ) : null}
 
               {qualification.numberOfLives || qualification.averageAge || qualification.individualAges ? (
                 <Section title="Dados da qualificação" description="Coletados pelo agente, separados entre atendimento individual e empresarial.">

@@ -56,6 +56,8 @@ describe("receivePublicForm", () => {
     expect(await receivePublicForm(cpf, meta)).toEqual({ ok: true, leadId: "lead-1", duplicate: false });
     expect(state.createLead).toHaveBeenCalledWith(expect.objectContaining({
       tenantId: "tenant-1", queueId: "q-pf", credentialId: "cred-1", idempotencyKey: "formulario-chave-abcdef12",
+      // Sem IA: o formulário já qualifica e o lead vai direto para a distribuição.
+      skipAiQualification: true,
       payload: { nome: "Maria Souza", telefone: "5521998765432", website: "" },
       formData: expect.objectContaining({ cidade: "Niterói", bairro: "Icaraí", idades: "30 a 39 anos" }),
       leadSource: expect.objectContaining({ channel: "formulario", leadType: "PF", externalId: "formulario-chave-abcdef12" }),

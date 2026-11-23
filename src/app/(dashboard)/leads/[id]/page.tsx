@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
 import { buildLeadClientInfo, formatLeadBeneficiaryDetails } from "@/features/leads/client-info";
+import { readPublicFormAnswers } from "@/features/public-form/lead-answers";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -746,6 +747,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
             }}
             qualification={qualificationDetails}
             formData={formData}
+            publicFormAnswers={readPublicFormAnswers(lead.sourceChannel, lead.sourceMetadata, lead.formData)}
             canSeePersonalData={canSeePersonalData}
             shouldMask={shouldMask}
             viewerRole={context.role}

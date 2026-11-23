@@ -8,9 +8,10 @@ import { authenticateLeadWebhook, WebhookAuthError } from "@/features/leads/webh
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
 import { getDatabase, schema } from "@/shared/db";
 
+import { PUBLIC_FORM_CHANNEL_ID as PUBLIC_FORM_CHANNEL } from "./channel";
 import { submissionToLeadData, type PublicFormSubmission } from "./form-flow";
 
-export const PUBLIC_FORM_CHANNEL = "formulario";
+export { PUBLIC_FORM_CHANNEL }; 
 
 /**
  * Para onde vai o lead do /formulario (variáveis no Coolify):
@@ -73,6 +74,9 @@ export async function receivePublicForm(
     payload: { nome: submission.name, telefone: submission.phone, website: submission.website },
     idempotencyKey: externalId,
     requestMetadata: request,
+    // O formulário já qualifica (23/11): sem a IA puxando conversa, o lead vai direto para a distribuição.
+    // Antes, a primeira mensagem da IA falhava e o lead ficava desqualificado e retido.
+    skipAiQualification: true,
     formData: lead.formData,
     livesCount: lead.livesCount,
     leadSource: {
