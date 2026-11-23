@@ -49,7 +49,7 @@ export const CALL_ANCORA_DEFAULT_SETTINGS: CallAncoraSettings = {
   windowStartHour: 8,
   windowEndHour: 20,
   saturdayEnabled: true,
-  autoDialByDefault: false,
+  autoDialByDefault: true,
   autoHangupEnabled: true,
   ringTimeoutSeconds: 22,
   quickActiveSeconds: 4,

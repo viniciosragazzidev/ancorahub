@@ -51,6 +51,7 @@ function labSnapshot(firstName: string): CallAncoraSnapshot {
     total: LAB_CONTACTS.length,
     queueSource: "cold_base",
     autoDialEnabled: true,
+    callsStarted: false,
     awaitingClassification: false,
     devicePaused: false,
     lastCall: null,
@@ -82,10 +83,14 @@ function advanceLabSession(session: CallAncoraSnapshot): CallAncoraSnapshot {
     callStatus: index < LAB_CONTACTS.length ? "ready" : "ended",
     callStartedAt: null,
     callElapsedSeconds: 0,
+    awaitingClassification: false,
     countdown: null,
     updatedAt: new Date().toISOString(),
   };
 }
+
+/** Laboratório: o 2º contato não atende, para mostrar que só ligação atendida pede feedback. */
+const LAB_UNANSWERED_ID = "lab-02";
 
 function statusLabel(status: CallStatus) {
   return ({ ready: "Pronta para ligar", dialing: "Discando", ringing: "Chamando", active: "Em ligação", ended: "Ligação encerrada" })[status];
@@ -221,6 +226,8 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
         if (!current) return current;
         const classified = {
           ...current,
+          awaitingClassification: false,
+          lastOutcome: current.current ? { contactId: current.current.id, outcome, auto: false } : current.lastOutcome,
           completed: current.completed + 1,
           interests: outcome === "interested" && current.current && !current.interests.some((item) => item.id === current.current?.id) ? [...current.interests, current.current] : current.interests,
           countdown: current.autoDialEnabled ? { remainingSeconds: 3, paused: false } : null,
@@ -259,6 +266,33 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
       setError(reason instanceof Error ? reason.message : failure);
     } finally {
       setBusy(false);
+    }
+  }, [isLab]);
+
+  /**
+   * Começar, pausar e retomar as ligações pela tela (LiteActionButton): o sucesso só aparece
+   * depois que o servidor confirma. No laboratório, a sessão simulada muda na hora.
+   */
+  const runAction = useCallback(async (action: "start-calls" | "run-pause" | "run-resume", failure: string): Promise<LiteActionOutcome> => {
+    if (isLab) {
+      await delay(350);
+      setSession((current) => {
+        if (!current) return current;
+        const countdown = current.countdown ? { ...current.countdown, paused: action === "run-pause" } : null;
+        if (action === "run-pause") return { ...current, runState: "paused", pausedBy: "web", devicePaused: true, countdown };
+        return { ...current, runState: "running", pausedBy: null, devicePaused: false, countdown, callsStarted: true };
+      });
+      return { ok: true };
+    }
+    setError(null);
+    try {
+      const response = await fetch("/api/call-ancora/session", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const payload = await response.json().catch(() => null) as { session?: CallAncoraSnapshot; error?: string } | null;
+      if (!response.ok || !payload?.session) throw new Error(payload?.error || failure);
+      setSession(payload.session);
+      return { ok: true };
+    } catch (reason) {
+      return { ok: false, message: reason instanceof Error ? reason.message : failure };
     }
   }, [isLab]);
 
@@ -301,14 +335,37 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
     setSimulating(true);
     const move = (callStatus: CallStatus) => setSession((current) => current ? { ...current, callStatus, callStartedAt: callStatus === "active" ? new Date().toISOString() : current.callStartedAt, callElapsedSeconds: 0, updatedAt: new Date().toISOString() } : current);
     move("dialing"); await delay(700);
-    move("ringing"); await delay(900);
-    move("active"); await delay(5_000);
-    move("ended");
+    move("ringing");
+    if (session.current?.id === LAB_UNANSWERED_ID) {
+      // Não atendeu: o celular desliga sozinho, a fila segue sem pedir feedback.
+      await delay(2_200);
+      setSession((current) => current?.current ? {
+        ...current,
+        callStatus: "ended",
+        completed: current.completed + 1,
+        awaitingClassification: false,
+        lastCall: { causeCode: null, causeLabel: null, reachedActive: false, talkSeconds: 0, autoOutcome: "no_answer", rule: "ring_timeout", dialToActiveMs: null, sim: null },
+        lastOutcome: { contactId: current.current.id, outcome: "no_answer", auto: true },
+        countdown: { remainingSeconds: 3, paused: current.runState === "paused" },
+        updatedAt: new Date().toISOString(),
+      } : current);
+      setSimulating(false);
+      return;
+    }
+    await delay(900);
+    move("active"); await delay(4_000);
+    setSession((current) => current ? {
+      ...current,
+      callStatus: "ended",
+      awaitingClassification: true,
+      lastCall: { causeCode: null, causeLabel: null, reachedActive: true, talkSeconds: 4, autoOutcome: null, rule: null, dialToActiveMs: 1_600, sim: null },
+      updatedAt: new Date().toISOString(),
+    } : current);
     setSimulating(false);
   }, [session, simulating]);
 
   useEffect(() => {
-    if (!isLab || !session?.autoDialEnabled || session.completed === 0 || session.callStatus !== "ready" || !session.current || simulating) return;
+    if (!isLab || !session?.callsStarted || session.runState !== "running" || session.callStatus !== "ready" || session.countdown || !session.current || simulating) return;
     const contactKey = `${session.sessionId}:${session.current.id}`;
     if (autoStartedLabContact.current === contactKey) return;
     autoStartedLabContact.current = contactKey;
@@ -333,10 +390,9 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
   const phoneReachable = !session?.phone || session.phone.reachable;
   const paused = session?.runState === "paused";
   const interestCount = session?.interests.length ?? 0;
+  const callsStarted = session?.callsStarted === true;
+  const canStart = Boolean(session && session.status === "active" && !callsStarted && session.current && (session.current.dialable || isLab));
   const sessionMenu = session && session.status === "active" && !isLab ? [
-    paused
-      ? { id: "resume", label: "Retomar sessão", onSelect: () => void sendAction({ action: "run-resume" }, "Não consegui retomar a sessão.") }
-      : { id: "pause", label: "Pausar sessão", onSelect: () => void sendAction({ action: "run-pause" }, "Não consegui pausar a sessão.") },
     ...(canUseTestList ? [{ id: "test-list", label: testToolsOpen ? "Fechar lista de teste" : "Lista de teste (ligação real)", onSelect: () => setTestToolsOpen((open) => !open) }] : []),
     { id: "end", label: "Encerrar sessão", tone: "danger" as const, onSelect: () => void sendAction({ action: "end" }, "Não consegui encerrar a sessão.") },
   ] : null;
@@ -410,14 +466,27 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
               ) : <span />}
               <div className="flex items-center gap-3">
                 {session.current && session.status !== "ended" ? <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums text-(--text-muted)">Contato <LiteNumber value={Math.max(1, Math.min(session.countdown ? session.completed : session.completed + 1, totalContacts))} /> de {totalContacts}</span> : null}
+                {callsStarted && session.status === "active" ? (
+                  <LiteActionButton
+                    key={paused ? "resume" : "pause"}
+                    size="sm"
+                    tone="secondary"
+                    icon={paused ? <Play className="size-4" aria-hidden="true" /> : <Pause className="size-4" aria-hidden="true" />}
+                    busyLabel={paused ? "Retomando…" : "Pausando…"}
+                    doneLabel={paused ? "Retomada" : "Pausada"}
+                    keeps={paused ? "A sessão continua pausada." : "As ligações continuam no automático."}
+                    onAction={() => runAction(paused ? "run-resume" : "run-pause", paused ? "Não consegui retomar as ligações." : "Não consegui pausar as ligações.")}
+                  >
+                    {paused ? "Retomar" : "Pausar"}
+                  </LiteActionButton>
+                ) : null}
                 {sessionMenu ? <LiteMenu label="Mais ações da sessão" items={sessionMenu} /> : null}
               </div>
             </div>
 
             {paused ? (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-(--radius-panel) border border-(--border) bg-(--surface-muted) px-4 py-3" role="status">
-                <p className="flex items-center gap-2 text-sm text-(--foreground)"><Pause className="size-4 text-(--text-muted)" aria-hidden="true" />{session.pausedBy === "phone" ? "O celular pausou a sessão." : "Você pausou a sessão."} A ligação em andamento continua; nenhuma nova começa.</p>
-                {!isLab ? <Button size="sm" variant="secondary" className="min-h-10 rounded-full" disabled={busy} onClick={() => void sendAction({ action: "run-resume" }, "Não consegui retomar a sessão.")}><Play className="size-4" aria-hidden="true" /> Retomar</Button> : null}
+                <p className="flex items-center gap-2 text-sm text-(--foreground)"><Pause className="size-4 text-(--text-muted)" aria-hidden="true" />{session.pausedBy === "phone" ? "O celular pausou a sessão." : "Você pausou a sessão."} A ligação em andamento continua; nenhuma nova começa até retomar.</p>
               </div>
             ) : null}
 
@@ -473,10 +542,23 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
                           <LiteMenu label="Mais ações da ligação" items={[{ id: "voicemail", label: "Caiu na caixa postal: desligar", disabled: busy || session.hangupRequested, onSelect: () => void sendAction({ action: "hangup-voicemail" }, "Não consegui pedir para o celular desligar.") }]} />
                         </div>
                       ) : null}
-                      {session.callStatus === "ready" && !session.countdown ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{paused ? "Sessão pausada. Retome para continuar ligando." : "Pronto. Toque em Começar ligação no celular."}</p> : null}
+                      {session.callStatus === "ready" && !session.countdown && canStart ? (
+                        <div className="mt-6 flex flex-col items-center gap-2">
+                          <LiteActionButton
+                            icon={<PhoneCall className="size-4" aria-hidden="true" />}
+                            busyLabel="Começando…"
+                            doneLabel="Ligações começaram"
+                            keeps="O celular continua conectado e esperando."
+                            onAction={() => runAction("start-calls", "Não consegui começar as ligações.")}
+                          >
+                            Começar ligações
+                          </LiteActionButton>
+                          <p className="max-w-sm text-xs leading-5 text-(--text-muted)">O celular disca sozinho e segue a fila no automático. Você pode pausar quando quiser.</p>
+                        </div>
+                      ) : session.callStatus === "ready" && !session.countdown ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{paused ? "Ligações pausadas. Toque em Retomar para continuar." : callsStarted ? "Ligando pelo celular…" : "Pronto para ligar."}</p> : null}
                       {lastCallText && (session.callStatus === "ended" || session.countdown) ? <p className="mt-5 text-sm font-medium text-(--foreground)" role="status">{lastCallText}</p> : null}
-                      {session.callStatus === "ended" && !session.countdown ? <p className="mt-5 text-base font-medium text-(--foreground)">Como foi a conversa?</p> : null}
-                      {session.countdown && currentOutcome && !isLab ? (
+                      {session.awaitingClassification && !session.countdown ? <p className="mt-5 text-base font-medium text-(--foreground)">Como foi a conversa?</p> : null}
+                      {session.countdown && currentOutcome ? (
                         <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-(--text-secondary)">
                           <span>Classificada como <span className="font-medium text-(--foreground)">{OUTCOME_LABEL[currentOutcome.outcome]}</span>{currentOutcome.auto ? " (automático, estimativa)" : ""}.</span>
                           <LiteMenu label="Corrigir classificação" items={(Object.keys(OUTCOME_LABEL) as CallOutcome[]).filter((outcome) => outcome !== currentOutcome.outcome).map((outcome) => ({ id: outcome, label: OUTCOME_LABEL[outcome], disabled: busy, onSelect: () => void sendAction({ action: "reclassify", outcome }, "Não consegui corrigir a classificação.") }))} />
@@ -488,7 +570,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
                           {!countdownExpired && !session.countdown.paused ? <span className="mt-1 inline-flex items-baseline gap-1 text-3xl font-medium tabular-nums text-(--foreground)"><LiteNumber value={session.countdown.remainingSeconds} /><span className="text-base text-(--text-secondary)">s</span></span> : null}
                         </div>
                       ) : null}
-                      {session.callStatus === "ended" && !session.countdown ? (
+                      {session.awaitingClassification && !session.countdown ? (
                         <div className="mt-5 flex w-full max-w-md flex-col items-stretch gap-3">
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <LiteActionButton busyLabel="Registrando…" doneLabel="Interesse registrado" keeps="A ligação continua registrada." disabled={busy} icon={<Heart className="size-4" aria-hidden="true" />} onAction={() => classify("interested")}>Com interesse</LiteActionButton>
@@ -530,7 +612,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
 
               {isLab ? (
                 <EnterInOrder index={4}>
-                  <article className="rounded-(--radius-panel) border border-(--border) bg-(--surface) p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-full bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-5" aria-hidden="true" /></span><div><h3 className="font-medium text-(--foreground)">Celular do laboratório</h3><p className="text-xs text-(--text-secondary)">Conectado à conta de {brokerFirstName}</p></div></div><Button size="md" variant="secondary" className="min-h-11 rounded-full" disabled={simulating || session.callStatus !== "ready" || (session.autoDialEnabled && session.completed > 0)} loading={simulating} onClick={() => void simulateLabCall()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? "Simulando…" : session.autoDialEnabled && session.completed > 0 ? "Começando automaticamente" : "Começar ligação"}</Button></div><div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-(--text-muted)"><span className="rounded-full bg-(--surface-muted) px-3 py-1.5">{statusLabel(session.callStatus)}</span><span>Laboratório: sem discagem real</span></div></article>
+                  <article className="rounded-(--radius-panel) border border-(--border) bg-(--surface) p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-full bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-5" aria-hidden="true" /></span><div><h3 className="font-medium text-(--foreground)">Celular do laboratório</h3><p className="text-xs text-(--text-secondary)">Conectado à conta de {brokerFirstName}</p></div></div></div><div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-(--text-muted)"><span className="rounded-full bg-(--surface-muted) px-3 py-1.5">{statusLabel(session.callStatus)}</span><span>Laboratório: sem discagem real; o 2º contato não atende</span></div></article>
                 </EnterInOrder>
               ) : null}
             </section>

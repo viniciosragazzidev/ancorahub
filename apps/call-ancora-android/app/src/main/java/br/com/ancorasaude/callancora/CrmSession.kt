@@ -109,7 +109,10 @@ object CrmSession {
         val current = state.current ?: return
         manualContactId = current.id
         if (awaitingContactId == null) source?.allowRetry()
+        val wasStarted = _ui.value.started || state.started
         _ui.value = _ui.value.copy(started = true, message = null)
+        // Começou pelo celular: avisa o servidor, para a tela do CRM mostrar Pausar.
+        if (!wasStarted) control("start")
         scope.launch { tick() }
     }
 
@@ -232,6 +235,11 @@ object CrmSession {
         }
         unauthorizedStreak = 0
         val state = src.latest
+        // A tela do CRM começou as ligações: o celular passa a discar sem toque.
+        if (state?.started == true && !_ui.value.started) {
+            CallBus.logEvent("CRM_INICIADO_PELA_TELA", "-", null)
+            _ui.value = _ui.value.copy(started = true)
+        }
         _ui.value = _ui.value.copy(state = state, message = if (_ui.value.message?.startsWith("Sem conexão") == true) null else _ui.value.message)
         // Botões da web: "Caixa postal (desligar)" ou "Desligar ligação".
         val request = state?.hangupRequest
@@ -275,7 +283,7 @@ object CrmSession {
         if (state.current?.id != contactId || state.current.dialable != true) return
 
         val block = when {
-            state.paused -> "Sessão pausada. Toque em Continuar."
+            state.paused -> "Ligações pausadas pela tela do CRM."
             !(state.autoDialEnabled || manualContactId == contactId) -> "Toque em Ligar para o próximo."
             !Readiness.allReady(context) -> "Libere os itens de \"Preparar o celular\"."
             !SignalMonitor.inService -> SignalMonitor.status.value.message + "."

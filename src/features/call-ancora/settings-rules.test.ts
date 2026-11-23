@@ -18,6 +18,10 @@ describe("configurações do Call Âncora", () => {
     expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, dailyContactsPerBroker: 0 }).success).toBe(false);
   });
 
+  it("discagem automática é o padrão", () => {
+    expect(CALL_ANCORA_DEFAULT_SETTINGS.autoDialByDefault).toBe(true);
+  });
+
   it("desligamento automático: padrão 22/4/25 s, faixas validadas e formato do celular", () => {
     expect(deviceHangupRules(CALL_ANCORA_DEFAULT_SETTINGS)).toEqual({ enabled: true, ringTimeoutSec: 22, quickActiveSec: 4, voicemailAfterSec: 25 });
     expect(callAncoraSettingsSchema.safeParse({ ...CALL_ANCORA_DEFAULT_SETTINGS, ringTimeoutSeconds: 10 }).success).toBe(false);

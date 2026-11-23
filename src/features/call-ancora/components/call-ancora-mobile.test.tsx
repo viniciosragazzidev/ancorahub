@@ -32,6 +32,7 @@ const session: CallAncoraSnapshot = {
   total: CONTACTS.length,
   queueSource: "test_list",
   autoDialEnabled: false,
+  callsStarted: false,
   awaitingClassification: false,
   devicePaused: false,
   lastCall: null,

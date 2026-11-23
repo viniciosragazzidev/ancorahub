@@ -43,6 +43,8 @@ export interface LiteActionButtonProps {
   /** Chamado depois do sucesso, com o plano de feedback (para o componente pai celebrar se puder). */
   onDone?: (celebrate: boolean) => void;
   size?: "md" | "sm";
+  /** "secondary" para a ação de apoio que convive com o CTA primário da tela. */
+  tone?: "primary" | "secondary";
   icon?: ReactNode;
   disabled?: boolean;
   className?: string;
@@ -106,6 +108,7 @@ export function LiteActionButton({
   retryLabel = "Tentar de novo",
   onDone,
   size = "md",
+  tone = "primary",
   icon,
   disabled,
   className,
@@ -178,7 +181,7 @@ export function LiteActionButton({
       <motion.button
         ref={buttonRef}
         type="button"
-        className={cn(styles.button, size === "sm" && styles.sm)}
+        className={cn(styles.button, size === "sm" && styles.sm, tone === "secondary" && styles.secondary)}
         data-state={state}
         aria-busy={state === "busy" || undefined}
         aria-label={state === "idle" && !retry ? ariaLabel : undefined}

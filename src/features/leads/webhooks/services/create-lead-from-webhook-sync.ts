@@ -15,7 +15,9 @@ import { lpFormPayloadSchema } from "../schemas/lp-form-payload.schema";
 import type { ReceiveLeadWebhookResult } from "../types/lead-webhook.types";
 import { hashNormalizedWebhookPayload, normalizeLeadEmail, normalizeLeadName, normalizeLeadPhone } from "../utils/lead-webhook.utils";
 import { notifyLeadArrived } from "@/features/notifications/send-push-helper";
+import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
 import { enqueueLeadEffect, enqueueLeadEffectTx } from "./lead-effect-outbox";
+import { isStaleOwnerOnReentry, parseStagnantDays } from "./reentry-stale-owner";
 import { resolveLeadWebhookIdempotency } from "./resolve-lead-webhook-idempotency";
 import { resolveWebhookBranch, WebhookBranchNotFoundError } from "./resolve-webhook-branch";
 
@@ -147,6 +149,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         sourceChannel: schema.leads.sourceChannel, sourceCampaign: schema.leads.sourceCampaign, metaCampaignId: schema.leads.metaCampaignId,
         sourceAd: schema.leads.sourceAd, sourceForm: schema.leads.sourceForm, metaAdId: schema.leads.metaAdId, metaAdSetId: schema.leads.metaAdSetId,
         metaFormId: schema.leads.metaFormId, metaPageId: schema.leads.metaPageId, capturedAt: schema.leads.capturedAt,
+        stageEnteredAt: schema.leads.stageEnteredAt, assignedAt: schema.leads.assignedAt, branchId: schema.leads.branchId,
       })
       .from(schema.leads)
       // Only this phone's candidates (same last 8 digits), not every lead of the tenant.
@@ -170,8 +173,18 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
           value !== null && !(key === "tipoPlanoStatus" && typeof input.leadSource?.metadata?.tipoPlano !== "string"),
         ))
         : null;
-      const moveToQueue = Boolean(queueId) && queueId !== existingLead.queueId && !existingLead.corretorId
+      // A broker who left the lead stalled longer than the company's "lead
+      // parado" limit loses it when the contact comes back: it is distributed
+      // again, as if it had no broker (lead 21997539304, 23/11).
+      const [tenantSla] = existingLead.corretorId
+        ? await tx.select({ stagnantDays: schema.tenants.slaStagnantDays }).from(schema.tenants).where(eq(schema.tenants.id, tenantId)).limit(1)
+        : [];
+      const staleOwnerId = existingLead.corretorId && isStaleOwnerOnReentry(existingLead, now, parseStagnantDays(tenantSla?.stagnantDays))
+        ? existingLead.corretorId
+        : null;
+      const moveToQueue = Boolean(queueId) && queueId !== existingLead.queueId && (!existingLead.corretorId || Boolean(staleOwnerId))
         && !["converted", "lost"].includes(existingLead.status ?? "");
+      const redistribute = moveToQueue || Boolean(staleOwnerId);
       await tx
         .update(schema.leads)
         .set({
@@ -193,15 +206,21 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
             ...(newMetadata ? { sourceMetadata: { ...existingMetadata, ...newMetadata, ...keepOrigin(existingMetadata) } } : {}),
           } : {}),
           ...(moveToQueue ? { queueId, branchId, distributionUpdatedAt: now } : {}),
+          ...(staleOwnerId ? { ...buildDeclinedLeadReleaseUpdate(now), redistributionCount: sql`${schema.leads.redistributionCount} + 1` } : {}),
           updatedAt: now,
         })
-        .where(eq(schema.leads.id, existingLead.id));
+        .where(staleOwnerId
+          // Guarded on the same owner: a broker who just took it back keeps it.
+          ? and(eq(schema.leads.id, existingLead.id), eq(schema.leads.corretorId, staleOwnerId))
+          : eq(schema.leads.id, existingLead.id));
 
       const newCampaign = input.leadSource?.campaign ?? null;
-      if (input.leadSource && (moveToQueue || (newCampaign && newCampaign !== existingLead.metaCampaignId))) {
+      if (input.leadSource && (redistribute || (newCampaign && newCampaign !== existingLead.metaCampaignId))) {
         const [newQueue] = queueId ? await tx.select({ name: schema.leadQueues.name }).from(schema.leadQueues).where(eq(schema.leadQueues.id, queueId)).limit(1) : [];
         const campaignLabel = typeof newMetadata?.campaignName === "string" ? newMetadata.campaignName : newCampaign;
-        const where = moveToQueue
+        const where = staleOwnerId
+          ? ` O corretor estava sem avançar o lead há mais de ${parseStagnantDays(tenantSla?.stagnantDays)} dias, então ele voltou para a fila${moveToQueue ? ` "${newQueue?.name ?? "da campanha"}"` : ""} e será distribuído de novo.`
+          : moveToQueue
           ? ` O lead foi movido para a fila "${newQueue?.name ?? "da campanha"}", porque ainda não tinha corretor.`
           : newQueue?.name && queueId !== existingLead.queueId
             ? ` A campanha vai para a fila "${newQueue.name}", mas o lead continua onde está porque já tem corretor.`
@@ -211,15 +230,20 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
           conteudo: `📝 Este contato preencheu um novo formulário${campaignLabel ? ` (campanha "${campaignLabel}")` : ""}. A origem original do lead foi mantida.${where}`,
         });
       }
-      if (moveToQueue) {
-        await tx.insert(schema.leadDistributionEvents).values({
+      if (redistribute) {
+        await tx.insert(schema.leadDistributionEvents).values(staleOwnerId ? {
+          id: randomUUID(), tenantId, leadId: existingLead.id, fromBranchId: existingLead.branchId, toBranchId: moveToQueue ? branchId : existingLead.branchId,
+          fromQueueId: existingLead.queueId, toQueueId: moveToQueue ? queueId : existingLead.queueId, previousOwnerId: staleOwnerId,
+          action: "returned_to_queue", source: "webhook", strategy: "outbox",
+          reason: "Novo formulário com o lead parado com o corretor; voltou para a fila para ser distribuído de novo.", actorId: createdByUserId, createdAt: now,
+        } : {
           id: randomUUID(), tenantId, leadId: existingLead.id, toBranchId: branchId, fromQueueId: existingLead.queueId, toQueueId: queueId,
           action: "queue_changed_by_new_form", source: "webhook", strategy: "outbox",
           reason: "Novo formulário de outra campanha; o lead ainda não tinha corretor.", actorId: createdByUserId, createdAt: now,
         });
         // Mid-qualification the AI hands it over later, as usual.
         if (existingLead.qualificationState !== "IN_PROGRESS") {
-          await enqueueLeadEffectTx(tx, { tenantId, leadId: existingLead.id, webhookDeliveryId: deliveryId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${deliveryId}:distribution`, payload: { branchId, leadName: normalizedName } });
+          await enqueueLeadEffectTx(tx, { tenantId, leadId: existingLead.id, webhookDeliveryId: deliveryId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${deliveryId}:distribution`, payload: { branchId: moveToQueue ? branchId : existingLead.branchId ?? branchId, leadName: normalizedName } });
         }
       }
 

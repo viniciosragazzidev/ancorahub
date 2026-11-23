@@ -17,7 +17,7 @@ export type CallOutcome = "interested" | "not_interested" | "no_answer" | "voice
 /** Resultados que o app (ou o servidor) pode decidir sozinho, por tempo. */
 export type CallAutoOutcome = "no_answer" | "voicemail";
 export type DeviceCallEvent = "dialing" | "active" | "disconnected";
-export type DeviceControlAction = "pause" | "resume" | "skip" | "end";
+export type DeviceControlAction = "pause" | "resume" | "skip" | "end" | "start";
 /** Estado da sessão: o servidor é a fonte única. */
 export type CallAncoraRunState = "running" | "paused" | "ended";
 /** Pedido da web para o celular desligar a ligação atual. */
@@ -67,6 +67,8 @@ export type CallAncoraSnapshot = {
   total: number;
   queueSource: "cold_base" | "test_list";
   autoDialEnabled: boolean;
+  /** As ligações foram iniciadas (pela tela do corretor ou pelo celular): o celular disca sozinho. */
+  callsStarted: boolean;
   /** A ligação terminou e espera Com interesse / Sem interesse na web. */
   awaitingClassification: boolean;
   /** Estado da sessão (fonte única) e versão que só cresce. */
@@ -101,6 +103,8 @@ export type CallAncoraDeviceState = {
   version: number;
   callStatus: CallStatus;
   autoDialEnabled: boolean;
+  /** Ligações iniciadas: o celular começa a discar sem o corretor tocar nele. */
+  started: boolean;
   paused: boolean;
   awaitingClassification: boolean;
   countdown: CallAncoraSnapshot["countdown"];
@@ -137,6 +141,8 @@ type Session = Scope & {
   interests: CallAncoraContact[];
   completed: number;
   autoDialEnabled: boolean;
+  /** Opcional só por compatibilidade com sessões guardadas antes do campo (undefined = não iniciada). */
+  callsStarted?: boolean;
   runState: CallAncoraRunState;
   pausedBy: "web" | "phone" | null;
   version: number;
@@ -168,6 +174,7 @@ export function toDeviceState(snapshot: CallAncoraSnapshot): CallAncoraDeviceSta
     version: snapshot.version,
     callStatus: snapshot.callStatus,
     autoDialEnabled: snapshot.autoDialEnabled,
+    started: snapshot.callsStarted,
     paused: snapshot.runState === "paused",
     awaitingClassification: snapshot.awaitingClassification,
     countdown: snapshot.countdown,
@@ -243,6 +250,7 @@ export class CallAncoraSessionStore {
       interests: [],
       completed: 0,
       autoDialEnabled: false,
+      callsStarted: false,
       runState: "running",
       pausedBy: null,
       version: 1,
@@ -428,10 +436,25 @@ export class CallAncoraSessionStore {
       this.resumeRun(session);
     } else if (action === "end") {
       this.endRun(session);
+    } else if (action === "start") {
+      this.startCalls(session);
     } else {
       if (session.callStatus !== "ready" || !session.queue[session.contactIndex]) return null;
       this.advanceToNextContact(session);
     }
+    this.bump(session);
+    this.advanceIfCountdownEnded(session);
+    return this.snapshot(session);
+  }
+
+  /**
+   * Web: "Começar ligações". O celular pareado recebe no próximo estado e disca o contato
+   * atual sozinho; dali em diante a fila segue no automático. Também retoma se estava pausada.
+   */
+  startCallsForBroker(scope: Scope): CallAncoraSnapshot | null {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session || session.pairedAt === null || session.runState === "ended") return null;
+    this.startCalls(session);
     this.bump(session);
     this.advanceIfCountdownEnded(session);
     return this.snapshot(session);
@@ -646,6 +669,11 @@ export class CallAncoraSessionStore {
     return this.snapshot(session);
   }
 
+  private startCalls(session: Session) {
+    session.callsStarted = true;
+    if (session.runState === "paused") this.resumeRun(session);
+  }
+
   private pauseRun(session: Session, by: "web" | "phone") {
     session.runState = "paused";
     session.pausedBy = by;
@@ -813,6 +841,7 @@ export class CallAncoraSessionStore {
       total: session.queue.length,
       queueSource: session.queueSource,
       autoDialEnabled: session.autoDialEnabled,
+      callsStarted: session.callsStarted === true,
       awaitingClassification: Boolean(current) && session.callStatus === "ended" && !session.classified,
       runState: session.runState,
       pausedBy: session.pausedBy,

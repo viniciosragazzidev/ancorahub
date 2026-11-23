@@ -29,6 +29,8 @@ data class CrmState(
     val version: Long,
     val callStatus: String,
     val autoDialEnabled: Boolean,
+    /** As ligações foram iniciadas (pela tela do CRM ou por este celular): discar sem toque. */
+    val started: Boolean,
     val paused: Boolean,
     val awaitingClassification: Boolean,
     val countdownSeconds: Int?,
@@ -121,6 +123,7 @@ class CrmApi(private val origin: String, private val token: String?) {
                 version = s.optLong("version", 0L),
                 callStatus = s.optString("callStatus"),
                 autoDialEnabled = s.optBoolean("autoDialEnabled"),
+                started = s.optBoolean("started", false),
                 paused = s.optString("runState") == "paused" || s.optBoolean("paused"),
                 awaitingClassification = s.optBoolean("awaitingClassification"),
                 countdownSeconds = countdown?.optInt("remainingSeconds"),

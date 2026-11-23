@@ -216,7 +216,8 @@ class CrmPanel(private val activity: MainActivity) {
         info(
             ui.message ?: when {
                 empty -> "Assim que houver contatos para você, eles aparecem aqui."
-                state.paused -> "Sessão pausada pelo AncoraHub."
+                state.paused -> "Ligações pausadas pela tela do CRM."
+                !ui.started && !state.started && !ended -> "Comece aqui ou em Começar ligações na tela do CRM."
                 else -> null
             },
         )
