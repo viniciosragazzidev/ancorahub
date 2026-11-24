@@ -2113,7 +2113,7 @@ Referência: BR-098; `docs/implementations/active/2026-11-11-cotador-corretor-ca
 - **Leads antigos:** agrupados pelo `importId` que cada importação já gravava, com o nome do dia em que entraram. É o mais fiel: cada importação antiga volta a ser a lista que foi de verdade. Duplicados antigos vêm da auditoria `supervisor_import.created`; rejeitados antigos não eram guardados e ficam 0. Lead sem `importId` (não deveria existir) vai para "Importações anteriores".
 - **Tela:** a vista "Lista importada" do supervisor mostra as listas como pastas (tabela Lite); clicar abre só os leads daquela lista, com o status de cada um e o filtro "Lista"; "Todos os contatos" junta tudo dizendo a lista de cada um. Distribuir dentro de uma lista vale só para ela.
 - **Auditoria:** `supervisor_lead_list.created` e `supervisor_lead_list.renamed`; `supervisor_import.created` e `.distributed` passam a levar `listId`.
-- **Chave:** a mesma `SUPERVISOR_LEAD_IMPORT` (desligar esconde a importação inteira). **Dados:** `drizzle/0236_supervisor_lead_lists.sql` (aditiva; só aplicar com o ok do usuário). O código tolera a migration ausente: sem ela, continua a lista única de antes.
+- **Chave:** a mesma `SUPERVISOR_LEAD_IMPORT` (desligar esconde a importação inteira). **Dados:** `drizzle/0236_supervisor_lead_lists.sql` (aditiva; aplicada em produção em 24/11/2026 com o ok do usuário). O código tolera a migration ausente: sem ela, continua a lista única de antes.
 
 ## DEC-192 - Pós-venda passa o lead para outro corretor quando faltou contato ou continuidade
 

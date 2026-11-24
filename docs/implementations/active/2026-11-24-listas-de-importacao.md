@@ -17,7 +17,7 @@ Decisão: DEC-191 em `docs/decision-log.md`.
 
 ## Produção
 
-- A migration 0236 **não foi aplicada**. Aplicar só com o ok do usuário (`npm run db:migrate`). Antes disso a tela continua com a lista única de antes, sem erro.
+- Migration 0236 aplicada em produção em 24/11/2026 com o ok do usuário, só ela, por `node scripts/apply-0236-supervisor-lead-lists.mjs --apply` (hash registrado em `drizzle.__drizzle_migrations`): 12 listas criadas, 8.813 leads ligados, 0 sem lista, índice válido.
 - O backfill da migration agrupa os leads antigos pelo `importId` de cada importação.
 
 ## Verificação
