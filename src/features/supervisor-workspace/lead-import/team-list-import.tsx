@@ -13,7 +13,8 @@ import form from "@/components/lite/page/lite-form.module.css";
 import { useDevLab } from "@/lib/dev-lab";
 import { fireFeedback, fireFeedbackOnce } from "@/lib/feedback/use-feedback";
 
-import { distributeTeamListAction, importTeamListAction, reviewTeamListAction, structureTeamListAction } from "./actions";
+import { distributeTeamListAction, importTeamListAction, renameTeamListAction, reviewTeamListAction, structureTeamListAction } from "./actions";
+import { LIST_NAME_MAX } from "./list-names";
 import { applyTableAnswer, applyTextAnswer, organizeTable, organizeText, tableRequest, textRequest, textToTable, type Organized, type SourceTable } from "./organize";
 import { SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX, SUPERVISOR_IMPORT_CHUNK, SUPERVISOR_IMPORT_MAX, planShares, vcardToLines, type ParsedContact, type TeamListApi } from "./parse-contacts";
 import styles from "./team-list-import.module.css";
@@ -25,7 +26,14 @@ const realApi: TeamListApi = {
   review: reviewTeamListAction,
   importContacts: importTeamListAction,
   distribute: distributeTeamListAction,
+  renameList: renameTeamListAction,
 };
+
+/** As Server Actions de verdade ou as do laboratório (/dev/laboratorio). */
+export function useTeamListApi(): TeamListApi {
+  const lab = useDevLab();
+  return lab?.teamList ?? realApi;
+}
 
 type Step = "lista" | "conferir" | "distribuir";
 type Celebration = { key: string; budgetKey: string; title: string; message: string; stats: SaleCelebrationStat[]; art: { src: string; width: number; height: number }; continueLabel: string };
@@ -33,7 +41,7 @@ type Celebration = { key: string; budgetKey: string; title: string; message: str
 /** Arte do Capitão Âncora para a lista importada e para a distribuição concluída. */
 const IMPORT_ART = { src: "/mascote/2026-11-18/desempenho-subindo.webp", width: 1145, height: 1374 };
 const DISTRIBUTE_ART = { src: "/mascote/2026-11-18/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
-type Review = { organized: Organized; known: Set<string>; weekLeft: number; cut: number };
+type Review = { organized: Organized; known: Set<string>; weekLeft: number; cut: number; suggestedName: string | null };
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${fmt(n)} ${many}`);
@@ -50,16 +58,19 @@ function joinColumns(labels: string[]) {
  * com ajuda da IA. Uma busca de repetidos no banco, gravação em blocos de 1.000. Nada vai para os corretores antes
  * de tocar em Distribuir.
  */
-export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectionDone }: {
+export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectionDone, listId = null, onImported }: {
   pending: number;
   team: TeamListBroker[];
   /** Contatos marcados na "Lista importada": a distribuição vale só para eles. */
   selectedLeadIds?: string[];
   onSelectionDone?: () => void;
+  /** Dentro de uma lista (DEC-191): Distribuir vale só para os leads dela. */
+  listId?: string | null;
+  /** Depois de importar: a lista nova (para abrir a pasta dela). */
+  onImported?: (list: { id: string; name: string }) => void;
 }) {
   const router = useRouter();
-  const lab = useDevLab();
-  const api = lab?.teamList ?? realApi;
+  const api = useTeamListApi();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>(pending ? "distribuir" : "lista");
   const [text, setText] = useState("");
@@ -69,11 +80,14 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [consent, setConsent] = useState(false);
+  const [listName, setListName] = useState("");
+  // A lista que recebe o Distribuir: a da página ou a que acabou de ser importada.
+  const [targetListId, setTargetListId] = useState<string | null>(listId);
   const [pendingCount, setPendingCount] = useState(pending);
   const [progress, setProgress] = useState("Importando…");
   const [notice, setNotice] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
-  const lastImport = useRef<{ imported: number; duplicates: number } | null>(null);
+  const lastImport = useRef<{ imported: number; duplicates: number; listId: string | null; listName: string | null } | null>(null);
 
   /**
    * Conquista do capitão (FEEDBACK.md nível 3): importar uma lista e distribuí-la são raros e marcam o dia da
@@ -85,7 +99,7 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
     else fireFeedback("confirm");
   }
   // Blocos já gravados desta lista: "Tentar de novo" continua de onde parou.
-  const sent = useRef<{ importId: string; upTo: number; imported: number; duplicates: number } | null>(null);
+  const sent = useRef<{ importId: string; upTo: number; imported: number; duplicates: number; listName: string | null } | null>(null);
   // O painel vai direto para o body: o cabeçalho da página prende elementos fixos e cortava o painel.
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- só sabe que está no navegador depois de montar
@@ -103,13 +117,17 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
       if (!contact.problem) continue;
       groups.set(contact.problem, [...(groups.get(contact.problem) ?? []), contact.line]);
     }
+    const rejected = [...groups.values()].reduce((sum, lines) => sum + lines.length, 0);
     if (inCrm.length) groups.set("Já está no CRM.", inCrm.map((contact) => contact.line));
     const outside = [...groups].sort((a, b) => b[1].length - a[1].length);
-    return { toImport, later: ready.length - toImport.length, outside, outsideTotal: outside.reduce((sum, [, lines]) => sum + lines.length, 0), fixed: toImport.filter((contact) => contact.fixed).length };
+    return { toImport, later: ready.length - toImport.length, outside, outsideTotal: outside.reduce((sum, [, lines]) => sum + lines.length, 0), rejected, inCrm: inCrm.length, fixed: toImport.filter((contact) => contact.fixed).length };
   }, [review]);
 
   function openSheet() {
-    setStep(pendingCount ? "distribuir" : "lista");
+    // Cada abertura volta para a lista da página (ou todas) com o número que o servidor mandou.
+    setTargetListId(listId);
+    setPendingCount(pending);
+    setStep(pending ? "distribuir" : "lista");
     setOpen(true);
   }
 
@@ -120,6 +138,7 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
     setReview(null);
     setReviewError(null);
     setConsent(false);
+    setListName("");
     sent.current = null;
   }
 
@@ -185,13 +204,15 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
       return;
     }
     sent.current = null;
-    setReview({ organized, known: new Set(result.data.known), weekLeft: result.data.weekLeft, cut });
+    const suggestedName = result.data.suggestedName ?? null;
+    setReview({ organized, known: new Set(result.data.known), weekLeft: result.data.weekLeft, cut, suggestedName });
+    setListName((current) => current || suggestedName || "");
     setStep("conferir");
   }
 
   async function importAll() {
     if (!view) return { ok: false as const, message: "Confira a lista de novo." };
-    const state = sent.current ?? { importId: crypto.randomUUID(), upTo: 0, imported: 0, duplicates: 0 };
+    const state = sent.current ?? { importId: crypto.randomUUID(), upTo: 0, imported: 0, duplicates: 0, listName: null };
     sent.current = state;
     const total = view.toImport.length;
     while (state.upTo < total) {
@@ -201,6 +222,8 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
         consent,
         importId: state.importId,
         contacts: chunk.map((contact) => ({ name: contact.name, phone: contact.phone!, email: contact.email, note: contact.note })),
+        // Nome e números da tela só no primeiro bloco: os outros caem na mesma lista.
+        ...(state.upTo === 0 ? { listName: listName.trim() || null, rejected: view.rejected, duplicatesBefore: view.inCrm } : {}),
       }).catch(() => ({ ok: false as const, error: "A conexão caiu no meio da importação." }));
       if (!result.ok) {
         const done = state.imported ? ` ${plural(state.imported, "contato já entrou", "contatos já entraram")}; o resto continua aqui.` : "";
@@ -209,10 +232,17 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
       state.upTo += chunk.length;
       state.imported += result.data.imported;
       state.duplicates += result.data.duplicates;
+      state.listName = result.data.listName ?? state.listName;
     }
-    setPendingCount((current) => current + state.imported);
-    lastImport.current = { imported: state.imported, duplicates: state.duplicates };
-    setNotice(`${plural(state.imported, "contato importado", "contatos importados")}.${state.duplicates ? ` ${plural(state.duplicates, "já estava", "já estavam")} no CRM.` : ""} Agora escolha quem recebe.`);
+    const newListId = state.listName ? state.importId : null;
+    // Na lista nova, o Distribuir vale só para ela; sem listas separadas, para tudo o que espera.
+    if (newListId) {
+      setTargetListId(newListId);
+      setPendingCount(state.imported);
+    } else setPendingCount((current) => current + state.imported);
+    lastImport.current = { imported: state.imported, duplicates: state.duplicates, listId: newListId, listName: state.listName };
+    const where = state.listName ? ` na ${state.listName}` : "";
+    setNotice(`${plural(state.imported, "contato importado", "contatos importados")}${where}.${state.duplicates ? ` ${plural(state.duplicates, "já estava", "já estavam")} no CRM.` : ""} Agora escolha quem recebe.`);
     return { ok: true as const };
   }
 
@@ -308,6 +338,20 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
                 detail: `${lines.length === 1 ? "Linha" : "Linhas"} ${lines.slice(0, 6).join(", ")}${lines.length > 6 ? "…" : ""}`,
               }))}
             />
+            {review.suggestedName !== null ? (
+              <div className={form.field}>
+                <label className={form.label} htmlFor="team-list-name">Nome da lista</label>
+                <input
+                  id="team-list-name"
+                  className={form.input}
+                  value={listName}
+                  maxLength={LIST_NAME_MAX}
+                  onChange={(event) => setListName(event.target.value)}
+                  placeholder={review.suggestedName}
+                />
+                <p className={form.hint}>Cada importação vira uma lista separada, como uma pasta. Dá para renomear depois.</p>
+              </div>
+            ) : null}
             <label className={styles.consent}>
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
               <span>Tenho autorização para contatar essas pessoas.</span>
@@ -326,6 +370,7 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
                   router.refresh();
                   resetList();
                   setStep("distribuir");
+                  if (done?.listId && done.listName) onImported?.({ id: done.listId, name: done.listName });
                   if (done?.imported) {
                     celebrate({
                       key: `import:${importId}`,
@@ -353,6 +398,7 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
             api={api}
             total={selectedLeadIds.length || pendingCount}
             leadIds={selectedLeadIds.length ? selectedLeadIds : undefined}
+            listId={targetListId}
             team={team}
             notice={notice}
             onDistributed={(left, distributed, brokers) => {
@@ -432,8 +478,9 @@ function ContactList({ title, items, muted = false }: { title: string; items: Ar
 }
 
 /** Marcar os corretores e, se quiser, ajustar quantos cada um recebe. Começa dividindo igual entre os disponíveis. */
-function Distribute({ api, total, leadIds, team, notice, onDistributed, onImportMore }: {
+function Distribute({ api, total, leadIds, listId, team, notice, onDistributed, onImportMore }: {
   leadIds?: string[];
+  listId: string | null;
   api: TeamListApi;
   total: number;
   team: TeamListBroker[];
@@ -567,7 +614,7 @@ function Distribute({ api, total, leadIds, team, notice, onDistributed, onImport
           keeps="Os leads continuam esperando aqui."
           onAction={async () => {
             const picked = Object.fromEntries(chosen.filter((id) => (counts[id] ?? 0) > 0).map((id) => [id, counts[id] ?? 0]));
-            const response = await api.distribute({ counts: picked, leadIds });
+            const response = await api.distribute({ counts: picked, leadIds, listId });
             if (!response.ok) return { ok: false, message: response.error };
             setResult(`${plural(response.data.distributed, "lead foi", "leads foram")} para a equipe. Cada corretor recebeu um aviso no CRM.`);
             onDistributed(response.data.left, response.data.distributed, Object.keys(response.data.perBroker).length);

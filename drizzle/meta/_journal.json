@@ -1205,6 +1205,13 @@
                         "when":  1794800200000,
                         "tag":  "0235_agent_actions",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  172,
+                        "version":  "7",
+                        "when":  1794800300000,
+                        "tag":  "0236_supervisor_lead_lists",
+                        "breakpoints":  true
                     }
                 ]
 }

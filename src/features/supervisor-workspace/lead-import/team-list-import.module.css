@@ -242,3 +242,35 @@
   margin: 0;
   accent-color: var(--primary);
 }
+
+/* Listas separadas (DEC-191): Importar/Distribuir e o menu da lista lado a lado no topo. */
+.headerActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Voltar para as pastas e "Ver todos os contatos": link discreto com alvo de 44px. */
+.back {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.back:focus-visible {
+  border-radius: 4px;
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}

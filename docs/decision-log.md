@@ -2102,3 +2102,15 @@ Referência: BR-098; `docs/implementations/active/2026-11-11-cotador-corretor-ca
 - **Chave:** `feature_broker_prior_clients_enabled`, global, desligada por padrão, auditada no Super-admin (Novidades do corretor); só vale com `feature_broker_navigation_reorg_enabled` e `feature_broker_client_wallet_lite_enabled`. Desligar esconde a opção sem apagar dados.
 - **Dados:** `drizzle/0231_broker_prior_clients.sql` (aditiva e reversível; não aplicada). O código tolera colunas e tabela ausentes: a opção some e os contratos anteriores não entram nas contagens.
 - **Pendência para a etapa 6 (Agenda):** próxima ação e retorno de cliente sem lead (`lead_tasks` é por lead); decidir entre `lead_tasks.client_id` anulável ou tabela própria.
+
+## DEC-191 - Listas de importação do supervisor separadas por importação
+
+**Adotada pelo recomendado do plano em 2026-11-24**, a pedido do usuário ("se ela subir uma nova lista, ela entra como se fosse uma nova pasta de leads separada"). Registro: `docs/implementations/active/2026-11-24-listas-de-importacao.md`.
+
+- **Modelo:** tabela `supervisor_lead_lists` (nome, supervisor que importou, unidade, quando, entraram, duplicados, rejeitados, `legacy`) e coluna `leads.import_list_id`. O id da lista é o mesmo `importId` que a importação já gravava em `leads.source_metadata`.
+- **Nome:** padrão "Lista DD/MM" com a data de Brasília; outra no mesmo dia vira "Lista 24/11 (2)". O supervisor troca o nome no passo Conferir e pode renomear depois (nome repetido também ganha o número).
+- **Números:** entraram = leads gravados; duplicados = já estavam no CRM (vistos no Conferir e no servidor); rejeitados = contatos que ficaram de fora por problema (sem celular, inválido, repetido na própria planilha). Os que passam do limite semanal ficam para depois e não contam como rejeitados.
+- **Leads antigos:** agrupados pelo `importId` que cada importação já gravava, com o nome do dia em que entraram. É o mais fiel: cada importação antiga volta a ser a lista que foi de verdade. Duplicados antigos vêm da auditoria `supervisor_import.created`; rejeitados antigos não eram guardados e ficam 0. Lead sem `importId` (não deveria existir) vai para "Importações anteriores".
+- **Tela:** a vista "Lista importada" do supervisor mostra as listas como pastas (tabela Lite); clicar abre só os leads daquela lista, com o status de cada um e o filtro "Lista"; "Todos os contatos" junta tudo dizendo a lista de cada um. Distribuir dentro de uma lista vale só para ela.
+- **Auditoria:** `supervisor_lead_list.created` e `supervisor_lead_list.renamed`; `supervisor_import.created` e `.distributed` passam a levar `listId`.
+- **Chave:** a mesma `SUPERVISOR_LEAD_IMPORT` (desligar esconde a importação inteira). **Dados:** `drizzle/0236_supervisor_lead_lists.sql` (aditiva; só aplicar com o ok do usuário). O código tolera a migration ausente: sem ela, continua a lista única de antes.

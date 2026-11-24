@@ -36,8 +36,11 @@ import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
 import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals";
-import { isSupervisorImportEnabled, countPendingSupervisorLeads, listSupervisorTeamBrokers, listSupervisorTeamList } from "@/features/supervisor-workspace/lead-import/service";
+import { isSupervisorImportEnabled, countPendingSupervisorLeads, listSupervisorLeadLists, listSupervisorTeamBrokers, listSupervisorTeamList } from "@/features/supervisor-workspace/lead-import/service";
+import { isLeadListsReady } from "@/features/supervisor-workspace/lead-import/list-schema";
+import { ALL_LISTS } from "@/features/supervisor-workspace/lead-import/list-names";
 import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
+import { TeamListsView } from "@/features/supervisor-workspace/lead-import/team-lists-view";
 import { TeamListSwitch } from "@/features/supervisor-workspace/lead-import/team-list-switch";
 import { TeamListImport } from "@/features/supervisor-workspace/lead-import/team-list-import";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
@@ -77,7 +80,7 @@ export default async function LeadsPage(props: Parameters<typeof LeadsPageConten
   return result;
 }
 
-async function SupervisorRadarContent({ context, search, view = "equipe" }: { context: TenantContext; search: string; view?: "equipe" | "lista" }) {
+async function SupervisorRadarContent({ context, search, view = "equipe", listId = null }: { context: TenantContext; search: string; view?: "equipe" | "lista"; listId?: string | null }) {
   const [radar, importEnabled] = await Promise.all([getSupervisorLiteRadar(context), isSupervisorImportEnabled()]);
   const leads = await withRadarSignals(context.tenantId, radar.leads.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null, stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null })));
   // Lista interna da equipe (16/11/2026): importar contatos e distribuir só para a equipe do supervisor.
@@ -86,8 +89,18 @@ async function SupervisorRadarContent({ context, search, view = "equipe" }: { co
   const team = teamRows.map((broker) => ({ id: broker.id, name: broker.name, availability: broker.availability ?? "available" }));
   // 16/11: lead dos corretores e lista importada pela supervisão ficam em vistas separadas.
   if (canImport && view === "lista") {
-    const list = await listSupervisorTeamList(context);
-    return <TeamListManager rows={list.rows} totals={list.totals} team={team} switcher={<TeamListSwitch value="lista" pending={pending} />} />;
+    const switcherList = <TeamListSwitch value="lista" pending={pending} />;
+    // 24/11 (DEC-191): cada importação é uma lista própria. Sem a migration 0236, a lista única de antes.
+    const lists = await listSupervisorLeadLists(context);
+    if (!lists.length && !(await isLeadListsReady())) {
+      const list = await listSupervisorTeamList(context);
+      return <TeamListManager rows={list.rows} totals={list.totals} team={team} switcher={switcherList} />;
+    }
+    if (!listId) return <TeamListsView lists={lists} team={team} pending={pending} switcher={switcherList} />;
+    const current = listId === ALL_LISTS ? null : lists.find((item) => item.id === listId) ?? null;
+    if (listId !== ALL_LISTS && !current) return <TeamListsView lists={lists} team={team} pending={pending} switcher={switcherList} />;
+    const list = await listSupervisorTeamList(context, current?.id ?? null);
+    return <TeamListManager key={listId} rows={list.rows} totals={list.totals} team={team} switcher={switcherList} folders={{ current, all: lists.map(({ id, name }) => ({ id, name })) }} />;
   }
   const action = canImport ? <TeamListImport pending={pending} team={team} /> : undefined;
   const switcher = canImport ? <TeamListSwitch value="equipe" pending={pending} /> : undefined;
@@ -110,6 +123,7 @@ async function LeadsPageContent({
     status?: string;
     search?: string;
     vista?: string;
+    lista?: string;
     branch?: string;
     new?: string;
     tipo?: string;
@@ -163,7 +177,7 @@ async function LeadsPageContent({
 
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
     const params = await searchParams;
-    return <Suspense fallback={<SupervisorRadarLoading />}><SupervisorRadarContent context={context} search={params.search ?? ""} view={params.vista === "lista" ? "lista" : "equipe"} /></Suspense>;
+    return <Suspense fallback={<SupervisorRadarLoading />}><SupervisorRadarContent context={context} search={params.search ?? ""} view={params.vista === "lista" ? "lista" : "equipe"} listId={params.lista?.slice(0, 80) || null} /></Suspense>;
   }
 
   // ─── Modo Lite (corretor) ──────────────────────────────────────────────

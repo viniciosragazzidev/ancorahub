@@ -12,6 +12,8 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { lerTelefone } from "@/shared/input/telefone";
 
 import { teamListClientReplied } from "./team-list-sql";
+import { cleanListName, defaultListName, uniqueListName } from "./list-names";
+import { isLeadListsReady, leadListLinks } from "./list-schema";
 
 import { EMAIL, SUPERVISOR_IMPORT_CHUNK, SUPERVISOR_IMPORT_WEEKLY_MAX, buildContact, cleanName, planShares, titleCase } from "./parse-contacts";
 
@@ -78,17 +80,22 @@ export type TeamListRow = {
   replied: boolean;
   createdAt: string;
   assignedAt: string | null;
+  /** Lista de importação do lead (DEC-191); null antes da migration 0236. */
+  listId: string | null;
 };
 
 /**
  * "Lista importada" do supervisor: tudo o que ele importou (para distribuir e já distribuído), com quem está e se
  * o cliente já respondeu. Uma consulta para as linhas (até 2.000, as mais novas) e uma para os totais.
  */
-export async function listSupervisorTeamList(context: TenantContext) {
+export async function listSupervisorTeamList(context: TenantContext, listId?: string | null) {
   if (context.role !== "supervisor") return { rows: [] as TeamListRow[], totals: { all: 0, pending: 0, distributed: 0, replied: 0 } };
   const db = getDatabase();
   const replied = teamListClientReplied();
-  const alive = and(ownImport(context), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt));
+  const listsReady = await isLeadListsReady();
+  // Uma lista só (DEC-191): os leads dela.
+  const onlyList = listsReady && listId ? eq(leadListLinks.importListId, listId) : undefined;
+  const alive = and(ownImport(context), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), onlyList);
   const [rows, [totals]] = await Promise.all([
     db.select({
       id: schema.leads.id,
@@ -100,6 +107,7 @@ export async function listSupervisorTeamList(context: TenantContext) {
       replied: sql<boolean>`${replied}`,
       createdAt: schema.leads.createdAt,
       assignedAt: schema.leads.assignedAt,
+      listId: listsReady ? sql<string | null>`${leadListLinks.importListId}` : sql<string | null>`null`,
     }).from(schema.leads)
       .leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId))
       .where(alive)
@@ -147,20 +155,31 @@ export async function reviewSupervisorList(context: TenantContext, phones: strin
     const read = lerTelefone(phone);
     return read.ok && read.celular ? [read.e164] : [];
   });
-  const known = await existingPhones(context.tenantId, clean);
-  return { known: clean.filter((phone) => known.has(phone.slice(-11))), weekLeft: await weekRoom(context) };
+  const [known, weekLeft, suggestedName] = await Promise.all([existingPhones(context.tenantId, clean), weekRoom(context), suggestListName(context)]);
+  return { known: clean.filter((phone) => known.has(phone.slice(-11))), weekLeft, suggestedName };
 }
 
 /**
  * Grava um bloco da lista (até SUPERVISOR_IMPORT_CHUNK) como leads da equipe, sem dono e fora de qualquer
  * distribuição automática. Gravação em bloco: 3 comandos por bloco, não 3 por lead.
  */
-export async function importSupervisorContacts(context: TenantContext, input: { importId: string; consent: boolean; contacts: Array<{ name: string; phone: string; email: string | null; note: string | null }> }) {
+export async function importSupervisorContacts(context: TenantContext, input: {
+  importId: string;
+  consent: boolean;
+  contacts: Array<{ name: string; phone: string; email: string | null; note: string | null }>;
+  /** Nome da lista (DEC-191). Vazio: "Lista DD/MM". Só vale no primeiro bloco; os outros reaproveitam a lista. */
+  listName?: string | null;
+  /** Contatos que a tela deixou de fora (sem celular, com problema). Só conta no primeiro bloco. */
+  rejected?: number;
+  /** Contatos que a tela já viu no CRM no "Conferir" e nem mandou. Só conta no primeiro bloco. */
+  duplicatesBefore?: number;
+}) {
   await assertSupervisor(context);
   if (!input.consent) throw new SupervisorImportError("Confirme que você tem autorização para contatar essas pessoas.");
   // O servidor relê cada contato: nunca confia no que a tela mandou.
   const seen = new Set<string>();
-  const clean = input.contacts.slice(0, SUPERVISOR_IMPORT_CHUNK).flatMap((draft) => {
+  const chunk = input.contacts.slice(0, SUPERVISOR_IMPORT_CHUNK);
+  const clean = chunk.flatMap((draft) => {
     const contact = buildContact({ line: 0, name: titleCase(cleanName(draft.name)), phoneRaw: draft.phone, email: draft.email?.match(EMAIL)?.[0]?.toLowerCase() ?? null, note: draft.note });
     if (!contact.phone || contact.problem || seen.has(contact.phone)) return [];
     seen.add(contact.phone);
@@ -171,12 +190,24 @@ export async function importSupervisorContacts(context: TenantContext, input: { 
   const room = await weekRoom(context);
   if (room <= 0) throw new SupervisorImportError(`Você já importou ${SUPERVISOR_IMPORT_WEEKLY_MAX.toLocaleString("pt-BR")} contatos nos últimos 7 dias. Dá para importar de novo quando a semana virar.`);
 
-  const known = await existingPhones(context.tenantId, clean.map((contact) => contact.phone!));
+  const [known, listsReady] = await Promise.all([existingPhones(context.tenantId, clean.map((contact) => contact.phone!)), isLeadListsReady()]);
   const fresh = clean.filter((contact) => !known.has(contact.phone!.slice(-11))).slice(0, room);
-  if (fresh.length) {
-    const now = new Date();
-    const rows = fresh.map((contact) => ({ contact, leadId: randomUUID() }));
-    await getDatabase().transaction(async (tx) => {
+  const duplicates = clean.length - fresh.length;
+  const now = new Date();
+  const rows = fresh.map((contact) => ({ contact, leadId: randomUUID() }));
+  // Lista e leads na mesma transação: "Tentar de novo" não soma o bloco duas vezes.
+  const list = await getDatabase().transaction(async (tx) => {
+    // A lista (pasta) nasce no primeiro bloco, mesmo se todos forem repetidos: ela mostra quantos ficaram de fora.
+    const saved = listsReady ? await saveListChunk(tx, context, {
+      listId: input.importId,
+      name: input.listName ?? null,
+      imported: fresh.length,
+      duplicates,
+      rejected: chunk.length - clean.length,
+      rejectedBefore: Math.max(0, Math.min(Math.floor(input.rejected ?? 0), SUPERVISOR_IMPORT_WEEKLY_MAX)),
+      duplicatesBefore: Math.max(0, Math.min(Math.floor(input.duplicatesBefore ?? 0), SUPERVISOR_IMPORT_WEEKLY_MAX)),
+    }) : null;
+    if (rows.length) {
       await tx.insert(schema.leads).values(rows.map(({ contact, leadId }) => ({
         id: leadId,
         tenantId: context.tenantId,
@@ -209,11 +240,139 @@ export async function importSupervisorContacts(context: TenantContext, input: { 
       })));
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(), userId: context.userId, entidade: "supervisor_import", entidadeId: input.importId, acao: "supervisor_import.created",
-        metadata: { sent: input.contacts.length, imported: fresh.length, duplicates: clean.length - fresh.length, leadIds: rows.map((row) => row.leadId) },
+        metadata: { sent: input.contacts.length, imported: fresh.length, duplicates, leadIds: rows.map((row) => row.leadId), listId: saved?.id ?? null },
       });
-    });
+      if (saved) await tx.update(leadListLinks).set({ importListId: saved.id }).where(and(eq(leadListLinks.tenantId, context.tenantId), inArray(leadListLinks.id, rows.map((row) => row.leadId))));
+    }
+    return saved;
+  });
+  return { imported: fresh.length, duplicates, listId: list?.id ?? null, listName: list?.name ?? null };
+}
+
+type Tx = Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0];
+
+const ownLists = (context: TenantContext) => and(eq(schema.supervisorLeadLists.tenantId, context.tenantId), eq(schema.supervisorLeadLists.supervisorId, context.userId));
+
+async function listNames(context: TenantContext, db: Tx | ReturnType<typeof getDatabase> = getDatabase()) {
+  const rows = await db.select({ name: schema.supervisorLeadLists.name }).from(schema.supervisorLeadLists).where(ownLists(context));
+  return rows.map((row) => row.name);
+}
+
+/** Nome sugerido para a próxima lista: "Lista 24/11", ou "Lista 24/11 (2)" se já houve uma hoje. Null antes da 0236. */
+export async function suggestListName(context: TenantContext, now = new Date()) {
+  if (!(await isLeadListsReady())) return null;
+  return uniqueListName(defaultListName(now), await listNames(context));
+}
+
+/** Cria a lista no primeiro bloco ou soma os números nos seguintes. A lista é sempre do próprio supervisor. */
+async function saveListChunk(db: Tx, context: TenantContext, input: { listId: string; name: string | null; imported: number; duplicates: number; rejected: number; rejectedBefore: number; duplicatesBefore: number }) {
+  const [current] = await db.select({ id: schema.supervisorLeadLists.id, name: schema.supervisorLeadLists.name, tenantId: schema.supervisorLeadLists.tenantId, supervisorId: schema.supervisorLeadLists.supervisorId })
+    .from(schema.supervisorLeadLists).where(eq(schema.supervisorLeadLists.id, input.listId)).limit(1);
+  const now = new Date();
+  if (current) {
+    if (current.tenantId !== context.tenantId || current.supervisorId !== context.userId) throw new SupervisorImportError("Essa lista é de outra pessoa. Comece a importação de novo.");
+    await db.update(schema.supervisorLeadLists).set({
+      importedCount: sql`${schema.supervisorLeadLists.importedCount} + ${input.imported}`,
+      duplicateCount: sql`${schema.supervisorLeadLists.duplicateCount} + ${input.duplicates}`,
+      rejectedCount: sql`${schema.supervisorLeadLists.rejectedCount} + ${input.rejected}`,
+      updatedAt: now,
+    }).where(eq(schema.supervisorLeadLists.id, current.id));
+    return { id: current.id, name: current.name };
   }
-  return { imported: fresh.length, duplicates: clean.length - fresh.length };
+  const name = uniqueListName(cleanListName(input.name) || defaultListName(now), await listNames(context, db));
+  await db.insert(schema.supervisorLeadLists).values({
+    id: input.listId,
+    tenantId: context.tenantId,
+    branchId: context.branchId,
+    supervisorId: context.userId,
+    name,
+    importedCount: input.imported,
+    duplicateCount: input.duplicates + input.duplicatesBefore,
+    rejectedCount: input.rejected + input.rejectedBefore,
+  });
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId: context.userId, entidade: "supervisor_lead_list", entidadeId: input.listId, acao: "supervisor_lead_list.created",
+    metadata: { tenantId: context.tenantId, name },
+  });
+  return { id: input.listId, name };
+}
+
+export type SupervisorLeadList = {
+  id: string;
+  name: string;
+  createdAt: string;
+  importedBy: string | null;
+  /** Números guardados na importação. */
+  imported: number;
+  duplicates: number;
+  rejected: number;
+  legacy: boolean;
+  /** Leads da lista agora (sem apagados e arquivados), quantos esperam distribuição e quantos responderam. */
+  total: number;
+  pending: number;
+  replied: number;
+};
+
+/**
+ * As listas (pastas) do supervisor, das mais novas para as mais antigas, com quantos esperam distribuição e quantos
+ * já responderam. Uma consulta para as listas e uma para os números. Vazio antes da migration 0236.
+ */
+export async function listSupervisorLeadLists(context: TenantContext): Promise<SupervisorLeadList[]> {
+  if (context.role !== "supervisor" || !(await isLeadListsReady())) return [];
+  const db = getDatabase();
+  const replied = teamListClientReplied();
+  const listColumn = sql<string>`${leadListLinks.importListId}`;
+  const [lists, stats] = await Promise.all([
+    db.select({
+      id: schema.supervisorLeadLists.id,
+      name: schema.supervisorLeadLists.name,
+      createdAt: schema.supervisorLeadLists.createdAt,
+      importedBy: schema.user.name,
+      imported: schema.supervisorLeadLists.importedCount,
+      duplicates: schema.supervisorLeadLists.duplicateCount,
+      rejected: schema.supervisorLeadLists.rejectedCount,
+      legacy: schema.supervisorLeadLists.legacy,
+    }).from(schema.supervisorLeadLists)
+      .leftJoin(schema.user, eq(schema.user.id, schema.supervisorLeadLists.supervisorId))
+      .where(ownLists(context))
+      .orderBy(desc(schema.supervisorLeadLists.createdAt))
+      .limit(500),
+    db.select({
+      listId: listColumn,
+      total: count(),
+      pending: sql<number>`count(*) filter (where ${schema.leads.corretorId} is null)`,
+      replied: sql<number>`count(*) filter (where ${replied})`,
+    }).from(schema.leads)
+      .where(and(ownImport(context), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), sql`${leadListLinks.importListId} is not null`))
+      .groupBy(listColumn),
+  ]);
+  const byList = new Map(stats.map((row) => [row.listId, row]));
+  return lists.map((list) => {
+    const stat = byList.get(list.id);
+    return { ...list, createdAt: list.createdAt.toISOString(), total: Number(stat?.total ?? 0), pending: Number(stat?.pending ?? 0), replied: Number(stat?.replied ?? 0) };
+  });
+}
+
+/** Renomear a lista. Só o supervisor dono; nome repetido ganha (2). Auditado. */
+export async function renameSupervisorLeadList(context: TenantContext, input: { listId: string; name: string }) {
+  await assertSupervisor(context);
+  if (!(await isLeadListsReady())) throw new SupervisorImportError("As listas separadas ainda não estão ligadas.");
+  const wanted = cleanListName(input.name);
+  if (!wanted) throw new SupervisorImportError("Dê um nome para a lista.");
+  const db = getDatabase();
+  const [current] = await db.select({ id: schema.supervisorLeadLists.id, name: schema.supervisorLeadLists.name })
+    .from(schema.supervisorLeadLists).where(and(ownLists(context), eq(schema.supervisorLeadLists.id, input.listId))).limit(1);
+  if (!current) throw new SupervisorImportError("Não achei essa lista. Atualize a página.");
+  if (current.name === wanted) return { id: current.id, name: current.name };
+  const name = uniqueListName(wanted, (await listNames(context)).filter((other) => other !== current.name));
+  await db.transaction(async (tx) => {
+    await tx.update(schema.supervisorLeadLists).set({ name, updatedAt: new Date() }).where(eq(schema.supervisorLeadLists.id, current.id));
+    await tx.insert(schema.auditLogs).values({
+      id: randomUUID(), userId: context.userId, entidade: "supervisor_lead_list", entidadeId: current.id, acao: "supervisor_lead_list.renamed",
+      metadata: { tenantId: context.tenantId, from: current.name, to: name },
+    });
+  });
+  return { id: current.id, name };
 }
 
 /** Texto do aviso no CRM (sem WhatsApp, pedido do Vinicios em 16/11). */
@@ -230,7 +389,7 @@ export function teamListNotice(received: number) {
  * escolhida (os mais antigos primeiro). Atribuição direta, sem mensagem para o cliente, sem WhatsApp ao corretor e
  * sem prazo de SLA (lista fria). Um UPDATE em bloco por corretor.
  */
-export async function distributeSupervisorLeads(context: TenantContext, input: { counts: Record<string, number>; leadIds?: string[] }) {
+export async function distributeSupervisorLeads(context: TenantContext, input: { counts: Record<string, number>; leadIds?: string[]; listId?: string | null }) {
   await assertSupervisor(context);
   const team = await listSupervisorTeamBrokers(context);
   const teamIds = new Set(team.map((broker) => broker.id));
@@ -239,7 +398,9 @@ export async function distributeSupervisorLeads(context: TenantContext, input: {
 
   const db = getDatabase();
   // Selecionados na lista: só eles entram. Sem seleção: os mais antigos que esperam.
-  const only = input.leadIds?.length ? inArray(schema.leads.id, input.leadIds) : undefined;
+  // Dentro de uma lista (DEC-191): só os leads dela.
+  const inList = input.listId && (await isLeadListsReady()) ? eq(leadListLinks.importListId, input.listId) : undefined;
+  const only = and(input.leadIds?.length ? inArray(schema.leads.id, input.leadIds) : undefined, inList);
   const [pendingRow] = await db.select({ total: count() }).from(schema.leads).where(and(pendingWhere(context), only));
   const pendingTotal = Number(pendingRow?.total ?? 0);
   if (!pendingTotal) throw new SupervisorImportError("Esses leads já foram distribuídos. Atualize a página.");
@@ -275,7 +436,7 @@ export async function distributeSupervisorLeads(context: TenantContext, input: {
     }
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(), userId: context.userId, entidade: "supervisor_import", entidadeId: context.userId, acao: "supervisor_import.distributed",
-      metadata: { shares: Object.fromEntries(received) },
+      metadata: { shares: Object.fromEntries(received), listId: input.listId ?? null },
     });
   });
 

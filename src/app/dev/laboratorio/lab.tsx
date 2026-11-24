@@ -24,6 +24,7 @@ import { WhatsAppHandoff } from "@/features/broker-workspace/whatsapp-handoff/wh
 import { DevLabProvider, type DevLab } from "@/lib/dev-lab";
 import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
+import { TeamListsView } from "@/features/supervisor-workspace/lead-import/team-lists-view";
 import { SaleChat, type SaleChatServices } from "@/features/post-sale/components/sale-chat";
 import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-ancora-workspace";
@@ -95,7 +96,13 @@ const LAB_LIST = ["Ana Teste", "Bia Teste", "Caio Teste", "Davi Teste", "Eva Tes
   replied: index >= 8,
   createdAt: new Date().toISOString(),
   assignedAt: null,
+  listId: index < 7 ? "lab-lista-2" : "lab-lista-1",
 }));
+/** Listas separadas (DEC-191): uma antiga já distribuída e a de hoje, com repetidos e contatos de fora. */
+const LAB_LISTS = [
+  { id: "lab-lista-2", name: "Lista 24/11", createdAt: new Date().toISOString(), importedBy: "Daianne Teste", imported: 7, duplicates: 2, rejected: 1, legacy: false },
+  { id: "lab-lista-1", name: "Lista 18/11", createdAt: new Date(Date.now() - 6 * 86_400_000).toISOString(), importedBy: "Daianne Teste", imported: 3, duplicates: 0, rejected: 0, legacy: false },
+];
 /** Catálogo de exemplo do Registrar venda em conversa. */
 const LAB_SALE_CATALOG: SaleCatalog = {
   carriers: [
@@ -227,18 +234,23 @@ export function FlowLab() {
       },
       review: async (phones) => {
         await wait(delay);
-        return { ok: true, data: { known: phones.filter((phone) => phone === LAB_KNOWN_PHONE), weekLeft: 5000 } };
+        return { ok: true, data: { known: phones.filter((phone) => phone === LAB_KNOWN_PHONE), weekLeft: 5000, suggestedName: "Lista 24/11 (2)" } };
       },
       importContacts: async (input) => {
         await wait(delay);
         if (outcome === "falha") return { ok: false, error: "Não consegui importar agora." };
-        return { ok: true, data: { imported: input.contacts.length, duplicates: 0 } };
+        return { ok: true, data: { imported: input.contacts.length, duplicates: 0, listId: input.importId, listName: input.listName?.trim() || "Lista 24/11 (2)" } };
       },
       distribute: async (input) => {
         await wait(delay);
         if (outcome === "falha") return { ok: false, error: "Não consegui distribuir agora. Os leads continuam aqui." };
         const distributed = Object.values(input.counts).reduce((sum, value) => sum + value, 0);
         return { ok: true, data: { distributed, left: 0, perBroker: input.counts } };
+      },
+      renameList: async (input) => {
+        await wait(delay);
+        if (outcome === "falha") return { ok: false, error: "Não consegui renomear agora. O nome antigo continua." };
+        return { ok: true, data: { id: input.listId, name: input.name } };
       },
     },
   }), [delay, outcome, mode]);
@@ -314,7 +326,7 @@ export function FlowLab() {
             <SasaVoiceButton pathname="/dashboard" chat={false} />
           </>
         ) : flow === "lista" ? (
-          <TeamListManager rows={LAB_LIST} totals={{ all: LAB_LIST.length, pending: LAB_LIST.filter((row) => !row.brokerId).length, distributed: LAB_LIST.filter((row) => row.brokerId).length, replied: LAB_LIST.filter((row) => row.replied).length }} team={LAB_TEAM} switcher={null} />
+          <LabTeamLists />
         ) : flow === "movimento" ? (
           <InterfaceMotionProvider enabled={!killSwitch}>
             <MotionShowcase delay={delay} failing={outcome === "falha"} />
@@ -409,4 +421,20 @@ export function FlowLab() {
       </aside>
     </DevLabProvider>
   );
+}
+
+/** Listas separadas no laboratório (DEC-191): pastas, uma lista, todos os contatos e renomear, sem sair da página. */
+function LabTeamLists() {
+  const [open, setOpen] = useState<string | null>(null);
+  const totalsOf = (rows: typeof LAB_LIST) => ({ all: rows.length, pending: rows.filter((row) => !row.brokerId).length, distributed: rows.filter((row) => row.brokerId).length, replied: rows.filter((row) => row.replied).length });
+  if (!open) {
+    const lists = LAB_LISTS.map((list) => {
+      const totals = totalsOf(LAB_LIST.filter((row) => row.listId === list.id));
+      return { ...list, total: totals.all, pending: totals.pending, replied: totals.replied };
+    });
+    return <TeamListsView lists={lists} team={LAB_TEAM} pending={lists.reduce((sum, list) => sum + list.pending, 0)} switcher={null} onOpenList={setOpen} />;
+  }
+  const current = LAB_LISTS.find((list) => list.id === open) ?? null;
+  const rows = current ? LAB_LIST.filter((row) => row.listId === current.id) : LAB_LIST;
+  return <TeamListManager key={open} rows={rows} totals={totalsOf(rows)} team={LAB_TEAM} switcher={null} folders={{ current, all: LAB_LISTS, onOpenList: setOpen }} />;
 }

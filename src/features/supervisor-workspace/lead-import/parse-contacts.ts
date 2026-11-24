@@ -50,11 +50,17 @@ export type TeamListApi = {
   /** Só quando a leitura automática fica em dúvida. `null` = IA indisponível: segue a leitura automática. */
   structure: (request: StructureRequest) => Promise<Result<StructureAnswer | null>>;
   /** Uma busca só: quais desses celulares (55DDDnúmero) já estão no CRM. Devolve os que já estão. */
-  review: (phones: string[]) => Promise<Result<{ known: string[]; weekLeft: number }>>;
-  /** Um bloco de até SUPERVISOR_IMPORT_CHUNK. `importId` junta os blocos da mesma lista. */
-  importContacts: (input: { consent: boolean; importId: string; contacts: Array<Omit<ContactDraft, "line">> }) => Promise<Result<{ imported: number; duplicates: number }>>;
-  /** Quantos leads cada corretor recebe. O servidor escolhe os mais antigos da lista. */
-  distribute: (input: { counts: Record<string, number>; leadIds?: string[] }) => Promise<Result<{ distributed: number; left: number; perBroker: Record<string, number> }>>;
+  /** `suggestedName`: "Lista 24/11" ou "Lista 24/11 (2)"; null quando as listas separadas ainda não existem (DEC-191). */
+  review: (phones: string[]) => Promise<Result<{ known: string[]; weekLeft: number; suggestedName?: string | null }>>;
+  /**
+   * Um bloco de até SUPERVISOR_IMPORT_CHUNK. `importId` junta os blocos da mesma lista e é o id da lista (DEC-191).
+   * `listName` e `rejected` (os que ficaram de fora na tela) só contam no primeiro bloco.
+   */
+  importContacts: (input: { consent: boolean; importId: string; contacts: Array<Omit<ContactDraft, "line">>; listName?: string | null; rejected?: number; duplicatesBefore?: number }) => Promise<Result<{ imported: number; duplicates: number; listId?: string | null; listName?: string | null }>>;
+  /** Quantos leads cada corretor recebe. O servidor escolhe os mais antigos da lista (ou só da lista `listId`). */
+  distribute: (input: { counts: Record<string, number>; leadIds?: string[]; listId?: string | null }) => Promise<Result<{ distributed: number; left: number; perBroker: Record<string, number> }>>;
+  /** Renomear uma lista de importação (DEC-191). */
+  renameList?: (input: { listId: string; name: string }) => Promise<Result<{ id: string; name: string }>>;
 };
 
 export type ParsedList = {

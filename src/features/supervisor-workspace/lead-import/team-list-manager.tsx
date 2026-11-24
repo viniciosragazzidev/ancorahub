@@ -1,14 +1,40 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
+import { ChipGroup } from "@/components/arc/chip-group/chip-group";
 import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
+import { liteDateFormatter } from "@/components/lite/format/date";
 
-import type { TeamListRow } from "./service";
+import { ALL_LISTS, teamListHref } from "./list-names";
+import type { SupervisorLeadList, TeamListRow } from "./service";
 import { TeamListImport, type TeamListBroker } from "./team-list-import";
+import { TeamListRename } from "./team-list-rename";
 import styles from "./team-list-import.module.css";
+
+/** Listas separadas (DEC-191): a lista aberta (null = todas) e as outras, para o filtro "Lista". */
+export type TeamListFolders = {
+  current: Pick<SupervisorLeadList, "id" | "name" | "createdAt" | "importedBy" | "imported" | "duplicates" | "rejected" | "legacy"> | null;
+  all: Array<Pick<SupervisorLeadList, "id" | "name">>;
+  /** Laboratório: troca de lista sem sair da página (null = pastas). */
+  onOpenList?: (listId: string | null) => void;
+};
+
+const importedAt = liteDateFormatter({ day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+/** "Importada em 24/11/2026 14:05 por Daianne · 120 entraram · 8 duplicados · 3 fora". */
+export function listSummary(list: NonNullable<TeamListFolders["current"]>) {
+  const when = list.legacy ? "Importada antes das listas separadas" : `Importada em ${importedAt.format(new Date(list.createdAt))}`;
+  const who = list.importedBy ? ` por ${list.importedBy.split(/\s+/)[0]}` : "";
+  const counts = [`${fmt(list.imported)} ${list.imported === 1 ? "entrou" : "entraram"}`];
+  if (list.duplicates) counts.push(`${fmt(list.duplicates)} ${list.duplicates === 1 ? "duplicado" : "duplicados"}`);
+  if (list.rejected) counts.push(`${fmt(list.rejected)} fora`);
+  return `${when}${who} · ${counts.join(" · ")}`;
+}
 
 type Filter = "all" | "pending" | "distributed" | "replied";
 type Totals = { all: number; pending: number; distributed: number; replied: number };
@@ -33,7 +59,12 @@ const normalize = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, 
  * "Lista importada" do supervisor (16/11/2026): todos os contatos que ele importou, para distribuir e já
  * distribuídos, com quem está cada um e se o cliente respondeu. Marca os que esperam e distribui em lote.
  */
-export function TeamListManager({ rows, totals, team, switcher }: { rows: TeamListRow[]; totals: Totals; team: TeamListBroker[]; switcher: ReactNode }) {
+export function TeamListManager({ rows, totals, team, switcher, folders = null }: { rows: TeamListRow[]; totals: Totals; team: TeamListBroker[]; switcher: ReactNode; folders?: TeamListFolders | null }) {
+  const router = useRouter();
+  const [renamed, setRenamed] = useState<string | null>(null);
+  const current = folders?.current ?? null;
+  const go = (listId: string | null) => (folders?.onOpenList ? folders.onOpenList(listId) : router.push(teamListHref(listId)));
+  const listNames = useMemo(() => new Map((folders?.all ?? []).map((list) => [list.id, list.name])), [folders]);
   const [filter, setFilter] = useState<Filter>(totals.pending ? "pending" : "all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -68,13 +99,35 @@ export function TeamListManager({ rows, totals, team, switcher }: { rows: TeamLi
     setSelected((current) => (allMarked ? current.filter((id) => !pendingVisible.includes(id)) : [...new Set([...current, ...pendingVisible])]));
   }
 
+  const status = `${fmt(totals.pending)} para distribuir · ${fmt(totals.distributed)} distribuídos · ${fmt(totals.replied)} responderam`;
+  const title = folders ? (current ? renamed ?? current.name : "Todos os contatos") : "Lista importada";
+
   return (
     <PeoplePage
-      title="Lista importada"
-      subtitle={`${fmt(totals.pending)} para distribuir · ${fmt(totals.distributed)} distribuídos · ${fmt(totals.replied)} responderam`}
-      action={<TeamListImport pending={totals.pending} team={team} selectedLeadIds={selected} onSelectionDone={() => setSelected([])} />}
+      title={title}
+      subtitle={current ? <>{listSummary(current)}<br />{status}</> : status}
+      action={(
+        <span className={styles.headerActions}>
+          <TeamListImport pending={totals.pending} team={team} selectedLeadIds={selected} onSelectionDone={() => setSelected([])} listId={current?.id ?? null} />
+          {current ? <TeamListRename listId={current.id} name={renamed ?? current.name} onRenamed={setRenamed} /> : null}
+        </span>
+      )}
     >
       {switcher}
+      {folders ? (
+        <>
+          <Link href={teamListHref(null)} className={styles.back} onClick={(event) => { if (folders.onOpenList) { event.preventDefault(); go(null); } }}>Todas as listas</Link>
+          {folders.all.length > 1 ? (
+            <ChipGroup
+              label="Lista"
+              options={folders.all.map((list) => ({ value: list.id, label: list.id === current?.id && renamed ? renamed : list.name }))}
+              value={current ? [current.id] : []}
+              onValueChange={(next) => go(next[0] ?? ALL_LISTS)}
+              maxVisible={5}
+            />
+          ) : null}
+        </>
+      ) : null}
       <PeopleFilters
         label="Situação da lista"
         options={options}
@@ -113,7 +166,11 @@ export function TeamListManager({ rows, totals, team, switcher }: { rows: TeamLi
                   </label>
                 ) : undefined}
                 chip={<Badge tone={pending ? "neutral" : row.replied ? "success" : "info"} size="sm">{pending ? "Para distribuir" : row.replied ? "Respondeu" : STATUS[row.status] ?? "Com o corretor"}</Badge>}
-                preview={pending ? row.phone.replace(/^55(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3") : `Com ${row.brokerName ?? "corretor"}`}
+                preview={[
+                  // Em "Todos os contatos", cada linha diz de qual lista veio.
+                  folders && !current && row.listId ? listNames.get(row.listId) : null,
+                  pending ? row.phone.replace(/^55(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3") : `Com ${row.brokerName ?? "corretor"}`,
+                ].filter(Boolean).join(" · ")}
               />
             );
           })}

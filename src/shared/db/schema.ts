@@ -5964,6 +5964,33 @@ export const agentActions = pgTable(
 );
 
 /**
+ * Listas de importação do supervisor (24/11/2026, DEC-191; migration 0236). Cada importação vira uma lista própria,
+ * como uma pasta de leads. O `id` é o mesmo `importId` gravado em `leads.source_metadata`. O vínculo do lead
+ * (`leads.import_list_id`) fica fora de `schema.leads` de propósito, em `lead-import/list-schema.ts`, para o resto do
+ * sistema funcionar antes e depois da migration.
+ */
+export const supervisorLeadLists = pgTable(
+  "supervisor_lead_lists",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+    supervisorId: text("supervisor_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    importedCount: integer("imported_count").notNull().default(0),
+    duplicateCount: integer("duplicate_count").notNull().default(0),
+    rejectedCount: integer("rejected_count").notNull().default(0),
+    /** "Importações anteriores": leads antigos sem importação conhecida. */
+    legacy: boolean("legacy").notNull().default(false),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("supervisor_lead_lists_owner_created_idx").on(table.tenantId, table.supervisorId, table.createdAt),
+  ],
+);
+
+/**
  * Toques de recuperação (fase 2 do plano de recuperação, 21/11/2026; migration 0234). Um por toque: passo, canal,
  * resultado, resposta e custo estimado. Lido pelo funil de recuperação e escrito pelo turbo, pelo follow-up de
  * silêncio e pela cadência única. Plano: docs/implementations/active/2026-11-21-recuperacao-de-leads.md.
