@@ -38,6 +38,9 @@ export async function ensureBrokerAcquisitionQueue(tenantId: string) {
     name: BROKER_ACQUISITION_QUEUE_NAME,
     slug: BROKER_ACQUISITION_QUEUE_SLUG,
     aiQualificationEnabled: false,
+    // Manual until the director picks who handles partnership requests: the leads wait in the
+    // queue instead of being offered to the customer brokers.
+    assignmentMode: "manual",
     createdAt: now,
     updatedAt: now,
   }).onConflictDoNothing();
