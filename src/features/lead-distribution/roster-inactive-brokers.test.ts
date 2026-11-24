@@ -24,6 +24,7 @@ const context: TenantContext = { tenantId, branchId: null, userId: "director", r
 const queries: { sql: string; params: unknown[] }[] = [];
 let scheduleRow: unknown[];
 let publishedDates: string[];
+let alreadyOnSchedule = false;
 let broker: { tenantId: string; branchId: string; id: string; role: string; jobTitle: string; active: boolean; status: string; membershipStatus: string };
 
 // In-memory executor of the predicates used by the real Drizzle query. No DB connection.
@@ -37,6 +38,7 @@ beforeEach(() => {
   queries.length = 0;
   scheduleRow = [scheduleId, "Plantão sintético", branchId, "2026-10-01T00:00:00Z", null, "active", null];
   publishedDates = [];
+  alreadyOnSchedule = false;
   broker = { tenantId, branchId, id: "broker-disabled", role: "broker", jobTitle: "broker", active: false, status: "disabled", membershipStatus: "inactive" };
   mocks.context.mockResolvedValue(context);
   mocks.flag.mockResolvedValue("true");
@@ -48,6 +50,9 @@ beforeEach(() => {
         ? [scheduleRow] : [] };
     }
     if (query.startsWith("select distinct") && query.includes('"monthly_plan_id" is not null')) return { rows: publishedDates.map((date) => [date]) };
+    if (alreadyOnSchedule && query.startsWith('select "id" from "duty_roster_assignments"') && equalsMatch(query, params, "duty_roster_assignments", "schedule_id", scheduleId) && equalsMatch(query, params, "duty_roster_assignments", "broker_id", broker.id)) {
+      return { rows: [["existing-row"]] };
+    }
     if (query.includes('from "branches"')) return { rows: [[branchId, "Unidade sintética", false]] };
     if (query.includes('from "tenant_memberships"')) {
       const allowed = [
@@ -92,6 +97,12 @@ describe("inactive brokers in duty planning", () => {
     expect(queries.some((q) => q.sql.startsWith('insert into "audit_logs"'))).toBe(true);
     expect(queries.some((q) => /^(update|delete)/.test(q.sql))).toBe(false);
     expect(queries.flatMap((q) => q.params)).not.toContain("forged-tenant");
+  });
+
+  it("refuses the same broker twice in the same plantão and day (24/11, Adriana duplicada)", async () => {
+    alreadyOnSchedule = true;
+    expect((await createRosterAssignmentAction({}, assignment())).error).toBe("Esse corretor já está nesse plantão neste dia.");
+    expect(queries.some((q) => q.sql.startsWith('insert into "duty_roster_assignments"'))).toBe(false);
   });
 
   it("restores the active-account requirement when disabled by Super-admin", async () => {

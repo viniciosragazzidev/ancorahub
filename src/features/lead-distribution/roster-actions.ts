@@ -105,6 +105,27 @@ async function findBrokerOverlap(db: DatabaseOrTransaction, tenantId: string, br
   return conflict ?? null;
 }
 
+const DUPLICATE_ROSTER_MESSAGE = "Esse corretor já está nesse plantão neste dia.";
+
+/**
+ * The same broker twice in the same plantão and day is never valid (24/11: Adriana was added twice
+ * a minute apart and showed twice on the presencial roster). An overlap with ANOTHER plantão stays
+ * allowed (DEC-132); this only refuses a second active weekly row on the same schedule and day.
+ */
+async function assertNotAlreadyOnSchedule(db: DatabaseOrTransaction, tenantId: string, scheduleId: string, brokerId: string, dayOfWeek: number, excludedId?: string) {
+  const conditions = [
+    eq(schema.dutyRosterAssignments.tenantId, tenantId),
+    eq(schema.dutyRosterAssignments.scheduleId, scheduleId),
+    eq(schema.dutyRosterAssignments.brokerId, brokerId),
+    eq(schema.dutyRosterAssignments.dayOfWeek, dayOfWeek),
+    eq(schema.dutyRosterAssignments.status, "active"),
+    isNull(schema.dutyRosterAssignments.dutyDate),
+  ];
+  if (excludedId) conditions.push(ne(schema.dutyRosterAssignments.id, excludedId));
+  const [existing] = await db.select({ id: schema.dutyRosterAssignments.id }).from(schema.dutyRosterAssignments).where(and(...conditions)).limit(1);
+  if (existing) throw new Error(DUPLICATE_ROSTER_MESSAGE);
+}
+
 /** DEC-132: saving an overlapping scale is allowed, but always audited. */
 async function auditOverlapAllowed(db: DatabaseOrTransaction, userId: string, brokerId: string) {
   await db.insert(schema.auditLogs).values({
@@ -165,6 +186,7 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
     const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
+      await assertNotAlreadyOnSchedule(tx, context.tenantId, schedule.id, input.brokerId, input.dayOfWeek);
       const overlap = await findBrokerOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule);
       if (overlap) await auditOverlapAllowed(tx, context.userId, input.brokerId);
       await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers);
@@ -212,6 +234,7 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
         expected: assignment,
         target: { scheduleId: schedule.id, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, actorId: context.userId, now: new Date() },
         prepare: async (lockedAssignment) => {
+          await assertNotAlreadyOnSchedule(tx, context.tenantId, schedule.id, input.brokerId, input.dayOfWeek, lockedAssignment.id);
           const overlap = await findBrokerOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule, lockedAssignment.id);
           await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers, lockedAssignment.id);
           return overlap;
