@@ -32,7 +32,7 @@ describe("connectionLimit", () => {
     expect(connectionLimit()).toBe(10);
 
     vi.stubEnv("DATABASE_URL", "postgresql://u:p@aws-0-sa-east-1.pooler.supabase.com:5432/postgres");
-    expect(connectionLimit()).toBe(4);
+    expect(connectionLimit()).toBe(6);
   });
 
   it("allows an explicit bounded production override", () => {

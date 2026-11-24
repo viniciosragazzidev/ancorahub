@@ -1472,6 +1472,8 @@ export const notifications = pgTable(
   (table) => [
     index("notifications_recipient_created_idx").on(table.recipientUserId, table.createdAt),
     index("notifications_tenant_idx").on(table.tenantId),
+    // 0238 (24/11/2026): contador de não lidas do sino, em toda tela.
+    index("notifications_recipient_unread_idx").on(table.tenantId, table.recipientUserId).where(sql`${table.readAt} IS NULL`),
     uniqueIndex("notifications_tenant_idempotency_unique").on(table.tenantId, table.idempotencyKey).where(sql`${table.idempotencyKey} IS NOT NULL`),
   ],
 );

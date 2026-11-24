@@ -44,10 +44,13 @@ export function connectionLimit() {
   // and script): with the default 15, more than 2 here ran it out (EMAXCONNSESSION)
   // and broke /leads. Pool size is 30 since 2026-10-06, and a probe inside the app
   // container measured 4-5 session sockets as safe (30 parallel logins, p95 < 100 ms),
-  // so production uses 4. The transaction pooler hung under load on this project
+  // so production used 4. The transaction pooler hung under load on this project
   // (scripts/db-pool-probe.cjs), so keep the CRM on 5432 until that is solved.
+  // 24/11/2026: 6. With 4, a screen's 15 to 26 queries ran in batches of 4 behind every
+  // other user. 6 pages + 3 background = 9 slots; during a deploy the old and the new
+  // container overlap (18 of the 30). Raise the Supabase pool size before going higher.
   if (process.env.NODE_ENV !== "production") return isTransactionPooler() ? 3 : 2;
-  return isTransactionPooler() ? 10 : 4;
+  return isTransactionPooler() ? 10 : 6;
 }
 
 /**

@@ -42,6 +42,25 @@ pulam `lease:`. Os status vivos usam essa linha para dizer "última rodada há 4
 sem rodar, avisar que o robô parou. Mudou o caminho ou a frequência aqui, mude também
 `src/features/live-status/job-schedule.ts` (o teste compara as duas tabelas).
 
+### Serviço só de tarefas (24/11/2026, a fazer no painel)
+
+Em 24/11 as tarefas rodavam no mesmo processo Node que monta as telas, e quase sem parar:
+SLA levava 436 s por rodada (a cada 5 min), tempo limite da qualificação 379 s (a cada 2 min),
+etapas paradas 329 s, distribuição 122 s (a cada 2 min). Isso disputa CPU com cada tela aberta.
+Separar não muda código: é a mesma imagem em outro serviço.
+
+1. No projeto do CRM, criar um segundo serviço a partir do mesmo repositório e da mesma branch
+   (`feat/diretor-visual-lite`), com as mesmas variáveis de ambiente. Nome sugerido: `crm-tarefas`.
+2. Nesse serviço: sem domínio público e sem health check externo. `DB_POOL_MAX=2`, porque ele
+   não monta telas; as tarefas usam `DB_BACKGROUND_POOL_MAX` (padrão 3).
+3. Recriar nele cada tarefa da tabela abaixo, com o mesmo comando (`http://127.0.0.1:3000<caminho>`).
+4. Conferir em `system_settings` (`heartbeat:*`) que as rodadas seguem gravando, e só então apagar
+   as tarefas do serviço das telas.
+5. Vagas no pooler de sessão (30): telas 6 + 3, tarefas 2 + 3. No deploy dos dois ao mesmo tempo,
+   até 28. Se aparecer `EMAXCONNSESSION`, aumente o `pool size` no Supabase antes de qualquer outra coisa.
+
+Rollback: recriar as tarefas no serviço das telas e parar o `crm-tarefas`.
+
 ## Tarefas
 
 | Caminho | Frequência | O que faz | Detalhes |
