@@ -23,6 +23,7 @@ import { ManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team"
 import { getManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team-queries";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { listAgentOffUsers } from "@/features/agent/access";
 import { TeamHeaderActionsLite, TeamLite } from "./_components/team-lite";
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
@@ -233,6 +234,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   // Dedup por id: gestores/supervisores/diretores com broker_profiles + tenant_memberships
   // aparecem nas duas queries; a versão de tenant_memberships (nome/e-mail atuais) vence.
   type TeamMemberRow = (typeof brokers)[number] | (typeof nonBrokers)[number];
+  // Agente IA por pessoa (24/11): só o diretor vê e muda, e só para quem é diretor.
+  const agentOff = context.role === "director" ? await listAgentOffUsers(context.tenantId).catch(() => []) : [];
   const members = [
     ...new Map<string, TeamMemberRow>(
       [...brokers, ...nonBrokers].map((member) => [member.id, member])
@@ -250,6 +253,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         ...member,
         canEditAuthority: canEditMemberAuthority(context, target),
         canManage: podeGerirEquipe && canManageMember(context, target),
+        agentEnabled: context.role === "director" && member.role === "director" ? !agentOff.includes(target.userId) : undefined,
       };
     });
   const activeMembers = members.filter((member) => member.status === "active").length;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAgentUIStreamResponse, type UIMessage } from "ai";
 
+import { canUseDirectorAgent } from "@/features/agent/access";
 import { createDirectorAgent } from "@/features/agent/agent";
 import { createServerAgentBackend } from "@/features/agent/backend-server";
 import { isAgentDirectorWritesEnabled, resolveAgentDirectorModel } from "@/features/agent/settings";
@@ -21,8 +22,9 @@ export async function POST(req: Request) {
   try {
     const context = await getRequiredTenantContext();
     // Gestor sem o Agente IA desde 10/11; o agente novo nasce só para o diretor (plano §3.4).
-    if (isOutsideManagerScope(context.role, context.jobTitle) || context.role !== "director") {
-      return NextResponse.json({ error: "O Agente IA está disponível só para o diretor." }, { status: 403 });
+    // Diretor, com o Agente IA liberado no cargo (se tiver) e ligado na ficha dele em Equipe (24/11).
+    if (isOutsideManagerScope(context.role, context.jobTitle) || !(await canUseDirectorAgent(context))) {
+      return NextResponse.json({ error: context.role === "director" ? "O Agente IA está desligado para você. Peça ao diretor para ligar em Equipe." : "O Agente IA está disponível só para o diretor." }, { status: 403 });
     }
     const guard = await readChatRequest(req, context);
     if (!guard.ok) {

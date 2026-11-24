@@ -19,6 +19,8 @@ import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import type { TenantRole } from "@/shared/db/schema";
 
+import { setMemberAgentAccessAction } from "@/features/agent/access-actions";
+
 import { deleteTeamMemberAction, generateResetPasswordLinkAction, transferLeadsAction, updateTeamMemberAction } from "../actions";
 import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./team-lite.module.css";
@@ -40,6 +42,8 @@ export type TeamMemberLite = {
   supervisorId?: string | null;
   canEditAuthority: boolean;
   canManage: boolean;
+  /** Agente IA desta pessoa (só vem para diretor, visto por diretor). */
+  agentEnabled?: boolean;
 };
 
 export type BranchOption = { id: string; name: string };
@@ -94,6 +98,8 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
   const initialTeam = member.userId ? allMembers.filter((item) => item.supervisorId === member.userId && item.userId).map((item) => item.userId!) : [];
   const [team, setTeam] = useState<string[]>(initialTeam);
   const [teamSearch, setTeamSearch] = useState("");
+  const agentEditable = currentRole === "director" && member.agentEnabled !== undefined && Boolean(member.userId);
+  const [agentOn, setAgentOn] = useState(member.agentEnabled ?? true);
   const teamCandidates = allMembers.filter((item) => item.role === "broker" && item.status === "active" && item.userId && item.userId !== member.userId && (branchId === "__tenant__" || item.branchId === branchId));
   const selectedCustomRole = customRoles.find((item) => item.id === customRoleId);
   const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || selectedCustomRole?.scope === "branch";
@@ -107,8 +113,9 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
       setCustomRoleId(member.customRoleId ?? "");
       setBranchId(member.branchId ?? "__tenant__");
       setTeamSearch("");
+      setAgentOn(member.agentEnabled ?? true);
     }
-  }, [open, member.customRoleId, member.jobTitle, member.role, member.branchId]);
+  }, [open, member.customRoleId, member.jobTitle, member.role, member.branchId, member.agentEnabled]);
 
   const chooseJobTitle = (value: string) => {
     setJobTitle(value);
@@ -129,6 +136,10 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
     void run("edit", async () => {
       const result = await updateTeamMemberAction({}, data);
       if (!result.success) return { ok: false as const, error: result.error };
+      if (agentEditable && agentOn !== member.agentEnabled) {
+        const agent = await setMemberAgentAccessAction({ userId: member.userId!, enabled: agentOn });
+        if (!agent.ok) return { ok: false as const, error: `Os dados foram salvos, mas o Agente IA não mudou: ${agent.error}` };
+      }
       onOpenChange(false);
       onDone?.(`${member.name ?? member.email}: dados atualizados`);
       refresh();
@@ -218,6 +229,15 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
               {!teamCandidates.length ? <li className={page.muted}>Nenhum corretor ativo nesta unidade.</li> : null}
             </ul>
             <span className={form.hint}>Só corretores ativos da unidade do supervisor. Marcar um corretor que já está com outro supervisor passa ele para este.</span>
+          </div>
+        ) : null}
+        {agentEditable ? (
+          <div className={form.field}>
+            <label className={form.check}>
+              <input type="checkbox" checked={agentOn} disabled={pending} onChange={(event) => setAgentOn(event.target.checked)} />
+              <span className={styles.checkName}>Agente IA</span>
+            </label>
+            <span className={form.hint}>Desligado, a pessoa não vê nem usa o Agente IA. Com cargo personalizado, o cargo também precisa liberar o Agente IA.</span>
           </div>
         ) : null}
         <div className={form.actions}>

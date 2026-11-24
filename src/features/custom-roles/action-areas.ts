@@ -80,6 +80,8 @@ const REGRAS: readonly Regra[] = [
   ["src/features/sasa-voice/", rota("minha-fila")],
   ["src/features/lead-distribution/", rota("distribuicao")],
   // Agente IA do diretor (21/11): o Desfazer refaz ações de plantão e distribuição; a própria ação ainda exige diretor.
+  // Ligar/desligar o Agente IA de alguém é da ficha em Equipe.
+  ["src/features/agent/access-actions", rota("equipe")],
   ["src/features/agent/", rota("distribuicao")],
   ["src/features/whatsapp-plantao-notice/", rota("distribuicao")],
   ["src/features/conversations/", rota("conversas")],

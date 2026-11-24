@@ -318,6 +318,11 @@ const labels: Record<PermissionKey, [string, string, string]> = {
     "Visualizar informações da filial associada.",
     "Configurações & Pessoal",
   ],
+  usar_agente_ia: [
+    "Agente IA",
+    "Usar o Agente IA do diretor para consultar e agir no CRM (escala, leads, equipe), com confirmação.",
+    "Configurações & Pessoal",
+  ],
   acessar_qualificacao_ia: [
     "Central de Qualificação IA",
     "Configurar e monitorar o agente de qualificação por IA.",

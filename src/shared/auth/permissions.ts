@@ -25,6 +25,8 @@ export const PERMISSIONS = {
   acessar_dashboard: ["broker", "supervisor", "manager", "director"],
   acessar_relatorios: ["supervisor", "manager", "director"],
   acessar_qualificacao_ia: ["supervisor", "director"],
+  // Agente IA do diretor (24/11): no cargo, liga e desliga a gaveta do agente; sem cargo, todo diretor usa.
+  usar_agente_ia: ["director"],
   acessar_catalogo: ["broker", "supervisor", "manager", "director"],
   acessar_configuracoes: ["broker", "supervisor", "manager", "director"],
   acessar_configuracoes_pessoais: ["broker", "supervisor", "manager", "director"],

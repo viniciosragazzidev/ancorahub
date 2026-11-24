@@ -44,6 +44,7 @@ import { resolveNegotiationsRouteAccess } from "@/features/negotiations/route-ac
 import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 import { getBrokerProfileTeamIds } from "@/features/team/broker-profile-team";
 import { canUseCallAncora } from "@/features/call-ancora/visibility";
+import { canUseDirectorAgent } from "@/features/agent/access";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -298,6 +299,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const membership = shell && shell.availabilityStatus !== null ? { availabilityStatus: shell.availabilityStatus, leadToastEnabled: shell.leadToastEnabled } : undefined;
   // With realtime switched off the server sends no signals; a null topic makes
   // the client fall back to periodic reconciliation instead of trusting a silent channel.
+  // Agente IA (24/11): diretor com o agente liberado no cargo e ligado na ficha.
+  const agentAllowed = await canUseDirectorAgent(context).catch(() => false);
   const syncTopic = realtimeSyncEnabled
     ? getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId })
     : null;
@@ -366,7 +369,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
                 só ao confirmar presença no plantão (presence-callout). */}
             {!isLightManager && <CommandPalette />}
             {!isLightBroker && !isLightManager && <SystemFeedbackDrawer />}
-            {!isLightBroker && !isLightManager && !isOutsideManagerScope(context.role, context.jobTitle) && <AgentDrawer />}
+            {agentAllowed && !isLightBroker && !isLightManager && !isOutsideManagerScope(context.role, context.jobTitle) && <AgentDrawer />}
             <BrokerProfileViewerProvider viewerRole={context.role} teamBrokerIds={brokerProfileTeamIds}>{children}</BrokerProfileViewerProvider>
           </NotificationCountProvider>
         </RealtimeSyncProvider>

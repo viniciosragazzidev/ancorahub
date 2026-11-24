@@ -8,6 +8,7 @@ import { getCachedSession } from "./cached-session";
 import { TtlCache } from "@/shared/cache/ttl-cache";
 import type { TenantRole } from "@/shared/db/schema";
 import { listEffectiveCapabilities, listEffectiveRoutes } from "@/features/custom-roles/service";
+import { listAgentOffUsers } from "@/features/agent/access";
 import { isUserProfileEnabled } from "@/features/user-profile/feature";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
@@ -157,11 +158,13 @@ async function loadUserDisplayInfo(session: NonNullable<Awaited<ReturnType<typeo
   }
 
   const redirectLogout = role ? ROLE_REDIRECT[role] ?? "/login" : "/login";
+  // Agente IA desligado na ficha da pessoa (24/11): a permissão sai da lista e a sidebar esconde o link.
+  const agentOffUsers = membership ? await listAgentOffUsers(membership.tenantId).catch(() => [] as string[]) : [];
   const permissions = membership
     ? [
       ...(await listEffectiveCapabilities({ tenantId: membership.tenantId, role: role ?? membership.role, jobTitle, customRoleId: membership.customRoleId })),
       ...(await listEffectiveRoutes({ tenantId: membership.tenantId, customRoleId: membership.customRoleId })),
-    ]
+    ].filter((permission) => permission !== "usar_agente_ia" || !agentOffUsers.includes(session.user.id))
     : [];
   const userProfileEnabled = await isUserProfileEnabled();
   const relationshipCenterEnabled = (await getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")) === "true";

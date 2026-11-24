@@ -407,7 +407,8 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
       <SidebarFooter className={cn("gap-1 border-t border-sidebar-border/70 p-2 pb-3", isMobile && "gap-2 px-3 pb-[max(0.75rem,var(--mobile-safe-bottom))]")}>
         <TooltipProvider delay={150}>
           {/* AI Agent Trigger (o gestor ficou sem o Agente IA em 10/11, versão antiga só com a gestão da unidade) */}
-          {!isOutsideManagerScope(roleKey ?? "", user?.jobTitle) ? <Tooltip>
+          {/* 24/11: só quem pode usar o agente (diretor, cargo com "Agente IA" e ligado na ficha) vê o atalho. */}
+          {!isOutsideManagerScope(roleKey ?? "", user?.jobTitle) && user?.permissions?.includes("usar_agente_ia") ? <Tooltip>
             <TooltipTrigger
               render={
                 <Button
