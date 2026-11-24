@@ -30,18 +30,12 @@ import styles from "./post-sale.module.css";
 
 const DATE_TIME = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" } as const;
 
-function ratingOf(row: PostSaleSurveyRow) {
-  const value = row.rating ?? (typeof row.answers.rating === "number" ? row.answers.rating : null);
-  return value === null ? "" : `${value}/5`;
-}
-
 const COLUMNS: LiteColumn<PostSaleSurveyRow>[] = [
   { id: "lead", label: "Lead", primary: true, render: (row) => <span><span className={page.cellTitle}>{row.leadName}</span><span className={page.cellSub}>{row.brokerName ?? "Sem corretor"}</span></span> },
   { id: "rule", label: "Origem", nowrap: true, render: (row) => postSaleRuleLabel(row.ruleKey) },
   { id: "stage", label: "Situação", render: (row) => <PostSaleStageBadge row={row} /> },
   { id: "sent", label: "Enviada", render: (row) => <span className={page.numeric}>{row.sentAt ? formatLiteDate(row.sentAt, DATE_TIME) : "Não saiu"}</span> },
   { id: "answers", label: "Respostas", render: (row) => row.lastReplyAt ? <PostSaleChips row={row} limit={2} /> : <span className={page.muted}>Sem resposta</span> },
-  { id: "rating", label: "Nota", numeric: true, phonePriority: "low", render: (row) => ratingOf(row) },
 ];
 
 const dayLabel = (day: string) => day.split("-").reverse().slice(0, 2).join("/");

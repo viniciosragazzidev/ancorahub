@@ -9,6 +9,10 @@
   gap: 16px;
 }
 
+.charts > * {
+  align-content: start;
+}
+
 .chartWide {
   grid-column: 1 / -1;
 }
@@ -22,20 +26,21 @@
   list-style: none;
 }
 
+/* Rótulo e número na mesma linha, barra larga embaixo: cabe em cartão estreito sem cortar o nome da regra. */
 .hbarRow {
   display: grid;
-  grid-template-columns: minmax(96px, 160px) minmax(0, 1fr) auto;
+  grid-template-areas: "label value" "bar bar";
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  min-height: 28px;
+  gap: 6px 12px;
   font-size: var(--text-sm);
 }
 
 .hbarRowButton {
-  width: 100%;
+  width: calc(100% + 16px);
   min-height: 44px;
-  margin: -8px 0;
-  padding: 0 8px;
+  margin: -6px -8px;
+  padding: 6px 8px;
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -50,6 +55,7 @@
 }
 
 .hbarLabel {
+  grid-area: label;
   overflow: hidden;
   color: var(--text-secondary);
   text-overflow: ellipsis;
@@ -57,6 +63,7 @@
 }
 
 .hbarTrack {
+  grid-area: bar;
   position: relative;
   height: 10px;
   border-radius: 9999px;
@@ -82,7 +89,7 @@
 }
 
 .hbarValue {
-  min-width: 72px;
+  grid-area: value;
   color: var(--foreground);
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -455,11 +462,6 @@
 }
 
 @media (max-width: 767px) {
-  .hbarRow {
-    grid-template-columns: minmax(80px, 112px) minmax(0, 1fr) auto;
-    gap: 8px;
-  }
-
   .columns {
     height: 120px;
   }

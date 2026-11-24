@@ -78,14 +78,12 @@ export function PostSaleOverview({ summary, rules, days, alerts, periodDays, onF
         </section>
 
         <section className={page.card} aria-labelledby="pos-venda-regras">
-          <div className={styles.cardHeadRow}>
-            <div className={page.cardHead}>
-              <h2 id="pos-venda-regras" className={page.cardTitle}>Por regra</h2>
-              <p className={page.cardDescription}>Responderam de enviadas. Clique para ver os leads.</p>
-            </div>
-            <PostSaleLegend />
+          <div className={page.cardHead}>
+            <h2 id="pos-venda-regras" className={page.cardTitle}>Por regra</h2>
+            <p className={page.cardDescription}>Responderam de enviadas. Clique para ver os leads.</p>
           </div>
           <PostSaleRuleBars rules={rules} onSelect={(key) => onFilter({ rule: key })} />
+          <PostSaleLegend />
         </section>
 
         <section className={`${page.card} ${styles.chartWide}`} aria-labelledby="pos-venda-dias">

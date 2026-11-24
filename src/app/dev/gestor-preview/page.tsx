@@ -1,3 +1,5 @@
+import "@/components/arc/venancor-scope.css";
+
 import { notFound } from "next/navigation";
 
 import { ManagerPreview, type Case, type Screen } from "./manager-preview";

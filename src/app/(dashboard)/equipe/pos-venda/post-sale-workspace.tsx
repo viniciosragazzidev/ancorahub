@@ -138,7 +138,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
           </div>
           {showPeriod ? (
             <div className={page.selectNarrow}>
-              <LiteSelect label="Período" hideLabel value={String(data.periodDays)} onChange={changePeriod} options={[{ value: "7", label: "Últimos 7 dias" }, { value: "30", label: "Últimos 30 dias" }, { value: "90", label: "Últimos 90 dias" }]} />
+              <LiteSelect label="Período" hideLabel value={String(data.periodDays)} onChange={changePeriod} options={[{ value: "7", label: "7 dias" }, { value: "30", label: "30 dias" }, { value: "90", label: "90 dias" }]} />
             </div>
           ) : null}
         </div>
