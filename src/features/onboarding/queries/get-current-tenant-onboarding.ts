@@ -16,8 +16,11 @@ export async function getCurrentTenantOnboarding(): Promise<TenantOnboarding | n
 
   const db = getDatabase();
 
+  // Velocidade (24/11/2026): roda no layout de toda tela; as quatro leituras vão juntas, não em fila.
+  const now = new Date();
+  const [[branchCount], [memberCount], [inviteCount], [membership]] = await Promise.all([
   // Check for active branches
-  const [branchCount] = await db
+  db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.branches)
     .where(
@@ -25,10 +28,10 @@ export async function getCurrentTenantOnboarding(): Promise<TenantOnboarding | n
         eq(schema.branches.tenantId, context.tenantId),
         eq(schema.branches.status, "active"),
       ),
-    );
+    ),
 
   // Check for other active members (besides current user)
-  const [memberCount] = await db
+  db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.tenantMemberships)
     .where(
@@ -37,11 +40,10 @@ export async function getCurrentTenantOnboarding(): Promise<TenantOnboarding | n
         eq(schema.tenantMemberships.status, "active"),
         sql`${schema.tenantMemberships.userId} != ${context.userId}`,
       ),
-    );
+    ),
 
   // Check for pending valid invites
-  const now = new Date();
-  const [inviteCount] = await db
+  db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.invites)
     .innerJoin(
@@ -54,10 +56,10 @@ export async function getCurrentTenantOnboarding(): Promise<TenantOnboarding | n
         sql`${schema.invites.usedAt} IS NULL`,
         gt(schema.invites.expiresAt, now),
       ),
-    );
+    ),
 
   // Check onboarding dismissed state for current membership
-  const [membership] = await db
+  db
     .select({
       onboardingDismissedAt: schema.tenantMemberships.onboardingDismissedAt,
       tenantName: schema.tenants.name,
@@ -72,7 +74,8 @@ export async function getCurrentTenantOnboarding(): Promise<TenantOnboarding | n
         eq(schema.tenantMemberships.userId, context.userId),
       ),
     )
-    .limit(1);
+    .limit(1),
+  ]);
 
   if (!membership) return null;
 

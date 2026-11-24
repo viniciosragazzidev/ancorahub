@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatHome } from "@/components/chat/chat-home";
 import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
-import { railLoadDelay, railRealtimeDecision } from "./chat-rail-refresh";
+import { RAIL_REFRESH_MS, railLoadDelay, railRealtimeDecision } from "./chat-rail-refresh";
 
 import { A11yPrefsProvider } from "@/features/assist/a11y-prefs";
 import { AssistHelpButton, AssistLayer } from "@/features/assist/components/assist-layer";
@@ -230,17 +230,19 @@ function useDesktopChatRail(enabled: boolean, initialData: ChatRailData | null, 
     setRail(initialData);
   }
   const serverRendersRail = initialData !== null;
+  // Survives each navigation: the effect re-runs on pathname, but a rail loaded
+  // less than RAIL_REFRESH_MS ago is not fetched again (it cost ~25 queries per click).
+  const lastLoadRef = useRef(0);
   useEffect(() => {
     if (!enabled || typeof window === "undefined" || !window.matchMedia) return;
     const media = window.matchMedia(DESKTOP_QUERY);
     let alive = true;
     let timer = 0;
-    let lastLoad = 0;
     let pending = false;
     const load = () => {
       if (!media.matches) return;
       pending = false;
-      lastLoad = Date.now();
+      lastLoadRef.current = Date.now();
       // A GET route, not a server action: "Ver como" refuses POSTs and the rail stayed a skeleton.
       void fetch("/api/chat/rail", { cache: "no-store" })
         .then((response) => (response.ok ? (response.json() as Promise<{ rail: ChatRailData | null }>) : null))
@@ -257,14 +259,14 @@ function useDesktopChatRail(enabled: boolean, initialData: ChatRailData | null, 
       if (decision === "skip") return;
       if (decision === "defer") { pending = true; return; }
       window.clearTimeout(timer);
-      timer = window.setTimeout(load, railLoadDelay(lastLoad, Date.now()));
+      timer = window.setTimeout(load, railLoadDelay(lastLoadRef.current, Date.now()));
     };
     const onVisibility = () => {
       if (document.visibilityState !== "visible" || !pending) return;
       window.clearTimeout(timer);
-      timer = window.setTimeout(load, railLoadDelay(lastLoad, Date.now()));
+      timer = window.setTimeout(load, railLoadDelay(lastLoadRef.current, Date.now()));
     };
-    if (!serverRendersRail) load();
+    if (!serverRendersRail && Date.now() - lastLoadRef.current >= RAIL_REFRESH_MS) load();
     media.addEventListener("change", load);
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
     document.addEventListener("visibilitychange", onVisibility);

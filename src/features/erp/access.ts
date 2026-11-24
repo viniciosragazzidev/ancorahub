@@ -11,6 +11,7 @@ import { getEffectiveAccess } from "@/features/custom-roles/service";
 import { getSupervisedBrokerIds } from "@/features/team/supervisor-service";
 import { getDatabase, schema } from "@/shared/db";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { getSystemSettings } from "@/features/system-settings/queries";
 import type { PermissionKey } from "@/shared/auth/permissions";
 import type { TenantContext } from "@/shared/auth/types";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
@@ -27,9 +28,14 @@ export function getErpEffectiveAccess(context: TenantContext, db?: ErpDatabase) 
   return getEffectiveAccess({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null }, db);
 }
 
-export async function getErpPlatformState(db: ErpDatabase = getDatabase()) {
-  const rows = await db.select({ key: schema.systemSettings.key, value: schema.systemSettings.value }).from(schema.systemSettings)
-    .where(inArray(schema.systemSettings.key, [FEATURE_FLAGS.ERP_OPERATIONAL.key, FEATURE_FLAGS.ERP_MODULES.key]));
+export async function getErpPlatformState(db?: ErpDatabase) {
+  const keys = [FEATURE_FLAGS.ERP_OPERATIONAL.key, FEATURE_FLAGS.ERP_MODULES.key];
+  // Sem transação (menu e telas): o cache curto de configurações, como as outras flags; antes era 1 query por tela.
+  // Dentro de transação continua lendo do banco, para a decisão valer na mesma escrita.
+  const rows = db
+    ? await db.select({ key: schema.systemSettings.key, value: schema.systemSettings.value }).from(schema.systemSettings)
+      .where(inArray(schema.systemSettings.key, keys))
+    : await getSystemSettings(keys);
   const enabled = rows.find((row) => row.key === FEATURE_FLAGS.ERP_OPERATIONAL.key)?.value === "true";
   let modules: ErpModuleKey[] = [];
   try { const result = modulesSchema.safeParse(JSON.parse(rows.find((row) => row.key === FEATURE_FLAGS.ERP_MODULES.key)?.value ?? "[]")); if (result.success) modules = result.data; } catch { /* Invalid configuration denies access. */ }

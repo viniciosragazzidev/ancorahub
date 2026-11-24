@@ -201,33 +201,19 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
   }));
   // Which queue receives each plantão: the queue's exclusivity list (what the
   // Filas page edits), not the legacy per-schedule queue_id.
-  const linkingQueues = schedules.length
-    ? await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId })
+  const scheduleIds = schedules.map((schedule) => schedule.id);
+  // Published monthly escala (DEC-123): one row per broker per date. Shown next
+  // to the weekly roster; from the start of the current month on.
+  const monthStart = `${new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()).slice(0, 7)}-01`;
+  // Velocidade (24/11/2026): as quatro leituras abaixo não dependem uma da outra; antes iam em fila.
+  const [linkingQueues, history, publishedAssignments, pendingBrokers] = await Promise.all([schedules.length
+    ? db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId })
       .from(schema.leadQueues)
       .where(eq(schema.leadQueues.tenantId, context.tenantId))
       .orderBy(asc(schema.leadQueues.name))
-    : [];
-  // A plantão may serve several queues (each queue's list holds it).
-  const linkedQueuesBySchedule = new Map<string, { id: string; name: string }[]>();
-  for (const queue of linkingQueues) {
-    for (const id of new Set([...(queue.exclusiveDutyScheduleIds ?? []), ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : [])])) {
-      linkedQueuesBySchedule.set(id, [...(linkedQueuesBySchedule.get(id) ?? []), { id: queue.id, name: queue.name }]);
-    }
-  }
-  const displaySchedules = schedules.map((schedule) => ({
-    ...schedule,
-    branchName: schedule.branchName ?? "Todas as unidades",
-    linkedQueues: linkedQueuesBySchedule.get(schedule.id) ?? [],
-    linkedQueueId: linkedQueuesBySchedule.get(schedule.id)?.[0]?.id ?? null,
-    queueName: linkedQueuesBySchedule.get(schedule.id)?.map((queue) => queue.name).join(", ") || schedule.queueName || "Sem fila vinculada",
-    credentialName: displayCredentialName(schedule.webhookCredentialId, schedule.credentialName),
-    /** Units of the plantão's type; empty = every unit. */
-    typeBranchIds: (schedule.typeId ? typeById.get(schedule.typeId)?.branchIds : null) ?? [],
-  }));
-
-  const scheduleIds = schedules.map((schedule) => schedule.id);
-  const history = scheduleIds.length
-    ? await db.select({
+    : [],
+  scheduleIds.length
+    ? db.select({
       scheduleId: schema.auditLogs.entidadeId,
       action: schema.auditLogs.acao,
       createdAt: schema.auditLogs.createdAt,
@@ -238,13 +224,9 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       .where(and(eq(schema.auditLogs.entidade, "unit_duty_schedule"), inArray(schema.auditLogs.entidadeId, scheduleIds)))
       .orderBy(desc(schema.auditLogs.createdAt))
       .limit(100)
-    : [];
-
-  // Published monthly escala (DEC-123): one row per broker per date. Shown next
-  // to the weekly roster; from the start of the current month on.
-  const monthStart = `${new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()).slice(0, 7)}-01`;
-  const publishedAssignments = scheduleIds.length
-    ? await db.select({
+    : [],
+  scheduleIds.length
+    ? db.select({
       id: schema.dutyRosterAssignments.id,
       scheduleId: schema.dutyRosterAssignments.scheduleId,
       brokerId: schema.dutyRosterAssignments.brokerId,
@@ -262,10 +244,9 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
         sql`${schema.dutyRosterAssignments.dutyDate} >= ${monthStart}::date`,
       ))
       .orderBy(asc(schema.dutyRosterAssignments.dutyDate), asc(schema.user.name))
-    : [];
-
-  const pendingBrokers = (await pendingBrokerPlanningEnabled())
-    ? await db.select({
+    : [],
+  pendingBrokerPlanningEnabled().then((enabled) => enabled
+    ? db.select({
       id: schema.brokerProfiles.id,
       name: schema.brokerProfiles.professionalName,
       internalCode: schema.brokerProfiles.internalCode,
@@ -285,7 +266,26 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
         ),
       ))
       .orderBy(asc(schema.brokerProfiles.professionalName))
-    : [];
+      .then((rows) => rows)
+    : []),
+  ]);
+  // A plantão may serve several queues (each queue's list holds it).
+  const linkedQueuesBySchedule = new Map<string, { id: string; name: string }[]>();
+  for (const queue of linkingQueues) {
+    for (const id of new Set([...(queue.exclusiveDutyScheduleIds ?? []), ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : [])])) {
+      linkedQueuesBySchedule.set(id, [...(linkedQueuesBySchedule.get(id) ?? []), { id: queue.id, name: queue.name }]);
+    }
+  }
+  const displaySchedules = schedules.map((schedule) => ({
+    ...schedule,
+    branchName: schedule.branchName ?? "Todas as unidades",
+    linkedQueues: linkedQueuesBySchedule.get(schedule.id) ?? [],
+    linkedQueueId: linkedQueuesBySchedule.get(schedule.id)?.[0]?.id ?? null,
+    queueName: linkedQueuesBySchedule.get(schedule.id)?.map((queue) => queue.name).join(", ") || schedule.queueName || "Sem fila vinculada",
+    credentialName: displayCredentialName(schedule.webhookCredentialId, schedule.credentialName),
+    /** Units of the plantão's type; empty = every unit. */
+    typeBranchIds: (schedule.typeId ? typeById.get(schedule.typeId)?.branchIds : null) ?? [],
+  }));
 
   return { branches, queues, credentials: displayCredentials, types, schedules: displaySchedules, brokers, pendingBrokers, assignments, publishedAssignments, history };
 }

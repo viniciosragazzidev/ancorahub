@@ -107,6 +107,10 @@ function DistributionStages() {
   );
 }
 
+const LITE_TAB_VIEWS: readonly DistributionView[] = ["resumo_dia", "roteamento", "filas", "plantao", "saude_historico"];
+/** Data of a tab that is not on screen: never read, because its block is not built. */
+const NOT_LOADED = undefined as never;
+
 export default async function LeadDistributionPage({
   searchParams,
 }: {
@@ -200,6 +204,15 @@ export default async function LeadDistributionPage({
     );
   }
 
+  // Velocidade (24/11/2026): no Lite cada aba abre só com o que ela mostra. A aba Plantão
+  // carregava as 26 consultas de todas as abas e levava 14 s. O modo antigo ainda monta
+  // todas as abas de uma vez, então lá tudo continua carregado.
+  const directorLite = await isDirectorLitePageOnServer(context, "/leads/distribuicao");
+  const oneTabOnly = managerGestorMode || (directorLite && LITE_TAB_VIEWS.includes(view));
+  const tabShows = (views: readonly DistributionView[]) => !oneTabOnly || views.includes(view);
+  const loadFor = <T,>(views: readonly DistributionView[], load: () => PromiseLike<T>, empty: T): Promise<T> =>
+    tabShows(views) ? Promise.resolve(load()) : Promise.resolve(empty);
+
   // Single consolidated Promise.all for fast TTFB
   const [
     brokers,
@@ -229,7 +242,8 @@ export default async function LeadDistributionPage({
     holdDisqualifiedLeads,
     dddRoutingSettings,
   ] = await Promise.all([
-    db
+
+    loadFor(["resumo_dia", "roteamento", "filas"], () => db
       .select({
         id: schema.user.id,
         name: schema.user.name,
@@ -250,8 +264,8 @@ export default async function LeadDistributionPage({
           eq(schema.tenantMemberships.status, "active"),
           eq(schema.user.active, true),
         ),
-      ),
-    db
+      ), []),
+    loadFor(["resumo_dia"], () => db
       .select({
         id: schema.leads.id,
         name: schema.leads.nome,
@@ -280,8 +294,8 @@ export default async function LeadDistributionPage({
             : undefined,
         ),
       )
-      .orderBy(schema.leads.createdAt),
-    db
+      .orderBy(schema.leads.createdAt), []),
+    loadFor(["resumo_dia"], () => db
       .select({ count: count(schema.leads.id) })
       .from(schema.leads)
       .where(
@@ -292,8 +306,8 @@ export default async function LeadDistributionPage({
           isNull(schema.leads.corretorId),
           visibleToManagement(),
         ),
-      ),
-    db
+      ), []),
+    loadFor(["resumo_dia"], () => db
       .select({ brokerId: schema.leads.corretorId, count: count(schema.leads.id) })
       .from(schema.leads)
       .where(
@@ -305,7 +319,7 @@ export default async function LeadDistributionPage({
           inArray(schema.leads.status, activeStatuses),
         ),
       )
-      .groupBy(schema.leads.corretorId),
+      .groupBy(schema.leads.corretorId), []),
     db
       .select({
         branchId: schema.tenantMemberships.branchId,
@@ -339,10 +353,10 @@ export default async function LeadDistributionPage({
         ),
       )
       .groupBy(schema.leads.branchId, schema.leads.status),
-    getLeadDistributionJobHealth(context.tenantId),
-    getDistributionJobConfig(),
-    getLeadEffectOutboxHealth(context.tenantId),
-    db
+    loadFor(["saude_historico"], () => getLeadDistributionJobHealth(context.tenantId), NOT_LOADED),
+    loadFor(["saude_historico"], () => getDistributionJobConfig(), NOT_LOADED),
+    loadFor(["saude_historico"], () => getLeadEffectOutboxHealth(context.tenantId), NOT_LOADED),
+    loadFor(["saude_historico"], () => db
       .select({
         id: schema.leadEffectOutbox.id,
         leadId: schema.leadEffectOutbox.leadId,
@@ -367,8 +381,8 @@ export default async function LeadDistributionPage({
         ),
       )
       .orderBy(schema.leadEffectOutbox.updatedAt)
-      .limit(20),
-    db
+      .limit(20), []),
+    loadFor(["plantao", "roteamento", "filas"], () => db
       .select({
         id: schema.leadQueues.id,
         name: schema.leadQueues.name,
@@ -394,8 +408,8 @@ export default async function LeadDistributionPage({
       .where(
         and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt)),
       )
-      .orderBy(schema.leadQueues.name),
-    db
+      .orderBy(schema.leadQueues.name), []),
+    loadFor(["filas"], () => db
       .select({ queueId: schema.leads.queueId, waiting: count(schema.leads.id) })
       .from(schema.leads)
       .where(
@@ -407,8 +421,8 @@ export default async function LeadDistributionPage({
           inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"]),
         ),
       )
-      .groupBy(schema.leads.queueId),
-    db
+      .groupBy(schema.leads.queueId), []),
+    loadFor(["saude_historico"], () => db
       .select({
         id: schema.leadDistributionEvents.id,
         action: schema.leadDistributionEvents.action,
@@ -436,8 +450,8 @@ export default async function LeadDistributionPage({
         ),
       )
       .orderBy(desc(schema.leadDistributionEvents.createdAt))
-      .limit(40),
-    db
+      .limit(40), []),
+    loadFor(["filas"], () => db
       .select({
         queueId: schema.leadDistributionPolicies.queueId,
         policy: schema.leadDistributionPolicies.policy,
@@ -448,8 +462,8 @@ export default async function LeadDistributionPage({
           eq(schema.leadDistributionPolicies.tenantId, context.tenantId),
           isNull(schema.leadDistributionPolicies.profileKey),
         ),
-      ),
-    metaCampaignsCache.getOrLoad(context.tenantId, () => db
+      ), []),
+    loadFor(["filas"], () => metaCampaignsCache.getOrLoad(context.tenantId, () => db
       .select({
         campaignId: schema.metaCampaigns.campaignId,
         name: schema.metaCampaigns.name,
@@ -457,8 +471,8 @@ export default async function LeadDistributionPage({
       })
       .from(schema.metaCampaigns)
       .where(eq(schema.metaCampaigns.tenantId, context.tenantId))
-      .orderBy(schema.metaCampaigns.name)),
-    metaAdsCache.getOrLoad(context.tenantId, () => db
+      .orderBy(schema.metaCampaigns.name)), []),
+    loadFor(["filas"], () => metaAdsCache.getOrLoad(context.tenantId, () => db
       .select({
         adId: schema.metaAds.adId,
         name: schema.metaAds.name,
@@ -471,8 +485,8 @@ export default async function LeadDistributionPage({
         and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)),
       )
       .where(eq(schema.metaAds.tenantId, context.tenantId))
-      .orderBy(schema.metaAds.name)),
-    db
+      .orderBy(schema.metaAds.name)), []),
+    loadFor(["filas"], () => db
       .select({
         campaignId: schema.metaCampaignQueueRoutes.campaignId,
         queueId: schema.metaCampaignQueueRoutes.queueId,
@@ -489,8 +503,8 @@ export default async function LeadDistributionPage({
             : undefined,
         ),
       )
-      .orderBy(schema.leadQueues.name),
-    db
+      .orderBy(schema.leadQueues.name), []),
+    loadFor(["filas"], () => db
       .select({
         adId: schema.metaAdQueueRoutes.adId,
         queueId: schema.metaAdQueueRoutes.queueId,
@@ -507,8 +521,8 @@ export default async function LeadDistributionPage({
             : undefined,
         ),
       )
-      .orderBy(schema.leadQueues.name),
-    db
+      .orderBy(schema.leadQueues.name), []),
+    loadFor(["filas"], () => db
       .select({
         id: schema.unitDutySchedules.id,
         name: schema.unitDutySchedules.name,
@@ -529,9 +543,9 @@ export default async function LeadDistributionPage({
             : undefined,
         ),
       )
-      .orderBy(schema.unitDutySchedules.name),
-    fetchRoutingRules(context.tenantId),
-    fetchBrokerDailySummary(context.tenantId, {
+      .orderBy(schema.unitDutySchedules.name), []),
+    loadFor(["roteamento"], () => fetchRoutingRules(context.tenantId), []),
+    loadFor(["resumo_dia"], () => fetchBrokerDailySummary(context.tenantId, {
       startDate: new Date(
         new Date().getFullYear(),
         new Date().getMonth(),
@@ -551,8 +565,8 @@ export default async function LeadDistributionPage({
         999,
       ),
       branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
-    }),
-    getDutyRosterSnapshot(context),
+    }), NOT_LOADED),
+    loadFor(["plantao"], () => getDutyRosterSnapshot(context), NOT_LOADED),
     // The queue preview is a side panel: if it fails, the Plantão tab still loads (null = "could not build").
     view === "plantao"
       ? getDutyQueueOrderPreviews(context).catch((error: unknown) => {
@@ -560,7 +574,7 @@ export default async function LeadDistributionPage({
         return null;
       })
       : Promise.resolve([]),
-    db
+    loadFor(["filas"], () => db
       .select({
         slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
         autoRedistributeOnFeedbackTimeout: schema.tenants.autoRedistributeOnFeedbackTimeout,
@@ -570,13 +584,13 @@ export default async function LeadDistributionPage({
       .limit(1)
       .then(
         (r) => r[0] ?? { slaFirstContactMinutes: "15", autoRedistributeOnFeedbackTimeout: true },
-      ),
-    getHoldDisqualifiedLeads(context.tenantId),
-    getDddRoutingSettings(context.tenantId),
-  ]);
+      ), NOT_LOADED),
+    loadFor(["roteamento"], () => getHoldDisqualifiedLeads(context.tenantId), NOT_LOADED),
+    loadFor(["roteamento"], () => getDddRoutingSettings(context.tenantId), NOT_LOADED),
+]);
 
   // Prioridade por tipo de plantão: só o Diretor vê e altera (gestor nunca recebe estes dados).
-  const plantaoPriority = context.role === "director"
+  const plantaoPriority = context.role === "director" && tabShows(["filas"])
     ? await getPlantaoPriorityOverview(context.tenantId, operationDayStart(new Date()))
       .then((overview) => ({
         flagOn: overview.flagOn,
@@ -636,7 +650,7 @@ export default async function LeadDistributionPage({
   );
 
   // DEC-127: the queue's attendance flow, offered only while the switch is on.
-  const attendanceFlowOptions = await (async () => {
+  const attendanceFlowOptions = !tabShows(["filas"]) ? null : await (async () => {
     const { attendanceFlowsEnabled, ensureBuiltinFlows } = await import("@/features/attendance-flows/runtime");
     if (!(await attendanceFlowsEnabled().catch(() => false))) return null;
     await ensureBuiltinFlows(context.tenantId);
@@ -695,7 +709,7 @@ export default async function LeadDistributionPage({
     );
   }
 
-  const coldLeadReview = context.role === "director"
+  const coldLeadReview = context.role === "director" && tabShows(["filas"])
     ? await getColdLeadRequalificationReview(context)
     : null;
 
@@ -730,9 +744,9 @@ export default async function LeadDistributionPage({
   const waitingInQueues = queuesForControl.reduce((sum, queue) => sum + (queue.waiting ?? 0), 0);
   const tenantPolicy = readDistributionPolicy(globalPolicy.find((policy) => !policy.queueId)?.policy ?? {});
   const slaMinutes = Number(tenantSlaSettings?.slaFirstContactMinutes) || 15;
-  const jobExceptions = jobHealth.failed + effectHealth.failed;
   // Cada cartão com `panel` abre a configuração daquele bloco; a lista principal da aba fica sempre à vista.
-  const rulesIntro = (
+  // Os blocos das abas viram funções: só montam (e só leem os dados) a aba que aparece.
+  const rulesIntro = () => (
     <DistributionTabIntro
       title="Entradas e regras"
       lead="O que acontece com cada lead antes da oferta: quem segura, para qual fila vai e em que ordem as regras valem."
@@ -760,7 +774,7 @@ export default async function LeadDistributionPage({
       />
     </DistributionTabIntro>
   );
-  const queuesIntro = (
+  const queuesIntro = () => (
     <DistributionTabIntro
       title="Filas"
       lead="Quem recebe cada lead, em que ordem e com quanto tempo para aceitar."
@@ -819,7 +833,8 @@ export default async function LeadDistributionPage({
       />
     </DistributionTabIntro>
   );
-  const healthIntro = (
+  const jobExceptions = (jobHealth?.failed ?? 0) + (effectHealth?.failed ?? 0);
+  const healthIntro = () => (
     <DistributionTabIntro
       title="Saúde"
       lead="Se o motor de distribuição está rodando e o que ficou para revisão."
@@ -841,10 +856,9 @@ export default async function LeadDistributionPage({
     </DistributionTabIntro>
   );
 
-  const directorLite = await isDirectorLitePageOnServer(context, "/leads/distribuicao");
   // Resumo da barra do topo no Lite (anatomia de página): os mesmos dois números que o modo normal mostra no topo.
   const liteSummary = `${totalAvailable.toLocaleString("pt-BR")} ${totalAvailable === 1 ? "disponível" : "disponíveis"} · ${totalNewLeads.toLocaleString("pt-BR")} aguardando`;
-  if (directorLite && ["resumo_dia", "roteamento", "filas", "plantao", "saude_historico"].includes(view)) {
+  if (directorLite && LITE_TAB_VIEWS.includes(view)) {
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" summary={liteSummary} />
@@ -862,11 +876,11 @@ export default async function LeadDistributionPage({
             </section>
           ) : view === "roteamento" ? (
             <section className={directorDistributionStyles.stack} aria-label="Entradas e regras">
-              {rulesIntro}
+              {rulesIntro()}
             </section>
           ) : view === "filas" && canViewDistributionQueues(context.role) && (!allowedViews || allowedViews.includes("filas")) ? (
             <section className={directorDistributionStyles.stack} aria-label="Filas de distribuição">
-              {queuesIntro}
+              {queuesIntro()}
             </section>
           ) : view === "filas" ? null : view === "plantao" ? (
             <section className={directorDistributionStyles.stack} aria-label="Gestão de plantões">
@@ -874,7 +888,7 @@ export default async function LeadDistributionPage({
             </section>
           ) : (
             <section className={directorDistributionStyles.stack} aria-label="Saúde da distribuição">
-              {healthIntro}
+              {healthIntro()}
             </section>
           )}
         </main>
