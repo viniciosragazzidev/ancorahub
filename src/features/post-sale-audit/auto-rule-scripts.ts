@@ -94,6 +94,8 @@ function ruleTurn(rule: AutoRuleKey, step: number, merged: PostSaleAnswers, answ
     `Obrigada, ${names.lead}! Foi rapidinho e ajuda demais a gente.`,
   ]);
   const teamWillResume = () => v("team", [`Obrigada por me contar, ${names.lead}. A equipe poderá retomar seu atendimento.`, `Obrigada por avisar, ${names.lead}. Vou passar isso para a equipe.`]);
+  // "Não quero mais ajuda" não é "a equipe vai retomar" (24/11).
+  const afterHelp = () => merged.wantsHelp === false ? v("no_help", [`Tudo bem, ${names.lead}. Obrigada por me contar. Se precisar, é só chamar por aqui.`, `Combinado, ${names.lead}. Obrigada pelo retorno. Qualquer coisa, estamos por aqui.`]) : teamWillResume();
   const askHelp = (first: string) => ask(3, v("help", [first, `Poxa, ${names.lead}, sinto muito. Você ainda quer ajuda com o plano?`]), "Você ainda quer ajuda com o plano?");
   switch (rule) {
     case "R1": {
@@ -101,11 +103,12 @@ function ruleTurn(rule: AutoRuleKey, step: number, merged: PostSaleAnswers, answ
       if (step === 0) return ask(1, v("contacted", [`Obrigada, ${names.lead}! ${contact}`, `Combinado, ${names.lead}! Primeiro: você conseguiu conversar com ${names.broker}?`, `Obrigada, ${names.lead}! Me conta: ${names.broker} chegou a falar com você?`]), contact);
       if (step === 1) {
         if (merged.contacted === false) return askHelp("Poxa, sinto muito. Você ainda quer ajuda com o plano?");
-        if (merged.contacted !== true) return ask(1, `Só para eu entender: você conseguiu falar com ${names.broker}?`, contact);
+        // Uma única pergunta de esclarecimento, já com as opções (24/11): a política nunca deixa repetir de novo.
+        if (merged.contacted !== true) return ask(1, v("contacted_again", [`Só para eu entender melhor: ${names.broker} chegou a te atender e seguiu com você, ou parou de responder?`, `Me ajuda a entender: ${names.broker} falou com você e continuou o atendimento, ou ficou sem retorno?`]), contact);
         return ask(2, v("speed", ["Que bom! E o atendimento foi rápido?", `Que bom! E ${names.broker} te respondeu rápido?`, "Ótimo! E o atendimento foi rápido?"]), "O atendimento foi rápido?");
       }
       if (step === 2) return { status: "completed", step, text: closing(), answers: merged, outcome: merged.speed === "slow" ? "bad_service" : qualityOutcome(merged, merged.closed === "yes" ? "closed" : "ok") };
-      return { status: "completed", step, text: teamWillResume(), answers: merged, outcome: "no_contact" };
+      return { status: "completed", step, text: afterHelp(), answers: merged, outcome: "no_contact" };
     }
     case "R2": {
       const quote = `Você chegou a receber a cotação de ${names.broker}?`;
@@ -118,7 +121,7 @@ function ruleTurn(rule: AutoRuleKey, step: number, merged: PostSaleAnswers, answ
         ]), "Como está a decisão: já fechou, ainda está pensando ou desistiu?");
       }
       if (step === 2) return { status: "completed", step, text: closing(), answers: merged, outcome: qualityOutcome(merged, merged.closed === "yes" ? "closed" : merged.closed === "deciding" ? "waiting" : "ok") };
-      return { status: "completed", step, text: teamWillResume(), answers: merged, outcome: merged.contacted === false ? "no_contact" : "waiting" };
+      return { status: "completed", step, text: afterHelp(), answers: merged, outcome: merged.contacted === false ? "no_contact" : "waiting" };
     }
     case "R3": {
       if (step === 0) return ask(1, v("hiring", [`Obrigada, ${names.lead}! Como foi a contratação do plano? Se quiser, me dê uma nota de 1 a 5.`, `Combinado, ${names.lead}! O que achou da contratação do plano? Pode ser uma nota de 1 a 5.`]), "Como foi a contratação do plano? Se quiser, me dê uma nota de 1 a 5.");

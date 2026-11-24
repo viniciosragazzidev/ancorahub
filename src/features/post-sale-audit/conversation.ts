@@ -20,7 +20,8 @@ import { compareLossReasons } from "./loss-reason-check";
 import { MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
 import { classifyR0AnswerByKeywords, r0ReadingSchema, r0TimelineSummary, readR0State, R0_RULE_KEY, type R0Answer, type R0SurveyState } from "./r0-rules";
 import { detectPostSaleIntents, mergeIntentState, postSaleIntentFields, postSaleReadingInstructions, readIntentState, type PostSaleIntentReading } from "./intents";
-import { decidePostSaleTurn, decideR0Turn, type PostSaleAnswersWithIntents } from "./turn-policy";
+import { decidePostSaleTurn, decideR0Turn, handoffReason, type PostSaleAnswersWithIntents } from "./turn-policy";
+import { loadPostSaleHandoffEligibility, runPendingPostSaleHandoff } from "./handoff";
 import { firstName } from "./reply-variants";
 import { z } from "zod";
 
@@ -179,15 +180,23 @@ async function finalizeProcessedTurn(survey: typeof schema.postSaleSurveys.$infe
       createdAt: now,
     }).onConflictDoNothing();
   }
-  if (!survey.pendingReplyText) return;
-  const replyText = survey.pendingReplyText;
-  await enqueueSurveyReply(survey, replyText, `post-sale-reply:${survey.id}:${providerMessageId}`);
-  await db.update(schema.postSaleSurveys).set({ pendingReplyText: null }).where(and(
-    eq(schema.postSaleSurveys.id, survey.id),
-    eq(schema.postSaleSurveys.tenantId, survey.tenantId),
-    eq(schema.postSaleSurveys.lastInboundMessageId, providerMessageId),
-    eq(schema.postSaleSurveys.pendingReplyText, replyText),
-  ));
+  if (survey.pendingReplyText) {
+    const replyText = survey.pendingReplyText;
+    await enqueueSurveyReply(survey, replyText, `post-sale-reply:${survey.id}:${providerMessageId}`);
+    await db.update(schema.postSaleSurveys).set({ pendingReplyText: null }).where(and(
+      eq(schema.postSaleSurveys.id, survey.id),
+      eq(schema.postSaleSurveys.tenantId, survey.tenantId),
+      eq(schema.postSaleSurveys.lastInboundMessageId, providerMessageId),
+      eq(schema.postSaleSurveys.pendingReplyText, replyText),
+    ));
+  }
+  // Troca de corretor (24/11): depois da resposta ao cliente, que já diz que outro corretor vai chamar.
+  // Idempotente: numa retentativa, o lead que já saiu do corretor antigo não é mexido de novo.
+  try {
+    await runPendingPostSaleHandoff(survey);
+  } catch (error) {
+    console.error("[post-sale-audit] handoff_failed", { surveyId: survey.id, error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
+  }
 }
 
 export async function handlePostSaleInbound(input: PostSaleInbound): Promise<boolean> {
@@ -300,7 +309,9 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   const prior = (currentSurvey.answers ?? {}) as PostSaleAnswersWithIntents;
   const autoRule = isAutoRuleKey(currentSurvey.ruleKey) ? currentSurvey.ruleKey : null;
   const question = autoRule ? autoRuleQuestionFocus(autoRule, currentSurvey.step, prior) : currentSurvey.step === 0 ? "permissão para fazer duas perguntas" : currentSurvey.step === 1 ? "se o corretor conseguiu falar" : currentSurvey.step === 2 ? "como foi o atendimento" : currentSurvey.step === 3 ? prior.contacted === false ? "se ainda quer ajuda com o plano" : "se recebeu cotação" : currentSurvey.step === 4 ? "se fechou o plano" : "motivo da decisão";
-  const names = { lead: firstName(lead.name, "Cliente"), broker: firstName(broker?.name, "corretor"), seed: currentSurvey.id };
+  // O lead pode ir para outro corretor? Só então a IA promete que outro corretor vai chamar (24/11).
+  const handoffEligibility = await loadPostSaleHandoffEligibility(currentSurvey);
+  const names = { lead: firstName(lead.name, "Cliente"), broker: firstName(broker?.name, "corretor"), seed: currentSurvey.id, canHandoff: handoffEligibility.allowed };
   // Uma leitura por mensagem: resposta da pergunta da vez e intenções da mensagem toda (09/11).
   const reading = await interpretPostSaleTurn({ tenantId: input.tenantId, step: currentSurvey.step, question, broker: names.broker, text: input.text, fallback: autoRule ? detectAutoRuleKeywords(input.text, question) : undefined });
   const answer: PostSaleAnswers = { ...reading.answer };
@@ -309,9 +320,12 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   // pergunta fora do roteiro) e depois o roteiro, manual ou da régua, pulando o que o cliente já respondeu.
   // Na abertura, "Pode perguntar" só autoriza (caso Dayana): a política descarta os fatos dessa resposta.
   const turn = decidePostSaleTurn({ rule: autoRule, step: currentSurvey.step, prior, answer, reading: reading.intents, text: input.text, names });
+  const turnAnswers = turn.handoff && turn.answers.handoff
+    ? { ...turn.answers, handoff: { ...turn.answers.handoff, requestedAt: new Date().toISOString() } }
+    : turn.answers;
   const answers = autoRule === "R4" && turn.status === "completed"
-    ? await withLossReasonCheck(currentSurvey, turn.answers as PostSaleAnswers)
-    : turn.answers as PostSaleAnswers;
+    ? await withLossReasonCheck(currentSurvey, turnAnswers as PostSaleAnswers)
+    : turnAnswers as PostSaleAnswers;
   const previousAlertReasons = postSaleAlertReasons(currentSurvey);
   // Nota 4 ou 5 vence um "negativo" solto (caso real de 09/11: "foi 5, o problema é que agora não está dando").
   const nextOutcome = turn.outcome === "ok" && answers.sentiment === "negative" && !(typeof answers.rating === "number" && answers.rating >= 4)
@@ -376,8 +390,12 @@ async function processR0Answer(input: PostSaleInbound, currentSurvey: typeof sch
   const db = getDatabase();
   const reading = await interpretR0Turn({ tenantId: input.tenantId, text: input.text });
   const answer = reading.answer;
+  const handoffEligibility = await loadPostSaleHandoffEligibility(currentSurvey);
+  const [broker] = currentSurvey.brokerId ? await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, currentSurvey.brokerId)).limit(1) : [];
+  const brokerName = firstName(broker?.name, "corretor");
   // Intenções valem também na R0: número errado, urgência, pedido de preço ou horário, reclamação.
-  const turn = decideR0Turn({ answer, reading: reading.intents, names: { lead: firstName(leadName, "Cliente"), broker: "", seed: currentSurvey.id } });
+  // Não atendido ou sem continuidade, com a troca ligada: o lead vai para outro corretor (24/11).
+  const turn = decideR0Turn({ answer, reading: reading.intents, text: input.text, names: { lead: firstName(leadName, "Cliente"), broker: brokerName, seed: currentSurvey.id, canHandoff: handoffEligibility.allowed } });
   const now = new Date();
   const previous = (currentSurvey.answers ?? {}) as Record<string, unknown>;
   const intentState = mergeIntentState(readIntentState(previous), reading.intents, input.text);
@@ -392,7 +410,15 @@ async function processR0Answer(input: PostSaleInbound, currentSurvey: typeof sch
   };
   const updateValues = {
     status: turn.status,
-    answers: { ...previous, r0, comment: input.text.slice(0, 500), ...(intentState.list.length ? { intents: intentState } : {}), ...(turn.status === "opted_out" ? { optOut: true } : {}) },
+    answers: {
+      ...previous,
+      r0,
+      comment: input.text.slice(0, 500),
+      ...(turn.contactStatus ? { contactStatus: turn.contactStatus } : {}),
+      ...(intentState.list.length ? { intents: intentState } : {}),
+      ...(turn.status === "opted_out" ? { optOut: true } : {}),
+      ...(turn.handoff && turn.contactStatus ? { handoff: { status: "pending", contactStatus: turn.contactStatus, reason: handoffReason(turn.contactStatus, brokerName), requestedAt: now.toISOString() } } : {}),
+    },
     outcome: turn.outcome,
     alertsHandledAt: null,
     lastReplyAt: now,

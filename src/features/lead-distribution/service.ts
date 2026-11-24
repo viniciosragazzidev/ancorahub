@@ -884,6 +884,22 @@ export async function processQueuedLead(
   if (lead.corretorId && !canRotateCurrentOwner) {
     return { status: "conflict", leadId, reason: "Lead já possui corretor confirmado." };
   }
+  // Pós-venda (24/11): o lead tirado de um corretor por falta de contato nunca volta para ele.
+  // O evento "returned_to_queue" de origem "post_sale" guarda o corretor antigo; vale por 30 dias.
+  if (!excludeBrokerId && !lead.corretorId && lead.assignmentSource === "redistribution") {
+    const [handoff] = await db.select({ previousOwnerId: schema.leadDistributionEvents.previousOwnerId })
+      .from(schema.leadDistributionEvents)
+      .where(and(
+        eq(schema.leadDistributionEvents.tenantId, context.tenantId),
+        eq(schema.leadDistributionEvents.leadId, leadId),
+        eq(schema.leadDistributionEvents.source, "post_sale"),
+        eq(schema.leadDistributionEvents.action, "returned_to_queue"),
+        gte(schema.leadDistributionEvents.createdAt, new Date(Date.now() - 30 * 86_400_000)),
+      ))
+      .orderBy(desc(schema.leadDistributionEvents.createdAt))
+      .limit(1);
+    if (handoff?.previousOwnerId) excludeBrokerId = handoff.previousOwnerId;
+  }
   const brokerToExclude = excludeBrokerId ?? (lead.assignmentSource === "automatic_offer" || lead.assignmentSource === "manual_offer" ? lead.corretorId : null);
   if (isHeldByRunningQualification(lead.qualificationStatus, lead.qualificationState, await isHotLeadEarlyDistributionEnabled())) {
     return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };

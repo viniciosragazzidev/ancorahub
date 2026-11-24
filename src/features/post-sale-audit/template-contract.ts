@@ -7,7 +7,7 @@ export const POST_SALE_META_TEMPLATE = {
   variables: ["cliente_nome", "empresa", "corretor_nome"],
 } as const;
 
-export const POST_SALE_WAHA_OPENING_DEFAULT = "Oi, {{nome}}! Tudo bem? Aqui é a {{assistente}}, da equipe de qualidade da {{empresa}}. Faz alguns dias você falou com a gente sobre plano de saúde, e o {{corretor}} ficou responsável pelo seu atendimento. Estou entrando em contato para saber como foi a sua experiência, porque queremos garantir que você seja bem atendido. Posso te fazer duas perguntinhas rápidas?";
+export const POST_SALE_WAHA_OPENING_DEFAULT = "Oi, {{nome}}! Tudo bem? Aqui é a {{assistente}}, da equipe de qualidade da {{empresa}}. Faz alguns dias você falou com a gente sobre plano de saúde, e {{corretor}} ficou responsável pelo seu atendimento. Estou entrando em contato para saber como foi a sua experiência, porque queremos garantir que você receba um bom atendimento. Posso te fazer duas perguntinhas rápidas?";
 
 export const POST_SALE_OPENING_VARIABLES = ["nome", "assistente", "empresa", "corretor"] as const;
 

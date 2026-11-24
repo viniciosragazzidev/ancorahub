@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CONTACT_STATUSES, detectContactStatus } from "./contact-status";
 import { postSaleIntentFields } from "./intents";
 import { pickVariant } from "./reply-variants";
 
@@ -152,6 +153,8 @@ export const r0AnswerSchema = z.object({
   request: z.string().max(160).nullable().optional(),
   reason: z.string().max(300).nullable().optional(),
   optOut: z.boolean().optional(),
+  /** Como foi o contato com o corretor (24/11): "começou e parou de responder" é stalled. */
+  contactStatus: z.enum(CONTACT_STATUSES).nullable().optional(),
 });
 
 /** Leitura da R0 pela IA: a classificação da R0 mais as intenções da conversa inteligente (09/11). */
@@ -173,7 +176,7 @@ export function classifyR0AnswerByKeywords(text: string): R0Answer {
   const optOut = R0_OPT_OUT.test(value);
   if (R0_CLOSED.test(value)) return { category: "closed_or_gave_up", closedKind: "closed_elsewhere", request: null, reason: text.trim().slice(0, 300) || null, optOut };
   if (R0_GAVE_UP.test(value)) return { category: "closed_or_gave_up", closedKind: "gave_up", request: null, reason: text.trim().slice(0, 300) || null, optOut };
-  if (SIMPLE_NO.test(value) || R0_NOT_ATTENDED.test(value)) return { category: "not_attended", closedKind: null, request: null, reason: null, optOut };
+  if (SIMPLE_NO.test(value) || R0_NOT_ATTENDED.test(value) || detectContactStatus(text) === "stalled") return { category: "not_attended", closedKind: null, request: null, reason: null, optOut };
   if (SIMPLE_YES.test(value) || R0_WANTS_MORE.test(value)) return { category: "wants_more", closedKind: null, request: text.trim().slice(0, 160) || null, reason: null, optOut };
   return { category: "other_subject", closedKind: null, request: text.trim().slice(0, 160) || null, reason: null, optOut };
 }

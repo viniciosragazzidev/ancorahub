@@ -40,11 +40,12 @@ import { labQualificationServices, QualificationLeadsLab } from "./qualification
 import { labRecoveryCallQueue, RecoveryFunnelLab } from "./recovery-funnel-lab";
 import { labRecoverySettings, RecoveryCadenceLab } from "./recovery-cadence-lab";
 import { NurtureLab } from "./nurture-lab";
+import { PostSaleConversationLab } from "./post-sale-conversation-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 import { SasaVoiceSettings } from "@/features/sasa-voice/components/sasa-voice-settings";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa" | "formulario";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa" | "formulario" | "posVendaConversa";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -62,6 +63,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "funilRecuperacao", label: "Funil de recuperação e fila de ligação" },
   { id: "cadenciaRecuperacao", label: "Cadência de recuperação" },
   { id: "nutricao", label: "Nutrição, A/B e Sasá (recuperar)" },
+  { id: "posVendaConversa", label: "Pós-venda: conversa e troca de corretor" },
   { id: "accordee", label: "Estilo Accordee (Início e Conversas do diretor)" },
   { id: "agenteDiretor", label: "Agente IA do diretor (escala e cadeiras)" },
   { id: "telefone", label: "Trocar meu telefone (corretor)" },
@@ -345,6 +347,8 @@ export function FlowLab() {
           <RecoveryCadenceLab />
         ) : flow === "nutricao" ? (
           <NurtureLab />
+        ) : flow === "posVendaConversa" ? (
+          <PostSaleConversationLab />
         ) : flow === "vozSasa" ? (
           <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">
             <SasaVoiceSettings />

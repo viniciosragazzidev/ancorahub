@@ -1,12 +1,13 @@
 import { COMPLAINT_KIND_LABELS, hasIntent, readIntentState, RESUME_INTENTS } from "./intents";
 import { lossReasonCheckSummary, readLossReasonCheck } from "./loss-reason-check";
 
-export const POST_SALE_ALERT_REASONS = ["no_contact", "bad_service", "low_rating", "wants_help", "not_attended", "team_no_reply", "loss_reason_mismatch", "wants_resume", "broker_complaint", "health_urgency"] as const;
+export const POST_SALE_ALERT_REASONS = ["no_contact", "no_follow_up", "bad_service", "low_rating", "wants_help", "not_attended", "team_no_reply", "loss_reason_mismatch", "wants_resume", "broker_complaint", "health_urgency"] as const;
 
 export type PostSaleAlertReason = (typeof POST_SALE_ALERT_REASONS)[number];
 
 export const POST_SALE_ALERT_REASON_LABELS: Record<PostSaleAlertReason, string> = {
   no_contact: "Cliente não conseguiu falar com o corretor",
+  no_follow_up: "Corretor não deu continuidade ao atendimento",
   bad_service: "Cliente relatou uma experiência ruim",
   low_rating: "Cliente deu nota 2 ou menos",
   wants_help: "Cliente pediu ajuda da equipe",
@@ -40,10 +41,13 @@ export function postSaleAlertReasons(state: PostSaleAlertState): PostSaleAlertRe
   const complaint = hasIntent(intents, "complaint") && !(notAttended && intents?.complaintKind === "disappeared");
   // Nota 4 ou 5 vence um "negativo" solto ("foi 5, o problema é que agora não dá"): precisão do alerta (09/11).
   const negativeAnswer = answers.sentiment === "negative" && !(typeof state.rating === "number" && state.rating >= 4);
-  if (state.outcome === "no_contact") reasons.push("no_contact");
+  // "Começou e parou" (24/11) tem alerta próprio: o corretor falou, mas não continuou.
+  const stalled = answers.contactStatus === "stalled";
+  if (state.outcome === "no_contact") reasons.push(stalled ? "no_follow_up" : "no_contact");
   if ((state.outcome === "bad_service" || negativeAnswer) && !complaint) reasons.push("bad_service");
   if (typeof state.rating === "number" && state.rating <= 2) reasons.push("low_rating");
-  if (answers.wantsHelp === true && !resume) reasons.push("wants_help");
+  const handoff = answerRecord(answers.handoff);
+  if (answers.wantsHelp === true && !resume && !handoff.status) reasons.push("wants_help");
   // R0 (cliente que volta a escrever): resposta "não fui atendido" e escalada sem retorno da equipe.
   if (state.outcome === "r0_not_attended") reasons.push("not_attended");
   const r0 = answerRecord(answers.r0);
@@ -65,6 +69,13 @@ function quoted(text: string | null | undefined, max = 160) {
 
 /** Detalhe do alerta (lista de alertas e notificação): as duas versões do motivo, o horário pedido, a fala do cliente. */
 export function postSaleAlertDetail(reason: PostSaleAlertReason, answers: unknown): string | null {
+  if (reason === "no_contact" || reason === "no_follow_up" || reason === "not_attended") {
+    const record = answerRecord(answers);
+    const handoff = answerRecord(record.handoff);
+    const moved = handoff.status === "done" ? "Lead passado para outro corretor." : handoff.status === "pending" ? "Lead sendo passado para outro corretor." : null;
+    const quote = typeof record.comment === "string" ? quoted(record.comment) : null;
+    return [moved, quote ? `Cliente: ${quote}` : null].filter(Boolean).join(" ") || null;
+  }
   if (reason === "loss_reason_mismatch") {
     const check = readLossReasonCheck(answers);
     return check ? lossReasonCheckSummary(check) : null;

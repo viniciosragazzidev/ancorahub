@@ -22,6 +22,7 @@ import { resolvePostSaleAudience } from "./audience";
 import { canResumePostSaleNow } from "./conversation-rules";
 import { sendPostSaleNudge } from "./conversation";
 import { parseR0Settings, postSaleR0SettingKey, serializeR0Settings, type R0Settings } from "./r0-rules";
+import { parsePostSaleHandoffSettings, postSaleHandoffSettingKey, serializePostSaleHandoffSettings, type PostSaleHandoffSettings } from "./handoff-rules";
 import { POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
 import { AUTO_RULE_KEYS, autoRuleSettingsInputSchema, parsePostSaleRuleFilter, type AutoRuleSettings, type PostSaleRuleFilter } from "./auto-rules";
 import { AutoRulesTableMissingError, loadAutoRules, saveAutoRule } from "./auto-rules-store";
@@ -519,6 +520,35 @@ export async function savePostSaleR0SettingsAction(raw: unknown): Promise<Action
     await setSystemSetting(postSaleR0SettingKey(context.tenantId), serializeR0Settings(settings));
     await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_rule", entityId: "R0", action: "post_sale.r0.settings_updated", metadata: { enabled: settings.enabled, queueCount: queueIds.length } });
     return { ok: true, data: settings };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/**
+ * Liga ou desliga a troca automática de corretor pelo pós-venda (24/11): cliente sem contato ou sem
+ * continuidade vai para outro corretor pela distribuição normal. Só diretor; desligada por padrão.
+ * Fica em system_settings (`post_sale_handoff_<tenantId>`) e cada mudança é auditada.
+ */
+export async function savePostSaleHandoffSettingsAction(raw: unknown): Promise<ActionResult<PostSaleHandoffSettings>> {
+  try {
+    const context = await authorizedContext();
+    if (context.role !== "director") throw new PostSaleActionError("Apenas diretores podem ligar a troca automática de corretor.");
+    const settings: PostSaleHandoffSettings = { enabled: z.object({ enabled: z.boolean() }).parse(raw).enabled };
+    await setSystemSetting(postSaleHandoffSettingKey(context.tenantId), serializePostSaleHandoffSettings(settings));
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_rule", entityId: "handoff", action: "post_sale.handoff.settings_updated", metadata: { enabled: settings.enabled } });
+    return { ok: true, data: settings };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/** Estado atual da troca automática de corretor (para a tela e para o diretor conferir). */
+export async function getPostSaleHandoffSettingsAction(): Promise<ActionResult<PostSaleHandoffSettings & { canEdit: boolean }>> {
+  try {
+    const context = await authorizedContext();
+    const settings = parsePostSaleHandoffSettings(await getSystemSetting(postSaleHandoffSettingKey(context.tenantId)).catch(() => null));
+    return { ok: true, data: { ...settings, canEdit: context.role === "director" } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }

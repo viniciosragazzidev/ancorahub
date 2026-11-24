@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isHolidayDateKey } from "@/shared/time/holidays";
+import { CONTACT_STATUSES } from "./contact-status";
 import { LOSS_REASON_CATEGORIES } from "./loss-reason-check";
 import { pickVariant } from "./reply-variants";
 
@@ -18,6 +19,8 @@ export const postSaleAnswerSchema = z.object({
   recommends: z.boolean().nullable().optional(),
   /** Régua R4: categoria do motivo da perda dito pelo cliente (comparada com a do corretor). */
   lossCategory: z.enum(LOSS_REASON_CATEGORIES).nullable().optional(),
+  /** Como foi o contato com o corretor (24/11): falou e foi bem, parou ou não concluiu, sem contato, não quis responder, outro. */
+  contactStatus: z.enum(CONTACT_STATUSES).nullable().optional(),
 });
 
 export type PostSaleAnswers = z.infer<typeof postSaleAnswerSchema>;
@@ -151,7 +154,7 @@ function manualTurn(step: number, merged: PostSaleAnswers, names: TurnNames): Po
   ]), contactQuestion);
   if (step === 1) {
     if (merged.contacted === false) return askHelp();
-    if (merged.contacted !== true) return ask(1, v("contacted_again", [contactQuestion, `Só para eu entender: você conseguiu falar com ${names.broker}?`]), contactQuestion);
+    if (merged.contacted !== true) return ask(1, v("contacted_again", [`Só para eu entender melhor: ${names.broker} chegou a te atender e seguiu com você, ou parou de responder?`, `Me ajuda a entender: ${names.broker} falou com você e continuou o atendimento, ou ficou sem retorno?`]), contactQuestion);
     return ask(2, v("service", [
       "Que bom. Como foi o atendimento? Se quiser, pode dar uma nota de 1 a 5.",
       "Que bom! E como foi o atendimento? Se quiser, me dá uma nota de 1 a 5.",

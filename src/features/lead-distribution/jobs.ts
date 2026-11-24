@@ -186,7 +186,7 @@ export async function wakeLeadsAwaitingEligibleBroker(tenantId: string) {
 export async function enqueueAndProcessLeadDistribution(input: {
   tenantId: string;
   leadId: string;
-  source: "qualification_completed" | "qualification_timeout" | "human_handoff" | "agent_trigger" | "offer_declined" | "manual_offer_expired" | "manual_offer_delivery_failed" | "sla_timeout" | "intake" | "bulk_recovery";
+  source: "qualification_completed" | "qualification_timeout" | "human_handoff" | "agent_trigger" | "offer_declined" | "manual_offer_expired" | "manual_offer_delivery_failed" | "sla_timeout" | "intake" | "bulk_recovery" | "post_sale_handoff";
 }) {
   await enqueueLeadDistributionJob({ tenantId: input.tenantId, leadId: input.leadId });
   await wakeLeadDistributionJob(input.tenantId, input.leadId);
