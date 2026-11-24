@@ -17,7 +17,7 @@ import { postSaleAlertMessage, postSaleAlertReasons } from "@/features/post-sale
 import { detectPostSaleIntents } from "@/features/post-sale-audit/intents";
 import { renderPostSaleOpeningMessage } from "@/features/post-sale-audit/rules";
 import { POST_SALE_WAHA_OPENING_DEFAULT } from "@/features/post-sale-audit/template-contract";
-import { decidePostSaleTurn, type PolicyTurn, type PostSaleAnswersWithIntents } from "@/features/post-sale-audit/turn-policy";
+import { decidePostSaleTurn, type PolicyKind, type PolicyTurn, type PostSaleAnswersWithIntents } from "@/features/post-sale-audit/turn-policy";
 
 type Scenario = "toinha" | "carmen" | "carmenLonga" | "semContato" | "vaga" | "livre";
 const SCENARIOS: Record<Scenario, { label: string; lead: string; broker: string; replies: string[] }> = {
@@ -30,6 +30,20 @@ const SCENARIOS: Record<Scenario, { label: string; lead: string; broker: string;
 };
 
 type Line = { from: "ia" | "cliente" | "sistema"; text: string };
+
+const POLICY_LABELS: Record<PolicyKind, string> = {
+  script: "Roteiro",
+  hold_question: "Acolheu a dúvida e voltou à pergunta",
+  wrong_person: "Número errado",
+  health_urgency: "Urgência de saúde",
+  resume: "Equipe vai retomar",
+  closed_elsewhere: "Fechou por fora",
+  gave_up: "Desistiu",
+  handoff: "Passou para outro corretor",
+  no_follow_up: "Sem continuidade, equipe avisada",
+  declined: "Não quis responder",
+  repeat_guard: "Encerrou sem repetir a pergunta",
+};
 
 function simulate(replies: string[], scenario: (typeof SCENARIOS)[Scenario], canHandoff: boolean) {
   const lines: Line[] = [{ from: "ia", text: renderPostSaleOpeningMessage(POST_SALE_WAHA_OPENING_DEFAULT, { nome: scenario.lead, assistente: "Sasá", empresa: "Âncora", corretor: scenario.broker }) }];
@@ -117,7 +131,7 @@ export function PostSaleConversationLab() {
             <dt className="text-ds-fog">Contato</dt>
             <dd className="text-ds-charcoal">{last?.answers.contactStatus ? CONTACT_STATUS_LABELS[last.answers.contactStatus] : "Ainda não disse"}</dd>
             <dt className="text-ds-fog">Caminho</dt>
-            <dd className="text-ds-charcoal">{last?.policy ?? "Abertura"}</dd>
+            <dd className="text-ds-charcoal">{last ? POLICY_LABELS[last.policy] : "Abertura"}</dd>
             <dt className="text-ds-fog">Repetiu</dt>
             <dd className="text-ds-charcoal tabular-nums">{last?.answers.questionRepeats ?? 0} de 1</dd>
             <dt className="text-ds-fog">Troca</dt>
