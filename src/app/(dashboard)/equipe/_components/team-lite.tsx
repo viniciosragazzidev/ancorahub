@@ -56,7 +56,9 @@ export function TeamHeaderActionsLite({ isDirector, branches, customRoles }: { i
   const [open, setOpen] = useState(false);
   return (
     <span className={styles.headerActions}>
-      <button type="button" className={page.primaryButton} aria-label="Novo funcionário" onClick={() => setOpen(true)}><UserPlus aria-hidden="true" size={16} /><span className={styles.longLabel}>Novo funcionário</span></button>
+      {/* Sem aria-label: o nome vem do texto (escondido só na tela estreita). Com aria-label, a regra de ícones do
+          cabeçalho do Diretor encolhia o botão para 28px sem fundo. */}
+      <button type="button" className={page.primaryButton} onClick={() => setOpen(true)}><UserPlus aria-hidden="true" size={16} /><span className={styles.longLabel}>Novo funcionário</span></button>
       <LiteSidePanel open={open} onOpenChange={setOpen} title="Novo funcionário" description={isDirector ? "Você pode criar diretores, gestores e corretores." : "Você pode criar apenas corretores."}>
         <TeamInviteLite branches={branches} canInviteManager={isDirector} canInviteDirector={isDirector} customRoles={customRoles} onDone={() => setOpen(false)} />
       </LiteSidePanel>

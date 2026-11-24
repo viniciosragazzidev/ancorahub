@@ -4,6 +4,8 @@
   position: fixed;
   inset: 0;
   z-index: 60;
+  /* Aberto a partir do cabeçalho, herdava o nowrap das ações da página: textos não quebravam e os campos vazavam. */
+  white-space: normal;
 }
 
 .scrim {

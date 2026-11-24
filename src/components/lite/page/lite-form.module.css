@@ -13,6 +13,8 @@
 
 .field {
   display: grid;
+  /* Campos lado a lado com dicas de alturas diferentes ficam alinhados pelo topo, sem esticar o controle. */
+  align-content: start;
   gap: 8px;
   min-width: 0;
 }
