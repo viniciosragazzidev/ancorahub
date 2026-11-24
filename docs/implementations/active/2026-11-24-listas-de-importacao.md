@@ -23,4 +23,4 @@ Decisão: DEC-191 em `docs/decision-log.md`.
 ## Verificação
 
 - `npx tsc --noEmit` limpo; `vitest` em `src/features/supervisor-workspace` e `src/app/dev`: 23 arquivos, 169 testes passando (novos: `list-names.test.ts`, `team-lists-view.test.tsx`).
-- Preview 3005 em `/dev/laboratorio` (fluxo Lista da equipe).
+- Laboratório `/dev/laboratorio` (fluxo Lista da equipe) conferido num dev server do worktree na porta 3017, porque a 3005 estava fora do ar em 24/11: pastas, abrir lista, filtro Lista, renomear e nome sugerido "Lista 24/11 (2)" no Conferir. O merge em `preview/3005` foi feito e o `ancorahub-relatorio` está nele.
