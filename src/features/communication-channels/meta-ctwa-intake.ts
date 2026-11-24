@@ -99,6 +99,8 @@ export async function ingestCtwaLead(input: {
   channelIntake?: ChannelLeadIntake | null;
   /** The lead is only received: the AI never talks to it. */
   skipAiQualification?: boolean;
+  /** Fixed queue that wins over the campaign's rule (Aquisição Corretores, 24/11). */
+  queueOverride?: { queueId: string; label: string } | null;
 }): Promise<CtwaIntakeResult> {
   const db = getDatabase();
   const source = await tenantIntakeSource(input.tenantId);
@@ -107,11 +109,13 @@ export async function ingestCtwaLead(input: {
 
   const hierarchy = await resolveAdHierarchy(input.tenantId, input.referral.adId);
   const capture = await resolveCapture(input.tenantId, hierarchy.campaignId);
-  let decision: { action: "capture"; queueId: string | null } | { action: "ignore"; queueId: null } = capture.decision;
+  let decision: { action: "capture"; queueId: string | null } | { action: "ignore"; queueId: null } = input.queueOverride
+    ? { action: "capture", queueId: input.queueOverride.queueId }
+    : capture.decision;
   // A campaign with a rule owns routing (a rule turned off still ignores). A campaign without any
   // rule, or one that could not be identified, falls to the number's own intake (30/10: an ad on the
   // 3232 whose campaign had no rule was ignored and the contact never became a lead).
-  if (shouldUseChannelIntakeForCtwa({ decisionAction: decision.action, globalMode: capture.globalMode, campaignRoute: capture.campaignRoute, channelIntakeEnabled: Boolean(input.channelIntake?.enabled) }) && input.channelIntake) {
+  if (!input.queueOverride && shouldUseChannelIntakeForCtwa({ decisionAction: decision.action, globalMode: capture.globalMode, campaignRoute: capture.campaignRoute, channelIntakeEnabled: Boolean(input.channelIntake?.enabled) }) && input.channelIntake) {
     decision = { action: "capture", queueId: input.channelIntake.queueId };
   }
   if (decision.action === "ignore") {
@@ -139,7 +143,7 @@ export async function ingestCtwaLead(input: {
       capturedAt: input.receivedAt,
       metadata: {
         entry: META_CTWA_ENTRY,
-        adsLabel: input.channelIntake?.enabled ? input.channelIntake.label : null,
+        adsLabel: input.queueOverride ? input.queueOverride.label : input.channelIntake?.enabled ? input.channelIntake.label : null,
         campaignName: hierarchy.campaignName,
         adHeadline: input.referral.headline,
         adUrl: input.referral.sourceUrl,

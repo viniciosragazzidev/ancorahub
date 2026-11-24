@@ -21,6 +21,7 @@ import { META_CLOUD_PROVIDER } from "./types";
 import { describeUnsupportedMessage } from "./meta-unsupported-message";
 import { readCtwaAdReferral } from "./meta-ctwa-referral";
 import { channelLeadIntakeKey, parseChannelLeadIntake, resolveChannelLeadIntakeRoute } from "./channel-lead-intake";
+import { BROKER_ACQUISITION_QUEUE_NAME, ensureBrokerAcquisitionQueue, isBrokerPartnershipMessage } from "./broker-acquisition";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { COEXISTENCE_WEBHOOK_FIELDS } from "./meta-coexistence-events";
 import type { MetaWebhookPayload, MetaWebhookStatus } from "./types";
@@ -357,7 +358,15 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         // A number kept in the WhatsApp Business app (coexistence) has its own
         // automation there: its leads and messages are only received, the AI
         // never talks to them, unless the director turned the AI on for it.
-        const skipAiQualification = coexistence && !channelIntake?.aiQualification;
+        // Aquisição Corretores (24/11): a new contact whose first message is the partnership ad's
+        // ready message is a broker, not a customer. Lead in that queue, never qualified by the AI,
+        // even when the campaign's capture is off. Every other contact follows the number's intake.
+        const brokerAcquisition = unknownContact && isBrokerPartnershipMessage(text);
+        const brokerAcquisitionQueueId = brokerAcquisition ? await ensureBrokerAcquisitionQueue(channel.tenantId).catch((error) => {
+          console.error("[whatsapp/broker-acquisition] queue.failed", { tenantId: channel.tenantId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+          return null;
+        }) : null;
+        const skipAiQualification = Boolean(brokerAcquisitionQueueId) || (coexistence && !channelIntake?.aiQualification);
 
         await db.insert(schema.whatsappMessages).values({
           id: randomUUID(),
@@ -380,12 +389,15 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           participantUserIds: [lead?.corretorId],
         }).catch(() => undefined);
 
-        if (ctwaReferral || intakeRoute.kind === "create_lead") {
+        if (ctwaReferral || intakeRoute.kind === "create_lead" || brokerAcquisitionQueueId) {
           const profileName = change.value?.contacts?.find((contact) => contact.wa_id === message.from)?.profile?.name ?? change.value?.contacts?.[0]?.profile?.name;
           const receivedAt = message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date();
+          const acquisitionIntake = brokerAcquisitionQueueId
+            ? { enabled: true, queueId: brokerAcquisitionQueueId, label: BROKER_ACQUISITION_QUEUE_NAME, aiQualification: false }
+            : null;
           const ctwaPromise = import("./meta-ctwa-intake").then(({ ingestCtwaLead, ingestChannelLead }) => ctwaReferral
-            ? ingestCtwaLead({ tenantId: channel.tenantId, phone, profileName, referral: ctwaReferral, providerMessageId: message.id, receivedAt, channelIntake, skipAiQualification })
-            : ingestChannelLead({ tenantId: channel.tenantId, channelId: channel.id, phone, profileName, providerMessageId: message.id, receivedAt, intake: intakeRoute.kind === "create_lead" ? intakeRoute.intake : channelIntake!, skipAiQualification }),
+            ? ingestCtwaLead({ tenantId: channel.tenantId, phone, profileName, referral: ctwaReferral, providerMessageId: message.id, receivedAt, channelIntake, skipAiQualification, queueOverride: acquisitionIntake ? { queueId: acquisitionIntake.queueId, label: acquisitionIntake.label } : null })
+            : ingestChannelLead({ tenantId: channel.tenantId, channelId: channel.id, phone, profileName, providerMessageId: message.id, receivedAt, intake: acquisitionIntake ?? (intakeRoute.kind === "create_lead" ? intakeRoute.intake : channelIntake!), skipAiQualification }),
           ).then(async (result) => {
             if (result.status !== "ignored") {
               await db.update(schema.whatsappMessages).set({ leadId: result.leadId })
