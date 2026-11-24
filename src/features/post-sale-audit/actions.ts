@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
@@ -12,7 +12,8 @@ import { getFeatureFlag, getSystemSetting, setSystemSetting } from "@/features/s
 import { isBusinessHours, nextBusinessOpening } from "@/features/team-notices/guard";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { loadLatestPostSaleLeadSurvey, loadPostSaleAlertTarget, loadPostSaleBrokerReport, loadPostSaleBrokerSummary, loadPostSaleOpenAlerts } from "./queries";
+import { loadLatestPostSaleLeadSurvey, loadPostSaleAlertTarget, loadPostSaleBrokerSummary, loadPostSaleOpenAlerts, loadPostSaleSurveyRows } from "./queries";
+import type { PostSaleSurveyRow } from "./overview";
 import { postSaleAlertReasons } from "./alert-rules";
 import type { PostSaleBrokerReportRow } from "./reporting";
 import { firstName, findUnknownPostSaleOpeningVariables, renderPostSaleOpeningMessage } from "./rules";
@@ -22,9 +23,9 @@ import { canResumePostSaleNow } from "./conversation-rules";
 import { sendPostSaleNudge } from "./conversation";
 import { parseR0Settings, postSaleR0SettingKey, serializeR0Settings, type R0Settings } from "./r0-rules";
 import { POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
-import { autoRuleSettingsInputSchema, parsePostSaleRuleFilter, type AutoRuleSettings, type PostSaleRuleFilter } from "./auto-rules";
+import { AUTO_RULE_KEYS, autoRuleSettingsInputSchema, parsePostSaleRuleFilter, type AutoRuleSettings, type PostSaleRuleFilter } from "./auto-rules";
 import { AutoRulesTableMissingError, loadAutoRules, saveAutoRule } from "./auto-rules-store";
-import { previewAutoRule, type AutoRulePreview } from "./auto-sweep";
+import { forcePostSaleAutoRuleForMilestoneDay, previewAutoRule, previewAutoRulesToday, type AutoRulePreview } from "./auto-sweep";
 import { postSaleViewAuditId } from "./view-audit";
 import { emptyPostSaleCampaignCounts, type PostSaleCampaignCounts, type PostSaleRetryResult } from "./campaign-retry";
 import { loadPostSaleCampaignCounts, retryFailedPostSaleSurveys } from "./campaign-retry-service";
@@ -359,8 +360,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
   queues: Array<{ id: string; name: string }>;
   branches: Array<{ id: string; name: string }>;
   campaigns: Array<{ id: string; name: string; ruleKey: string | null; status: string; totals: Record<string, number>; createdAt: string; counts: PostSaleCampaignCounts }>;
-  responses: Array<{ id: string; leadId: string; leadName: string; brokerName: string | null; campaignName: string; ruleKey: string | null; status: string; outcome: string | null; rating: number | null; answers: Record<string, unknown>; sentAt: string | null; lastReplyAt: string | null }>;
-  report: PostSaleBrokerReportRow[];
+  surveys: PostSaleSurveyRow[];
   alerts: Awaited<ReturnType<typeof loadPostSaleOpenAlerts>>;
   periodDays: number;
   r0: R0Settings & { canEdit: boolean };
@@ -375,7 +375,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
     const db = getDatabase();
     const branchFilter = context.role === "manager" ? context.branchId : undefined;
     const r0Settings = parseR0Settings(await getSystemSetting(postSaleR0SettingKey(context.tenantId)).catch(() => null));
-    const [brokers, queues, campaigns, responses, report, alerts, branches, autoRules] = await Promise.all([
+    const [brokers, queues, campaigns, surveys, alerts, branches, autoRules] = await Promise.all([
       db.select({ id: schema.tenantMemberships.userId, name: schema.user.name }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
         .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), branchFilter ? eq(schema.tenantMemberships.branchId, branchFilter) : undefined))
@@ -384,16 +384,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
       db.select({ id: schema.postSaleCampaigns.id, name: schema.postSaleCampaigns.name, ruleKey: schema.postSaleCampaigns.ruleKey, status: schema.postSaleCampaigns.status, totals: schema.postSaleCampaigns.totals, createdAt: schema.postSaleCampaigns.createdAt }).from(schema.postSaleCampaigns)
         .where(and(eq(schema.postSaleCampaigns.tenantId, context.tenantId), context.role === "manager" ? eq(schema.postSaleCampaigns.createdBy, context.userId) : undefined))
         .orderBy(desc(schema.postSaleCampaigns.createdAt)).limit(20),
-      // Only clients who answered (09/11, Vinicios: "ir para os leads que responderam de forma fácil").
-      db.select({ id: schema.postSaleSurveys.id, leadId: schema.postSaleSurveys.leadId, leadName: schema.leads.nome, brokerName: schema.user.name, campaignName: schema.postSaleCampaigns.name, ruleKey: schema.postSaleSurveys.ruleKey, status: schema.postSaleSurveys.status, outcome: schema.postSaleSurveys.outcome, rating: schema.postSaleSurveys.rating, answers: schema.postSaleSurveys.answers, sentAt: schema.postSaleSurveys.sentAt, lastReplyAt: schema.postSaleSurveys.lastReplyAt, createdAt: schema.postSaleSurveys.createdAt })
-        .from(schema.postSaleSurveys)
-        .leftJoin(schema.user, eq(schema.user.id, schema.postSaleSurveys.brokerId))
-        .innerJoin(schema.leads, and(eq(schema.leads.id, schema.postSaleSurveys.leadId), eq(schema.leads.tenantId, schema.postSaleSurveys.tenantId)))
-        .innerJoin(schema.postSaleCampaigns, and(eq(schema.postSaleCampaigns.id, schema.postSaleSurveys.campaignId), eq(schema.postSaleCampaigns.tenantId, schema.postSaleSurveys.tenantId)))
-        .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
-        .where(and(eq(schema.postSaleSurveys.tenantId, context.tenantId), isNotNull(schema.postSaleSurveys.lastReplyAt), isNull(schema.leads.deletedAt), branchFilter ? sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchFilter}` : undefined))
-        .orderBy(desc(schema.postSaleSurveys.lastReplyAt), desc(schema.postSaleSurveys.createdAt)).limit(300),
-      loadPostSaleBrokerReport(context, window, ruleFilter),
+      loadPostSaleSurveyRows(context, window),
       loadPostSaleOpenAlerts(context),
       db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches)
         .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active"), branchFilter ? eq(schema.branches.id, branchFilter) : undefined))
@@ -401,13 +392,12 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
       loadAutoRules(context.tenantId),
     ]);
     const campaignCounts = await loadPostSaleCampaignCounts(context.tenantId, campaigns.map((row) => row.id));
-    await recordPostSaleViewAudit({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: "workspace", action: "post_sale_report.viewed", metadata: { periodDays, brokerRows: report.length, openAlerts: alerts.length } });
+    await recordPostSaleViewAudit({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: "workspace", action: "post_sale_report.viewed", metadata: { periodDays, surveys: surveys.length, openAlerts: alerts.length } });
     return { ok: true, data: {
       brokers: brokers.map((row) => ({ id: row.id, name: row.name ?? "Corretor" })),
       queues,
       campaigns: campaigns.map((row) => ({ ...row, totals: row.totals as Record<string, number>, createdAt: row.createdAt.toISOString(), counts: campaignCounts[row.id] ?? emptyPostSaleCampaignCounts() })),
-      responses: responses.map((row) => ({ ...row, brokerName: row.brokerName ?? null, answers: row.answers as Record<string, unknown>, sentAt: row.sentAt?.toISOString() ?? null, lastReplyAt: row.lastReplyAt?.toISOString() ?? null })),
-      report,
+      surveys,
       alerts,
       periodDays,
       r0: { ...r0Settings, canEdit: context.role === "director" },
@@ -708,6 +698,44 @@ export async function retryFailedPostSaleCampaignAction(campaignId: string): Pro
     if (!result.retryable) throw new PostSaleActionError("Nenhuma pesquisa desta campanha está para reenviar.");
     const { retryable, ...data } = result;
     await recordPostSaleAudit({ tenantId: context.tenantId, userId: context.userId, campaignId: campaign.id, action: "post_sale_campaign.retried", metadata: { retryable, ...data } });
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/** "O que sai hoje": prévia por regra ligada, sem gravar nada. Diretor e gestor veem. */
+export async function previewPostSaleTodayAction(): Promise<ActionResult<Awaited<ReturnType<typeof previewAutoRulesToday>>>> {
+  try {
+    const context = await authorizedContext();
+    return { ok: true, data: await previewAutoRulesToday(context) };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+const forceRuleInput = z.object({
+  key: z.enum(AUTO_RULE_KEYS),
+  milestoneDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Escolha o dia do marco."),
+});
+
+/**
+ * Envio forçado de uma regra para os leads cujo marco caiu num dia (ex.: R1 de todos os aceitos ontem), sem o
+ * limite diário. Só diretor, com a regra ligada. Mesmo seletor, canal, texto e idempotência do motor: quem já
+ * recebeu não recebe de novo.
+ */
+export async function forcePostSaleAutoRuleAction(raw: unknown): Promise<ActionResult<{ started: number; eligible: number; alreadyStarted: number; failed: number }>> {
+  try {
+    const context = await authorizedContext();
+    if (context.role !== "director") throw new PostSaleActionError("Apenas diretores podem forçar o envio da régua.");
+    const input = forceRuleInput.parse(raw);
+    const state = await loadAutoRules(context.tenantId);
+    if (!state.rules.find((rule) => rule.key === input.key)?.enabled) throw new PostSaleActionError(`Ligue a ${input.key} em Automações antes de forçar o envio.`);
+    const result = await forcePostSaleAutoRuleForMilestoneDay({ tenantId: context.tenantId, key: input.key, milestoneDay: input.milestoneDay });
+    if ("lease" in result && result.lease === "busy") throw new PostSaleActionError("A régua está rodando agora. Tente de novo em 1 minuto.");
+    const stats = result.rules[input.key];
+    const data = { started: stats?.started ?? 0, eligible: stats?.eligible ?? 0, alreadyStarted: result.alreadyStarted, failed: result.enqueueFailed };
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_rule", entityId: input.key, action: "post_sale.auto_rule.forced", metadata: { milestoneDay: input.milestoneDay, ...data } });
     return { ok: true, data };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };

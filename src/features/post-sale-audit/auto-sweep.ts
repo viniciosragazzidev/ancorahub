@@ -487,3 +487,50 @@ export async function previewAutoRule(context: TenantContext, settings: AutoRule
     excluded: (Object.entries(selection.excluded) as Array<[PostSaleExclusionReason, number]>).filter(([, count]) => count > 0).map(([reason, count]) => ({ reason: reason === "recent_survey" ? `pesquisado nos últimos ${AUTO_RULE_LIMITS.cooldownDays} dias` : POST_SALE_EXCLUSION_LABELS[reason], count })),
   };
 }
+
+export type AutoRuleTodayItem = {
+  key: AutoRuleKey;
+  label: string;
+  enabled: boolean;
+  /** Dia em que sai (hoje no horário comercial; senão a próxima abertura). */
+  sendDay: string;
+  /** Já abertas pela regra nesse dia. */
+  alreadySent: number;
+  /** Prontos para receber agora, antes dos limites. */
+  eligible: number;
+  /** O que o motor ainda manda nesse dia, com os limites da regra e da empresa. */
+  wouldSend: number;
+  limit: number;
+  /** Prontos por dia do marco (ex.: aceitos em 23/11), para o envio forçado de um dia. */
+  byMilestoneDay: Array<{ day: string; count: number }>;
+};
+
+/**
+ * "O que sai hoje" (24/11): para cada regra ligada, quem está pronto agora e quanto o motor ainda manda no
+ * dia, somando o que já saiu. Mesmo seletor do motor. Não grava nada.
+ */
+export async function previewAutoRulesToday(context: TenantContext, now = new Date()): Promise<{ ready: boolean; sendDay: string; withinHours: boolean; tenantUsed: number; tenantLimit: number; rules: AutoRuleTodayItem[] }> {
+  const state = await loadAutoRules(context.tenantId);
+  const { sendDay, within } = autoRuleSchedule(now);
+  if (!state.ready) return { ready: false, sendDay, withinHours: within, tenantUsed: 0, tenantLimit: AUTO_RULE_LIMITS.tenantDailyLimit, rules: [] };
+  const usage = await usageForDay(context.tenantId, sendDay);
+  let usedByTenant = usage.total;
+  const rules: AutoRuleTodayItem[] = [];
+  for (const settings of state.rules) {
+    const alreadySent = usage.byRule.get(settings.key) ?? 0;
+    const limit = Math.min(effectiveAutoRuleDailyLimit(settings), AUTO_RULE_LIMITS.tenantDailyLimit);
+    const base: AutoRuleTodayItem = { key: settings.key, label: AUTO_RULE_DEFINITIONS[settings.key].label, enabled: settings.enabled, sendDay, alreadySent, eligible: 0, wouldSend: 0, limit, byMilestoneDay: [] };
+    if (!settings.enabled) { rules.push(base); continue; }
+    const selection = await selectAutoRuleRecipients({ tenantId: context.tenantId, settings, sendDay, now, context });
+    const days = new Map<string, number>();
+    for (const recipient of selection.recipients) {
+      const day = saoPauloDateKey(recipient.milestoneAt);
+      days.set(day, (days.get(day) ?? 0) + 1);
+    }
+    const capacity = autoRuleRemainingCapacity({ settings, usedByRule: alreadySent, usedByTenant });
+    const wouldSend = Math.min(selection.recipients.length, capacity);
+    usedByTenant += wouldSend;
+    rules.push({ ...base, eligible: selection.recipients.length, wouldSend, byMilestoneDay: [...days].map(([day, count]) => ({ day, count })).sort((a, b) => b.day.localeCompare(a.day)) });
+  }
+  return { ready: true, sendDay, withinHours: within, tenantUsed: usage.total, tenantLimit: AUTO_RULE_LIMITS.tenantDailyLimit, rules };
+}

@@ -9,7 +9,9 @@ import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 import { UnitManagerLinks } from "@/features/dashboard/components/allowed-link";
 import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { PostSaleWorkspace } from "./post-sale-workspace";
-import { parsePostSaleTab } from "./post-sale-tabs";
+import { isLegacyResponsesTab, parsePostSaleTab } from "./post-sale-tabs";
+import { DashboardHeader } from "@/components/dashboard-header";
+import litePage from "@/components/lite/page/lite-page.module.css";
 
 type PostSaleSearchParams = Promise<{ period?: string; leadIds?: string | string[]; aba?: string | string[] }>;
 
@@ -50,11 +52,17 @@ export default async function PostSalePage({ searchParams }: { searchParams: Pos
       }
     }
   }
+  const sent = initial.data.surveys.filter((row) => row.sentAt).length;
+  const answered = initial.data.surveys.filter((row) => row.lastReplyAt).length;
+  const summary = `${sent.toLocaleString("pt-BR")} ${sent === 1 ? "pesquisa enviada" : "pesquisas enviadas"} e ${answered.toLocaleString("pt-BR")} ${answered === 1 ? "respondida" : "respondidas"} nos últimos ${initial.data.periodDays} dias`;
   return (
     <BrokerProfileViewerProvider viewerRole={context.role}>
       {/* Gestor de unidade (20/11): "Abrir conversa" leva às conversas de qualificação, que são do diretor, e sai. */}
       <UnitManagerLinks active={isOutsideManagerScope(context.role, context.jobTitle)}>
-        <PostSaleWorkspace initialTab={parsePostSaleTab(params.aba, rawLeadIds !== undefined)} initialData={initial.data} initialAudience={initialAudience} initialPreview={initialPreview} initialFeedback={initialFeedback} />
+        <DashboardHeader breadcrumb="Equipe" title="Pós-venda" summary={summary} />
+        <main className={litePage.stack}>
+          <PostSaleWorkspace initialTab={parsePostSaleTab(params.aba, rawLeadIds !== undefined)} initialRespondedOnly={isLegacyResponsesTab(params.aba)} initialData={initial.data} initialAudience={initialAudience} initialPreview={initialPreview} initialFeedback={initialFeedback} />
+        </main>
       </UnitManagerLinks>
     </BrokerProfileViewerProvider>
   );

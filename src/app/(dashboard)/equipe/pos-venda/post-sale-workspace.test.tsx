@@ -16,6 +16,8 @@ const actions = vi.hoisted(() => ({
   savePostSaleR0SettingsAction: vi.fn(),
   getPostSaleSurveyMessagesAction: vi.fn(),
   resumePostSaleSurveyAction: vi.fn(),
+  previewPostSaleTodayAction: vi.fn(),
+  forcePostSaleAutoRuleAction: vi.fn(),
 }));
 vi.mock("@/features/post-sale-audit/actions", () => actions);
 
@@ -25,14 +27,25 @@ import { parsePostSaleTab, postSaleTabHref } from "./post-sale-tabs";
 
 type WorkspaceData = Parameters<typeof PostSaleWorkspace>[0]["initialData"];
 
+const NOW = new Date().toISOString();
+
+function survey(overrides: Partial<WorkspaceData["surveys"][number]>): WorkspaceData["surveys"][number] {
+  return { id: "s", leadId: `lead-${overrides.id ?? "s"}`, leadName: "Lead", brokerId: "broker-1", brokerName: "Ana", campaignId: "c1", campaignName: "R1", ruleKey: "R1", status: "sent", outcome: null, rating: null, answers: {}, skipReason: null, createdAt: NOW, sentAt: NOW, deliveredAt: null, readAt: null, lastReplyAt: null, completedAt: null, alertOpen: false, ...overrides };
+}
+
 function data(overrides: Partial<WorkspaceData> = {}): WorkspaceData {
   return {
     brokers: [{ id: "broker-1", name: "Ana" }],
     queues: [{ id: "queue-1", name: "FILA TATIANA" }],
     branches: [],
     campaigns: [],
-    responses: [],
-    report: [{ brokerId: "broker-1", brokerName: "Ana", sent: 4, responded: 2, attendancePercent: 50, attendanceAnswered: 2, attended: 1, averageRating: 4, ratingCount: 2, ratingTotal: 8, closePercent: null, closeAnswered: 0, closed: 0, noContact: 1, openAlerts: 0, customerReturned: 0 }],
+    surveys: [
+      survey({ id: "s1", leadName: "Maria", status: "completed", rating: 5, answers: { contacted: true }, lastReplyAt: NOW, readAt: NOW, deliveredAt: NOW }),
+      survey({ id: "s2", leadName: "João", status: "answering", rating: 3, answers: { contacted: false }, lastReplyAt: NOW, deliveredAt: NOW }),
+      survey({ id: "s3", leadName: "Clara", status: "sent", deliveredAt: NOW }),
+      survey({ id: "s4", leadName: "Pedro", status: "no_reply" }),
+      survey({ id: "s5", leadName: "Rita", status: "failed", sentAt: null, skipReason: "falha ao enfileirar o canal de origem" }),
+    ],
     alerts: [],
     periodDays: 30,
     r0: { enabled: false, queueIds: [], canEdit: true },
@@ -61,12 +74,15 @@ describe("abas do pós-venda", () => {
     expect(postSaleTabHref("?period=7&aba=respostas", "visao-geral")).toBe("/equipe/pos-venda?period=7");
   });
 
-  it("abre na Visão geral com a faixa de números e troca de aba atualizando a URL", () => {
+  it("abre na Visão geral com os números do período e troca de aba atualizando a URL", () => {
     render(<PostSaleWorkspace initialData={data()} />);
     const summary = screen.getByLabelText("Resumo do período");
     expect(within(summary).getByText("Enviadas").nextSibling?.textContent).toBe("4");
-    expect(within(summary).getByText("% atendido").nextSibling?.textContent).toBe("50%");
+    expect(within(summary).getByText("Entregues").nextSibling?.textContent).toBe("3");
+    expect(within(summary).getByText("Respondidas").nextSibling?.textContent).toBe("2");
+    expect(within(summary).getByText("Sem resposta").nextSibling?.textContent).toBe("2");
     expect(within(summary).getByText("Nota média").nextSibling?.textContent).toBe("4/5");
+    expect(screen.getByText(/1 pesquisa não saiu/)).toBeVisible();
     expect(screen.getByRole("tab", { name: /Visão geral/ })).toHaveAttribute("aria-selected", "true");
 
     fireEvent.click(screen.getByRole("tab", { name: /Automações/ }));
@@ -76,6 +92,30 @@ describe("abas do pós-venda", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: /Visão geral/ }));
     expect(window.location.search).toBe("?period=30");
+  });
+
+  it("clicar numa regra leva para os leads filtrados", () => {
+    render(<PostSaleWorkspace initialData={data()} />);
+    fireEvent.click(screen.getByRole("button", { name: /R1 Checagem de atendimento: 2 responderam de 4 enviadas/ }));
+    expect(screen.getByRole("tab", { name: /Leads/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/5 de 5 pesquisas/)).toBeVisible();
+  });
+
+  it("corretor abre o painel com os leads dele e o lead abre a conversa", async () => {
+    actions.getPostSaleSurveyMessagesAction.mockResolvedValue({ ok: true, data: [{ id: "m1", direction: "in", body: "Fui bem atendida", sentAt: NOW, fromAssistant: false }] });
+    render(<PostSaleWorkspace initialData={data()} initialTab="corretores" />);
+    fireEvent.click(screen.getAllByText("Ana")[0]!);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Leads (5)")).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: /Maria/ }));
+    expect(await within(screen.getByRole("dialog")).findByText("Fui bem atendida")).toBeVisible();
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Voltar para Ana" })).toBeVisible();
+  });
+
+  it("link antigo ?aba=respostas abre Leads só com quem respondeu", () => {
+    expect(parsePostSaleTab("respostas")).toBe("leads");
+    render(<PostSaleWorkspace initialData={data()} initialTab="leads" initialRespondedOnly />);
+    expect(screen.getByText(/2 de 5 pesquisas/)).toBeVisible();
   });
 
   it("abre direto na aba pedida", () => {

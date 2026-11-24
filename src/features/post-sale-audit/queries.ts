@@ -3,7 +3,8 @@ import "server-only";
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
-import { postSaleAlertDetail, postSaleAlertReasons } from "./alert-rules";
+import { isPostSaleAlertOpen, postSaleAlertDetail, postSaleAlertReasons } from "./alert-rules";
+import type { PostSaleSurveyRow } from "./overview";
 import type { PostSaleRuleFilter } from "./auto-rules";
 import { aggregatePostSaleBrokerReport, type PostSaleBrokerReportRow, type PostSaleReportBroker, type PostSaleReportSurvey } from "./reporting";
 
@@ -222,3 +223,77 @@ export async function loadPostSaleAlertTarget(context: TenantContext, surveyId: 
   return survey ?? null;
 }
 
+
+/**
+ * Pesquisas do período para a tela Equipe › Pós-venda (24/11): uma linha por lead e régua, com entrega e
+ * leitura da abertura (outbox). Inclui as que ainda estão na fila, falharam ou não saíram. As contas são
+ * feitas na tela (`overview.ts`).
+ */
+export async function loadPostSaleSurveyRows(context: TenantContext, window: PostSaleReportWindow, limit = 3000): Promise<PostSaleSurveyRow[]> {
+  if (!canReadPostSale(context)) return [];
+  const db = getDatabase();
+  const at = sql`coalesce(${schema.postSaleSurveys.sentAt}, ${schema.postSaleSurveys.createdAt})`;
+  const rows = await db.select({
+    id: schema.postSaleSurveys.id,
+    leadId: schema.postSaleSurveys.leadId,
+    leadName: schema.leads.nome,
+    brokerId: schema.postSaleSurveys.brokerId,
+    brokerName: schema.user.name,
+    campaignId: schema.postSaleSurveys.campaignId,
+    campaignName: schema.postSaleCampaigns.name,
+    ruleKey: schema.postSaleSurveys.ruleKey,
+    status: schema.postSaleSurveys.status,
+    outcome: schema.postSaleSurveys.outcome,
+    rating: schema.postSaleSurveys.rating,
+    answers: schema.postSaleSurveys.answers,
+    skipReason: schema.postSaleSurveys.skipReason,
+    createdAt: schema.postSaleSurveys.createdAt,
+    sentAt: schema.postSaleSurveys.sentAt,
+    deliveredAt: schema.whatsappOutboundMessages.deliveredAt,
+    readAt: schema.whatsappOutboundMessages.readAt,
+    lastReplyAt: schema.postSaleSurveys.lastReplyAt,
+    completedAt: schema.postSaleSurveys.completedAt,
+    alertsHandledAt: schema.postSaleSurveys.alertsHandledAt,
+  })
+    .from(schema.postSaleSurveys)
+    .innerJoin(schema.leads, and(eq(schema.leads.id, schema.postSaleSurveys.leadId), eq(schema.leads.tenantId, schema.postSaleSurveys.tenantId)))
+    .innerJoin(schema.postSaleCampaigns, and(eq(schema.postSaleCampaigns.id, schema.postSaleSurveys.campaignId), eq(schema.postSaleCampaigns.tenantId, schema.postSaleSurveys.tenantId)))
+    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
+    .leftJoin(schema.user, eq(schema.user.id, schema.postSaleSurveys.brokerId))
+    .leftJoin(schema.whatsappOutboundMessages, eq(schema.whatsappOutboundMessages.id, schema.postSaleSurveys.outboundId))
+    .where(and(
+      eq(schema.postSaleSurveys.tenantId, context.tenantId),
+      gte(at, window.from),
+      lt(at, window.to),
+      isNull(schema.leads.deletedAt),
+      branchWhere(context),
+    ))
+    .orderBy(desc(at))
+    .limit(limit);
+  const iso = (value: Date | null) => value?.toISOString() ?? null;
+  return rows.map((row) => {
+    const answers = (row.answers ?? {}) as Record<string, unknown>;
+    return {
+      id: row.id,
+      leadId: row.leadId,
+      leadName: row.leadName ?? "Lead",
+      brokerId: row.brokerId,
+      brokerName: row.brokerName ?? null,
+      campaignId: row.campaignId,
+      campaignName: row.campaignName,
+      ruleKey: row.ruleKey,
+      status: row.status,
+      outcome: row.outcome,
+      rating: row.rating,
+      answers,
+      skipReason: row.skipReason,
+      createdAt: row.createdAt.toISOString(),
+      sentAt: iso(row.sentAt),
+      deliveredAt: iso(row.deliveredAt),
+      readAt: iso(row.readAt),
+      lastReplyAt: iso(row.lastReplyAt),
+      completedAt: iso(row.completedAt),
+      alertOpen: isPostSaleAlertOpen({ outcome: row.outcome, rating: row.rating, answers, alertsHandledAt: row.alertsHandledAt }),
+    };
+  });
+}

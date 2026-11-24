@@ -38,8 +38,13 @@ function postSaleData(brokers: string[]): WorkspaceData {
     queues: [{ id: "q1", name: "Fila da unidade" }],
     branches: [],
     campaigns: [],
-    responses: [],
-    report: brokers.map((name, index) => ({ brokerId: `b${index}`, brokerName: name, sent: 6 - index, responded: 3, attendancePercent: 67, attendanceAnswered: 3, attended: 2, averageRating: 4.5, ratingCount: 2, ratingTotal: 9, closePercent: null, closeAnswered: 0, closed: 0, noContact: 1, openAlerts: index === 0 ? 1 : 0, customerReturned: 0 })),
+    surveys: brokers.flatMap((name, index) => Array.from({ length: 6 - index }, (_, item) => ({
+      id: `s${index}-${item}`, leadId: `l${index}-${item}`, leadName: `Cliente ${index + 1}.${item + 1}`, brokerId: `b${index}`, brokerName: name,
+      campaignId: "c1", campaignName: "R1 Checagem de atendimento", ruleKey: "R1", status: item < 3 ? "completed" : "sent", outcome: null,
+      rating: item < 2 ? 5 - item : null, answers: item < 3 ? { contacted: item !== 2 } : {}, skipReason: null,
+      createdAt: NOW_ISO, sentAt: NOW_ISO, deliveredAt: NOW_ISO, readAt: item < 4 ? NOW_ISO : null, lastReplyAt: item < 3 ? NOW_ISO : null, completedAt: item < 3 ? NOW_ISO : null,
+      alertOpen: index === 0 && item === 2,
+    }))),
     alerts: [],
     periodDays: 30,
     // O gestor vê a régua e a regra R0, mas só o diretor edita (getPostSaleWorkspaceAction devolve canEdit falso).
