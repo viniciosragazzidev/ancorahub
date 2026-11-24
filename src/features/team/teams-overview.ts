@@ -13,7 +13,7 @@ import { getDatabase, schema } from "@/shared/db";
  * inclusive quem ainda não respondeu.
  */
 
-const OPEN_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
+const OPEN_STATUSES = ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 export function canSeeTeams(context: TenantContext) {
   return context.role === "director" || (context.role === "manager" && Boolean(context.branchId));

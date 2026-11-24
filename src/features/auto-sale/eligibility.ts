@@ -1,6 +1,6 @@
 /** Quem pode entrar no piloto (§1 do plano). Puro: o servidor reúne os dados e decide aqui. */
 
-export const ELIGIBLE_LEAD_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "awaiting_reply"] as const;
+export const ELIGIBLE_LEAD_STATUSES = ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "awaiting_reply"] as const;
 
 export type EligibilityInput = {
   qualificationStatus: string | null;

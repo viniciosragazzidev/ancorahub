@@ -21,6 +21,8 @@ export type LiteRequirement = {
 };
 
 export type LightLeadDetailData = {
+  /** Etapa "Entrei em contato" (24/11) ligada pelo Super-admin. Padrão: ligada. */
+  contactedStageEnabled?: boolean;
   id: string;
   nome: string;
   telefone: string | null;
@@ -89,6 +91,12 @@ export const DECLINE_REASONS = [
 ];
 
 export const STEP_OPTIONS = [
+  {
+    id: "contacted",
+    label: "Entrei em contato",
+    description: "Conte como foi o contato: o texto fica na linha do tempo do lead",
+    targetStatus: "contacted",
+  },
   {
     id: "quote_sent",
     label: "Cotação enviada",

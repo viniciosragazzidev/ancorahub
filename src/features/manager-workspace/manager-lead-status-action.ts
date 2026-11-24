@@ -28,10 +28,12 @@ export async function changeManagerLeadStatusAction(_previous: ManagerLeadStatus
   const leadId = String(formData.get("leadId") ?? "");
   const newStatus = String(formData.get("newStatus") ?? "");
   const motivoPerda = String(formData.get("motivoPerda") ?? "") || null;
+  const observacao = String(formData.get("observacao") ?? "").trim() || null;
   if (!leadId || !newStatus) return { mutationId, error: "Escolha a nova etapa." };
   if (newStatus === "lost" && !(MOTIVOS_PERDA as readonly string[]).includes(motivoPerda ?? "")) {
     return { mutationId, error: "Escolha o motivo da perda." };
   }
+  if (newStatus === "contacted" && !observacao) return { mutationId, error: "Conte em poucas palavras como foi o contato." };
 
   const db = getDatabase();
   const [lead] = await db
@@ -48,7 +50,7 @@ export async function changeManagerLeadStatusAction(_previous: ManagerLeadStatus
   if (!lead) return { mutationId, error: "Este lead não está na sua unidade." };
 
   try {
-    await changeLeadStatus({ leadId, newStatus, motivoPerda, justificativaRegressao: null });
+    await changeLeadStatus({ leadId, newStatus, motivoPerda, justificativaRegressao: null, observacao });
     return { mutationId, success: true, newStatus };
   } catch (error) {
     return { mutationId, error: error instanceof Error ? error.message : "Não foi possível alterar a etapa." };

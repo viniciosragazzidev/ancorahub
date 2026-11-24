@@ -12,7 +12,7 @@ import type { CustomerWaitingStage } from "@/features/customer-waiting/domain";
 import { getCustomerWaitingMode } from "@/features/customer-waiting/flag";
 import { loadCustomerWaitingLeads } from "@/features/customer-waiting/queries";
 
-const ACTIVE_STATUSES = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+const ACTIVE_STATUSES = ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 const BROKER_MESSAGE = sql`(${schema.whatsappMessages.direction} = 'outgoing' or (${schema.whatsappMessages.direction} = 'outbound' and coalesce(${schema.whatsappMessages.senderRole}, '') not in ('assistant', 'system'))) `;
 const REAL_MESSAGE = sql`(${schema.whatsappMessages.mediaKind} is not null or lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) not in ('', '[text]'))`;
 

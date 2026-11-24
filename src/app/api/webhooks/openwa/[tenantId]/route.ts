@@ -78,7 +78,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ tena
   const isInternal = [...brokers, ...numbers, ...channels].some((b) => b.phone && samePhone(b.phone));
   const matchingLeads = isInternal ? [] : leads.filter((item) => samePhone(item.phone));
   const isOutgoing = event.direction === "outgoing" || event.fromMe === true;
-  let lead: { id: string; phone: string; status: (typeof schema.leads.$inferSelect)["status"] } | null = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(item.status)) ?? matchingLeads[0] ?? null;
+  let lead: { id: string; phone: string; status: (typeof schema.leads.$inferSelect)["status"] } | null = matchingLeads.find((item) => ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(item.status)) ?? matchingLeads[0] ?? null;
   let client: (typeof clients)[number] | null = isInternal ? null : clients.find((item) => samePhone(item.phone)) ?? null;
   let createdLead = false;
   if (!lead && !client && !isOutgoing && !isInternal) {

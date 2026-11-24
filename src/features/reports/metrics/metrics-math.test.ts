@@ -85,7 +85,7 @@ describe("formatDeltaPtBR", () => {
 });
 
 describe("buildFunnelRows", () => {
-  it("constrói funil de 8 estágios com reached cumulativo e gargalo", () => {
+  it("constrói funil de 9 estágios com reached cumulativo e gargalo", () => {
     const { rows, lost, biggestBottleneck } = buildFunnelRows({
       new: 231,
       distributed: 120,
@@ -98,16 +98,16 @@ describe("buildFunnelRows", () => {
       lost: 240,
     });
 
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(9);
     expect(rows[0].stage).toBe("new");
-    expect(rows[7].stage).toBe("converted");
+    expect(rows[8].stage).toBe("converted");
     expect(rows[0].reached).toBe(231 + 120 + 411 + 327 + 173 + 60 + 42 + 217);
-    expect(rows[7].reached).toBe(217);
-    expect(rows[7].progressionToNext).toBeNull();
+    expect(rows[8].reached).toBe(217);
+    expect(rows[8].progressionToNext).toBeNull();
     expect(lost).toBe(240);
     // cotação → negociação perde 327−173 sobre 327+173+60+42+217…
     expect(biggestBottleneck).not.toBeNull();
-    expect(biggestBottleneck).toBe(3);
+    expect(biggestBottleneck).toBe(4);
   });
 
   it("coorte vazia não gera gargalo", () => {

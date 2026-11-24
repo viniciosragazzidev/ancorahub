@@ -18,6 +18,7 @@ export const STAGE_LABELS: Record<string, string> = {
   new: "Novo",
   distributed: "Distribuído",
   in_contact: "Em atendimento",
+  contacted: "Entrei em contato",
   quote_sent: "Cotação enviada",
   negotiation: "Negociação",
   documentation_pending: "Documentação",

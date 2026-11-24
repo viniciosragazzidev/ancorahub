@@ -2118,3 +2118,15 @@ Referência: BR-098; `docs/implementations/active/2026-11-11-cotador-corretor-ca
 ## DEC-192 - Pós-venda passa o lead para outro corretor quando faltou contato ou continuidade
 
 **Pedida pelo Vinicios em 2026-11-24; implementada desligada. Ligar em produção depende do ok dele.** Quando o cliente conta na conversa do pós-venda (R1, R2, pesquisa manual ou R0) que ficou sem contato, ou que o corretor começou e parou ("mandou mensagem mas não concluiu", "não deu continuidade", "não fala nada há 2 dias"), a IA responde que vai passar o atendimento para outro corretor, que vai chamá-lo em seguida. O lead é solto do corretor avaliado (só se ainda está com ele), volta para a fila (`returned_to_queue`, origem `post_sale`, motivo "pós-venda: cliente sem continuidade do corretor X") e a distribuição normal oferece para outro corretor, respeitando plantão e filas. O corretor antigo fica fora das ofertas desse lead por 30 dias. Fica tudo auditado (`lead.post_sale_redistributed`), com nota no lead, aviso ao corretor antigo e o alerta do pós-venda para direção e gestor da unidade. Sem contato, a IA primeiro pergunta se o cliente ainda quer ajuda; só o "sim" troca. Não troca: lead vendido, perdido, em documentação ou em análise, lead já com outro corretor, dono diretor ou lead na Venda Automatizada. Interruptor por empresa em `system_settings` (`post_sale_handoff_<tenantId>`), desligado por padrão; com ele desligado, a IA só avisa a equipe, como antes. Registro: `docs/implementations/active/2026-11-06-pos-venda-regua-automatica.md`.
+## DEC-193 - Etapa "Entrei em contato" com o relato do contato
+
+**Pedido do Vinicios em 2026-11-24, adotada pelo recomendado do plano.** "Adicione em etapa do lead, na hora do registro, a etapa de 'Entrei em contato' com uma área de observação (para descrever o processo do contato)."
+
+- **Etapa nova no funil:** `contacted` ("Entrei em contato") no enum `lead_status`, entre `in_contact` (Em atendimento) e `quote_sent` (Cotação enviada). Migration aditiva `0237_lead_status_contacted.sql`.
+- **Relato obrigatório para pessoa:** quem registra a etapa (corretor, gestor, diretor) conta como foi o contato (até 2000 caracteres), validado no servidor. O texto vai para `lead_stage_history.reason` e para a linha do tempo (`lead_interactions`, "Como foi o contato: ..."). Pode ser registrada de novo a cada contato ("Novo contato registrado").
+- **A IA nunca move um lead para essa etapa** (ela leva o relato do corretor); o passo a passo da IA trata o lead nela como Em atendimento. Mudança em lote, Desfazer do Sasá e o agente do diretor também não levam para ela.
+- **Listas de etapas:** onde Em atendimento conta como etapa aberta (filtros, kanban, funil, relatórios, SLA, pós-venda, distribuição), Entrei em contato também conta.
+- **Super-admin:** `feature_lead_contacted_stage_enabled` (padrão ligada). Desligada, a etapa sai do registro do corretor e o servidor recusa mover lead para ela; quem já está nela continua.
+- **Auditoria:** a mudança segue a auditoria de `changeLeadStatus` (`audit_logs`, histórico de etapas).
+
+Registro: `docs/implementations/active/2026-11-24-etapa-entrei-em-contato.md`.

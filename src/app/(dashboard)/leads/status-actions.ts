@@ -155,6 +155,7 @@ export async function changeLeadStatusAction(
     motivoPerda: (formData.get("motivoPerda") ?? formData.get("lossReason")) as string | null,
     justificativaRegressao: (formData.get("justificativaRegressao") ??
       formData.get("regressionJustification")) as string | null,
+    observacao: (formData.get("observacao") ?? formData.get("notes")) as string | null,
   };
 
   try {
@@ -199,6 +200,8 @@ async function bulkChangeLeadStatusDirect(
     .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds)));
 
   if (newStatus === "converted") throw new Error("Status 'Convertido' não pode ser definido manualmente.");
+  // Entrei em contato (24/11) leva o relato de cada contato: não cabe em mudança em lote.
+  if (newStatus === "contacted") throw new Error("\"Entrei em contato\" é registrado lead a lead, com a observação do contato.");
 
   const updatedIds: string[] = [];
 

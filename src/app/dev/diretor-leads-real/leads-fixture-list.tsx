@@ -33,7 +33,7 @@ const TAGS = [
   { id: "t2", name: "Retorno", colorHue: 30 },
 ];
 
-const STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted"];
+const STATUSES = ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted"];
 
 export function LeadsFixtureList({ leads }: { leads: LeadWorkspaceItem[] }) {
   const [selected, setSelected] = useState<string[]>([]);

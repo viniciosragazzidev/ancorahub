@@ -41,7 +41,7 @@ function dutyDayLabel(dateKey: string) {
 }
 
 const STAGES: Record<string, string> = {
-  new: "novo", distributed: "distribuído", in_contact: "em contato", quote_sent: "cotação enviada", negotiation: "em negociação",
+  new: "novo", distributed: "distribuído", in_contact: "em contato", contacted: "entrei em contato", quote_sent: "cotação enviada", negotiation: "em negociação",
   documentation_pending: "documentação pendente", under_analysis: "em análise", awaiting_reply: "aguardando resposta", converted: "vendido", lost: "perdido",
 };
 
@@ -741,7 +741,7 @@ export function buildAgentTools(env: ToolEnv) {
         texto: z.string().max(80).optional().describe("Nome ou 4+ dígitos do telefone."),
         sem_dono: z.boolean().optional().describe("Só leads sem corretor esperando distribuição."),
         corretor_id: PERSON_ID.optional(),
-        etapa: z.enum(["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"]).optional(),
+        etapa: z.enum(["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"]).optional(),
         limite: z.number().int().min(1).max(30).optional(),
         atribuido_de: DATE.optional().describe("Chegou ao corretor a partir deste dia (AAAA-MM-DD, São Paulo)."),
         atribuido_ate: DATE.optional().describe("Chegou ao corretor até este dia, inclusive."),
@@ -986,7 +986,7 @@ export function buildAgentTools(env: ToolEnv) {
           message: `${changed.length === 1 ? leads[0]!.name : `${changed.length} leads`} agora em ${stageLabel(input.etapa)}${input.motivo_perda ? ` (motivo: ${input.motivo_perda.replace(/_/g, " ")})` : ""}.`,
           href: changed.length === 1 ? `/leads/${changed[0]}` : "/leads",
           // Desfazer volta à etapa anterior quando todos estavam na mesma (e não era encerrado).
-          undo: prior && prior !== "lost" && prior !== "converted" && prior !== "distributed"
+          undo: prior && prior !== "lost" && prior !== "converted" && prior !== "distributed" && prior !== "contacted"
             ? { tool: "lead_mudar_etapa", input: { lead_ids: changed, etapa: prior }, label: "Desfazer" }
             : undefined,
         };

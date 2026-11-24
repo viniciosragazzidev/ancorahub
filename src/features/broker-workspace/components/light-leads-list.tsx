@@ -52,7 +52,7 @@ export type LightLeadItem = {
 
 type FilterTab = "new" | "active" | "returns" | "risk" | "team" | "closed";
 
-const ACTIVE_STATUSES = ["in_contact", "quote_sent", "negotiation", "documentation_pending"];
+const ACTIVE_STATUSES = ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending"];
 
 const isLostLead = (lead: LightLeadItem) => lead.status === "lost" || Boolean(lead.isLost);
 const isNewLead = (lead: LightLeadItem) =>
@@ -89,6 +89,7 @@ const EMPTY_COPY: Record<FilterTab, { title: string; description: string }> = {
 
 const STATUS_LABEL: Record<string, string> = {
   in_contact: "Em atendimento",
+  contacted: "Entrei em contato",
   quote_sent: "Cotação enviada",
   negotiation: "Em negociação",
   documentation_pending: "Documentação pendente",

@@ -175,7 +175,7 @@ export async function removeLeadAssignmentAction(_prev: ManagementActionState, f
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.corretorId, currentBrokerId),
           eq(schema.leads.distributionStatus, "assigned"),
-          inArray(schema.leads.status, ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]),
+          inArray(schema.leads.status, ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]),
           isNull(schema.leads.archivedAt),
           isNull(schema.leads.deletedAt),
         )).returning({ id: schema.leads.id });
@@ -549,7 +549,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
         throw new Error("A unidade escolhida não está ativa e apta a receber leads.");
       }
       const assignmentChoiceEnabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
-      const serviceAlreadyStarted = Boolean(lead.firstContactAt || lead.serviceStartedAt) || ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status);
+      const serviceAlreadyStarted = Boolean(lead.firstContactAt || lead.serviceStartedAt) || ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status);
       if (!lead.corretorId && assignmentChoiceEnabled && !input.assignmentMode && !serviceAlreadyStarted) return { mutationId, needsAssignmentMode: true, error: "Escolha se deseja atribuir direto ou enviar uma oferta para aceite." };
       if (input.assignmentMode && (!assignmentChoiceEnabled || lead.corretorId)) throw new Error("Esta escolha está disponível somente para leads sem corretor e quando habilitada pelo Super-admin.");
       if (input.assignmentMode === "offer" && serviceAlreadyStarted) throw new Error("Para transferir um atendimento iniciado, use a atribuição direta.");
@@ -723,7 +723,7 @@ export async function assumeLeadForInvestigationAction(_prev: ManagementActionSt
     const leadId = z.string().uuid().parse(formData.get("leadId"));
     const reason = z.string().trim().min(3).max(200).parse(formData.get("reason"));
     const { context, db, lead } = await getManagedLead(leadId);
-    if (["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) throw new Error("Este lead já está ativo em atendimento e não pode ser assumido por outro usuário.");
+    if (["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) throw new Error("Este lead já está ativo em atendimento e não pode ser assumido por outro usuário.");
     const now = new Date();
     const claimed = await db.transaction(async (tx) => {
       const updated = await claimLeadForInvestigation(tx, {
@@ -766,7 +766,7 @@ export async function assumeLeadForMessagingAction(leadId: string): Promise<Mana
     }
     if (!lead.corretorId) throw new Error("Este lead ainda não possui um corretor responsável.");
     const currentOwnerId = lead.corretorId;
-    if (!["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
+    if (!["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
       throw new Error("O atendimento só pode ser assumido quando já estiver ativo.");
     }
     const now = new Date();

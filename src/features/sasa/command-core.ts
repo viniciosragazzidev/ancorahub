@@ -100,7 +100,7 @@ export function readSasaPick(value: string): { text: string; leadId: string | nu
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  new: "Novo", distributed: "Aguardando atendimento", in_contact: "Em atendimento", quote_sent: "Cotação enviada", negotiation: "Em negociação",
+  new: "Novo", distributed: "Aguardando atendimento", in_contact: "Em atendimento", contacted: "Entrei em contato", quote_sent: "Cotação enviada", negotiation: "Em negociação",
   documentation_pending: "Documentação pendente", under_analysis: "Em análise", awaiting_reply: "Aguardando resposta",
 };
 
@@ -144,7 +144,7 @@ type Plan =
 /** Etapa que a fala sugere, só quando é para a frente e diferente da atual. */
 function stageFromSpeech(text: string, current: string): SasaStage | null {
   const said = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const order = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending"];
+  const order = ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending"];
   const pick: SasaStage | null = /\b(document|rg|cpf|comprovante|carteirinha)/.test(said) ? "documentation_pending"
     : /\b(fechar|aceitou|topou|gostou|quer seguir|vai assinar|desconto|negociar|proposta)\b/.test(said) ? "negotiation"
       : /\b(recebeu a cotacao|viu a cotacao|olhou a cotacao)\b/.test(said) ? "quote_sent"
@@ -248,7 +248,7 @@ function dutyAnswer(world: SasaWorld, stamp: string): Plan {
 }
 
 /** Ordem de quem recuperar: quem está mais perto de fechar primeiro, e o mais antigo antes. */
-const RECOVER_ORDER = ["negotiation", "quote_sent", "awaiting_reply", "in_contact"];
+const RECOVER_ORDER = ["negotiation", "quote_sent", "awaiting_reply", "contacted", "in_contact"];
 
 export function recoverListOf(queue: ReadonlyArray<{ id: string; name: string; status: string; arrivedAt: Date | null }>, withReturn: ReadonlySet<string>) {
   return queue

@@ -64,7 +64,7 @@ const NAMES = [
   "Justiniano Albuquerque de Souza", "Cristiane Farizele Monteiro", "Nazareth Gonçalves Pereira", "Roseleia Oliveira Bittencourt",
   "Maximiliano Cavalcanti Rocha", "Ana", "Bartolomeu Wanderley Castelo Branco", "Juliana Prado",
 ];
-const STATUSES = ["new", "new", "distributed", "in_contact", "quote_sent", "negotiation", "converted", "lost"];
+const STATUSES = ["new", "new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "converted", "lost"];
 
 const LEADS: LeadWorkspaceItem[] = NAMES.map((nome, index) => ({
   ...BASE,

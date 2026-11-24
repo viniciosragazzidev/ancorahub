@@ -71,6 +71,9 @@ export function LeadStatusSelector({
   const [feedbackAfterStatus, setFeedbackAfterStatus] = useState(false);
   const [showSaleConfirm, setShowSaleConfirm] = useState(false);
   const [motivoPerda, setMotivoPerda] = useState("");
+  // Entrei em contato (24/11): a etapa pede o relato de como foi o contato.
+  const [showContactNote, setShowContactNote] = useState(false);
+  const [contactNote, setContactNote] = useState("");
   const [justificativaRegressao, setJustificativaRegressao] = useState("");
   const potentialSaleCheck = isAiPotentialSale(qualificationDetails);
   const [state, dispatch, pending] = useActionState<StatusChangeState, FormData>(
@@ -104,12 +107,13 @@ export function LeadStatusSelector({
     }
   }, [state, router]);
 
-  const submitChange = (status: string, motivo?: string, justificativa?: string) => {
+  const submitChange = (status: string, motivo?: string, justificativa?: string, observacao?: string) => {
     const formData = new FormData();
     formData.set("leadId", leadId);
     formData.set("newStatus", status);
     if (motivo) formData.set("motivoPerda", motivo);
     if (justificativa) formData.set("justificativaRegressao", justificativa);
+    if (observacao) formData.set("observacao", observacao);
     setFeedbackAfterStatus(role === "broker" && status !== "lost");
     startTransition(() => {
       addOptimisticStatus(status);
@@ -127,6 +131,11 @@ export function LeadStatusSelector({
 
     if (value === "converted") {
       setShowSaleConfirm(true);
+      return;
+    }
+
+    if (value === "contacted") {
+      setShowContactNote(true);
       return;
     }
 
@@ -148,6 +157,17 @@ export function LeadStatusSelector({
     setShowLostConfirm(false);
     setMotivoPerda("");
     setJustificativaRegressao("");
+  };
+
+  const confirmContact = () => {
+    const note = contactNote.trim();
+    if (!note) {
+      toast.error("Conte em poucas palavras como foi o contato.");
+      return;
+    }
+    submitChange("contacted", undefined, undefined, note);
+    setShowContactNote(false);
+    setContactNote("");
   };
 
   const cancelLost = () => {
@@ -273,6 +293,38 @@ export function LeadStatusSelector({
                     }
                   >
                     {pending ? "Salvando..." : "Confirmar Perda"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </DialogPanel>
+        </DialogPopup>
+      </Dialog>
+      {/* Entrei em contato: o relato do contato vai para o histórico de etapas e para a linha do tempo. */}
+      <Dialog open={showContactNote} onOpenChange={setShowContactNote}>
+        <DialogPopup>
+          <DialogPanel>
+            <div className="p-6">
+              <DialogTitle>Entrei em contato</DialogTitle>
+              <DialogDescription>
+                Conte como foi o contato. O texto fica na linha do tempo do lead.
+              </DialogDescription>
+              <div className="mt-4 space-y-4">
+                <textarea
+                  rows={4}
+                  maxLength={2000}
+                  aria-label="Como foi o contato"
+                  className="w-full rounded-md border border-input bg-background p-2 text-sm"
+                  placeholder="Ex.: liguei, cliente pediu cotação para 3 vidas e retorno amanhã"
+                  value={contactNote}
+                  onChange={(e) => setContactNote(e.target.value)}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setShowContactNote(false); setContactNote(""); }} disabled={pending}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={confirmContact} disabled={!contactNote.trim() || pending}>
+                    {pending ? "Salvando..." : "Salvar etapa"}
                   </Button>
                 </div>
               </div>

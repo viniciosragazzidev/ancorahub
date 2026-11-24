@@ -44,7 +44,7 @@ export const AUTO_RULE_LIMITS = {
 } as const;
 
 /** Etapas em que o lead está aberto com o corretor (R1 e R2). */
-export const AUTO_RULE_OPEN_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
+export const AUTO_RULE_OPEN_STATUSES = ["distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 /** Oferta ainda não aceita: o corretor tem o lead de forma provisória, então não é marco da R1/R2. */
 export const AUTO_RULE_UNACCEPTED_SOURCES = ["automatic_offer", "manual_offer", "manual_unassignment"] as const;

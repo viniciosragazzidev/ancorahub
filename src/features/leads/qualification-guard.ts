@@ -7,6 +7,7 @@ import { getQualificationTenantSettings } from "@/features/ai-qualification/tena
 
 export const QUALIFIED_STAGES = [
   "in_contact",
+  "contacted",
   "quote_sent",
   "negotiation",
   "documentation_pending",

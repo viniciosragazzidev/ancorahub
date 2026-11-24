@@ -10,7 +10,7 @@ import { getLeadTimeline } from "@/features/leads/queries";
 import { buildTeamLeadLightDetail, getTeamLeadPresentationSupplements } from "./team-lead-detail-presentation";
 import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
-const ACTIVE_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
+const ACTIVE_STATUSES = ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 export type ManagerLiteLeadData = { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number; viewerName: string; brokersWithoutWhatsApp: number };
 
@@ -75,7 +75,7 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
     funnel: {
       new: Number(funnelCounts.get("new") ?? 0) + Number(funnelCounts.get("distributed") ?? 0),
       firstContact: Number(awaitingFirstContact?.total ?? 0),
-      service: Number(funnelCounts.get("in_contact") ?? 0), quote: Number(funnelCounts.get("quote_sent") ?? 0),
+      service: Number(funnelCounts.get("in_contact") ?? 0) + Number(funnelCounts.get("contacted") ?? 0), quote: Number(funnelCounts.get("quote_sent") ?? 0),
       closing: Number(funnelCounts.get("negotiation") ?? 0) + Number(funnelCounts.get("documentation_pending") ?? 0) + Number(funnelCounts.get("under_analysis") ?? 0),
     },
     slaMinutes,

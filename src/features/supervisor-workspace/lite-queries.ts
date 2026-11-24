@@ -13,7 +13,7 @@ import { isTeamListLead } from "@/features/supervisor-workspace/lead-import/team
 import { addDays, zonedMidnight } from "@/features/lead-distribution/monthly-duty-plan";
 
 const TZ = "America/Sao_Paulo";
-const TEAM_ACTIVE = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
+const TEAM_ACTIVE = ["distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 function localDateKey(date: Date) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(date);
@@ -119,7 +119,7 @@ export async function getSupervisorLiteRadar(context: TenantContext, now = new D
     funnel: {
       new: Number(counts.get("new") ?? 0) + Number(counts.get("distributed") ?? 0),
       firstContact,
-      service: Number(counts.get("in_contact") ?? 0),
+      service: Number(counts.get("in_contact") ?? 0) + Number(counts.get("contacted") ?? 0),
       quote: Number(counts.get("quote_sent") ?? 0),
       closing: Number(counts.get("negotiation") ?? 0) + Number(counts.get("documentation_pending") ?? 0) + Number(counts.get("under_analysis") ?? 0),
     },
@@ -175,7 +175,7 @@ export async function getSupervisorLiteMemberPulse(input: {
     db.select({
       received: sql<number>`count(*) filter (where ${schema.leads.assignedAt} >= ${todayStart.toISOString()}::timestamptz and ${schema.leads.assignedAt} < ${tomorrowStart.toISOString()}::timestamptz)::int`,
       accepted: sql<number>`count(*) filter (where ${schema.leads.id} in (select ${schema.leadOffers.leadId} from ${schema.leadOffers} where ${schema.leadOffers.tenantId} = ${context.tenantId} and ${schema.leadOffers.brokerId} = ${memberId} and ${schema.leadOffers.status} = 'ACCEPTED' and ${schema.leadOffers.acceptedAt} >= ${todayStart.toISOString()}::timestamptz and ${schema.leadOffers.acceptedAt} < ${tomorrowStart.toISOString()}::timestamptz))::int`,
-      inService: sql<number>`count(*) filter (where ${inArray(schema.leads.status, ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"])})::int`,
+      inService: sql<number>`count(*) filter (where ${inArray(schema.leads.status, ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"])})::int`,
       late: sql<number>`count(*) filter (where ${schema.leads.firstContactAt} is null and ${schema.leads.assignedAt} < ${now.toISOString()}::timestamptz - (${slaMinutes} * interval '1 minute'))::int`,
       onTimeTotal: sql<number>`count(*) filter (where ${schema.leads.firstContactAt} >= ${chartStart.toISOString()}::timestamptz and ${schema.leads.firstContactAt} < ${tomorrowStart.toISOString()}::timestamptz)::int`,
       onTime: sql<number>`count(*) filter (where ${schema.leads.firstContactAt} >= ${chartStart.toISOString()}::timestamptz and ${schema.leads.firstContactAt} < ${tomorrowStart.toISOString()}::timestamptz and ${schema.leads.assignedAt} is not null and ${schema.leads.firstContactAt} <= ${schema.leads.assignedAt} + (${slaMinutes} * interval '1 minute'))::int`,
@@ -195,7 +195,7 @@ export async function getSupervisorLiteMemberPulse(input: {
         leadScope,
         or(
           and(isNull(schema.leads.firstContactAt), lt(schema.leads.assignedAt, new Date(now.getTime() - slaMinutes * 60_000))),
-          and(inArray(schema.leads.status, ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]), lt(schema.leads.stageEnteredAt, new Date(now.getTime() - 3 * 86_400_000))),
+          and(inArray(schema.leads.status, ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]), lt(schema.leads.stageEnteredAt, new Date(now.getTime() - 3 * 86_400_000))),
         ),
       )).orderBy(asc(schema.leads.assignedAt)).limit(10),
     getTeamOfferStats(context.tenantId, statsWindow(now), teamIds),
@@ -225,6 +225,7 @@ export async function getSupervisorLiteMemberPulse(input: {
     funnel: [
       { status: "distributed", label: "Novos", total: Number(funnelByStatus.get("new") ?? 0) + Number(funnelByStatus.get("distributed") ?? 0) },
       { status: "in_contact", label: "Em atendimento", total: Number(funnelByStatus.get("in_contact") ?? 0) },
+      { status: "contacted", label: "Entrei em contato", total: Number(funnelByStatus.get("contacted") ?? 0) },
       { status: "quote_sent", label: "Cotações", total: Number(funnelByStatus.get("quote_sent") ?? 0) },
       { status: "negotiation", label: "Negociação", total: Number(funnelByStatus.get("negotiation") ?? 0) },
       { status: "documentation_pending", label: "Documentação", total: Number(funnelByStatus.get("documentation_pending") ?? 0) },

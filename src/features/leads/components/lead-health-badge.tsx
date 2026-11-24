@@ -116,6 +116,7 @@ export function computeLeadHealth(
   // 6. Stalled — active status without stage progress
   const activeStatuses: readonly string[] = [
     "in_contact",
+    "contacted",
     "quote_sent",
     "negotiation",
     "documentation_pending",

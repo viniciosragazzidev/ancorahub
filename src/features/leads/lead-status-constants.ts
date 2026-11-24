@@ -2,6 +2,7 @@ export const LEAD_STATUS_ORDER: Record<string, number> = {
   new: 0,
   distributed: 1,
   in_contact: 2,
+  contacted: 2.5,
   quote_sent: 3,
   negotiation: 4,
   documentation_pending: 5,
@@ -14,23 +15,26 @@ export const LEAD_STATUS_ORDER: Record<string, number> = {
 /** Mapa de transições válidas entre status do pipeline.
  *  Permite fluxo flexível e natural para corretores avançarem entre etapas ativas. */
 export const VALID_TRANSITIONS: Record<string, readonly string[]> = {
-  new: ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
-  distributed: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "new", "lost"],
-  in_contact: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
-  quote_sent: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
-  negotiation: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
-  documentation_pending: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
-  under_analysis: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
+  new: ["distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
+  distributed: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "new", "lost"],
+  in_contact: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
+  // Entrei em contato (24/11): o corretor registra como foi o contato; pode registrar de novo a cada contato.
+  contacted: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
+  quote_sent: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
+  negotiation: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
+  documentation_pending: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
+  under_analysis: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
   // Aguardando retorno (05/11): volta para qualquer etapa ativa quando o cliente responde, ou vai para perdido.
-  awaiting_reply: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
-  converted: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "lost"],
-  lost: ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted"],
+  awaiting_reply: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
+  converted: ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "lost"],
+  lost: ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted"],
 };
 
 export const LEAD_STATUS_LABELS: Record<string, string> = {
   new: "Novo",
   distributed: "Distribuído",
   in_contact: "Em Atendimento",
+  contacted: "Entrei em Contato",
   quote_sent: "Cotação Enviada",
   negotiation: "Negociação",
   documentation_pending: "Documentação Pendente",

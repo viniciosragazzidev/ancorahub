@@ -130,6 +130,7 @@ const AVAILABILITY_LABELS: Record<string, string> = {
 const LEAD_STATUS_LABELS: Record<string, string> = {
   distributed: "Aguardando atendimento",
   in_contact: "Em atendimento",
+  contacted: "Entrei em contato",
   quote_sent: "Cotação enviada",
   negotiation: "Em negociação",
   documentation_pending: "Documentação pendente",

@@ -65,7 +65,7 @@ export function computeSlaInfo(
   }
 
   // Active stages → stagnation SLA
-  const activeStatuses: readonly string[] = ["in_contact", "quote_sent", "negotiation"];
+  const activeStatuses: readonly string[] = ["in_contact", "contacted", "quote_sent", "negotiation"];
   if (activeStatuses.includes(lead.status) && lead.stageEnteredAt) {
     const stageMs = new Date(lead.stageEnteredAt).getTime();
     const elapsed = now - stageMs;

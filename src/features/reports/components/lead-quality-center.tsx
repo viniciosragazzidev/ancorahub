@@ -85,6 +85,7 @@ function leadStatusLabel(status: string) {
     new: "Novo",
     distributed: "Distribuído",
     in_contact: "Em atendimento",
+    contacted: "Entrei em contato",
     quote_sent: "Cotação enviada",
     negotiation: "Em negociação",
     documentation_pending: "Documentação pendente",

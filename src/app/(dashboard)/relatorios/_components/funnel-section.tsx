@@ -10,6 +10,7 @@ const STAGE_COLORS: Record<FunnelStage | "lost", string> = {
   new: "bg-sky-500/20 text-sky-700 dark:text-sky-300",
   distributed: "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300",
   in_contact: "bg-violet-500/20 text-violet-700 dark:text-violet-300",
+  contacted: "bg-violet-500/20 text-violet-700 dark:text-violet-300",
   quote_sent: "bg-purple-500/20 text-purple-700 dark:text-purple-300",
   negotiation: "bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300",
   documentation_pending: "bg-amber-500/20 text-amber-700 dark:text-amber-300",

@@ -32,7 +32,7 @@ describe("changeManagerLeadStatusAction (gestor Lite)", () => {
     const result = await changeManagerLeadStatusAction({}, form({ leadId: "lead-1", newStatus: "quote_sent" }));
 
     expect(result.success).toBe(true);
-    expect(changeLeadStatus).toHaveBeenCalledWith({ leadId: "lead-1", newStatus: "quote_sent", motivoPerda: null, justificativaRegressao: null });
+    expect(changeLeadStatus).toHaveBeenCalledWith({ leadId: "lead-1", newStatus: "quote_sent", motivoPerda: null, justificativaRegressao: null, observacao: null });
   });
 
   it("refuses anyone who is not a manager with a unit, without touching the lead", async () => {
@@ -57,6 +57,16 @@ describe("changeManagerLeadStatusAction (gestor Lite)", () => {
 
     expect(result.error).toBe("Este lead não está na sua unidade.");
     expect(changeLeadStatus).not.toHaveBeenCalled();
+  });
+
+  it("asks how the contact went when the new stage is Entrei em contato, and passes it on", async () => {
+    const refused = await changeManagerLeadStatusAction({}, form({ leadId: "lead-1", newStatus: "contacted", observacao: "   " }));
+    expect(refused.error).toBe("Conte em poucas palavras como foi o contato.");
+    expect(changeLeadStatus).not.toHaveBeenCalled();
+
+    const accepted = await changeManagerLeadStatusAction({}, form({ leadId: "lead-1", newStatus: "contacted", observacao: " Liguei, pediu cotação " }));
+    expect(accepted.success).toBe(true);
+    expect(changeLeadStatus).toHaveBeenCalledWith(expect.objectContaining({ newStatus: "contacted", observacao: "Liguei, pediu cotação" }));
   });
 
   it("requires a loss reason when the new stage is lost", async () => {

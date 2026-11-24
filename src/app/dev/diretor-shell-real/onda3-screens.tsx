@@ -139,7 +139,7 @@ export function TarefasShellScreen() {
   );
 }
 
-const DRILL_STATUSES = ["negotiation", "documentation_pending", "under_analysis", "in_contact", "quote_sent"];
+const DRILL_STATUSES = ["negotiation", "documentation_pending", "under_analysis", "in_contact", "contacted", "quote_sent"];
 
 export function DrillShellScreen() {
   const rows = SALE_NAMES.concat(SALE_NAMES.map((name) => `${name} (2)`)).map((name, index) => ({

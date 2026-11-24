@@ -44,7 +44,7 @@ export function temperatureLabel(status: string | null | undefined, short = fals
 
 export function leadStatusLabel(status: string) {
   const labels: Record<string, string> = {
-    new: "Novo", distributed: "Distribuído", in_contact: "Em atendimento", quote_sent: "Cotação enviada",
+    new: "Novo", distributed: "Distribuído", in_contact: "Em atendimento", contacted: "Entrei em contato", quote_sent: "Cotação enviada",
     negotiation: "Em negociação", documentation_pending: "Documentação pendente", under_analysis: "Em análise", awaiting_reply: "Aguardando retorno",
     converted: "Convertido", lost: "Perdido",
   };

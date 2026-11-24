@@ -8,6 +8,7 @@ export const ACTIVE_LEAD_STATUSES = [
   "new",
   "distributed",
   "in_contact",
+  "contacted",
   "quote_sent",
   "negotiation",
   "documentation_pending",

@@ -51,7 +51,7 @@ export const customRoleScopeValues = ["none", "own", "branch", "tenant"] as cons
 export const teamJobTitleValues = ["director", "manager", "supervisor", "broker", "marketing", "finance", "operations", "support"] as const;
 export const userStatusValues = ["pending", "active", "disabled"] as const;
 /** `awaiting_reply` ("Aguardando retorno", 05/11): o cliente parou de responder; sai da lista ativa e volta se ele responder. */
-export const leadStatusValues = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"] as const;
+export const leadStatusValues = ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"] as const;
 export const leadOriginValues = ["manual", "webhook"] as const;
 export const leadDistributionStatusValues = ["unassigned", "awaiting_unit", "queued", "assigning", "assigned", "distribution_failed", "returned_to_queue"] as const;
 export const leadDistributionOriginValues = ["parent", "unit"] as const;

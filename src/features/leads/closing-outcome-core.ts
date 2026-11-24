@@ -46,6 +46,7 @@ export function stageShortLabel(status: string) {
     new: "Novo",
     distributed: "Distribuído",
     in_contact: "Em atendimento",
+    contacted: "Entrei em contato",
     quote_sent: "Cotação enviada",
     negotiation: "Negociação",
     awaiting_reply: "Aguardando retorno",

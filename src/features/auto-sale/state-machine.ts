@@ -49,7 +49,7 @@ export function leadStatusForStage(stage: AutoSaleStage): string | null {
 }
 
 const LEAD_ORDER: Record<string, number> = {
-  new: 0, distributed: 1, awaiting_reply: 1, in_contact: 2, quote_sent: 3, negotiation: 4, documentation_pending: 5, under_analysis: 6, converted: 7, lost: 8,
+  new: 0, distributed: 1, awaiting_reply: 1, in_contact: 2, contacted: 2.5, quote_sent: 3, negotiation: 4, documentation_pending: 5, under_analysis: 6, converted: 7, lost: 8,
 };
 
 /**

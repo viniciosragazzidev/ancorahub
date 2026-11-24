@@ -1,24 +1,31 @@
 import type { ConversationAssessment, PolicyExecutionResult } from "./types";
-import { LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
-
 /** Funnel stages the IA may advance through by itself ("forward" rule). Never from or to converted/lost. */
-const FORWARD_STAGES = new Set(["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+const FORWARD_STAGES = new Set(["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+/**
+ * The path the IA walks, one stage at a time. "Entrei em contato" (24/11) is never a target: it carries the broker's
+ * own account of the contact. A lead there counts as "Em atendimento" for the steps.
+ */
+const FORWARD_PATH = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 /** Stages before the attendance started: leaving them needs a real exchange between broker and customer. */
 const PRE_CONTACT_STAGES = new Set(["new", "distributed"]);
 
+function forwardRank(status: string) {
+  return (FORWARD_PATH as readonly string[]).indexOf(status === "contacted" ? "in_contact" : status);
+}
+
 function isForwardMove(from: string, to: string) {
-  return FORWARD_STAGES.has(from) && FORWARD_STAGES.has(to)
-    && (LEAD_STATUS_ORDER[to] ?? -1) > (LEAD_STATUS_ORDER[from] ?? Number.POSITIVE_INFINITY);
+  return FORWARD_STAGES.has(from) && (FORWARD_PATH as readonly string[]).includes(to)
+    && forwardRank(to) > forwardRank(from);
 }
 
 function forwardSteps(from: string, to: string) {
-  return (LEAD_STATUS_ORDER[to] ?? 0) - (LEAD_STATUS_ORDER[from] ?? 0);
+  return forwardRank(to) - forwardRank(from);
 }
 
-/** The funnel stage right after `from` (Novo → Distribuído → Em contato → Cotação enviada → …). */
+/** The funnel stage right after `from` (Novo → Distribuído → Em atendimento → Cotação enviada → …). */
 function nextForwardStage(from: string) {
-  const order = (LEAD_STATUS_ORDER[from] ?? -1) + 1;
-  return [...FORWARD_STAGES].find((stage) => LEAD_STATUS_ORDER[stage] === order) ?? null;
+  const rank = forwardRank(from);
+  return rank < 0 ? null : FORWARD_PATH[rank + 1] ?? null;
 }
 import type { ConversationIntelligenceConfig } from "@/shared/domain-root/conversation-intelligence-root";
 

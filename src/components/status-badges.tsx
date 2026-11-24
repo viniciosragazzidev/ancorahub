@@ -81,6 +81,8 @@ export function LeadStatusBadge({ status }: { status: string }) {
       return <AnimatedBadge status="info" size="sm">Distribuído</AnimatedBadge>;
     case "in_contact":
       return <AnimatedBadge status="warning" size="sm">Em atendimento</AnimatedBadge>;
+    case "contacted":
+      return <AnimatedBadge status="warning" size="sm">Entrei em contato</AnimatedBadge>;
     case "quote_sent":
       return <AnimatedBadge status="info" size="sm">Cotação</AnimatedBadge>;
     case "negotiation":

@@ -70,6 +70,7 @@ const activeStatuses = [
   "new",
   "distributed",
   "in_contact",
+  "contacted",
   "quote_sent",
   "negotiation",
   "documentation_pending",

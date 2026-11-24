@@ -38,7 +38,7 @@ import { createDutyConfigCache } from "./duty-config-cache";
 import { findBranchDefaultQueueName, findPostSaleExemptionQueueName, getQueueName, isPostSaleQueueName, postSaleTransferAuditAction } from "./post-sale-transfer";
 import { createDistributionStepMemo, type AsyncStepMemo } from "./distribution-step-memo";
 
-const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
+const activeCommercialStatuses = ["distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 function canManage(context: TenantContext) {
   return context.role === "director" || context.role === "manager";
@@ -845,7 +845,7 @@ export async function processQueuedLead(
   if (qualificationHoldReason) {
     return { status: "manual_required", leadId, reason: qualificationHoldReason };
   }
-  if (lead.deletedAt || lead.archivedAt || !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(lead.status)) {
+  if (lead.deletedAt || lead.archivedAt || !["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(lead.status)) {
     return { status: "manual_required", leadId, reason: "Lead inativo; distribuição bloqueada." };
   }
   if (lead.corretorId && (lead.firstContactAt || lead.serviceStartedAt || !["new", "distributed"].includes(lead.status))) {
@@ -1796,7 +1796,7 @@ export async function offerLeadToBrokerManually(
   )).limit(1);
   if (!lead || lead.deletedAt || lead.archivedAt) return { status: "conflict" as const, reason: "Lead não encontrado ou indisponível." };
   if (lead.corretorId) return { status: "conflict" as const, reason: "Este lead já possui corretor. Atualize a lista antes de continuar." };
-  if (!["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(lead.status)) {
+  if (!["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(lead.status)) {
     return { status: "conflict" as const, reason: "Leads encerrados não podem receber uma nova oferta." };
   }
   if (!lead.branchId) return { status: "conflict" as const, reason: "Envie o lead para uma unidade antes de oferecer a um corretor." };

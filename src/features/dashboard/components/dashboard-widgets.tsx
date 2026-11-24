@@ -41,6 +41,7 @@ export const LEAD_STATUS: Record<string, { label: string; tone: DsStatusBadgeSta
   new: { label: "Novo", tone: "secondary" },
   distributed: { label: "Distribuído", tone: "secondary" },
   in_contact: { label: "Em atendimento", tone: "info" },
+  contacted: { label: "Entrei em contato", tone: "info" },
   quote_sent: { label: "Cotação enviada", tone: "info" },
   negotiation: { label: "Em negociação", tone: "info" },
   documentation_pending: { label: "Pend. documentos", tone: "warning" },

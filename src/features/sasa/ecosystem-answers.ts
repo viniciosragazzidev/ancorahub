@@ -24,7 +24,7 @@ const waited = (minutes: number | null) => (minutes === null ? "" : minutes < 60
 const duration = (seconds: number | null) => (seconds === null ? "sem dado" : seconds < 90 ? `${Math.round(seconds)} s` : seconds < 5400 ? `${Math.round(seconds / 60)} min` : `${Math.round(seconds / 3600)} h`);
 
 export const STAGE_LABEL: Record<string, string> = {
-  new: "novo", distributed: "aguardando atendimento", in_contact: "em atendimento", quote_sent: "cotação enviada", negotiation: "em negociação",
+  new: "novo", distributed: "aguardando atendimento", in_contact: "em atendimento", contacted: "entrei em contato", quote_sent: "cotação enviada", negotiation: "em negociação",
   documentation_pending: "documentação pendente", under_analysis: "em análise", awaiting_reply: "aguardando resposta", converted: "convertido", lost: "perdido",
 };
 

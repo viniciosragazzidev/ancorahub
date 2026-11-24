@@ -602,6 +602,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Permite configurar cotas mensais, gerar propostas automáticas e publicar escalas de plantão.",
   },
+  LEAD_CONTACTED_STAGE: {
+    key: "feature_lead_contacted_stage_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Etapa \"Entrei em contato\" no registro de etapa do lead, com a observação de como foi o contato (linha do tempo e histórico de etapas). Desligada, a etapa some do registro do corretor e ninguém move lead para ela; quem já está nela continua.",
+  },
   DUTY_SEAT_PASS: {
     key: "feature_duty_seat_pass_enabled",
     scope: "global",

@@ -15,6 +15,7 @@ import { toLocalDateKey } from "./format";
 import type { LeadDetailController } from "./use-lead-detail";
 
 const STEP_SEGMENTS = [
+  { value: "contacted", label: "Contato feito" },
   { value: "quote_sent", label: "Cotação" },
   { value: "negotiation", label: "Negociação" },
   { value: "no_contact", label: "Sem contato" },
@@ -46,7 +47,9 @@ export function StepSheet({ c }: { c: LeadDetailController }) {
     updatingStep,
     stepError,
     handleSaveStep,
+    contactedStageEnabled,
   } = c;
+  const segments = contactedStageEnabled ? STEP_SEGMENTS : STEP_SEGMENTS.filter((segment) => segment.value !== "contacted");
 
   const followUpOptions =
     selectedStep === "no_contact" ? FOLLOW_UP_OPTIONS.no_contact : selectedStep === "quote_sent" ? FOLLOW_UP_OPTIONS.quote_sent : null;
@@ -65,7 +68,7 @@ export function StepSheet({ c }: { c: LeadDetailController }) {
     >
       <div className="flex flex-col gap-5 pb-2">
         <div className="flex flex-col gap-2">
-          <SegmentedControl label="Etapa do atendimento" options={STEP_SEGMENTS} value={selectedStep} onValueChange={setSelectedStep} />
+          <SegmentedControl label="Etapa do atendimento" options={segments} value={selectedStep} onValueChange={setSelectedStep} />
           {currentStepOption ? <p className="text-sm text-(--text-secondary)">{currentStepOption.description}</p> : null}
           {selectedStep === "no_interest" || selectedStep === "no_contact" ? (
             <p className="text-sm text-(--text-secondary)">Este atendimento será marcado como finalizado.</p>
@@ -97,6 +100,17 @@ export function StepSheet({ c }: { c: LeadDetailController }) {
               />
             ) : null}
           </div>
+        ) : null}
+
+        {selectedStep === "contacted" ? (
+          <Textarea
+            label="Como foi o contato?"
+            placeholder="Ex.: liguei, cliente pediu cotação para 3 vidas e retorno amanhã"
+            rows={4}
+            maxLength={2000}
+            value={observation}
+            onChange={(event) => setObservation(event.target.value)}
+          />
         ) : null}
 
         {selectedStep === "negotiation" ? (

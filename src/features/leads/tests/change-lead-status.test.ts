@@ -7,10 +7,11 @@ import {
 } from "../lead-status-constants";
 
 describe("LEAD_STATUS_LABELS", () => {
-  it("contains labels for all 10 statuses", () => {
+  it("contains labels for all 11 statuses", () => {
     const keys = Object.keys(LEAD_STATUS_LABELS);
     expect(keys).toContain("new");
     expect(keys).toContain("distributed");
+    expect(keys).toContain("contacted");
     expect(keys).toContain("in_contact");
     expect(keys).toContain("quote_sent");
     expect(keys).toContain("negotiation");
@@ -19,7 +20,7 @@ describe("LEAD_STATUS_LABELS", () => {
     expect(keys).toContain("awaiting_reply");
     expect(keys).toContain("converted");
     expect(keys).toContain("lost");
-    expect(keys).toHaveLength(10);
+    expect(keys).toHaveLength(11);
   });
 
   it("uses Portuguese labels", () => {

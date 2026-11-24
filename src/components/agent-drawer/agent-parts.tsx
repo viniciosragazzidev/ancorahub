@@ -59,7 +59,7 @@ export function seatLabelsFrom(parts: ReadonlyArray<{ type: string }>) {
 }
 
 const STAGE_LABEL: Record<string, string> = {
-  new: "novo", in_contact: "em contato", quote_sent: "cotação enviada", negotiation: "em negociação", documentation_pending: "documentação pendente",
+  new: "novo", in_contact: "em contato", contacted: "entrei em contato", quote_sent: "cotação enviada", negotiation: "em negociação", documentation_pending: "documentação pendente",
   under_analysis: "em análise", awaiting_reply: "aguardando resposta", lost: "perdido",
 };
 

@@ -96,6 +96,7 @@ const STATUS_CONFIG: Record<string, { name: string; color: string }> = {
   new: { name: "Novos", color: "var(--chart-1)" },
   distributed: { name: "Distribuídos", color: "var(--chart-2)" },
   in_contact: { name: "Em Contato", color: "var(--chart-3)" },
+  contacted: { name: "Entrei em Contato", color: "var(--chart-3)" },
   quote_sent: { name: "Cotação", color: "var(--chart-4)" },
   negotiation: { name: "Negociação", color: "var(--chart-5)" },
   documentation_pending: { name: "Documentação", color: "hsl(280 60% 60%)" },
@@ -161,7 +162,7 @@ async function getNocKpis(
   }
 
   const activeStatuses = [
-    "in_contact", "quote_sent", "negotiation",
+    "in_contact", "contacted", "quote_sent", "negotiation",
     "documentation_pending", "under_analysis",
   ] as const;
 
@@ -629,7 +630,7 @@ async function getBranchHealth(context: TenantContext): Promise<BranchHealth[]> 
     db.select({
       branchId: schema.leads.branchId,
       leadsToday: sql<number>`count(*) filter (where ${schema.leads.createdAt} >= ${today.start.toISOString()} and ${schema.leads.createdAt} < ${today.end.toISOString()})`,
-      activeAttendances: sql<number>`count(*) filter (where ${schema.leads.status} in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply'))`,
+      activeAttendances: sql<number>`count(*) filter (where ${schema.leads.status} in ('in_contact', 'contacted', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply'))`,
       unassignedLeads: sql<number>`count(*) filter (where ${schema.leads.corretorId} is null and ${schema.leads.distributionStatus} in ('unassigned', 'queued', 'awaiting_unit', 'returned_to_queue'))`,
       slaRiskLeads: sql<number>`count(*) filter (where ${schema.leads.status} = 'distributed' and ${schema.leads.corretorId} is not null and ${schema.leads.firstContactAt} is null and ${schema.leads.assignedAt} is not null and ${schema.leads.assignedAt} < ${slaDeadline.toISOString()})`,
     }).from(schema.leads).where(and(eq(schema.leads.tenantId, scope.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.branchId, branchIds))).groupBy(schema.leads.branchId),

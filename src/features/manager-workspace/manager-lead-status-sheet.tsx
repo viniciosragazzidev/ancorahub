@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
+import { Textarea } from "@/components/arc/textarea/textarea";
 import { LitePress } from "@/components/light/light-motion";
 import { useActionStateFeedback } from "@/components/lite/feedback/action-notice";
 import { LiteSuccess } from "@/components/lite/motion/success";
@@ -63,6 +64,7 @@ export function ManagerLeadStatusSheet({ leadId, leadName, currentStatus }: { le
               {reasonLabel(reason)}
             </label>)}
           </fieldset> : null}
+          {next === "contacted" ? <Textarea name="observacao" label="Como foi o contato?" description="Ex.: liguei, cliente pediu cotação para 3 vidas e retorno amanhã." rows={3} maxLength={2000} required /> : null}
           {errorText ? <p role="alert" className="text-sm text-(--danger,#b42318)">{errorText}</p> : null}
           <Button type="submit" disabled={pending || !next} aria-busy={pending || undefined} className="w-full">{pending ? "Salvando…" : !next ? "Escolha uma etapa" : errorText ? "Tentar de novo" : `Mover para ${LEAD_STATUS_LABELS[next] ?? next}`}</Button>
         </form>

@@ -150,7 +150,7 @@ export function evaluateLeadRules(ctx: LeadActionContext): NextBestAction | null
   }
 
   // 7. Qualificação concluída, sem cotação
-  if ((ctx.qualificationStatus === "completed" || ctx.status === "in_contact") && !ctx.hasActiveQuote) {
+  if ((ctx.qualificationStatus === "completed" || ctx.status === "in_contact" || ctx.status === "contacted") && !ctx.hasActiveQuote) {
     return {
       key: `create-quote-${leadId}`,
       title: "Criar Cotação de Saúde",

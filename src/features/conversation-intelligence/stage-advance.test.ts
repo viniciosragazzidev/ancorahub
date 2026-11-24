@@ -34,6 +34,15 @@ describe("stage advance by the conversation (28/10)", () => {
     expect(result.targetStatus).toBe("quote_sent");
   });
 
+  it("never moves a lead into Entrei em contato (it carries the broker's own account) and walks on from it", () => {
+    const fromInContact = evaluateAssessmentPolicy({ assessment: assessment("contacted", 0.95), currentLeadStatus: "in_contact", ...talked, config });
+    expect(fromInContact.action).not.toBe("AUTO_TRANSITION");
+    const fromContacted = evaluateAssessmentPolicy({ assessment: assessment("quote_sent", 0.8), currentLeadStatus: "contacted", ...talked, config });
+    expect(fromContacted).toMatchObject({ action: "AUTO_TRANSITION", targetStatus: "quote_sent" });
+    const partial = evaluateAssessmentPolicy({ assessment: assessment("negotiation", 0.8), currentLeadStatus: "contacted", ...talked, config });
+    expect(partial).toMatchObject({ action: "AUTO_TRANSITION", targetStatus: "quote_sent" });
+  });
+
   it("moves one stage from 75%", () => {
     const result = evaluateAssessmentPolicy({ assessment: assessment("negotiation", 0.75), currentLeadStatus: "quote_sent", ...talked, config });
     expect(result).toMatchObject({ action: "AUTO_TRANSITION", targetStatus: "negotiation" });

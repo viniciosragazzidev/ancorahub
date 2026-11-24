@@ -207,7 +207,7 @@ export function buildDrill(id: DrilldownId, total: number, unitId: UnitId, now: 
   const brokers = BROKERS.filter((broker) => unitId === "all" || broker.unit === unitId);
   const statusById: Record<DrilldownId, string[]> = {
     converted: ["converted"],
-    "not-converted": ["in_contact", "quote_sent", "negotiation"],
+    "not-converted": ["in_contact", "contacted", "quote_sent", "negotiation"],
     lost: ["lost"],
     "out-of-sla": ["distributed", "new"],
     "stale-negotiations": ["negotiation", "documentation_pending", "under_analysis"],
@@ -412,7 +412,7 @@ export function buildQualityReport(period: QualityPeriod, unitId: UnitId, queueI
 export function focusLeads(segment: LeadQualitySegment, unitId: UnitId, now: Date): LeadQualityReport["focusedLeads"] {
   const brokers = BROKERS.filter((broker) => unitId === "all" || broker.unit === unitId);
   const temperatures = ["hot", "warm", "warm", "cold", "cold", "cold", "unclassified"];
-  const statuses = ["in_contact", "quote_sent", "distributed", "converted", "lost", "negotiation"];
+  const statuses = ["in_contact", "contacted", "quote_sent", "distributed", "converted", "lost", "negotiation"];
   return Array.from({ length: Math.min(segment.total, 10) }, (_, index) => ({
     id: `${segment.key}-${index}`,
     name: LEAD_NAMES[(index * 3 + segment.key.length) % LEAD_NAMES.length],

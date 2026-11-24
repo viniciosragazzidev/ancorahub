@@ -41,7 +41,7 @@ function form(values: Record<string, string>) {
   return data;
 }
 
-/** Etapas para as quais um "Desfazer" pode voltar (nunca convertido nem perdido). */
+/** Etapas para as quais um "Desfazer" pode voltar (nunca convertido nem perdido nem "Entrei em contato", que pede o relato do contato). */
 const RESTORABLE_STEPS = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 const isoInstant = z.string().datetime({ offset: true });
 

@@ -12,7 +12,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { isTeamListLead } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 const WAITING = ["new", "distributed"] as const;
-const IN_SERVICE = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
+const IN_SERVICE = ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 const TIME_ZONE = "America/Sao_Paulo";
 
 export type TeamBroker = {

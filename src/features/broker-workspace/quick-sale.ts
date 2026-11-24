@@ -13,6 +13,7 @@ export const QUICK_SALE_STAGES = [
   "negotiation",
   "quote_sent",
   "awaiting_reply",
+  "contacted",
   "in_contact",
 ] as const satisfies readonly (typeof BROKER_WALLET_NEGOTIATING_STAGES)[number][];
 export type QuickSaleStage = (typeof QUICK_SALE_STAGES)[number];

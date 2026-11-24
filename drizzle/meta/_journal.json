@@ -1212,6 +1212,13 @@
                         "when":  1794800300000,
                         "tag":  "0236_supervisor_lead_lists",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  173,
+                        "version":  "7",
+                        "when":  1794900000000,
+                        "tag":  "0237_lead_status_contacted",
+                        "breakpoints":  true
                     }
                 ]
 }

@@ -14,6 +14,8 @@ export function stageLabel(status: string) {
   switch (status) {
     case "in_contact":
       return "Em atendimento";
+    case "contacted":
+      return "Entrei em contato";
     case "quote_sent":
       return "Cotação enviada";
     case "negotiation":

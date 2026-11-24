@@ -30,6 +30,7 @@ const activeLeadStatuses = [
   "new",
   "distributed",
   "in_contact",
+  "contacted",
   "quote_sent",
   "negotiation",
   "documentation_pending",
@@ -344,7 +345,7 @@ async function MinhaFilaContent() {
     (l) => l.status === "new" || l.status === "distributed",
   ).length;
   const inProgress = leads.filter((l) =>
-    (["in_contact", "quote_sent", "negotiation"] as const).includes(
+    (["in_contact", "contacted", "quote_sent", "negotiation"] as const).includes(
       l.status as any,
     ),
   ).length;
@@ -498,7 +499,7 @@ async function MinhaFilaContent() {
 
     const activeCreated = leads.filter((lead) => {
       const createdAt = lead.createdAt.getTime();
-      return createdAt >= dayStart && createdAt < dayEnd && (["in_contact", "quote_sent", "negotiation"] as readonly string[]).includes(lead.status);
+      return createdAt >= dayStart && createdAt < dayEnd && (["in_contact", "contacted", "quote_sent", "negotiation"] as readonly string[]).includes(lead.status);
     }).length;
 
     const stalledCreated = leads.filter((lead) => {

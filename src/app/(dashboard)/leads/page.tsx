@@ -335,6 +335,7 @@ async function LeadsPageContent({
       ? and(
           inArray(schema.leads.status, [
             "in_contact",
+            "contacted",
             "quote_sent",
             "negotiation",
             "documentation_pending",
@@ -460,7 +461,7 @@ async function LeadsPageContent({
     ne(schema.leads.qualificationState, "IN_PROGRESS"),
     inArray(schema.leads.qualificationStatus, ["waiting_human", "no_whatsapp_contact", "meta_blocked"]),
     inArray(schema.leads.qualificationStatus, ["qualified", "hot", "warm", "cold", "manual_transfer", "disqualified"]),
-    inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "converted", "lost"])
+    inArray(schema.leads.status, ["distributed", "in_contact", "contacted", "quote_sent", "negotiation", "converted", "lost"])
   );
 
   // Keep the common scope independent from the active projection. The

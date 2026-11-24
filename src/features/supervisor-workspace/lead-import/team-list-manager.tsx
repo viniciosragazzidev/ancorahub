@@ -45,6 +45,7 @@ const STATUS: Record<string, string> = {
   new: "Para distribuir",
   distributed: "Novo",
   in_contact: "Em atendimento",
+  contacted: "Entrei em contato",
   quote_sent: "Cotação enviada",
   negotiation: "Negociação",
   documentation_pending: "Documentos",

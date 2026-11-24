@@ -18,6 +18,7 @@ function statusToStageIndex(status: string): number {
     case "distributed":
       return 0;
     case "in_contact":
+    case "contacted":
       return 1;
     case "quote_sent":
       return 2;

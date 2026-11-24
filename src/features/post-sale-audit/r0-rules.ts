@@ -26,7 +26,7 @@ export const R0_DEFAULTS = {
 } as const;
 
 /** Etapas em que o lead está com o corretor e ainda em negociação (sem Documentação, Em análise, vendido ou perdido). */
-export const R0_ELIGIBLE_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "awaiting_reply"] as const;
+export const R0_ELIGIBLE_STATUSES = ["distributed", "in_contact", "contacted", "quote_sent", "negotiation", "awaiting_reply"] as const;
 
 export type R0Settings = { enabled: boolean; queueIds: string[] };
 

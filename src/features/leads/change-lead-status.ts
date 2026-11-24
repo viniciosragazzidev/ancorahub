@@ -9,6 +9,8 @@ import { assertTenantAccess } from "@/shared/auth/authorization";
 import { hasPermission } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
+import { getFeatureFlag } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
 import type { TenantContext } from "@/shared/auth/types";
@@ -24,6 +26,7 @@ import type { MotivoPerda } from "./lead-status-constants";
 import { recordStageChange, stageActorType } from "./stage-history";
 import { isStageRegression } from "./stage-history-core";
 import { entersClosingStage, leavesClosingStage } from "./closing-outcome-core";
+import { cleanObservation, MISSING_CONTACT_OBSERVATION, missingContactObservation, OBSERVATION_MAX_LENGTH, stageChangeTimelineText } from "./contact-observation";
 
 // ─── Tipos ────────────────────────────────────────────────────────────
 
@@ -34,6 +37,8 @@ export type ChangeLeadStatusInput = {
   newStatus: string;
   motivoPerda?: string | null;
   justificativaRegressao?: string | null;
+  /** Observação do registro (24/11): como foi o contato. Obrigatória em "Entrei em contato" feito por pessoa. */
+  observacao?: string | null;
   expectedVersion?: number;
 };
 
@@ -81,6 +86,7 @@ const changeStatusInput = z.object({
   ),
   motivoPerda: z.string().optional().nullable(),
   justificativaRegressao: z.string().optional().nullable(),
+  observacao: z.string().trim().max(OBSERVATION_MAX_LENGTH, `A observação pode ter até ${OBSERVATION_MAX_LENGTH} caracteres.`).optional().nullable(),
   expectedVersion: z.number().int().positive().optional(),
 });
 
@@ -215,6 +221,7 @@ export async function changeLeadStatus(
   const previousStatus = lead.status;
   const newStatus = input.newStatus;
   const canonicalMotivoPerda = normalizeMotivoPerda(input.motivoPerda);
+  const observacao = cleanObservation(input.observacao);
   if (input.expectedVersion !== undefined && input.expectedVersion !== lead.version) {
     throw new Error("CONFLICT_VERSION");
   }
@@ -228,6 +235,15 @@ export async function changeLeadStatus(
     throw new Error(
       `Transição inválida: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → ${LEAD_STATUS_LABELS[newStatus] ?? newStatus}.`,
     );
+  }
+
+  // 2. Entrei em contato (24/11): quem registra conta como foi o contato.
+  if (newStatus === "contacted" && previousStatus !== "contacted"
+    && (await getFeatureFlag(FEATURE_FLAGS.LEAD_CONTACTED_STAGE).catch(() => "true")) === "false") {
+    throw new Error("A etapa \"Entrei em contato\" está desativada pelo Super-admin.");
+  }
+  if (missingContactObservation({ newStatus, observation: observacao, bySystem: Boolean(system) })) {
+    throw new Error(MISSING_CONTACT_OBSERVATION);
   }
 
   // 3. Validação de obrigatoriedade de qualificação
@@ -321,7 +337,7 @@ export async function changeLeadStatus(
       ? `Lead reaberto (${previousStatus} → ${LEAD_STATUS_LABELS[newStatus] ?? newStatus}) por ${context.role === "director" ? "Diretor" : "Gestor"}.`
       : newStatus === "lost"
         ? `Status alterado: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → Perdido. Motivo: ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}`
-        : `Status alterado: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → ${LEAD_STATUS_LABELS[newStatus] ?? newStatus}.`;
+        : stageChangeTimelineText({ previousStatus, newStatus, observation: observacao });
 
     await tx.insert(schema.leadInteractions).values({
       id: randomUUID(),
@@ -329,7 +345,9 @@ export async function changeLeadStatus(
       userId: actorUserId,
       tipo: "status_change",
       conteudo: system?.interactionContent ?? interactionContent,
-      ...(system?.interactionMetadata ? { metadata: system.interactionMetadata } : {}),
+      ...(system?.interactionMetadata
+        ? { metadata: system.interactionMetadata }
+        : observacao ? { metadata: { observation: observacao, fromStatus: previousStatus, toStatus: newStatus } } : {}),
       createdAt: now,
     });
 
@@ -370,7 +388,7 @@ export async function changeLeadStatus(
       changedAt: now,
       actorType,
       actorUserId: system ? (system.actorType === "rule" || system.actorType === "system" ? null : actorUserId) : context.userId,
-      reason: system?.reason ?? (newStatus === "lost" ? (MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda ?? null) : (input.justificativaRegressao?.trim() || null)),
+      reason: system?.reason ?? (newStatus === "lost" ? (MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda ?? null) : (observacao ?? (input.justificativaRegressao?.trim() || null))),
       lossCode: newStatus === "lost" ? canonicalMotivoPerda ?? null : null,
       previousStageEnteredAt: lead.stageEnteredAt ?? null,
       lead: { branchId: lead.branchId, queueId: lead.queueId, sourceChannel: lead.sourceChannel, metaCampaignId: lead.metaCampaignId, metaAdId: lead.metaAdId, metaFormId: lead.metaFormId },

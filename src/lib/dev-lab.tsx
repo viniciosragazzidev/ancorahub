@@ -50,6 +50,8 @@ export type DevLab = {
     /** Voz do Sasá por ElevenLabs (teste de 23/11): conexão e fala simuladas. */
     voice?: import("@/features/sasa-voice/client").SasaVoiceBackend;
   };
+  /** Registrar etapa na ficha do corretor (24/11, "Entrei em contato"): no lugar de changeLeadStatusAction. */
+  leadStatus?: (formData: FormData) => Promise<import("@/app/(dashboard)/leads/status-actions").StatusChangeState>;
   /** Configurações > Meu telefone (23/11): no lugar de changeOwnPhoneAction. */
   phoneChange?: (phone: string) => Promise<import("@/features/broker-phone-change/actions").ChangeOwnPhoneState>;
   /** Formulário público (/formulario, 23/11): no lugar do POST /api/public/formulario. */

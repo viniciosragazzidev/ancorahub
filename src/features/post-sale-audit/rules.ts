@@ -3,7 +3,7 @@ import { z } from "zod";
 export const POST_SALE_CAMPAIGN_MAX_LEADS = 300;
 export const POST_SALE_SURVEY_COOLDOWN_DAYS = 60;
 export const POST_SALE_HUMAN_ACTIVE_WINDOW_HOURS = 24;
-export const POST_SALE_LEAD_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"] as const;
+export const POST_SALE_LEAD_STATUSES = ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"] as const;
 
 export const postSaleAudienceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("lead"), leadId: z.string().trim().min(1).max(80) }),

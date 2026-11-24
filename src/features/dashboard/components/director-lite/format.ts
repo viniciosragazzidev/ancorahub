@@ -56,6 +56,7 @@ export const LEAD_STATUS: Record<string, { label: string; tone: "neutral" | "inf
   new: { label: "Novo", tone: "neutral" },
   distributed: { label: "Distribuído", tone: "neutral" },
   in_contact: { label: "Em atendimento", tone: "info" },
+  contacted: { label: "Entrei em contato", tone: "info" },
   quote_sent: { label: "Cotação enviada", tone: "info" },
   negotiation: { label: "Em negociação", tone: "info" },
   documentation_pending: { label: "Documentação pendente", tone: "warning" },

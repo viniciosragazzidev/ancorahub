@@ -53,6 +53,7 @@ const CLOSING_AI_STAGES = new Set(["CLOSING", "DOCUMENT_COLLECTION"]);
 const ADVANCED_AI_STAGES = new Set(["NEGOTIATION", "QUOTE_PRESENTED", "CLOSING"]);
 const ADVANCED_STATUS_RANK: Record<string, number> = {
   in_contact: 0,
+  contacted: 0,
   quote_sent: 1,
   negotiation: 2,
   documentation_pending: 3,

@@ -57,7 +57,7 @@ export async function getDomainDashboard(context: TenantContext, domain: "team" 
   }
   const [members, active] = await Promise.all([
     db.select({ value: count() }).from(schema.tenantMemberships).where(and(scopes.memberships, eq(schema.tenantMemberships.status, "active"))),
-    db.select({ value: count() }).from(schema.leads).where(and(scopes.leads, isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), eq(schema.leads.status, "in_contact"))),
+    db.select({ value: count() }).from(schema.leads).where(and(scopes.leads, isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.status, ["in_contact", "contacted"]))),
   ]);
   return { title: "Visão da equipe", description: "Pessoas e operação dentro do seu escopo.", metrics: [{ label: "Membros ativos", value: Number(members[0]?.value ?? 0) }, { label: "Em atendimento", value: Number(active[0]?.value ?? 0) }], actionHref: "/equipe" };
 }

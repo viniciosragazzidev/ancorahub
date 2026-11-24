@@ -127,7 +127,7 @@ export function LeadDrawerManagementActions({
 
   const isQualifiedOrDistributed =
     currentStatus === "distributed" ||
-    ["in_contact", "quote_sent", "negotiation", "converted", "lost"].includes(currentStatus) ||
+    ["in_contact", "contacted", "quote_sent", "negotiation", "converted", "lost"].includes(currentStatus) ||
     qualificationState === "QUALIFIED" ||
     qualificationState === "COMPLETED" ||
     (Boolean(qualificationStatus) && ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified"].includes(qualificationStatus!));
@@ -225,7 +225,7 @@ export function LeadDrawerManagementActions({
     onError: handleRemoveAssignmentError,
   });
 
-  const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(currentStatus);
+  const activeStatus = ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";
   const dutyLookup = dutyReassignment.leadId === leadId ? dutyReassignment : { leadId, status: "loading" as const, hasActiveDuty: false, isPostSale: false, postSaleBranches: [], brokers: [] };
   const hasActiveDuty = dutyLookup.status === "ready" && dutyLookup.hasActiveDuty;

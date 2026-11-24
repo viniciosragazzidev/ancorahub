@@ -34,6 +34,7 @@ export type OfferOutcomeHistoryItem = {
 const ACTIVE_STATUSES = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
 const ENGAGED_LEAD_STATUSES = new Set([
   "in_contact",
+  "contacted",
   "quote_sent",
   "negotiation",
   "documentation_pending",

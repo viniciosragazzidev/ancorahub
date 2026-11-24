@@ -52,7 +52,7 @@ export type LeadConversationAdvice = { nextBestAction: string | null; pendingFro
 
 const HISTORY_LIMIT = 15;
 const MESSAGES_LIMIT = 100;
-const IN_SERVICE = new Set(["in_contact", "quote_sent", "negotiation"]);
+const IN_SERVICE = new Set(["in_contact", "contacted", "quote_sent", "negotiation"]);
 const LOSS_CHOICES: MotivoPerda[] = ["sem_contato", "sem_interesse", "preco", "ja_contratou", "encontrou_mais_barato", "desistiu", "outro"];
 const RETURN_CHOICES = [
   { value: "today", label: "Hoje às 18h" },
@@ -255,7 +255,7 @@ function nextStep(lead: LeadConversationLead, now: Date, whatsappUrl: string | n
     const stage = LEAD_STATUS_LABELS[lead.status] ?? lead.status;
     const choices: ChatChoice[] = [...whatsappChoice(whatsappUrl)];
     // The step before the quote: the broker wrote and is waiting (kept in the lead's history).
-    if (lead.status === "in_contact") choices.push({ id: "waiting-reply", label: "Enviei mensagem, aguardando resposta", reply: "Enviei mensagem, estou aguardando a resposta", action: { kind: "server", name: "lead.addNote", payload: { leadId: lead.id, content: "Mensagem enviada, aguardando resposta do cliente." } } });
+    if (lead.status === "in_contact" || lead.status === "contacted") choices.push({ id: "waiting-reply", label: "Enviei mensagem, aguardando resposta", reply: "Enviei mensagem, estou aguardando a resposta", action: { kind: "server", name: "lead.addNote", payload: { leadId: lead.id, content: "Mensagem enviada, aguardando resposta do cliente." } } });
     if (lead.status !== "quote_sent") choices.push({ id: "quote", label: "Enviei a cotação", action: { kind: "next", questionId: "q-quote" } });
     if (lead.status !== "negotiation") choices.push({ id: "negotiation", label: "Estamos negociando", action: { kind: "server", name: "lead.changeStep", payload: { leadId: lead.id, status: "negotiation" } } });
     choices.push({ id: "return", label: "Agendar retorno", action: { kind: "next", questionId: "q-return" } });

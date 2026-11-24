@@ -19,6 +19,7 @@ import { onWhatsAppOpenFailed, takeWhatsAppHandoff, useAcceptHandoffEnabled, typ
 import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
 import { runOptimistic } from "@/lib/optimistic-core";
+import { useDevLab } from "@/lib/dev-lab";
 import { STEP_OPTIONS, type ConfirmationDocument, type LightLeadDetailData, type LiteRequirement } from "./types";
 
 const DECLINE_ERROR = "Não deu para devolver o lead agora";
@@ -57,6 +58,10 @@ export function useLeadDetail({
     const { node: successOverlay } = useSuccessOverlay();
     const fire = useFeedback();
     const router = useRouter();
+    // Laboratório de fluxos: a resposta do servidor ao registrar etapa é simulada (fora dele é null).
+    const lab = useDevLab();
+    // Etapa "Entrei em contato" (24/11): o Super-admin pode desligar.
+    const contactedStageEnabled = lead.contactedStageEnabled !== false;
     const [accepted, setAccepted] = useState(lead.status !== "distributed" && lead.status !== "new");
     const [leadStatus, setLeadStatus] = useState(lead.status);
     const [detailsExpanded, setDetailsExpanded] = useState(initialDetailsExpanded);
@@ -149,7 +154,8 @@ export function useLeadDetail({
     const isDistributed = leadStatus === "distributed" || leadStatus === "new";
 
     function handleOpenUpdateModal() {
-      if (leadStatus === "in_contact") setSelectedStep("quote_sent");
+      if (leadStatus === "in_contact" && contactedStageEnabled) setSelectedStep("contacted");
+      else if (leadStatus === "contacted") setSelectedStep("quote_sent");
       else if (leadStatus === "quote_sent") setSelectedStep("negotiation");
       else setSelectedStep("quote_sent");
 
@@ -284,7 +290,12 @@ export function useLeadDetail({
         formData.append("lossReason", reason);
       }
 
-      if (observation.trim()) formData.append("notes", observation);
+      if (selectedStep === "contacted" && !observation.trim()) {
+        setStepError("Conte em poucas palavras como foi o contato.");
+        return;
+      }
+      // Só vai a observação do campo que está na tela (Entrei em contato ou Negociação).
+      if ((selectedStep === "contacted" || selectedStep === "negotiation") && observation.trim()) formData.append("observacao", observation.trim());
 
       // Proteção de Regressão da IA
       if (potentialSaleCheck.isPotentialSale && isSelectedStepRegression) {
@@ -298,6 +309,8 @@ export function useLeadDetail({
 
       if (
         targetStatus === leadStatus &&
+        // Entrei em contato pode ser registrado de novo a cada contato, com o relato novo.
+        selectedStep !== "contacted" &&
         selectedStep !== "no_interest" &&
         selectedStep !== "no_contact"
       ) {
@@ -317,7 +330,7 @@ export function useLeadDetail({
           setLeadStatus(targetStatus);
           setShowUpdateSheet(false);
         },
-        commit: () => changeLeadStatusAction({}, formData),
+        commit: () => (lab?.leadStatus ? lab.leadStatus(formData) : changeLeadStatusAction({}, formData)),
         rollback: () => {
           setLeadStatus(previousStatus);
           setShowUpdateSheet(true);
@@ -519,6 +532,7 @@ export function useLeadDetail({
     handleRequestSale,
     handleSubmitSaleDocument,
     currentStepOption,
+    contactedStageEnabled,
     successOverlay: successOverlay,
   };
 }

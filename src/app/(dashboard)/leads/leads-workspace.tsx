@@ -119,7 +119,7 @@ const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
 
 // One view of the server-enforced lead state machine. The terminal "lost" stage
 // stays out of the operational board and remains available through filters/history.
-const kanbanStatuses = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted"];
+const kanbanStatuses = ["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted"];
 
 function loadKanbanConfig(): { ordered: string[]; hidden: string[] } | null {
   if (typeof window === "undefined") return null;
@@ -132,7 +132,15 @@ function loadKanbanConfig(): { ordered: string[]; hidden: string[] } | null {
     const valid = parsed.ordered.every((s: string) => kanbanStatuses.includes(s));
     const validHidden = parsed.hidden.every((s: string) => kanbanStatuses.includes(s));
     if (!valid || !validHidden) return null;
-    return { ordered: parsed.ordered, hidden: parsed.hidden };
+    // Etapa nova (ex.: "Entrei em contato", 24/11) entra logo depois da etapa que vem antes dela no funil.
+    const ordered = [...parsed.ordered];
+    kanbanStatuses.forEach((status, index) => {
+      if (ordered.includes(status)) return;
+      const previous = kanbanStatuses[index - 1];
+      const at = previous ? ordered.indexOf(previous) : -1;
+      ordered.splice(at + 1, 0, status);
+    });
+    return { ordered, hidden: parsed.hidden };
   } catch {
     return null;
   }
@@ -162,6 +170,11 @@ const kanbanTone: Record<string, { dot: string; column: string; count: string }>
     count: "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300",
   },
   in_contact: {
+    dot: "bg-violet-500",
+    column: "border-violet-500/20 bg-violet-500/[0.035]",
+    count: "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  },
+  contacted: {
     dot: "bg-violet-500",
     column: "border-violet-500/20 bg-violet-500/[0.035]",
     count: "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-300",
@@ -557,7 +570,7 @@ export function LeadsWorkspace({
   ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers, branches, postSaleEnabled, router, handleBulkReassignCommitted, handleBulkBranchCommitted, handleBulkRevertCommitted, handleBulkStatusCommitted]);
 
 
-  const activeCount = useMemo(() => workspaceLeads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [workspaceLeads]);
+  const activeCount = useMemo(() => workspaceLeads.filter((l) => l.status === "in_contact" || l.status === "contacted" || l.status === "negotiation").length, [workspaceLeads]);
   const convertedCount = useMemo(() => workspaceLeads.filter((l) => l.status === "converted").length, [workspaceLeads]);
   const leadsTrend = useMemo(() => {
     return Array.from({ length: 7 }, (_, index) => {
@@ -574,7 +587,7 @@ export function LeadsWorkspace({
 
       return {
         unassigned: dayLeads.filter((lead) => !lead.corretorId).length,
-        active: dayLeads.filter((lead) => lead.status === "in_contact" || lead.status === "negotiation").length,
+        active: dayLeads.filter((lead) => lead.status === "in_contact" || lead.status === "contacted" || lead.status === "negotiation").length,
         converted: dayLeads.filter((lead) => lead.status === "converted").length,
       };
     });

@@ -70,6 +70,7 @@ export async function getCandidateLeadsForBulkQualification(filterType: string =
       or(
         eq(schema.leads.status, "new"),
         eq(schema.leads.status, "in_contact"),
+        eq(schema.leads.status, "contacted"),
         eq(schema.leads.status, "distributed")
       )!,
       sql`${schema.leads.createdAt} <= ${twentyFourHoursAgo}`
@@ -80,6 +81,7 @@ export async function getCandidateLeadsForBulkQualification(filterType: string =
       or(
         eq(schema.leads.status, "new"),
         eq(schema.leads.status, "in_contact"),
+        eq(schema.leads.status, "contacted"),
         eq(schema.leads.status, "distributed")
       )!
     );

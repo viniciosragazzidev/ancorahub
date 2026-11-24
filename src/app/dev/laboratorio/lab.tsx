@@ -41,11 +41,12 @@ import { labRecoveryCallQueue, RecoveryFunnelLab } from "./recovery-funnel-lab";
 import { labRecoverySettings, RecoveryCadenceLab } from "./recovery-cadence-lab";
 import { NurtureLab } from "./nurture-lab";
 import { PostSaleConversationLab } from "./post-sale-conversation-lab";
+import { ContactStageLab, createLabLeadStatus, type LabTimelineEntry } from "./contact-stage-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 import { SasaVoiceSettings } from "@/features/sasa-voice/components/sasa-voice-settings";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa" | "formulario" | "posVendaConversa";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa" | "formulario" | "posVendaConversa" | "entreiEmContato";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -60,6 +61,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "callAncora", label: "Call Âncora (celular simulado)" },
   { id: "leadHover", label: "Hover card do lead (desktop)" },
   { id: "etapaLead", label: "Etapa do lead (qualificação)" },
+  { id: "entreiEmContato", label: "Registrar etapa: Entrei em contato" },
   { id: "funilRecuperacao", label: "Funil de recuperação e fila de ligação" },
   { id: "cadenciaRecuperacao", label: "Cadência de recuperação" },
   { id: "nutricao", label: "Nutrição, A/B e Sasá (recuperar)" },
@@ -134,6 +136,9 @@ export function FlowLab() {
   const [sale, setSale] = useState(0);
   const [lessMotion, setLessMotion] = useState(false);
   const [killSwitch, setKillSwitch] = useState(false);
+  // Entrei em contato (24/11): etapa atual do lead simulado e a linha do tempo que o registro escreve.
+  const contactLead = useRef({ status: "in_contact" });
+  const [contactTimeline, setContactTimeline] = useState<LabTimelineEntry[]>([]);
   // "Menos animação" é a mesma marca que Configurações › Acessibilidade põe no <html>; volta ao valor anterior ao sair.
   useEffect(() => {
     if (!lessMotion) return;
@@ -227,6 +232,12 @@ export function FlowLab() {
         return outcome === "falha" ? { error: "Não foi possível registrar a venda agora." } : { success: true, saleId: "lab-" + Date.now() };
       },
     } satisfies SaleChatServices,
+    leadStatus: createLabLeadStatus({
+      delay,
+      fail: outcome === "falha",
+      current: contactLead.current,
+      onRecord: (entry) => setContactTimeline((entries) => [entry, ...entries]),
+    }),
     teamList: {
       // Simula a IA: devolve o mapa do jeito que a leitura automática faria (ou nada, em "falha").
       structure: async (request) => {
@@ -270,7 +281,7 @@ export function FlowLab() {
     }],
   };
 
-  const restart = () => { setRun((value) => value + 1); setHandoff(null); sasaState.current.world = labSasaWorld(); sasaState.current.closed = []; sasaState.current.heard = 0; setSaleDraft(null); chooseSpeech(null); };
+  const restart = () => { contactLead.current.status = "in_contact"; setContactTimeline([]); setRun((value) => value + 1); setHandoff(null); sasaState.current.world = labSasaWorld(); sasaState.current.closed = []; sasaState.current.heard = 0; setSaleDraft(null); chooseSpeech(null); };
 
   return (
     <DevLabProvider value={lab}>
@@ -349,6 +360,8 @@ export function FlowLab() {
           <NurtureLab />
         ) : flow === "posVendaConversa" ? (
           <PostSaleConversationLab />
+        ) : flow === "entreiEmContato" ? (
+          <ContactStageLab run={run} timeline={contactTimeline} />
         ) : flow === "vozSasa" ? (
           <main className="arc-venancor mx-auto flex w-full max-w-md flex-col gap-3 p-4">
             <SasaVoiceSettings />

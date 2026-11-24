@@ -14,7 +14,8 @@ type NextStatusSuggestionProps = {
 const SUGGESTED_NEXT_MAP: Record<string, string> = {
   new: "in_contact",
   distributed: "in_contact",
-  in_contact: "quote_sent",
+  in_contact: "contacted",
+  contacted: "quote_sent",
   quote_sent: "negotiation",
   negotiation: "documentation_pending",
   documentation_pending: "under_analysis",

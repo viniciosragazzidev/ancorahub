@@ -43,9 +43,9 @@ describe("leadStatusTone", () => {
 
 describe("pipelineStep", () => {
   it("posição no funil; perdido fica fora", () => {
-    expect(pipelineStep("new")).toEqual({ step: 1, total: 8 });
-    expect(pipelineStep("negotiation")).toEqual({ step: 5, total: 8 });
-    expect(pipelineStep("converted")).toEqual({ step: 8, total: 8 });
+    expect(pipelineStep("new")).toEqual({ step: 1, total: 9 });
+    expect(pipelineStep("negotiation")).toEqual({ step: 6, total: 9 });
+    expect(pipelineStep("converted")).toEqual({ step: 9, total: 9 });
     expect(pipelineStep("lost")).toBeNull();
   });
 });

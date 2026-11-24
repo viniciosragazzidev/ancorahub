@@ -87,6 +87,7 @@ const HOT = new Set(["hot", "qualified"]);
 const NEGOTIATION: Record<string, { code: JourneyCode; label: string }> = {
   distributed: { code: "N1", label: "Primeiro contato" },
   in_contact: { code: "N1", label: "Primeiro contato" },
+  contacted: { code: "N1", label: "Primeiro contato" },
   awaiting_reply: { code: "N1", label: "Primeiro contato" },
   quote_sent: { code: "N2", label: "Cotação enviada" },
   negotiation: { code: "N3", label: "Negociação" },

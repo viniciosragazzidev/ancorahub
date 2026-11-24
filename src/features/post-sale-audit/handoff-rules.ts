@@ -36,7 +36,7 @@ export function serializePostSaleHandoffSettings(settings: PostSaleHandoffSettin
 }
 
 /** Etapas em que o lead ainda está aberto com um corretor (sem Documentação, Em análise, vendido ou perdido). */
-export const POST_SALE_HANDOFF_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "awaiting_reply"] as const;
+export const POST_SALE_HANDOFF_STATUSES = ["distributed", "in_contact", "contacted", "quote_sent", "negotiation", "awaiting_reply"] as const;
 
 export type PostSaleHandoffSkip =
   | "disabled"

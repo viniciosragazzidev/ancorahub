@@ -441,6 +441,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
     });
 
     const lightLead: LightLeadDetailData = {
+      contactedStageEnabled: (await getFeatureFlag(FEATURE_FLAGS.LEAD_CONTACTED_STAGE).catch(() => "true")) !== "false",
       id: lead.id,
       nome: lead.nome,
       telefone: lightContact.telefone,
