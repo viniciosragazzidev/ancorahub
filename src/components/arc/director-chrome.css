@@ -23,7 +23,9 @@
   padding: 12px;
 }
 
-.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-header"] > div > a:first-child {
+/* Caixa do logo. O :not(.director-shortcuts) impede que a regra pegue o primeiro link do bloco de atalhos: sem a Visão
+   do super-admin (caso da Taina, diretora), a Área de Plantão vira o primeiro filho e ficava com 28px, só o ponto verde. */
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child {
   width: var(--control-height-sm, 44px);
   min-width: var(--control-height-sm, 44px);
   height: var(--control-height-sm, 44px);

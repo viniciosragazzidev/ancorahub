@@ -146,11 +146,11 @@
   [data-slot="sidebar-wrapper"]:has(> .arc-venancor[data-skin="diretor"] .director-sidebar) { --sidebar-width: 13.5rem !important; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] { gap: 16px; padding: 16px 12px 12px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div { gap: 8px; }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child {
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child {
     width: 28px; min-width: 28px; height: 28px; flex-basis: 28px; padding: 3px;
     border-radius: 6px; border-color: var(--border); background: var(--surface);
   }
-  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img { width: 20px; height: 20px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child img { width: 20px; height: 20px; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > div > p:first-child { font-size: 13px; font-weight: 500; letter-spacing: normal; }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > div > p + p { font-size: 12px; color: var(--text-muted); }
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-content"] { padding: 8px 12px; }
@@ -239,8 +239,8 @@
 .arc-venancor[data-skin="diretor"] .director-sidebar .director-duty-link > span:first-child { width: 16px; justify-content: center; }
 .arc-venancor[data-skin="diretor"] .director-sidebar .director-duty-link > span:last-child { font-size: 13px; font-weight: 400; }
 /* Logo da empresa (imagem larga): cabe inteiro, sem a caixa quadrada. */
-.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child:has(img:not([src="/icon.png"])) { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; max-width: 96px; height: 28px !important; padding: 0 !important; overflow: hidden; border: 0; background: transparent; }
-.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img:not([src="/icon.png"]) { width: auto; max-width: 96px; height: 24px; object-fit: contain; }
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child:has(img:not([src="/icon.png"])) { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; max-width: 96px; height: 28px !important; padding: 0 !important; overflow: hidden; border: 0; background: transparent; }
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child img:not([src="/icon.png"]) { width: auto; max-width: 96px; height: 24px; object-fit: contain; }
 @media (hover: hover) and (pointer: fine) {
   .arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"],
   .arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] { height: 32px; min-height: 32px; padding: 0 8px 0 6px; font-size: 13px; }
@@ -273,8 +273,8 @@
 /* Topo da sidebar só com o logo (pedido do Vinicios, 21/11/2026): sem "Âncora CRM / Menu principal". O nome segue no
    title e no alt do logo. Logo largo da empresa até 140px de largura. */
 .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:first-child > div:not(.director-super-admin-actions) { display: none; }
-.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child:has(img:not([src="/icon.png"])) { max-width: 140px; }
-.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img:not([src="/icon.png"]) { max-width: 140px; height: 28px; }
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child:has(img:not([src="/icon.png"])) { max-width: 140px; }
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child img:not([src="/icon.png"]) { max-width: 140px; height: 28px; }
 
 /* Atalhos do topo (22/11/2026, pedido do Vinicios): Visão, Ver como e Área de Plantão são ações, não destinos do menu.
    Ficam num bloco próprio no desenho de cartão do diretor (fundo da superfície, borda 1px Ash, raio de 8px, respiro de
