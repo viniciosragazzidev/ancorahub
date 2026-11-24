@@ -263,8 +263,10 @@ export async function loadPostSaleSurveyRows(context: TenantContext, window: Pos
     .leftJoin(schema.whatsappOutboundMessages, eq(schema.whatsappOutboundMessages.id, schema.postSaleSurveys.outboundId))
     .where(and(
       eq(schema.postSaleSurveys.tenantId, context.tenantId),
-      gte(at, window.from),
-      lt(at, window.to),
+      // `at` is raw SQL: Drizzle does not map the Date, and postgres-js refuses a Date param here (24/11: the
+      // whole Pós-venda page fell to "Acesso negado"). Pass ISO text cast to timestamptz.
+      sql`${at} >= ${window.from.toISOString()}::timestamptz`,
+      sql`${at} < ${window.to.toISOString()}::timestamptz`,
       isNull(schema.leads.deletedAt),
       branchWhere(context),
     ))
