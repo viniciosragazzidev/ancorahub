@@ -80,6 +80,22 @@ export function isBarePermission(text: string) {
   return words.length > 0 && words.length <= 8 && words.every((word) => PERMISSION_WORDS.has(word)) && !words.includes("nao");
 }
 
+function plain(text: string) {
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+const CLEAR_OPT_OUT = /\b(nao quero mais(?! (o |um |uma )?(plano|contratar|fazer|fechar|convenio))|nao quero (responder|receber|pesquisa|mensage\w*|mais nada)|(para|pare|parem|parar) de (me )?(mandar|enviar|perguntar|chamar|mandando|enviando|perguntando)|nao me (mande|mandem|envie|enviem|chame|chamem|pergunte|perguntem) mais|(sempre|toda hora|de novo) a mesma pergunta|mesma pergunta)\b/;
+const REPEAT_COMPLAINT = /\b(mesma pergunta|sempre a mesma|repetid\w*|de novo a mesma)\b/;
+
+/**
+ * Pedido claro para parar (Carmen Lucia, 24/11: "Obrigada, não quero mais, está enviando sempre a mesma
+ * pergunta"): vira opt-out pelas palavras, mesmo que a IA leia outra coisa. "Não quero mais o plano" segue
+ * como desistência.
+ */
+export function isClearPostSaleOptOut(text: string) {
+  return CLEAR_OPT_OUT.test(plain(text));
+}
+
 /** A mensagem respondeu alguma coisa da pesquisa (e não só perguntou ou comentou)? */
 export function answerHasFact(answer: PostSaleAnswers) {
   return typeof answer.contacted === "boolean"
@@ -181,9 +197,10 @@ export function decidePostSaleTurn(input: {
   const intents = reading.intents ?? [];
   const now = (intent: (typeof intents)[number]) => intents.includes(intent);
   const intentState = mergeIntentState(readIntentState(prior), reading, input.text);
+  const clearOptOut = isClearPostSaleOptOut(input.text);
   const base = barePermission
     ? { ...(input.answer.optOut !== undefined ? { optOut: input.answer.optOut } : {}), comment: input.answer.comment }
-    : input.answer;
+    : clearOptOut ? { ...input.answer, optOut: true } : input.answer;
   // Contato com o corretor (24/11): R1, R2 e a pesquisa manual leem as cinco respostas possíveis.
   const contactRule = rule === null || rule === "R1" || rule === "R2";
   // Um "sim" solto só vale como "falou com o corretor" quando a pergunta é essa (abertura ou etapa 1 da R1/manual).
@@ -215,7 +232,9 @@ export function decidePostSaleTurn(input: {
   // 1. Opt-out: o roteiro já trata (inclusive "agora não" na abertura, que é recusa e não opt-out).
   if (answer.optOut) {
     const turn = script();
-    return { ...turn, answers: withState(turn.answers), policy: "script" };
+    // Reclamou da pergunta repetida: pede desculpas antes de encerrar (24/11).
+    const sorry = turn.status === "opted_out" && REPEAT_COMPLAINT.test(plain(input.text)) ? `Desculpe pelas mensagens repetidas, ${names.lead}. ` : "";
+    return { ...turn, text: `${sorry}${turn.text}`, answers: withState(turn.answers, undefined, { questionRepeats: 0 }), policy: "script" };
   }
   if (now("wrong_person")) return close("wrong_person", t.wrongPerson, "other", { wrongNumber: true });
   if (now("health_urgency")) return close("health_urgency", t.urgency, "other");
@@ -269,7 +288,7 @@ export function decidePostSaleTurn(input: {
 export function decideR0Turn(input: { answer: R0Answer; reading: PostSaleIntentReading; names: PolicyNames; text?: string }): R0Turn & { wrongNumber?: boolean; policy: PolicyKind; handoff?: boolean; contactStatus?: ContactStatus | null } {
   const intents = input.reading.intents ?? [];
   const t = texts(input.names);
-  const optOut = Boolean(input.answer.optOut) || intents.includes("opt_out");
+  const optOut = Boolean(input.answer.optOut) || intents.includes("opt_out") || (input.text ? isClearPostSaleOptOut(input.text) : false);
   if (!optOut && intents.includes("wrong_person")) return { status: "completed", outcome: "other", awaitsTeam: false, text: t.wrongPerson, wrongNumber: true, policy: "wrong_person" };
   if (!optOut && intents.includes("health_urgency")) return { status: "completed", outcome: "r0_other", awaitsTeam: true, text: t.urgency, policy: "health_urgency" };
   const resume = RESUME_INTENTS.some((intent) => intents.includes(intent));

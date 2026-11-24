@@ -131,6 +131,42 @@ describe("nunca repete a mesma pergunta mais de uma vez", () => {
   });
 });
 
+describe("pedido claro para parar vira opt-out (Carmen Lucia, 24/11)", () => {
+  it.each([
+    "Obrigada, não quero mais, está enviando sempre a mesma pergunta, mesmo eu dando a resposta.",
+    "Para de mandar mensagem",
+    "Não quero mais",
+    "Não me mandem mais isso",
+  ])("%s", (text) => {
+    for (const canHandoff of [true, false]) {
+      const turns = talk(["Pode perguntar", text], { lead: "Carmen", broker: "Viviani", canHandoff });
+      expect(turns[1]).toMatchObject({ status: "opted_out" });
+      expect(turns[1].handoff).toBeUndefined();
+      expectTone(turns[1].text);
+    }
+  });
+
+  it("também no meio da repetição e com IA que leu outra coisa", () => {
+    const turns = talk(["Pode perguntar", "Hmm", "Obrigada, não quero mais, está enviando sempre a mesma pergunta, mesmo eu dando a resposta."], { lead: "Carmen", broker: "Viviani" });
+    expect(turns[2]).toMatchObject({ status: "opted_out" });
+    expect(turns[2].text).toMatch(/^Desculpe pelas mensagens repetidas, Carmen\. /);
+    const ai = decidePostSaleTurn({ rule: "R1", step: 1, prior: { lastQuestion: "Você conseguiu falar com Viviani?" }, answer: { contacted: null, optOut: false, comment: "não quero mais" }, reading: { intents: ["gave_up"] }, text: "Obrigada, não quero mais", names: { lead: "Carmen", broker: "Viviani" } });
+    expect(ai.status).toBe("opted_out");
+  });
+
+  it("'não quero mais o plano' continua desistência", () => {
+    const turns = talk(["Pode", "Não quero mais o plano"], { lead: "Ana", broker: "Alan" });
+    expect(turns[1].status).toBe("completed");
+    expect(turns[1].policy).toBe("gave_up");
+  });
+
+  it("R0 também", () => {
+    const text = "Para de me mandar mensagem";
+    const turn = decideR0Turn({ answer: classifyR0AnswerByKeywords(text), reading: { intents: [] }, text, names: { lead: "Ana", broker: "Alan", canHandoff: true } });
+    expect(turn.status).toBe("opted_out");
+  });
+});
+
 describe("outros caminhos da R1", () => {
   it("falou e foi bem segue o roteiro normal", () => {
     const turns = talk(["Pode perguntar", "Sim, falei", "Sim"], { lead: "Ana", broker: "Alan", canHandoff: true });
