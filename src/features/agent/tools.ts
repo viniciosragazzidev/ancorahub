@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { AgentBackend, AgentActionRecord, DutyNow } from "./backend";
 import { passSeat, passWarningText, seatPassCheck } from "@/features/lead-distribution/duty-pass";
 import { matchPeople } from "./people-match";
-import { hasFreeSeat, hhmm, matchesSeat, pickSeats, seatLabel, seatsOf, understaffed } from "./seats";
+import { blockedSeats, hasFreeSeat, hhmm, matchesSeat, pickSeats, seatLabel, seatsOf, understaffed } from "./seats";
 import type { LeadSummary, Person, SeatOccurrence, ToolResult } from "./types";
 
 /**
@@ -305,8 +305,41 @@ export function buildAgentTools(env: ToolEnv) {
           rascunho: choice.occurrence.source === "draft",
         }));
         if (!vagas.length) {
-          const hint = pick.outsideTypeAvailable ? ` Há ${pick.outsideTypeAvailable} vagas em plantões de tipo fora da unidade dela; posso usar se você quiser.` : "";
-          return fail("sem_vagas", `Não achei vaga livre para ${person.name} nesse período.${hint}`, "Pergunte se pode ampliar o período, mudar o filtro ou usar plantões fora do tipo.");
+          // Sem vaga: mostra os plantões do pedido que não serviram, com quem está, para o diretor escolher trocar
+          // (plantao_passar_cadeira) ou escalar mesmo assim (fora_do_tipo / acima_do_maximo).
+          const blocked = blockedSeats(seats, person.id, {
+            weekdays: input.dias_semana, shift: input.turno ?? null, attendanceMode: input.modalidade ?? null,
+            scheduleText: input.plantao_texto ?? null, from, until, includeOutsideType: input.incluir_fora_do_tipo,
+          }).slice(0, 6);
+          if (!blocked.length) return fail("sem_vagas", `Não achei plantão para ${person.name} nesse período.`, "Pergunte se pode ampliar o período ou mudar o filtro.");
+          const why = (item: (typeof blocked)[number]) => [
+            item.full ? `cheio (${item.occurrence.brokerIds.length} de ${item.occurrence.maximumBrokers})` : null,
+            item.outsideType ? "fora do tipo da unidade dela" : null,
+          ].filter(Boolean).join(" e ");
+          const who = (item: (typeof blocked)[number]) => item.occurrence.brokerIds.map((id) => people.get(id)?.name ?? "Corretor");
+          const lines = blocked.map((item) => `• ${seatLabel(item.occurrence)}: ${why(item)}${who(item).length ? `. Estão: ${who(item).join(", ")}` : ""}`);
+          return {
+            // Resposta válida (há o que oferecer); o "o que fazer" segue em error.fix para o modelo.
+            ok: true,
+            message: [`Sem vaga livre para ${person.name}. Plantões do pedido:`, ...lines].join("\n"),
+            error: {
+              code: "sem_vagas",
+              fix:
+                "Mostre a lista (sem ids) e ofereça: trocar com alguém de lá (plantao_passar_cadeira, de quem sai para " + person.name + ") " +
+                "ou escalar mesmo assim (plantao_escalar_em_vagas com o ocorrencia_id e fora_do_tipo e/ou acima_do_maximo true, conforme o motivo). " +
+                "Se o diretor responder só \"adiciona\" / \"sim\" / \"pode\", é escalar mesmo assim: chame plantao_escalar_em_vagas direto, sem buscar de novo.",
+            },
+            data: {
+              corretor: { id: person.id, nome: person.name },
+              opcoes: blocked.map((item) => ({
+                ocorrencia_id: item.occurrence.id,
+                rotulo: seatLabel(item.occurrence),
+                cheio: item.full,
+                fora_do_tipo: item.outsideType,
+                escalados: item.occurrence.brokerIds.map((id) => ({ id, nome: people.get(id)?.name ?? "Corretor" })),
+              })),
+            },
+          };
         }
         const short = vagas.length < input.quantidade ? ` Só achei ${vagas.length} de ${input.quantidade}.` : "";
         const draft = vagas.some((vaga) => vaga.rascunho) ? " Algumas estão só no rascunho do mês (falta publicar)." : "";
@@ -326,6 +359,7 @@ export function buildAgentTools(env: ToolEnv) {
         corretor_id: PERSON_ID,
         ocorrencia_ids: z.array(OCCURRENCE_ID).min(1).max(20),
         fora_do_tipo: z.boolean().optional().describe("true só se o diretor aceitou plantão fora do tipo da unidade."),
+        acima_do_maximo: z.boolean().optional().describe("true só se o diretor aceitou escalar num plantão cheio (passa do máximo)."),
       }),
       execute: async (input, { toolCallId }): Promise<ToolResult> => write("plantao_escalar_em_vagas", toolCallId, input, async () => {
         const ids = [...new Set(input.ocorrencia_ids)];
@@ -340,7 +374,7 @@ export function buildAgentTools(env: ToolEnv) {
           const seat = byId.get(id);
           if (!seat) { problems.push(`${dayLabel(id.slice(-10))}: plantão não está na escala`); continue; }
           if (seat.brokerIds.includes(person.id)) { problems.push(`${seatLabel(seat)}: já estava`); continue; }
-          if (!hasFreeSeat(seat)) { problems.push(`${seatLabel(seat)}: lotado`); continue; }
+          if (!hasFreeSeat(seat) && !input.acima_do_maximo) { problems.push(`${seatLabel(seat)}: cheio (o diretor pode aceitar escalar acima do máximo ou trocar com alguém)`); continue; }
           try {
             await backend.addSeat(seat, person.id, Boolean(input.fora_do_tipo));
             done.push(seat);

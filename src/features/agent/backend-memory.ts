@@ -382,7 +382,9 @@ export function createMemoryBackend(world: MemoryWorld): AgentBackend & { world:
       if (seat.ended) throw new Error("Este plantão já terminou. Não é possível escalar corretores nele.");
       if (seat.brokerIds.includes(brokerId)) throw new Error("Este corretor já está neste plantão.");
       if (!seat.allowedBrokerIds.includes(brokerId) && !force) throw new Error("A unidade deste corretor não participa deste tipo de plantão. Confirme para escalar mesmo assim.");
-      if (seat.maximumBrokers !== null && seat.brokerIds.length >= seat.maximumBrokers) throw new Error("Plantão lotado.");
+      // Igual ao servidor: a escala publicada aceita passar do máximo (o agente só faz isso com o toque do diretor);
+      // o plantão avulso (escala semanal) recusa.
+      if (seat.source === "avulso" && seat.maximumBrokers !== null && seat.brokerIds.length >= seat.maximumBrokers) throw new Error("Este plantão atingiu o máximo de corretores definido.");
       seat.brokerIds.push(brokerId);
     },
     async removeSeat(occurrence, brokerId) {

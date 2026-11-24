@@ -164,10 +164,14 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
   const dutyNote = name === "plantao_marcar_falta" || name === "plantao_liberar_presenca" || name === "plantao_reenviar_convite"
     ? (typeof input.plantao_id === "string" && seatLabels.get(input.plantao_id) ? `Plantão: ${seatLabels.get(input.plantao_id)}.` : "No plantão de agora (ou no próximo, em até 24 h).")
     : null;
-  const strongNote = name === "mensagem_cliente" ? `"${String(input.texto ?? "")}" — vai pelo WhatsApp da empresa para o cliente e não dá para desfazer.`
+  // Escalar como exceção: o cartão diz o que passa por cima da regra.
+  const exceptionNote = name === "plantao_escalar_em_vagas" && (input.fora_do_tipo === true || input.acima_do_maximo === true)
+    ? [input.fora_do_tipo === true ? "Fora do tipo da unidade dela." : null, input.acima_do_maximo === true ? "Passa do máximo de corretores do plantão." : null].filter(Boolean).join(" ")
+    : null;
+  const strongNote = name === "mensagem_cliente" ? `"${String(input.texto ?? "")}". Vai pelo WhatsApp da empresa para o cliente e não dá para desfazer.`
     : name === "conversa_devolver_ia" ? "A IA volta a responder o cliente."
     : name === "fila_modo" && input.modo === "automatic" ? "Os leads que esperam nessa fila entram na distribuição agora."
-    : name === "corretores_mensagem" ? `"${String(input.texto ?? "")}" — vai pelo WhatsApp e não dá para desfazer.`
+    : name === "corretores_mensagem" ? `"${String(input.texto ?? "")}". Vai pelo WhatsApp e não dá para desfazer.`
     : name === "membro_convidar" ? `WhatsApp ${String(input.whatsapp ?? "")}${input.email ? `, e-mail ${String(input.email)}` : ""}, unidade ${label(input.unidade_id)}. O convite sai por WhatsApp.`
     : name === "membro_ativar" && !input.ativo ? "Desativada, a pessoa não entra no sistema nem recebe leads."
     : name === "aviso_inicio" && !input.desligar ? `${input.texto ? `${String(input.texto)} ` : ""}Todos os corretores veem no Início.`
@@ -211,6 +215,7 @@ function ApprovalCard({ part, seatLabels, onRespond }: {
         </ul>
       ) : null}
       {dutyNote ? <p className="director-agent-card-note">{dutyNote}</p> : null}
+      {exceptionNote ? <p className="director-agent-card-note">{exceptionNote}</p> : null}
       {noUndoNote ? <p className="director-agent-card-note">{noUndoNote}</p> : null}
       {entry?.risk.notifies && !strongNote ? <p className="director-agent-card-note">{swapLines ? "As duas pessoas recebem aviso no app." : "A pessoa recebe aviso no app."}</p> : null}
       <div className="director-agent-card-actions">

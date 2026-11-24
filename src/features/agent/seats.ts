@@ -123,6 +123,32 @@ export function pickSeats(occurrences: readonly SeatOccurrence[], brokerId: stri
   return { picked, available: pool.length, outsideTypeAvailable: filters.includeOutsideType ? 0 : outside.length };
 }
 
+/**
+ * Sem vaga (24/11, pedido "adiciona a Osmarina em 30/11 presencial tarde"): os plantões que casam com o pedido mas
+ * não serviram, e por quê. O agente mostra quem está em cada um e oferece trocar (passar a cadeira) ou escalar mesmo
+ * assim (fora do tipo ou acima do máximo), sempre com o cartão de confirmação.
+ */
+export type BlockedSeat = { occurrence: SeatOccurrence; full: boolean; outsideType: boolean };
+
+export function blockedSeats(occurrences: readonly SeatOccurrence[], brokerId: string, filters: SeatFilters = {}): BlockedSeat[] {
+  const sorted = [...occurrences].sort((a, b) => a.dutyDate.localeCompare(b.dutyDate) || minutes(a.startsAt) - minutes(b.startsAt) || a.scheduleName.localeCompare(b.scheduleName, "pt-BR"));
+  const text = filters.scheduleText ? normalize(filters.scheduleText) : null;
+  return sorted
+    .filter((occurrence) => {
+      if (occurrence.started || occurrence.ended) return false;
+      if (occurrence.brokerIds.includes(brokerId)) return false;
+      if (filters.weekdays?.length && !filters.weekdays.includes(weekdayOf(occurrence.dutyDate))) return false;
+      if (filters.typeId && occurrence.typeId !== filters.typeId) return false;
+      if (filters.attendanceMode && occurrence.attendanceMode !== filters.attendanceMode) return false;
+      if (filters.shift && shiftOf(occurrence.startsAt) !== filters.shift) return false;
+      if (filters.from && occurrence.dutyDate < filters.from) return false;
+      if (filters.until && occurrence.dutyDate > filters.until) return false;
+      return !text || normalize(`${occurrence.scheduleName} ${occurrence.typeName ?? ""}`).includes(text);
+    })
+    .map((occurrence) => ({ occurrence, full: !hasFreeSeat(occurrence), outsideType: !occurrence.allowedBrokerIds.includes(brokerId) }))
+    .filter((item) => item.full || (item.outsideType && !filters.includeOutsideType));
+}
+
 /** Quantas cadeiras a pessoa tem no período (A14: "quantas cadeiras a Ana tem no mês?"). */
 export function seatsOf(occurrences: readonly SeatOccurrence[], brokerId: string, now: Date) {
   const today = now.toISOString().slice(0, 10);

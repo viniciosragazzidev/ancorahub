@@ -40,7 +40,9 @@ export const AGENT_CATALOG = {
   },
   plantao_escalar_em_vagas: {
     name: "plantao_escalar_em_vagas", title: "Escalar nos plantões", doing: "Escalando…", topic: "plantoes",
-    risk: { readOnly: false, notifies: true }, roles: DIRECTOR, confirm: many("ocorrencia_ids"), covers: ["A1", "A2"],
+    // Fora do tipo ou acima do máximo é exceção: sempre pede o toque do diretor, mesmo com uma vaga só.
+    risk: { readOnly: false, notifies: true }, roles: DIRECTOR,
+    confirm: (input) => (input.fora_do_tipo === true || input.acima_do_maximo === true ? "toque" : many("ocorrencia_ids")(input)), covers: ["A1", "A2"],
   },
   plantao_tirar_de_vagas: {
     name: "plantao_tirar_de_vagas", title: "Tirar dos plantões", doing: "Tirando da escala…", topic: "plantoes",
