@@ -128,7 +128,9 @@ export async function selectAutoRuleRecipients(input: {
       gte(milestoneColumn, floor),
       lte(milestoneColumn, now),
     ))
-    .orderBy(asc(milestoneColumn), asc(schema.leads.id))
+    // Newest first (24/11): with more than CANDIDATE_LIMIT leads in the window, oldest-first filled the
+    // whole page with stale milestones and the leads due today (yesterday's) never came in.
+    .orderBy(desc(milestoneColumn), desc(schema.leads.id))
     .limit(CANDIDATE_LIMIT);
   selection.candidates = rows.length;
   if (!rows.length) return selection;
@@ -328,18 +330,35 @@ export async function runPostSaleAutoSweep(now = new Date(), options: { force?: 
   return leased.acquired ? leased.value : { ...empty, lease: "busy" };
 }
 
-async function runTenant(tenantId: string, now: Date, deadline: number, result: PostSaleAutoSweepResult) {
+/**
+ * Envio forçado pelo diretor (24/11): uma regra para os leads cujo marco caiu num dia (ex.: R1 de todos
+ * os aceitos ontem), sem o limite diário. Mesmo seletor, filtros, canal, texto e idempotência do motor:
+ * quem já recebeu não recebe de novo. O que sai conta no uso do dia, então o motor não soma outro lote.
+ */
+export async function forcePostSaleAutoRuleForMilestoneDay(input: { tenantId: string; key: AutoRuleKey; milestoneDay: string; now?: Date }) {
+  const now = input.now ?? new Date();
+  const result: PostSaleAutoSweepResult = { tenants: 1, started: 0, rules: {}, alreadyStarted: 0, enqueueFailed: 0, scheduled: false };
+  const leased = await withJobLease("post-sale-auto", 300_000, async () => {
+    await runTenant(input.tenantId, now, Date.now() + 240_000, result, { keys: [input.key], milestoneDay: input.milestoneDay, ignoreLimits: true });
+    return result;
+  });
+  return leased.acquired ? leased.value : { ...result, lease: "busy" as const };
+}
+
+type RunTenantFilter = { keys?: AutoRuleKey[]; milestoneDay?: string; ignoreLimits?: boolean };
+
+async function runTenant(tenantId: string, now: Date, deadline: number, result: PostSaleAutoSweepResult, filter: RunTenantFilter = {}) {
   const db = getDatabase();
   const [tenant] = await db.select({ name: schema.tenants.name, status: schema.tenants.status }).from(schema.tenants).where(eq(schema.tenants.id, tenantId)).limit(1);
   if (!tenant || tenant.status !== "active") return;
   const state = await loadAutoRules(tenantId);
-  const enabled = state.rules.filter((rule) => rule.enabled);
+  const enabled = state.rules.filter((rule) => rule.enabled && (!filter.keys || filter.keys.includes(rule.key)));
   if (!state.ready || !enabled.length) return;
   const { sendAt, sendDay } = autoRuleSchedule(now);
   result.scheduled ||= Boolean(sendAt);
   const usage = await usageForDay(tenantId, sendDay);
   let usedByTenant = usage.total;
-  if (usedByTenant >= AUTO_RULE_LIMITS.tenantDailyLimit) return;
+  if (!filter.ignoreLimits && usedByTenant >= AUTO_RULE_LIMITS.tenantDailyLimit) return;
   const systemUserId = await resolveSystemUserId(tenantId);
   const context = tenantWideContext(tenantId, systemUserId);
   const [config] = await db.select({ assistantName: schema.aiQualificationConfigs.assistantName }).from(schema.aiQualificationConfigs).where(eq(schema.aiQualificationConfigs.tenantId, tenantId)).limit(1);
@@ -351,8 +370,9 @@ async function runTenant(tenantId: string, now: Date, deadline: number, result: 
     let usedByRule = usage.byRule.get(settings.key) ?? 0;
     const stats = { candidates: 0, eligible: 0, started: 0, limitReached: false };
     result.rules[settings.key] = stats;
-    if (autoRuleRemainingCapacity({ settings, usedByRule, usedByTenant }) <= 0) { stats.limitReached = true; continue; }
+    if (!filter.ignoreLimits && autoRuleRemainingCapacity({ settings, usedByRule, usedByTenant }) <= 0) { stats.limitReached = true; continue; }
     const selection = await selectAutoRuleRecipients({ tenantId, settings, sendDay, now, context });
+    if (filter.milestoneDay) selection.recipients = selection.recipients.filter((recipient) => saoPauloDateKey(recipient.milestoneAt) === filter.milestoneDay);
     stats.candidates = selection.candidates;
     stats.eligible = selection.recipients.length;
     if (!selection.recipients.length) continue;
@@ -363,7 +383,7 @@ async function runTenant(tenantId: string, now: Date, deadline: number, result: 
 
     for (const recipient of selection.recipients) {
       if (Date.now() > deadline) { result.budgetExhausted = true; return; }
-      if (autoRuleRemainingCapacity({ settings, usedByRule, usedByTenant }) <= 0) { stats.limitReached = true; break; }
+      if (!filter.ignoreLimits && autoRuleRemainingCapacity({ settings, usedByRule, usedByTenant }) <= 0) { stats.limitReached = true; break; }
       campaignId ??= await ensureAutoCampaign(tenantId, settings.key, sendDay, systemUserId, now);
       const surveyId = autoRuleSurveyId(tenantId, recipient.leadId, settings.key, recipient.milestoneAt);
       const brokerName = brokerNames.get(recipient.brokerId) ?? "nosso corretor";
