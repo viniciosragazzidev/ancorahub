@@ -224,8 +224,9 @@ export function buildAgentTools(env: ToolEnv) {
         so_faltando_gente: z.boolean().optional(),
         turno: z.enum(["manha", "tarde", "noite"]).optional(),
         plantao_texto: z.string().max(60).optional().describe("Parte do nome do plantão ou do tipo, ex.: Manhã, PME."),
+        para_adicionar_id: PERSON_ID.optional().describe("Quem o diretor quer adicionar: cada plantão diz se já está, se está cheio ou se é fora do tipo da unidade dela."),
       }),
-      execute: async ({ de, ate, corretor_id, so_faltando_gente, turno, plantao_texto }): Promise<ToolResult> => {
+      execute: async ({ de, ate, corretor_id, so_faltando_gente, turno, plantao_texto, para_adicionar_id }): Promise<ToolResult> => {
         const today = spDateKey(backend.now());
         const from = de ?? today;
         const until = ate ?? addDays(from, 6);
@@ -255,9 +256,18 @@ export function buildAgentTools(env: ToolEnv) {
           vagas_livres: item.maximumBrokers === null ? null : Math.max(0, item.maximumBrokers - item.brokerIds.length),
           minimo: item.minimumBrokers,
           rascunho: item.source === "draft",
+          // Para quem vai entrar: o que a chamada de escalar precisa levar (flags) e o cartão vai mostrar.
+          ...(para_adicionar_id
+            ? { ja_esta: item.brokerIds.includes(para_adicionar_id), cheio: !hasFreeSeat(item), fora_do_tipo: !item.allowedBrokerIds.includes(para_adicionar_id) }
+            : {}),
         }));
         if (!rows.length) return { ok: true, message: so_faltando_gente ? "Nenhum plantão abaixo do mínimo nesse período." : "Nenhum plantão nesse período.", data: { ocorrencias: [] }, href: "/plantoes" };
-        const text = rows.slice(0, 15).map((row) => `${row.rotulo}: ${row.escalados.length ? row.escalados.join(", ") : "ninguém"}${row.escalados.length < row.minimo ? ` (mínimo ${row.minimo})` : ""}`).join("\n");
+        const note = (row: (typeof rows)[number]) => !para_adicionar_id ? "" : [
+          row.ja_esta ? `${nameOf(people, para_adicionar_id)} já está` : null,
+          row.cheio ? "cheio" : null,
+          row.fora_do_tipo ? `fora do tipo da unidade de ${nameOf(people, para_adicionar_id)}` : null,
+        ].filter(Boolean).map((part) => ` [${part}]`).join("");
+        const text = rows.slice(0, 15).map((row) => `${row.rotulo}: ${row.escalados.length ? row.escalados.join(", ") : "ninguém"}${row.escalados.length < row.minimo ? ` (mínimo ${row.minimo})` : ""}${note(row)}`).join("\n");
         return { ok: true, message: `${text}${rows.length > 15 ? `\n… e mais ${rows.length - 15}.` : ""}`, data: { ocorrencias: rows }, href: "/plantoes" };
       },
     }),
@@ -368,13 +378,29 @@ export function buildAgentTools(env: ToolEnv) {
         const person = people.get(input.corretor_id);
         if (!person || person.role !== "broker" || person.status !== "active") return fail("pessoa", "Essa pessoa não pode ser escalada (não é corretor ativo).", "Confira com pessoas_buscar.");
         const byId = new Map(seats.map((seat) => [seat.id, seat]));
+        // Adicionar num plantão dito não depende de vaga livre (24/11, caso da Osmarina). Cheio ou fora do tipo é exceção:
+        // antes de gravar qualquer coisa, volta pedindo a mesma chamada com a flag, e aí o cartão pede o toque do diretor.
+        const exceptions = ids.flatMap((id) => {
+          const seat = byId.get(id);
+          if (!seat || seat.brokerIds.includes(person.id)) return [];
+          const full = !hasFreeSeat(seat) && !input.acima_do_maximo;
+          const outside = !seat.allowedBrokerIds.includes(person.id) && !input.fora_do_tipo;
+          return full || outside ? [{ seat, full, outside }] : [];
+        });
+        if (exceptions.length) {
+          const flags = [exceptions.some((item) => item.outside) ? "fora_do_tipo: true" : null, exceptions.some((item) => item.full) ? "acima_do_maximo: true" : null].filter(Boolean).join(" e ");
+          return fail(
+            "confirmar_excecao",
+            `Para adicionar ${person.name}: ${exceptions.map((item) => `${seatLabel(item.seat)} está ${[item.full ? `cheio (${item.seat.brokerIds.length} de ${item.seat.maximumBrokers})` : null, item.outside ? "fora do tipo da unidade dela" : null].filter(Boolean).join(" e ")}`).join("; ")}.`,
+            `Nada foi gravado. Chame plantao_escalar_em_vagas de novo com os mesmos ocorrencia_ids e ${flags}, sem perguntar em texto: o cartão de confirmação mostra a exceção ao diretor.`,
+          );
+        }
         const done: SeatOccurrence[] = [];
         const problems: string[] = [];
         for (const id of ids) {
           const seat = byId.get(id);
           if (!seat) { problems.push(`${dayLabel(id.slice(-10))}: plantão não está na escala`); continue; }
           if (seat.brokerIds.includes(person.id)) { problems.push(`${seatLabel(seat)}: já estava`); continue; }
-          if (!hasFreeSeat(seat) && !input.acima_do_maximo) { problems.push(`${seatLabel(seat)}: cheio (o diretor pode aceitar escalar acima do máximo ou trocar com alguém)`); continue; }
           try {
             await backend.addSeat(seat, person.id, Boolean(input.fora_do_tipo));
             done.push(seat);

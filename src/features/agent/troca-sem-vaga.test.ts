@@ -90,3 +90,33 @@ describe("sem vaga: oferecer troca ou escalar mesmo assim", () => {
     expect(list.map((item) => item.occurrence.id)).toEqual(["a:2026-11-30"]);
   });
 });
+
+describe("adicionar num plantão dito não depende de vaga livre", () => {
+  it("a escala diz, para quem vai entrar, o que é cheio e fora do tipo", async () => {
+    const { run } = setup([
+      seat({ id: "s-tarde:2026-11-30", brokerIds: ["u-bruno", "u-ana2"] }),
+      seat({ id: "s-manha:2026-12-04", dutyDate: "2026-12-04", startsAt: "09:00", endsAt: "13:30", scheduleName: "Presencial · Manhã", allowedBrokerIds: ["u-bruno"], maximumBrokers: null }),
+    ]);
+    const tarde = await run("plantao_escala", { de: "2026-11-30", ate: "2026-11-30", turno: "tarde", plantao_texto: "Presencial", para_adicionar_id: "u-carla" });
+    expect(tarde.message).toContain("[cheio]");
+    const manha = await run("plantao_escala", { de: "2026-12-04", ate: "2026-12-04", turno: "manha", plantao_texto: "Presencial", para_adicionar_id: "u-carla" });
+    expect(manha.message).toContain("[fora do tipo da unidade de Carla Mendes]");
+    expect(manha.message).not.toMatch(/s-manha|u-carla/);
+  });
+
+  it("sem as flags, nada grava e a volta pede a mesma chamada com elas; com elas, adiciona os dois", async () => {
+    const { world, run } = setup([
+      seat({ id: "s-tarde:2026-11-30", brokerIds: ["u-bruno", "u-ana2"] }),
+      seat({ id: "s-manha:2026-12-04", dutyDate: "2026-12-04", startsAt: "09:00", endsAt: "13:30", scheduleName: "Presencial · Manhã", allowedBrokerIds: ["u-bruno"], maximumBrokers: null }),
+    ]);
+    const ids = ["s-tarde:2026-11-30", "s-manha:2026-12-04"];
+    const first = await run("plantao_escalar_em_vagas", { corretor_id: "u-carla", ocorrencia_ids: ids });
+    expect(first.ok).toBe(false);
+    expect(first.error?.code).toBe("confirmar_excecao");
+    expect(first.error?.fix).toContain("fora_do_tipo: true e acima_do_maximo: true");
+    expect(world.seats.every((item) => !item.brokerIds.includes("u-carla"))).toBe(true);
+    const done = await run("plantao_escalar_em_vagas", { corretor_id: "u-carla", ocorrencia_ids: ids, fora_do_tipo: true, acima_do_maximo: true });
+    expect(done.ok).toBe(true);
+    expect(world.seats.every((item) => item.brokerIds.includes("u-carla"))).toBe(true);
+  });
+});
