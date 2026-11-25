@@ -40,6 +40,45 @@ export async function createLeadTaskAction(_previous: LeadTaskState, formData: F
   }
 }
 
+const taskEditInput = z.object({
+  title: z.string().trim().min(3, "Informe um título com ao menos 3 caracteres.").max(160, "Título com no máximo 160 caracteres."),
+  dueAt: z.string().refine((value) => !Number.isNaN(Date.parse(value)), "Prazo inválido.").nullable(),
+});
+
+/** Busca a tarefa no tenant e aplica o mesmo escopo de concluir: corretor só as suas, gestor só da filial. */
+async function loadScopedTask(context: Awaited<ReturnType<typeof getRequiredTenantContext>>, taskId: string) {
+  const db = getDatabase();
+  const [task] = await db.select({ id: schema.leadTasks.id, leadId: schema.leadTasks.leadId, completedAt: schema.leadTasks.completedAt, assignedTo: schema.leadTasks.assignedTo, tenantId: schema.leadTasks.tenantId, branchId: schema.leads.branchId })
+    .from(schema.leadTasks).innerJoin(schema.leads, eq(schema.leadTasks.leadId, schema.leads.id))
+    .where(and(eq(schema.leadTasks.id, taskId), eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+  if (!task) return { db, error: "Tarefa não encontrada." } as const;
+  if (context.role === "broker" && task.assignedTo !== context.userId) return { db, error: "Você só pode alterar suas próprias tarefas." } as const;
+  if (context.role === "manager" && (!context.branchId || task.branchId !== context.branchId)) return { db, error: "Esta tarefa não pertence à sua filial." } as const;
+  return { db, task } as const;
+}
+
+/** Edita título e prazo da tarefa (⋯ da tarefa). `dueAt` em ISO; null tira o prazo. */
+export async function updateLeadTaskAction(taskId: string, input: { title: string; dueAt: string | null }): Promise<LeadTaskState> {
+  if (!z.string().uuid().safeParse(taskId).success) return { error: "Tarefa inválida." };
+  const parsed = taskEditInput.safeParse({ title: input?.title, dueAt: input?.dueAt ? input.dueAt : null });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  try {
+    const context = await getRequiredTenantContext();
+    const scoped = await loadScopedTask(context, taskId);
+    if ("error" in scoped) return { error: scoped.error };
+    await scoped.db.transaction(async (tx) => {
+      await tx.update(schema.leadTasks)
+        .set({ title: parsed.data.title, dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null })
+        .where(and(eq(schema.leadTasks.id, scoped.task.id), eq(schema.leadTasks.tenantId, context.tenantId)));
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_task", entidadeId: scoped.task.id, acao: "editou" });
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("[lead-task] edit failed", error);
+    return { error: "Não foi possível salvar a tarefa. Tente de novo." };
+  }
+}
+
 export async function toggleLeadTaskAction(taskId: string): Promise<LeadTaskState> {
   return setLeadTaskDone(taskId, "toggle");
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
 import { CheckCircle, Clock, ListChecks, Plus, Users } from "@/components/huge-icons";
@@ -13,7 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AppSelect } from "@/components/ui/select";
-import { createLeadTaskAction, toggleLeadTaskAction, type LeadTaskState } from "@/features/leads/task-actions";
+import { LiteActionButton, LiteFilterChips, LiteMenu } from "@/components/lite/controls";
+import { createLeadTaskAction, toggleLeadTaskAction, updateLeadTaskAction, type LeadTaskState } from "@/features/leads/task-actions";
+import { applyTaskPreset, TASK_PRESETS, taskLocalInputToIso, toTaskLocalInput } from "@/features/leads/task-presets";
 
 type LeadTask = { id: string; title: string; description: string | null; dueAt: string | null; completedAt: string | null; priority: "low" | "normal" | "urgent" };
 type Assignee = { id: string; name: string };
@@ -22,7 +25,21 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
   const [open, setOpen] = useState(false);
   const [priority, setPriority] = useState<LeadTask["priority"]>("normal");
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>(assignees.slice(0, 1).map((assignee) => assignee.id));
+  const [title, setTitle] = useState("");
+  const [dueLocal, setDueLocal] = useState("");
+  const [presetId, setPresetId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<LeadTask | null>(null);
   const [state, action, pending] = useActionState<LeadTaskState, FormData>(createLeadTaskAction, {});
+
+  function pickPreset(id: string) {
+    const preset = TASK_PRESETS.find((item) => item.id === id);
+    if (!preset) return;
+    // O prazo sai de "agora", no clique; o usuário ainda pode mudar antes de criar.
+    const filled = applyTaskPreset(preset, new Date());
+    setTitle(filled.title);
+    setDueLocal(filled.dueAt);
+    setPresetId(id);
+  }
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
@@ -30,6 +47,9 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
       toast.success("Tarefa criada.");
       setOpen(false);
       setPriority("normal");
+      setTitle("");
+      setDueLocal("");
+      setPresetId(null);
       setSelectedAssignees(assignees.slice(0, 1).map((assignee) => assignee.id));
     }
   }, [assignees, state.error, state.success]);
@@ -68,9 +88,10 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
             </DialogHeader>
             <form action={action} className="grid gap-4">
               <input name="leadId" type="hidden" value={leadId} />
+              <LiteFilterChips label="Atalhos de tarefa" chips={TASK_PRESETS.map((preset) => ({ id: preset.id, label: preset.label }))} active={presetId ? [presetId] : []} onToggle={pickPreset} />
               <div className="grid gap-2">
                 <Label htmlFor="task-title">Título</Label>
-                <Input id="task-title" maxLength={160} name="title" placeholder="Ex.: Retornar para confirmar interesse" required />
+                <Input id="task-title" maxLength={160} name="title" placeholder="Ex.: Retornar para confirmar interesse" required value={title} onChange={(event) => { setTitle(event.target.value); setPresetId(null); }} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="task-description">
@@ -82,7 +103,9 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
                 <Label htmlFor="task-due">
                   Prazo <span className="text-muted-foreground">(opcional)</span>
                 </Label>
-                <Input id="task-due" name="dueAt" type="datetime-local" />
+                <Input id="task-due" type="datetime-local" value={dueLocal} onChange={(event) => { setDueLocal(event.target.value); setPresetId(null); }} />
+                {/* O campo mostra a hora de São Paulo; o servidor recebe o instante exato. */}
+                <input name="dueAt" type="hidden" value={taskLocalInputToIso(dueLocal) ?? ""} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="task-priority">Prioridade</Label>
@@ -167,6 +190,7 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
                 ) : null}
               </div>
               {task.completedAt ? <CheckCircle className="size-5 text-emerald-500" /> : null}
+              <LiteMenu label={`Ações da tarefa ${task.title}`} items={[{ id: "editar", label: "Editar", onSelect: () => setEditing(task) }]} />
             </div>
           ))
         ) : (
@@ -177,6 +201,68 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
           </div>
         )}
       </CardContent>
+      <EditLeadTaskDialog task={editing} onClose={() => setEditing(null)} />
     </Card>
+  );
+}
+
+/** Editar tarefa pelo ⋯: só título e prazo. Fecha depois que o servidor confirma. */
+function EditLeadTaskDialog({ task, onClose }: { task: LeadTask | null; onClose: () => void }) {
+  const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [dueLocal, setDueLocal] = useState("");
+  const [presetId, setPresetId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!task) return;
+    setTitle(task.title);
+    setDueLocal(task.dueAt ? toTaskLocalInput(new Date(task.dueAt)) : "");
+    setPresetId(null);
+  }, [task]);
+
+  function pickPreset(id: string) {
+    const preset = TASK_PRESETS.find((item) => item.id === id);
+    if (!preset) return;
+    const filled = applyTaskPreset(preset, new Date());
+    setTitle(filled.title);
+    setDueLocal(filled.dueAt);
+    setPresetId(id);
+  }
+
+  async function save() {
+    if (!task) return { ok: false as const, message: "Tarefa não encontrada." };
+    const result = await updateLeadTaskAction(task.id, { title, dueAt: taskLocalInputToIso(dueLocal) });
+    if (result.error) return { ok: false as const, message: result.error };
+    return { ok: true as const };
+  }
+
+  return (
+    <Dialog open={Boolean(task)} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogPopup className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Editar tarefa</DialogTitle>
+          <DialogDescription>Ajuste o título ou o prazo.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <LiteFilterChips label="Atalhos de tarefa" chips={TASK_PRESETS.map((preset) => ({ id: preset.id, label: preset.label }))} active={presetId ? [presetId] : []} onToggle={pickPreset} />
+          <div className="grid gap-2">
+            <Label htmlFor="task-edit-title">Título</Label>
+            <Input id="task-edit-title" maxLength={160} required value={title} onChange={(event) => { setTitle(event.target.value); setPresetId(null); }} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="task-edit-due">
+              Prazo <span className="text-muted-foreground">(opcional)</span>
+            </Label>
+            <Input id="task-edit-due" type="datetime-local" value={dueLocal} onChange={(event) => { setDueLocal(event.target.value); setPresetId(null); }} />
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline">Cancelar</Button>} />
+            <LiteActionButton busyLabel="Salvando..." doneLabel="Tarefa salva" keeps="A tarefa continua como estava." disabled={title.trim().length < 3} onAction={save} onDone={() => { router.refresh(); window.setTimeout(onClose, 600); }}>
+              Salvar
+            </LiteActionButton>
+          </DialogFooter>
+        </div>
+      </DialogPopup>
+    </Dialog>
   );
 }
