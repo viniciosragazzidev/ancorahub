@@ -558,3 +558,98 @@ Fica de fora por ora: cobrança de revendedor, extensões e banco externo. Não 
 ### 6.5 Próximos passos sugeridos
 - Itens 2, 3 e 4 da lista priorizada.
 - Corretor: nada muda. A Início em conversa já é melhor que a sidebar deles.
+
+---
+
+## 7. Passada pelo curso, módulo a módulo (25/11/2026)
+
+Fonte: as 85 lições do curso público, lidas dos dados em DC `curso/licoes/*.json`, cada uma comparada com a tela equivalente do AncoraHub. Critério: o que poupa tempo de quem usa o sistema o dia todo numa corretora de planos de saúde, sempre no estilo Lite.
+
+Legenda: **Trazer** (DeskComm melhor ou AH não tem), **AH melhor**, **Igual**, **Não se aplica** (só faz sentido para clínica, loja ou servidor próprio).
+
+### 7.1 Atendimento
+
+| Módulo DC | Equivalente AH | Veredito | O que trazer, no jeito da corretora |
+|---|---|---|---|
+| Inbox | `/conversas` (`conversations-workspace.tsx`) | Trazer em parte | Respostas rápidas reais no composer (hoje 4 textos fixos em `quick-responses-popover.tsx`), "/" abre a lista, `{{nome}}` trocado; vazio por filtro; `?` com atalhos; "Lembrar se não responder"; lote na central |
+| Radar | espalhado: `stale-stage-rule.ts`, drilldowns, `/integridade` | Trazer | Visão "Esfriando" em `/leads`: Crítico / Em risco, dono, parado há; "Em voo" quando há retorno marcado; ⋯ Assumir, Cobrar corretor, Redistribuir |
+| Agenda | `/agenda` só do corretor | Trazer em parte | "Retornos da equipe" para gestor e diretor, filtro por corretor; contador de atrasados |
+| Respostas rápidas | `/atendimento/mensagens` (biblioteca, sem uso humano) | Trazer | Categoria "Resposta rápida (equipe)" com atalho, lida pelo composer |
+| Tipos de agendamento | não há | Não se aplica | Corretora não vende sessão com duração e preço |
+| Aviso de agendamento | avisos da equipe em `/integrations/whatsapp` | Trazer a observabilidade | "Últimos envios" com status e motivo; "Enviar teste" por aviso; recusar número da própria conta |
+| Distribuição de atendimento | `/distribuicao` | AH melhor | Só um aviso ao salvar uma fila sem corretor elegível |
+| Equipe | `/equipe` (`team-lite.tsx`) | Igual | Colunas "Último acesso" e "Carga" (leads ativos / capacidade); selo "No plantão agora" |
+
+### 7.2 CRM
+
+| Módulo DC | Equivalente AH | Veredito | O que trazer |
+|---|---|---|---|
+| Prospecção | Call Âncora, base fria | Não se aplica | Raspagem do Maps e IA fria no WhatsApp: risco de bloqueio e LGPD |
+| Funis | `/leads` kanban e lista | AH melhor | Exportar CSV real (hoje `alert()` em `leads-lite-bulk.tsx:53`); "Etiqueta…" em lote; ⋯ no cartão (Próxima etapa, Nova tarefa, Perdido); filtro "Com tarefa atrasada" |
+| Etapas do funil | estados fixos com regra | Igual | Funil de corretora é fixo de propósito (SLA, distribuição, pós-venda) |
+| Campanhas | pós-venda `/equipe/pos-venda` | Igual | "Enviar teste para mim" antes do disparo; "Duplicar" envio |
+| Contatos | `/clientes` | Trazer | "Anonimizar (LGPD)" no ⋯; depois "Possível duplicado" com Juntar |
+| Empresas | `/empresas` em grade de cartões | Trazer | Tabela Lite + gaveta com leads PJ; "Consultar CNPJ" (BrasilAPI) avisando CNPJ não ativo, que não assina PME |
+| Pessoas | contato no lead PJ | Não se aplica | No máximo "Decisor e cargo" no lead PJ |
+| Tarefas | `leadTasks`, só no `/agenda` do corretor | Trazer | Tela `/tarefas` Lite agrupada por prazo, Minhas / Da equipe; editar tarefa |
+| Planos de tarefa | não há | Trazer pequeno | Atalhos na "Nova tarefa" (Ligar amanhã 9h, Cobrar documentos, Retornar cotação, Confirmar carteirinha); sequência de pós-venda D+1, D+15, D+30 |
+| Chamadas | `/call-ancora` | AH melhor | "Minhas ligações" com Não atendeu e Caixa postal para religar |
+| Produtos | catálogo de planos e `/cotacao` | AH melhor | Nada |
+| Importações | `/marketing/importacoes` | Trazer | Clicar no histórico abre o resultado linha a linha (dados já em `marketing_import_results`), "Só problemas", baixar erros, planilha modelo |
+| Propostas do dia a dia | `/vendas?tab=propostas` | Trazer | "Enviar no WhatsApp" como ação principal (link público na conversa do lead); "Em revisão" primeiro |
+| Propostas (configuração) | validade digitada toda vez | Trazer | Validade e condições padrão da corretora |
+| Modelos de proposta | cotação da operadora | Não se aplica | O documento é a tabela da operadora |
+| Comandas | não há | Não se aplica | Balcão de clínica |
+| Financeiro | ERP `/financeiro` | AH melhor | "Repetir todo mês" nas despesas, sempre como pendente |
+| Meta de vendas | `/metas` com escopos | AH melhor | Nada |
+
+### 7.3 Agente de IA
+
+| Módulo DC | Equivalente AH | Veredito | O que trazer |
+|---|---|---|---|
+| Agentes | `/qualificacao` (uma IA) | Trazer em parte | Histórico do prompt com "Restaurar como nova versão"; "Confere antes de enviar" à vista (as 13 guardas); playbooks fora de `customInstructions` |
+| Follow-ups | Recuperação e Turbo | AH melhor no motor | "Onde está agora" e Pausar, Pular e Encerrar na gaveta do lead; selo "Não dispara ainda" nas regras inertes |
+| Fluxos de atendimento | `/atendimento/fluxo`, fluxos por fila | Igual | Nada |
+| Roteadores | uma IA, rotas por fila | Não se aplica | |
+| Credenciais | chaves da plataforma | Não se aplica ao diretor | Selo de validação no super-admin |
+| Provedores | perfis com fallback | AH melhor | "Se falhar:" por perfil no super-admin |
+| Conhecimento | Materiais das operadoras com fatos revisados | AH melhor | Motivo da falha à vista na gaveta do material |
+| Memória | Situações aprendidas | Trazer só versões | Junto do histórico do prompt; arquivar e reativar situação |
+| Skills | Situações | Igual | Nada |
+| Casos | transferência binária para o corretor | Trazer reduzido | "Pergunta para a direção": a IA consulta a direção (carência, rede, preço fora do material) e segue falando com o cliente |
+| Alertas da IA | alertas no Simulador | Trazer (feito, AL1) | Os alertas eram exemplos falsos gravados no banco. Agora são calculados dos fatos (lead sem corretor há 15 min, falhas seguidas da IA), com "O que fazer" e "Abrir" |
+| Aviso no WhatsApp | avisos da equipe | Trazer depois de Casos | Aviso "IA precisa de decisão" |
+| Propostas da IA | próxima ação por regra | Igual | Nada |
+| Execuções | só totais | Trazer | "Últimas execuções" em Conectividade, com falha explicada |
+| Uso e orçamento | orçamento da plataforma | Igual | Custo por tipo de uso no super-admin; nunca "parar a IA", porque derruba a entrada de leads |
+
+### 7.4 Canais, Análise e Configurações
+
+| Módulo DC | Equivalente AH | Veredito | O que trazer |
+|---|---|---|---|
+| Conexões | `/integrations`, vigia de autorreparo | Trazer em parte | Tabela "WhatsApp da equipe" (quem caiu) para o diretor; proteção de envio à vista |
+| Webhooks | fontes de captura em `/settings?tab=integracoes` | Trazer | "Recebidos" na gaveta da fonte, com motivo (dados já em `webhook_deliveries`) |
+| Desempenho | `/dashboard`, `/relatorios`, `/noc` | AH melhor | Previsão ponderada por etapa |
+| Meta Ads, conexão | `/marketing/campanhas`, OAuth | AH melhor | Nada |
+| Conversões | CAPI com contador de recusados | Trazer | Lista das recusas com "Tentar de novo"; links rastreáveis de WhatsApp por origem |
+| Atividades | audit e histórico | Trazer enxuto | Equipe, IA e Automático no painel |
+| Perfil | `/settings` Minha conta | AH melhor | Nada |
+| Segurança | 2FA e passkeys | Trazer | "Exigir da equipe" com carência (dado de saúde e CPF) |
+| Notificações | `/notificacoes`, 36 tipos | Trazer em parte | Preferência por tipo; privacidade do push com celular bloqueado |
+| App no celular | PWA | Igual | Link "Celular não avisa? Instale o app" |
+| Automações | `/fluxos-whatsapp` | AH melhor | "Execuções" do fluxo (`crm_automation_logs`) |
+| Tags | gerenciador simples | Trazer | Tabela com contagem, renomear, juntar; contato interno fora de lead e IA |
+| Recursos opcionais | flags só no super-admin | Trazer | Seção "Recursos" só leitura para o diretor |
+| Organização | Empresa só leitura | Trazer em parte | DPO e política de privacidade; retenção de mídia |
+| Marca | logo e cor | Trazer pequeno | Aviso de contraste |
+| Plano e cobrança | `/assinatura` | Não se aplica | "Falar com o comercial" no lugar do botão desligado |
+| LGPD | consentimento no cadastro | Trazer | Pedido do titular: exportar e anonimizar na ficha, prazo D+15 |
+| API tokens, Trunk SIP, MCP externo, Extensões, Dados externos, Atualização | | Não se aplica | |
+| Admin da plataforma | `/super-admin` | Igual | Filtro de empresa no audit; alertas e uso de IA por empresa |
+
+### 7.5 Lotes de implementação
+Cada lote vira commits em `docs/deskcomm-engenharia-reversa`, juntados em `preview/3005`.
+
+1. **Lote 1, uso diário e pequeno:** alertas reais (feito), exportar CSV de leads, atalhos de "Nova tarefa", respostas rápidas reais na central, "Recebidos" da fonte de captura, resultado linha a linha da importação, "Último acesso" na equipe.
+2. **Lote 2, uso diário médio:** `/tarefas`, "Esfriando" em `/leads`, ⋯ no cartão do kanban, execuções da IA, WhatsApp da equipe, "Enviar no WhatsApp" e padrões da proposta.
+3. **Lote 3, gestão e conformidade:** recursos, etiquetas, contato interno, 2FA da equipe, LGPD, recusas da CAPI, CNPJ e empresas, histórico do prompt.

@@ -6,6 +6,7 @@
  */
 import { useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
+import Link from "next/link";
 
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
@@ -18,6 +19,12 @@ import styles from "./qualification-lite.module.css";
 
 const MEMORY_FIELDS: Array<[keyof SimMemory, string]> = [["nome", "Nome"], ["plano", "Plano"], ["vidas", "Vidas"], ["idade", "Idade"], ["cidade", "Cidade"], ["email", "E-mail"]];
 const LEVEL_LABEL: Record<string, string> = { critical: "Crítico", warning: "Atenção", info: "Informação" };
+const ALERT_TITLE: Record<string, string> = {
+  queue_no_broker: "Lead sem corretor",
+  ai_send_failed: "IA sem conseguir responder",
+  qualified_without_routing: "Qualificado sem fila",
+  whatsapp_latency_spike: "WhatsApp lento",
+};
 
 export function SimulatorTabLite({ alerts, onAcknowledge, alertsStatus, messages, input, onInput, onSend, loading, memory }: {
   alerts: QualificationAlertRecord[];
@@ -49,12 +56,14 @@ export function SimulatorTabLite({ alerts, onAcknowledge, alertsStatus, messages
                 <span className={sections.rowText}>
                   <span className={sections.badges} style={{ alignItems: "center" }}>
                     <span className={page.badge} data-tone={alert.level === "critical" ? "danger" : "warning"}>{LEVEL_LABEL[alert.level] ?? alert.level}</span>
-                    <span className={sections.rowTitle}>{alert.alertType}</span>
+                    <span className={sections.rowTitle}>{ALERT_TITLE[alert.alertType] ?? "Alerta da operação"}</span>
                   </span>
                   <span className={sections.rowDescription}>{alert.message}</span>
-                  {alert.suggestedAction ? <span className={sections.itemSub}>Ação recomendada: {alert.suggestedAction}</span> : null}
+                  {alert.suggestedAction ? <span className={sections.itemSub}>O que fazer: {alert.suggestedAction}</span> : null}
+                  {alert.live ? <span className={sections.itemSub}>Some sozinho quando o problema acabar.</span> : null}
                 </span>
-                {alert.status === "active" ? <button type="button" className={page.button} disabled={alertsStatus?.state === "busy"} aria-busy={(alertsStatus?.state === "busy" && resolving === alert.id) || undefined} onClick={() => { setResolving(alert.id); onAcknowledge(alert.id); }}><BusyLabel busy={alertsStatus?.state === "busy" && resolving === alert.id} label="Resolvendo…">Resolver alerta</BusyLabel></button> : null}
+                {alert.href ? <Link href={alert.href} className={page.button}>Abrir</Link> : null}
+                {alert.status === "active" && !alert.live ? <button type="button" className={page.button} disabled={alertsStatus?.state === "busy"} aria-busy={(alertsStatus?.state === "busy" && resolving === alert.id) || undefined} onClick={() => { setResolving(alert.id); onAcknowledge(alert.id); }}><BusyLabel busy={alertsStatus?.state === "busy" && resolving === alert.id} label="Resolvendo…">Resolver alerta</BusyLabel></button> : null}
               </li>
             ))}
           </ul>
