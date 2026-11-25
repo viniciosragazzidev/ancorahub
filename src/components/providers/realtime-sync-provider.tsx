@@ -17,7 +17,7 @@ import {
   dispatchRealtimeSyncEvent,
   type RealtimeSyncBrowserDetail,
 } from "@/components/providers/realtime-events";
-import { createClient, logSupabaseRealtimeDiagnostic } from "@/utils/supabase/client";
+import { logSupabaseRealtimeDiagnostic } from "@/utils/supabase/client";
 
 interface RealtimeSyncProviderProps {
   children: React.ReactNode;
@@ -372,7 +372,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
 
   useEffect(() => {
     if (!syncTopic) return;
-    const supabase = createClient();
+    if (typeof EventSource === "undefined") return;
     const clearRealtimeFailureTimer = () => {
       if (realtimeFailureTimerRef.current === null) return;
       window.clearTimeout(realtimeFailureTimerRef.current);
@@ -385,43 +385,47 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
         setIsOnline(false);
       }, REALTIME_FAILURE_GRACE_MS);
     };
-    const channel = supabase
-      .channel(syncTopic, { config: { broadcast: { self: false } } })
-      .on("broadcast", { event: "refresh" }, (payload) => {
-        clearRealtimeFailureTimer();
-        const signal = payload.payload as Partial<RealtimeSyncBrowserDetail>;
-        if (signal.kind === "domain.invalidated") {
-          setIsOnline(true);
-          handleRemoteSignal({ kind: "domain.invalidated", domain: signal.domain });
-          return;
-        }
-        if (!signal.notificationId || (signal.kind !== "notification.created" && signal.kind !== "notification.read")) return;
+    // 25/11: canal próprio (SSE em /api/realtime/stream, pg_notify no servidor), sem o Supabase
+    // Realtime. O servidor escolhe o tópico pela sessão; o EventSource reconecta sozinho.
+    const source = new EventSource("/api/realtime/stream");
+    source.addEventListener("ready", () => {
+      logSupabaseRealtimeDiagnostic({ event: "subscription_status", status: "SUBSCRIBED", errorPresent: false });
+      clearRealtimeFailureTimer();
+      setIsOnline(true);
+      setIsRealtimeLive(true);
+      setLastSyncedAt(Date.now());
+      // Reconectar significa que avisos podem ter se perdido enquanto o canal estava fora.
+      if (hasSubscribedRef.current) scheduleServerRefresh();
+      hasSubscribedRef.current = true;
+    });
+    source.addEventListener("refresh", (event) => {
+      clearRealtimeFailureTimer();
+      let signal: Partial<RealtimeSyncBrowserDetail>;
+      try {
+        signal = JSON.parse((event as MessageEvent<string>).data) as Partial<RealtimeSyncBrowserDetail>;
+      } catch {
+        return;
+      }
+      if (signal.kind === "domain.invalidated") {
         setIsOnline(true);
-        handleRemoteSignal({ kind: signal.kind, notificationId: signal.notificationId });
-      })
-      .subscribe((status, error) => {
-        logSupabaseRealtimeDiagnostic({
-          event: "subscription_status",
-          status,
-          errorPresent: Boolean(error),
-        });
-        if (shouldDelayRealtimeUnavailable(status)) scheduleRealtimeUnavailable();
-        if (status !== "SUBSCRIBED") setIsRealtimeLive(false);
-        if (status === "SUBSCRIBED") {
-          clearRealtimeFailureTimer();
-          setIsOnline(true);
-          setIsRealtimeLive(true);
-          setLastSyncedAt(Date.now());
-          // A re-subscription means signals may have been lost while the channel was down.
-          if (hasSubscribedRef.current) scheduleServerRefresh();
-          hasSubscribedRef.current = true;
-        }
-      });
+        handleRemoteSignal({ kind: "domain.invalidated", domain: signal.domain });
+        return;
+      }
+      if (!signal.notificationId || (signal.kind !== "notification.created" && signal.kind !== "notification.read")) return;
+      setIsOnline(true);
+      handleRemoteSignal({ kind: signal.kind, notificationId: signal.notificationId });
+    });
+    source.onerror = () => {
+      logSupabaseRealtimeDiagnostic({ event: "subscription_status", status: "CHANNEL_ERROR", errorPresent: true });
+      setIsRealtimeLive(false);
+      scheduleRealtimeUnavailable();
+      // 401/204 fecham de vez (CLOSED): fica na conferência periódica, sem insistir.
+    };
     logSupabaseRealtimeDiagnostic({ event: "subscribe_requested" });
     return () => {
       clearRealtimeFailureTimer();
       setIsRealtimeLive(false);
-      void supabase.removeChannel(channel);
+      source.close();
     };
   }, [handleRemoteSignal, scheduleServerRefresh, syncTopic]);
 
