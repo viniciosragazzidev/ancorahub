@@ -6,7 +6,7 @@ import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
-import { isSupervisorObservationInScope, readSupervisorObservation, readSupervisorObservationStage } from "./observations-core";
+import { isSupervisorObservationInScope, pageSupervisorObservationRows, readSupervisorObservation, readSupervisorObservationStage } from "./observations-core";
 
 const PAGE_SIZE = 50;
 
@@ -41,8 +41,10 @@ export async function getSupervisorObservationPage(context: TenantContext, filte
   const brokerIds = brokers.map((broker) => broker.id);
   if (!brokerIds.length) return { brokers, observations: [], hasMore: false, next: null };
 
-  const beforeDate = filter.beforeAt ? new Date(filter.beforeAt) : null;
-  const validCursor = beforeDate && Number.isFinite(beforeDate.getTime()) && filter.beforeId ? beforeDate : null;
+  const beforeAt = filter.beforeAt?.trim() ?? "";
+  const validCursor = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/.test(beforeAt)
+    && Number.isFinite(Date.parse(beforeAt))
+    && Boolean(filter.beforeId?.trim());
   const stage = (STAGES as readonly string[]).includes(filter.stage ?? "") ? filter.stage as SupervisorObservationStage : null;
   const observationExists = sql`(nullif(trim(${schema.leadInteractions.metadata}->>'observation'), '') is not null or ${schema.leadInteractions.conteudo} ilike '%Como foi o contato:%')`;
   const stageAtObservation = sql<string | null>`${schema.leadInteractions.metadata}->>'toStatus'`;
@@ -59,6 +61,7 @@ export async function getSupervisorObservationPage(context: TenantContext, filte
     content: schema.leadInteractions.conteudo,
     stage: stageAtObservation,
     createdAt: schema.leadInteractions.createdAt,
+    createdAtCursor: sql<string>`${schema.leadInteractions.createdAt}::text`,
   }).from(schema.leadInteractions)
     .innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadInteractions.leadId), eq(schema.leads.tenantId, context.tenantId)))
     .innerJoin(schema.user, eq(schema.user.id, schema.leadInteractions.userId))
@@ -73,26 +76,24 @@ export async function getSupervisorObservationPage(context: TenantContext, filte
       isNull(schema.leads.archivedAt),
       filter.brokerId ? eq(schema.leadInteractions.userId, filter.brokerId) : undefined,
       stage ? or(eq(stageAtObservation, stage), sql`${schema.leadInteractions.conteudo} ilike ${`Status alterado: % → ${LEGACY_STAGE_LABELS[stage]}.%`}`, stage === "contacted" ? sql`${schema.leadInteractions.conteudo} ilike 'Novo contato registrado.%'` : undefined) : undefined,
-      validCursor ? or(lt(schema.leadInteractions.createdAt, validCursor), and(eq(schema.leadInteractions.createdAt, validCursor), lt(schema.leadInteractions.id, filter.beforeId!))) : undefined,
+      validCursor ? or(lt(schema.leadInteractions.createdAt, sql`${beforeAt}::timestamptz`), and(eq(schema.leadInteractions.createdAt, sql`${beforeAt}::timestamptz`), lt(schema.leadInteractions.id, filter.beforeId!.trim()))) : undefined,
     ))
     .orderBy(desc(schema.leadInteractions.createdAt), desc(schema.leadInteractions.id))
     .limit(PAGE_SIZE + 1);
 
-  const pageRows = rows.slice(0, PAGE_SIZE);
+  const page = pageSupervisorObservationRows(rows, PAGE_SIZE);
   const scope = { role: context.role, tenantId: context.tenantId, branchId: context.branchId, supervisorId: context.userId, teamBrokerIds: brokerIds };
-  const observations = pageRows.flatMap((row) => {
+  const observations = page.pageRows.flatMap((row) => {
     if (!isSupervisorObservationInScope(scope, { tenantId: row.tenantId, branchId: row.branchId, leadOwnerId: row.leadOwnerId, authorId: row.authorId })) return [];
     const observation = readSupervisorObservation(row.metadata, row.content);
     if (!observation) return [];
     return [{ id: row.id, leadId: row.leadId, leadName: row.leadName, brokerId: row.authorId, brokerName: row.authorName, stage: readSupervisorObservationStage(row.metadata, row.content), text: observation, createdAt: row.createdAt.toISOString() }];
   });
-  const last = observations.at(-1);
-
   return {
     brokers,
     observations,
-    hasMore: rows.length > PAGE_SIZE,
-    next: rows.length > PAGE_SIZE && last ? { beforeAt: last.createdAt, beforeId: last.id } : null,
+    hasMore: page.hasMore,
+    next: page.next,
   };
 }
 

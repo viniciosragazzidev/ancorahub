@@ -1,4 +1,5 @@
-import { importedFirstContactDueAt, importedFirstContactHours, isImportedLeadPending, isTeamListLead } from "@/features/broker-workspace/imported-first-contact";
+import { importedFirstContactHours, isTeamListLead } from "@/features/broker-workspace/imported-first-contact";
+import { resolveFirstContactSla } from "@/features/broker-workspace/priority";
 
 export type SupervisorPendingReason = "offer_waiting" | "first_contact_overdue" | "return_overdue";
 
@@ -40,37 +41,26 @@ export function classifyFirstContact(input: {
   assignedAt: Date | null;
   firstContactAt: Date | null;
   stageEnteredAt: Date | null;
-  latestMessageAt: Date | null;
+  latestMessageAt?: Date | null;
+  hasAnyMessage?: boolean;
   slaMinutes: number;
   now: Date;
 }): SupervisorPendingItem | null {
-  const teamList = isTeamListLead(input.sourceChannel);
-  // A lista da equipe entra em atendimento já na distribuição. Ela tem o prazo próprio
-  // e só deixa de ser pendência quando houver contato ou avanço de etapa.
-  if (!input.assignedAt || (teamList ? input.status !== "in_contact" : !["new", "distributed"].includes(input.status))) return null;
-  const recordedContact = input.firstContactAt ?? input.latestMessageAt ?? (teamList && input.status !== "in_contact" ? input.stageEnteredAt : null);
-  if (recordedContact) return null;
-
-  if (teamList) {
-    const hours = importedFirstContactHours(input.sourceMetadata);
-    if (!isImportedLeadPending({ assignedAt: input.assignedAt, contacted: false, hours, now: input.now })) return null;
-    const dueAt = importedFirstContactDueAt(input.assignedAt, hours);
-    const elapsedMinutes = Math.max(0, Math.floor((input.now.getTime() - (dueAt?.getTime() ?? input.now.getTime())) / 60_000));
-    return {
-      id: `first-contact:${input.leadId}`,
-      reason: "first_contact_overdue",
-      leadId: input.leadId,
-      leadName: input.name,
-      brokerId: input.brokerId,
-      brokerName: input.brokerName,
-      dueAt: dueAt?.toISOString() ?? null,
-      detail: `Sem primeiro contato após ${hours} h da lista importada · ${elapsedMinutes} min vencido`,
-    };
-  }
-
-  const dueAt = new Date(input.assignedAt.getTime() + Math.max(1, input.slaMinutes) * 60_000);
-  if (dueAt.getTime() > input.now.getTime()) return null;
-  const elapsedMinutes = Math.max(0, Math.floor((input.now.getTime() - dueAt.getTime()) / 60_000));
+  const imported = isTeamListLead(input.sourceChannel);
+  const hours = imported ? importedFirstContactHours(input.sourceMetadata) : null;
+  const sla = resolveFirstContactSla({
+    status: input.status,
+    sourceChannel: input.sourceChannel,
+    importedFirstContactHours: hours,
+    assignedAt: input.assignedAt,
+    firstContactAt: input.firstContactAt,
+    stageEnteredAt: input.stageEnteredAt,
+    hasAnyMessage: input.hasAnyMessage ?? Boolean(input.latestMessageAt),
+    slaFirstContactMinutes: input.slaMinutes,
+    now: input.now,
+  });
+  if (!sla || sla.state !== "overdue") return null;
+  const elapsedMinutes = Math.max(0, Math.floor((input.now.getTime() - sla.dueAt.getTime()) / 60_000));
   return {
     id: `first-contact:${input.leadId}`,
     reason: "first_contact_overdue",
@@ -78,11 +68,12 @@ export function classifyFirstContact(input: {
     leadName: input.name,
     brokerId: input.brokerId,
     brokerName: input.brokerName,
-    dueAt: dueAt.toISOString(),
-    detail: `Sem primeiro contato após o SLA · ${elapsedMinutes} min vencido`,
+    dueAt: sla.dueAt.toISOString(),
+    detail: sla.imported
+      ? `Sem primeiro contato ap\u00f3s ${hours ?? 24} h da lista importada \u00b7 ${elapsedMinutes} min vencido`
+      : `Sem primeiro contato ap\u00f3s o SLA \u00b7 ${elapsedMinutes} min vencido`,
   };
 }
-
 export function isShiftActiveNow(startsAt: string, endsAt: string, nowTime: string, paused: boolean) {
   if (paused) return false;
   const toMinutes = (value: string) => {
@@ -95,7 +86,7 @@ export function isShiftActiveNow(startsAt: string, endsAt: string, nowTime: stri
   return end >= start ? current >= start && current < end : current >= start || current < end;
 }
 
-export function groupSupervisorPendencies(items: SupervisorPendingItem[]) {
+export function groupSupervisorPendencies(items: SupervisorPendingItem[], maxItemsPerReason = 50) {
   const order: SupervisorPendingReason[] = ["offer_waiting", "first_contact_overdue", "return_overdue"];
   return order.flatMap((reason) => {
     const groupItems = items.filter((item) => item.reason === reason).sort((left, right) => {
@@ -103,6 +94,6 @@ export function groupSupervisorPendencies(items: SupervisorPendingItem[]) {
       const rightDue = right.dueAt ? Date.parse(right.dueAt) : 0;
       return leftDue - rightDue || left.leadName.localeCompare(right.leadName, "pt-BR");
     });
-    return groupItems.length ? [{ reason, count: groupItems.length, items: groupItems }] : [];
+    return groupItems.length ? [{ reason, count: groupItems.length, items: groupItems.slice(0, maxItemsPerReason) }] : [];
   });
 }

@@ -85,7 +85,7 @@ function BrokerObservations({ items }: { items: TimelineItem[] }) {
     {observations.length ? <ol className="grid gap-3">{observations.map((item) => <li key={item.id} className="border-b border-(--border) pb-3 last:border-b-0">
       <p className="text-xs text-(--text-muted)">Etapa: {item.observationStage ? stageLabel(item.observationStage) : "Etapa não identificada"}</p>
       <p className="whitespace-pre-wrap break-words text-sm leading-6 text-(--text-secondary)">{item.text}</p>
-      <time className="mt-1 block text-xs text-(--text-muted)" dateTime={new Date(item.createdAt).toISOString()}>{item.userName ? `${item.userName} Â· ` : ""}{dateFormat.format(new Date(item.createdAt))}</time>
+      <time className="mt-1 block text-xs text-(--text-muted)" dateTime={new Date(item.createdAt).toISOString()}>{item.userName ? `${item.userName} · ` : ""}{dateFormat.format(new Date(item.createdAt))}</time>
     </li>)}</ol> : <p className="text-sm text-(--text-secondary)">O corretor ainda não registrou observações neste lead.</p>}
   </section>;
 }

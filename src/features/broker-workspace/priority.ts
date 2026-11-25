@@ -1,4 +1,4 @@
-import { importedFirstContactDueAt } from "./imported-first-contact";
+import { IMPORTED_FIRST_CONTACT_HOURS, importedFirstContactDueAt, isTeamListLead } from "./imported-first-contact";
 
 export type BrokerWorkspaceActionKind =
   | "awaiting_response"
@@ -20,7 +20,9 @@ export type BrokerWorkspacePriorityLead = {
   createdAt: Date;
   assignedAt: Date | null;
   firstContactAt: Date | null;
-  stageEnteredAt: Date;
+  stageEnteredAt: Date | null;
+  sourceChannel?: string | null;
+  hasAnyMessage?: boolean;
   lastIncomingAt: Date | null;
   hasPendingQuote: boolean;
   pendingDocumentCount: number;
@@ -60,7 +62,7 @@ export type BrokerWorkspacePriorityInput = {
   stagnantDays?: number;
 };
 
-const activeLeadStatuses = new Set([
+export const BROKER_WORKSPACE_ACTIVE_LEAD_STATUSES = [
   "new",
   "distributed",
   "in_contact",
@@ -70,7 +72,46 @@ const activeLeadStatuses = new Set([
   "documentation_pending",
   "under_analysis",
   "awaiting_reply",
-]);
+] as const;
+
+const activeLeadStatuses = new Set<string>(BROKER_WORKSPACE_ACTIVE_LEAD_STATUSES);
+
+export type FirstContactSlaInput = {
+  status: string;
+  sourceChannel?: string | null;
+  importedFirstContactHours?: number | null;
+  assignedAt: Date | null;
+  firstContactAt: Date | null;
+  stageEnteredAt: Date | null;
+  hasAnyMessage?: boolean;
+  slaFirstContactMinutes: number;
+  now?: Date;
+};
+
+/** Single source of truth for broker and supervisor first-contact pendencies. */
+export function resolveFirstContactSla(input: FirstContactSlaInput): { state: "overdue" | "risk"; dueAt: Date; imported: boolean } | null {
+  if (!activeLeadStatuses.has(input.status) || input.firstContactAt || !input.assignedAt) return null;
+  const now = input.now ?? new Date();
+  const imported = isTeamListLead(input.sourceChannel) || input.importedFirstContactHours != null;
+
+  if (imported) {
+    const hours = input.importedFirstContactHours ?? IMPORTED_FIRST_CONTACT_HOURS;
+    const dueAt = importedFirstContactDueAt(input.assignedAt, hours);
+    const advancedFromInitialStage = input.status !== "in_contact" && input.stageEnteredAt !== null;
+    if (input.hasAnyMessage || advancedFromInitialStage || !dueAt || dueAt.getTime() > now.getTime()) return null;
+    return { state: "overdue", dueAt, imported: true };
+  }
+
+  const safeSlaMinutes = Math.max(1, input.slaFirstContactMinutes);
+  const dueAt = new Date(input.assignedAt.getTime() + safeSlaMinutes * 60_000);
+  if (dueAt.getTime() <= now.getTime()) return { state: "overdue", dueAt, imported: false };
+  const riskMs = Math.max(10 * 60_000, Math.round(safeSlaMinutes * 0.2) * 60_000);
+  return dueAt.getTime() - now.getTime() <= riskMs ? { state: "risk", dueAt, imported: false } : null;
+}
+
+export function isFirstContactOverdue(input: FirstContactSlaInput) {
+  return resolveFirstContactSla(input)?.state === "overdue";
+}
 
 const kindOrder: Record<BrokerWorkspaceActionKind, number> = {
   awaiting_response: 0,
@@ -97,7 +138,6 @@ function addLeadPriority(
   dueAt: Date | null,
   description: string,
 ) {
-  const isConversation = kind === "awaiting_response";
   priorities.push({
     kind,
     severity,
@@ -118,7 +158,6 @@ export function prioritizeBrokerWorkspace(input: BrokerWorkspacePriorityInput): 
   const now = input.now ?? new Date();
   const stagnantMs = (input.stagnantDays ?? 3) * 24 * 60 * 60 * 1000;
   const safeSlaMinutes = Math.max(1, input.slaFirstContactMinutes);
-  const slaRiskMs = Math.max(10 * 60 * 1000, Math.round(safeSlaMinutes * 0.2) * 60 * 1000);
   const priorities: BrokerWorkspacePriority[] = [];
   const leadsById = new Map(input.leads.map((lead) => [lead.id, lead]));
 
@@ -129,19 +168,11 @@ export function prioritizeBrokerWorkspace(input: BrokerWorkspacePriorityInput): 
       addLeadPriority(priorities, lead, "awaiting_response", "critical", lead.lastIncomingAt, null, "Cliente aguardando resposta.");
     }
 
-    if (!lead.firstContactAt && lead.assignedAt && lead.importedFirstContactHours) {
-      // Lista fria: sem "perto do limite"; só vira pendência quando o prazo da importação passa sem contato.
-      const dueAt = importedFirstContactDueAt(lead.assignedAt, lead.importedFirstContactHours);
-      if (dueAt && dueAt.getTime() <= now.getTime()) {
-        addLeadPriority(priorities, lead, "sla_overdue", "critical", lead.assignedAt, dueAt, "Prazo do primeiro contato da lista venceu.");
-      }
-    } else if (!lead.firstContactAt && lead.assignedAt) {
-      const slaAt = new Date(lead.assignedAt.getTime() + safeSlaMinutes * 60 * 1000);
-      if (slaAt.getTime() <= now.getTime()) {
-        addLeadPriority(priorities, lead, "sla_overdue", "critical", lead.assignedAt, slaAt, "SLA de primeiro contato vencido.");
-      } else if (slaAt.getTime() - now.getTime() <= slaRiskMs) {
-        addLeadPriority(priorities, lead, "sla_risk", "warning", lead.assignedAt, slaAt, "SLA de primeiro contato próximo do limite.");
-      }
+    const firstContactSla = resolveFirstContactSla({ ...lead, slaFirstContactMinutes: safeSlaMinutes, now });
+    if (firstContactSla?.state === "overdue") {
+      addLeadPriority(priorities, lead, "sla_overdue", "critical", lead.assignedAt!, firstContactSla.dueAt, firstContactSla.imported ? "Prazo do primeiro contato da lista venceu." : "SLA de primeiro contato vencido.");
+    } else if (firstContactSla?.state === "risk") {
+      addLeadPriority(priorities, lead, "sla_risk", "warning", lead.assignedAt!, firstContactSla.dueAt, "SLA de primeiro contato pr\u00f3ximo do limite.");
     }
 
     if (lead.status === "new" || lead.status === "distributed") {
@@ -153,7 +184,7 @@ export function prioritizeBrokerWorkspace(input: BrokerWorkspacePriorityInput): 
     if (lead.pendingDocumentCount > 0) {
       addLeadPriority(priorities, lead, "document_pending", "normal", lead.createdAt, null, "Há documentos pendentes neste atendimento.");
     }
-    if (now.getTime() - lead.stageEnteredAt.getTime() >= stagnantMs) {
+    if (lead.stageEnteredAt && now.getTime() - lead.stageEnteredAt.getTime() >= stagnantMs) {
       addLeadPriority(priorities, lead, "follow_up_stalled", "warning", lead.stageEnteredAt, null, "Negociação sem avanço na etapa atual.");
     }
   }
@@ -204,23 +235,13 @@ export function getNextBrokerWorkspaceAction(input: BrokerWorkspacePriorityInput
   return prioritizeBrokerWorkspace(input)[0] ?? null;
 }
 
-/**
- * First-contact SLA state of one lead, with the same window the priority queue uses:
- * "overdue" once the deadline passed, "risk" inside the last 20% of the SLA (at least 10 minutes).
- * Only leads without a first contact and with an assignment date can be in either state.
- */
+/** Compatibility wrapper for callers that only need the hot-lead window. */
 export function resolveSlaFirstContactState(input: {
   firstContactAt: Date | null;
   assignedAt: Date | null;
   slaFirstContactMinutes: number;
   now?: Date;
 }): { state: "overdue" | "risk"; slaAt: Date } | null {
-  if (input.firstContactAt || !input.assignedAt) return null;
-  const now = input.now ?? new Date();
-  const safeSlaMinutes = Math.max(1, input.slaFirstContactMinutes);
-  const slaRiskMs = Math.max(10 * 60 * 1000, Math.round(safeSlaMinutes * 0.2) * 60 * 1000);
-  const slaAt = new Date(input.assignedAt.getTime() + safeSlaMinutes * 60 * 1000);
-  if (slaAt.getTime() <= now.getTime()) return { state: "overdue", slaAt };
-  if (slaAt.getTime() - now.getTime() <= slaRiskMs) return { state: "risk", slaAt };
-  return null;
+  const result = resolveFirstContactSla({ ...input, status: "in_contact", stageEnteredAt: null });
+  return result ? { state: result.state, slaAt: result.dueAt } : null;
 }

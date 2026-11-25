@@ -1,12 +1,13 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getLocalDutyParts } from "@/features/leads/assignment";
 import { periodDay } from "@/features/engagement/scoring";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
+import { BROKER_WORKSPACE_ACTIVE_LEAD_STATUSES } from "@/features/broker-workspace/priority";
 
 import { classifyFirstContact, groupSupervisorPendencies, isOfferActionable, isReturnTaskOverdue, isShiftActiveNow, type SupervisorPendingItem, type SupervisorPendingReason } from "./control-core";
 
@@ -50,9 +51,35 @@ function recordCounts(rows: Array<{ brokerId: string; total: number | string }>)
   return new Map(rows.map((row) => [row.brokerId, Number(row.total ?? 0)]));
 }
 
-function parseMessageRows(result: unknown): Array<{ lead_id: string; sent_at: Date | string }> {
-  const rows = Array.isArray(result) ? result : (result as { rows?: unknown[] } | null)?.rows ?? [];
-  return rows as Array<{ lead_id: string; sent_at: Date | string }>;
+type FirstContactCandidate = {
+  leadId: string;
+  name: string;
+  status: string;
+  sourceChannel: string | null;
+  sourceMetadata: unknown;
+  assignedAt: Date | string | null;
+  firstContactAt: Date | string | null;
+  stageEnteredAt: Date | string | null;
+  hasAnyMessage: boolean;
+  brokerId: string;
+};
+
+function parseCandidateAggregate(value: unknown): Omit<FirstContactCandidate, "brokerId">[] {
+  if (Array.isArray(value)) return value as Omit<FirstContactCandidate, "brokerId">[];
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed as Omit<FirstContactCandidate, "brokerId">[] : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function nullableDate(value: Date | string | null) {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
 }
 
 /** Dados mínimos do painel de controle; todos os joins e filtros partem da sessão do supervisor. */
@@ -88,36 +115,35 @@ export async function getSupervisorControlData(context: TenantContext, now = new
 
   const inServiceSql = sql`count(*) filter (where ${inArray(leads.status, [...ACTIVE_SERVICE])})::int`;
   const contactsSql = sql`count(*) filter (where ${leads.firstContactAt} >= ${todayStart.toISOString()}::timestamptz and ${leads.firstContactAt} < ${tomorrowStart.toISOString()}::timestamptz)::int`;
-  const importedHours = sql`case when ${leads.sourceMetadata}->>'firstContactHours' in ('4', '12', '24', '48', '72') then (${leads.sourceMetadata}->>'firstContactHours')::int else 24 end`;
-  const importedPendingSql = sql`(
-    ${leads.sourceChannel} = 'supervisor_import'
-    and ${leads.status} = 'in_contact'
-    and ${leads.firstContactAt} is null
+  const candidateWindowSql = sql`(
+    ${leads.firstContactAt} is null
     and ${leads.assignedAt} is not null
-    and ${leads.assignedAt} + (${importedHours} * interval '1 hour') <= ${now.toISOString()}::timestamptz
-    and not exists (
-      select 1 from whatsapp_messages wm
-      where wm.tenant_id = ${leads.tenantId} and wm.lead_id = ${leads.id}
-        and coalesce(wm.provider_status, '') not in ('failed', 'deleted')
-        and coalesce(wm.message_id, '') not ilike '%status@broadcast%'
-        and not (wm.media_kind is null and lower(trim(coalesce(wm.body, ''))) in ('', '[text]'))
+    and ${inArray(leads.status, [...BROKER_WORKSPACE_ACTIVE_LEAD_STATUSES])}
+    and (
+      (${leads.sourceChannel} = 'supervisor_import' and ${leads.assignedAt} <= ${now.toISOString()}::timestamptz - interval '4 hours')
+      or (${leads.sourceChannel} is distinct from 'supervisor_import' and ${leads.assignedAt} <= ${lateBefore.toISOString()}::timestamptz)
     )
   )`;
-  const hotPendingSql = sql`(
-    ${leads.sourceChannel} is distinct from 'supervisor_import'
-    and ${inArray(leads.status, [...WAITING_STATUS])}
-    and ${leads.firstContactAt} is null
-    and ${leads.assignedAt} is not null
-    and ${leads.assignedAt} < ${lateBefore.toISOString()}::timestamptz
-    and not exists (
-      select 1 from whatsapp_messages wm
-      where wm.tenant_id = ${leads.tenantId} and wm.lead_id = ${leads.id}
-        and coalesce(wm.provider_status, '') not in ('failed', 'deleted')
-        and coalesce(wm.message_id, '') not ilike '%status@broadcast%'
-        and not (wm.media_kind is null and lower(trim(coalesce(wm.body, ''))) in ('', '[text]'))
-    )
+  const hasAnyMessageSql = sql`exists (
+    select 1 from whatsapp_messages wm
+    where wm.tenant_id = ${leads.tenantId} and wm.lead_id = ${leads.id}
+      and coalesce(wm.message_id, '') not ilike '%status@broadcast%'
+      and not (wm.media_kind is null and lower(trim(coalesce(wm.body, ''))) in ('', '[text]'))
   )`;
-  const firstContactPendingSql = sql`(${importedPendingSql} or ${hotPendingSql})`;
+  const firstContactCandidatesSql = sql`coalesce(
+    jsonb_agg(jsonb_build_object(
+      'leadId', ${leads.id},
+      'name', ${leads.nome},
+      'status', ${leads.status},
+      'sourceChannel', ${leads.sourceChannel},
+      'sourceMetadata', jsonb_build_object('firstContactHours', ${leads.sourceMetadata}->>'firstContactHours'),
+      'assignedAt', ${leads.assignedAt},
+      'firstContactAt', ${leads.firstContactAt},
+      'stageEnteredAt', ${leads.stageEnteredAt},
+      'hasAnyMessage', ${hasAnyMessageSql}
+    )) filter (where ${candidateWindowSql}),
+    '[]'::jsonb
+  )`;
   const baseLeadScope = and(
     eq(leads.tenantId, context.tenantId),
     eq(leads.branchId, context.branchId),
@@ -126,8 +152,8 @@ export async function getSupervisorControlData(context: TenantContext, now = new
     isNull(leads.archivedAt),
   );
 
-  const [metricsRows, acceptedRows, dutyRows, offerCounts, offerRows, firstContactCounts, firstContactRows, returnCounts, returnRows] = await Promise.all([
-    db.select({ brokerId: leads.corretorId, inService: inServiceSql, firstContactsToday: contactsSql })
+  const [metricsRows, acceptedRows, dutyRows, offerRows, returnRows] = await Promise.all([
+    db.select({ brokerId: leads.corretorId, inService: inServiceSql, firstContactsToday: contactsSql, firstContactCandidateCount: sql<number>`count(*) filter (where ${candidateWindowSql})::int`, firstContactCandidates: firstContactCandidatesSql })
       .from(leads).where(baseLeadScope).groupBy(leads.corretorId),
     db.select({ brokerId: schema.leadOffers.brokerId, total: sql<number>`count(distinct ${leads.id})::int` }).from(schema.leadOffers)
       .innerJoin(leads, and(eq(leads.id, schema.leadOffers.leadId), eq(leads.tenantId, schema.leadOffers.tenantId)))
@@ -156,21 +182,7 @@ export async function getSupervisorControlData(context: TenantContext, now = new
           and(isNull(schema.dutyRosterAssignments.dutyDate), eq(schema.dutyRosterAssignments.dayOfWeek, localDuty.weekday), lte(schema.dutyRosterAssignments.validFrom, now), or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now))),
         ),
       )).orderBy(asc(schema.dutyRosterAssignments.startsAt), asc(schema.dutyRosterAssignments.brokerId)),
-    db.select({ brokerId: schema.leadOffers.brokerId, total: count() }).from(schema.leadOffers)
-      .innerJoin(leads, and(eq(leads.id, schema.leadOffers.leadId), eq(leads.tenantId, schema.leadOffers.tenantId)))
-      .where(and(
-        eq(schema.leadOffers.tenantId, context.tenantId),
-        inArray(schema.leadOffers.brokerId, teamIds),
-        inArray(schema.leadOffers.status, [...ACTIVE_OFFERS]),
-        gt(schema.leadOffers.expiresAt, now),
-        lt(schema.leadOffers.offeredAt, actionableOfferBefore),
-        eq(leads.corretorId, schema.leadOffers.brokerId),
-        eq(leads.branchId, context.branchId),
-        inArray(leads.status, [...WAITING_STATUS]),
-        isNull(leads.deletedAt),
-        isNull(leads.archivedAt),
-      )).groupBy(schema.leadOffers.brokerId),
-    db.select({ id: schema.leadOffers.id, leadId: leads.id, leadName: leads.nome, brokerId: schema.leadOffers.brokerId, brokerName: schema.user.name, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt, status: schema.leadOffers.status, leadStatus: leads.status, currentOwnerId: leads.corretorId })
+    db.select({ id: schema.leadOffers.id, leadId: leads.id, leadName: leads.nome, brokerId: schema.leadOffers.brokerId, brokerName: schema.user.name, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt, status: schema.leadOffers.status, leadStatus: leads.status, currentOwnerId: leads.corretorId, total: sql<number>`count(*) over()::int` })
       .from(schema.leadOffers)
       .innerJoin(leads, and(eq(leads.id, schema.leadOffers.leadId), eq(leads.tenantId, schema.leadOffers.tenantId)))
       .innerJoin(schema.user, eq(schema.user.id, schema.leadOffers.brokerId))
@@ -186,28 +198,7 @@ export async function getSupervisorControlData(context: TenantContext, now = new
         isNull(leads.deletedAt),
         isNull(leads.archivedAt),
       )).orderBy(asc(schema.leadOffers.offeredAt)).limit(MAX_ITEMS_PER_REASON),
-    db.select({ brokerId: sql<string>`${leads.corretorId}`, total: sql<number>`count(*) filter (where ${firstContactPendingSql})::int` })
-      .from(leads).where(baseLeadScope).groupBy(leads.corretorId),
-    db.select({ leadId: leads.id, name: leads.nome, brokerId: sql<string>`${leads.corretorId}`, brokerName: schema.user.name, status: leads.status, sourceChannel: leads.sourceChannel, sourceMetadata: leads.sourceMetadata, assignedAt: leads.assignedAt, firstContactAt: leads.firstContactAt, stageEnteredAt: leads.stageEnteredAt })
-      .from(leads)
-      .innerJoin(schema.user, eq(schema.user.id, leads.corretorId))
-      .where(and(baseLeadScope, firstContactPendingSql))
-      .orderBy(asc(leads.assignedAt)).limit(MAX_ITEMS_PER_REASON),
-    db.select({ brokerId: sql<string>`${schema.leadTasks.assignedTo}`, total: count() }).from(schema.leadTasks)
-      .innerJoin(leads, and(eq(leads.id, schema.leadTasks.leadId), eq(leads.tenantId, schema.leadTasks.tenantId)))
-      .where(and(
-        eq(schema.leadTasks.tenantId, context.tenantId),
-        inArray(schema.leadTasks.assignedTo, teamIds),
-        isNull(schema.leadTasks.completedAt),
-        isNotNull(schema.leadTasks.dueAt),
-        lt(schema.leadTasks.dueAt, now),
-        sql`(${schema.leadTasks.title} ilike '%retorn%' or ${schema.leadTasks.title} ilike '%follow%')`,
-        eq(leads.branchId, context.branchId),
-        eq(leads.corretorId, schema.leadTasks.assignedTo),
-        isNull(leads.deletedAt),
-        isNull(leads.archivedAt),
-      )).groupBy(schema.leadTasks.assignedTo),
-    db.select({ id: schema.leadTasks.id, leadId: leads.id, leadName: leads.nome, brokerId: sql<string>`${schema.leadTasks.assignedTo}`, brokerName: schema.user.name, dueAt: schema.leadTasks.dueAt, completedAt: schema.leadTasks.completedAt, title: schema.leadTasks.title })
+    db.select({ id: schema.leadTasks.id, leadId: leads.id, leadName: leads.nome, brokerId: sql<string>`${schema.leadTasks.assignedTo}`, brokerName: schema.user.name, dueAt: schema.leadTasks.dueAt, completedAt: schema.leadTasks.completedAt, title: schema.leadTasks.title, total: sql<number>`count(*) over()::int` })
       .from(schema.leadTasks)
       .innerJoin(leads, and(eq(leads.id, schema.leadTasks.leadId), eq(leads.tenantId, schema.leadTasks.tenantId)))
       .innerJoin(schema.user, eq(schema.user.id, schema.leadTasks.assignedTo))
@@ -253,36 +244,25 @@ export async function getSupervisorControlData(context: TenantContext, now = new
     };
   });
 
-  let latestMessages: Array<{ lead_id: string; sent_at: Date | string }> = [];
-  if (firstContactRows.length) {
-    const leadIds = firstContactRows.map((row) => row.leadId);
-    const messageResult = await db.execute(sql`
-      select distinct on (${schema.whatsappMessages.leadId}) ${schema.whatsappMessages.leadId} as lead_id, ${schema.whatsappMessages.sentAt} as sent_at
-      from ${schema.whatsappMessages}
-      where ${schema.whatsappMessages.tenantId} = ${context.tenantId}
-        and ${inArray(schema.whatsappMessages.leadId, leadIds)}
-        and coalesce(${schema.whatsappMessages.providerStatus}, '') not in ('failed', 'deleted')
-        and coalesce(${schema.whatsappMessages.messageId}, '') not ilike '%status@broadcast%'
-        and not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))
-      order by ${schema.whatsappMessages.leadId}, ${schema.whatsappMessages.sentAt} desc
-    `);
-    latestMessages = parseMessageRows(messageResult);
-  }
-  const latestMessageByLead = new Map(latestMessages.map((row) => [row.lead_id, new Date(row.sent_at)]));
+  const candidateRows: FirstContactCandidate[] = metricsRows.flatMap((row) => {
+    const brokerId = row.brokerId;
+    if (!brokerId || Number(row.firstContactCandidateCount ?? 0) === 0) return [];
+    return parseCandidateAggregate(row.firstContactCandidates).map((candidate) => ({ ...candidate, brokerId }));
+  });
   const brokerNameById = new Map(teamRows.map((row) => [row.id, row.name]));
-  const firstContactItems = firstContactRows.flatMap((row) => {
+  const firstContactItems = candidateRows.flatMap((row) => {
     const item = classifyFirstContact({
       leadId: row.leadId,
       name: row.name,
       brokerId: row.brokerId,
-      brokerName: row.brokerName ?? brokerNameById.get(row.brokerId) ?? "Corretor",
+      brokerName: brokerNameById.get(row.brokerId) ?? "Corretor",
       status: row.status,
       sourceChannel: row.sourceChannel,
       sourceMetadata: row.sourceMetadata,
-      assignedAt: row.assignedAt,
-      firstContactAt: row.firstContactAt,
-      stageEnteredAt: row.stageEnteredAt,
-      latestMessageAt: latestMessageByLead.get(row.leadId) ?? null,
+      assignedAt: nullableDate(row.assignedAt),
+      firstContactAt: nullableDate(row.firstContactAt),
+      stageEnteredAt: nullableDate(row.stageEnteredAt),
+      hasAnyMessage: row.hasAnyMessage,
       slaMinutes,
       now,
     });
@@ -299,13 +279,13 @@ export async function getSupervisorControlData(context: TenantContext, now = new
     return [{ id: `return:${row.id}`, reason: "return_overdue" as const, leadId: row.leadId, leadName: row.leadName, brokerId: row.brokerId, brokerName: row.brokerName, dueAt: row.dueAt!.toISOString(), detail: `${row.title} · retorno vencido há ${minutes} min` }];
   });
   const countsByReason = {
-    offer_waiting: recordCounts(offerCounts),
-    first_contact_overdue: recordCounts(firstContactCounts),
-    return_overdue: recordCounts(returnCounts),
+    offer_waiting: Number(offerRows[0]?.total ?? 0),
+    first_contact_overdue: firstContactItems.length,
+    return_overdue: Number(returnRows[0]?.total ?? 0),
   };
   const rawGroups = groupSupervisorPendencies([...offerItems, ...firstContactItems, ...returnItems]);
   const pendencies = rawGroups.map((group) => {
-    const total = [...countsByReason[group.reason].values()].reduce((sum, value) => sum + value, 0);
+    const total = countsByReason[group.reason];
     return { ...group, count: total, remaining: Math.max(0, total - group.items.length) };
   });
 

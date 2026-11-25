@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { classifyFirstContact, groupSupervisorPendencies, isOfferActionable, isReturnTaskOverdue, isShiftActiveNow } from "./control-core";
+import { prioritizeBrokerWorkspace, type BrokerWorkspacePriorityLead } from "@/features/broker-workspace/priority";
 
 const now = new Date("2026-11-25T15:00:00.000Z");
 const lead = {
@@ -24,7 +25,7 @@ describe("regras de motivo no controle do supervisor", () => {
     expect(classifyFirstContact({ ...lead, assignedAt: new Date(now.getTime() - 30 * 3_600_000), firstContactAt: new Date(now.getTime() - 1_000) })).toBeNull();
     expect(classifyFirstContact({ ...lead, assignedAt: new Date(now.getTime() - 30 * 3_600_000), latestMessageAt: new Date(now.getTime() - 1_000) })).toBeNull();
     expect(classifyFirstContact({ ...lead, status: "contacted", assignedAt: new Date(now.getTime() - 30 * 3_600_000), stageEnteredAt: new Date(now.getTime() - 1_000) })).toBeNull();
-    expect(classifyFirstContact({ ...lead, sourceChannel: "whatsapp", status: "distributed", assignedAt: new Date(now.getTime() - 30 * 60_000), latestMessageAt: new Date(now.getTime() - 1_000) })).toBeNull();
+    expect(classifyFirstContact({ ...lead, sourceChannel: "whatsapp", status: "distributed", assignedAt: new Date(now.getTime() - 30 * 60_000), latestMessageAt: new Date(now.getTime() - 1_000) })).toMatchObject({ reason: "first_contact_overdue" });
   });
 
   it("mantém o SLA da empresa nos leads quentes e agrupa pendências por motivo", () => {
@@ -40,6 +41,42 @@ describe("regras de motivo no controle do supervisor", () => {
   it("reconhece plantões que atravessam a meia-noite e ignora turno pausado", () => {
     expect(isShiftActiveNow("22:00", "02:00", "00:30", false)).toBe(true);
     expect(isShiftActiveNow("09:00", "12:00", "09:00", true)).toBe(false);
+  });
+});
+
+describe("paridade do SLA entre corretor e supervisor", () => {
+  it("usa o mesmo SLA do corretor para etapas quentes, mensagens e lista importada", () => {
+    const cases: Array<{ name: string; overrides: Partial<typeof lead>; hasAnyMessage: boolean; overdue: boolean }> = [
+      { name: "lead quente em etapa ativa", overrides: { sourceChannel: "whatsapp", status: "negotiation", assignedAt: new Date(now.getTime() - 30 * 60_000) }, hasAnyMessage: false, overdue: true },
+      { name: "mensagem nao grava primeiro contato do lead quente", overrides: { sourceChannel: "whatsapp", status: "quote_sent", assignedAt: new Date(now.getTime() - 30 * 60_000) }, hasAnyMessage: true, overdue: true },
+      { name: "mensagem da lista conta mesmo se falhou ou foi removida", overrides: { status: "in_contact", assignedAt: new Date(now.getTime() - 25 * 3_600_000) }, hasAnyMessage: true, overdue: false },
+      { name: "lista em novo sem stageEnteredAt vence em 24 horas", overrides: { status: "distributed", assignedAt: new Date(now.getTime() - 25 * 3_600_000), stageEnteredAt: null }, hasAnyMessage: false, overdue: true },
+    ];
+
+    for (const scenario of cases) {
+      const input = { ...lead, ...scenario.overrides, hasAnyMessage: scenario.hasAnyMessage };
+      const supervisorOverdue = Boolean(classifyFirstContact(input));
+      const brokerLead: BrokerWorkspacePriorityLead = {
+        id: input.leadId,
+        name: input.name,
+        status: input.status,
+        createdAt: input.assignedAt ?? now,
+        assignedAt: input.assignedAt,
+        firstContactAt: input.firstContactAt,
+        stageEnteredAt: input.stageEnteredAt,
+        sourceChannel: input.sourceChannel,
+        hasAnyMessage: scenario.hasAnyMessage,
+        importedFirstContactHours: input.sourceChannel === "supervisor_import" ? 24 : null,
+        lastIncomingAt: null,
+        hasPendingQuote: false,
+        pendingDocumentCount: 0,
+      };
+      const brokerOverdue = prioritizeBrokerWorkspace({ leads: [brokerLead], tasks: [], now, slaFirstContactMinutes: input.slaMinutes })
+        .some((item) => item.kind === "sla_overdue");
+
+      expect(supervisorOverdue).toBe(scenario.overdue);
+      expect(brokerOverdue).toBe(scenario.overdue);
+    }
   });
 });
 

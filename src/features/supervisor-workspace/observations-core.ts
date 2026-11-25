@@ -13,6 +13,18 @@ export type SupervisorObservationSource = {
   authorId: string | null;
 };
 
+export function pageSupervisorObservationRows<T extends { id: string; createdAtCursor: string }>(rows: readonly T[], pageSize: number) {
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const pageRows = rows.slice(0, safePageSize);
+  const hasMore = rows.length > safePageSize;
+  const last = pageRows.at(-1);
+  return {
+    pageRows,
+    hasMore,
+    next: hasMore && last ? { beforeAt: last.createdAtCursor, beforeId: last.id } : null,
+  };
+}
+
 const STATUS_KEYS = new Set(["new", "distributed", "in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"]);
 const STATUS_BY_LABEL: Record<string, string> = {
   novo: "new", distribuido: "distributed", "em atendimento": "in_contact", "entrei em contato": "contacted",

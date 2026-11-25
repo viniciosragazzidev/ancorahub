@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isSupervisorObservationInScope, isSupervisorTeamBrokerObservation, readSupervisorObservation, readSupervisorObservationStage } from "./observations-core";
+import { isSupervisorObservationInScope, isSupervisorTeamBrokerObservation, pageSupervisorObservationRows, readSupervisorObservation, readSupervisorObservationStage } from "./observations-core";
 
 const scope = { role: "supervisor", tenantId: "tenant-a", branchId: "unit-a", supervisorId: "sup-a", teamBrokerIds: ["broker-a", "broker-b"] };
 
@@ -32,5 +32,20 @@ describe("observações da equipe do supervisor", () => {
     expect(readSupervisorObservationStage({}, "Status alterado: Em Atendimento → Entrei em Contato. Como foi o contato: Liguei." )).toBe("contacted");
     expect(readSupervisorObservationStage(null, "Novo contato registrado. Como foi o contato: Retornou." )).toBe("contacted");
     expect(readSupervisorObservationStage(null, "Texto sem etapa" )).toBeNull();
+  });
+
+  it("uses the last raw row as cursor and preserves database timestamp precision", () => {
+    const rows = Array.from({ length: 51 }, (_, index) => ({
+      id: `row-${index}`,
+      createdAtCursor: `2026-11-25 12:34:${String(59 - index).padStart(2, "0")}.${String(123456 - index).padStart(6, "0")}+00`,
+      hasObservation: index !== 49,
+    }));
+    const page = pageSupervisorObservationRows(rows, 50);
+    const visibleObservations = page.pageRows.filter((row) => row.hasObservation);
+
+    expect(page.hasMore).toBe(true);
+    expect(visibleObservations.at(-1)?.id).toBe("row-48");
+    expect(page.next).toEqual({ beforeAt: rows[49]!.createdAtCursor, beforeId: "row-49" });
+    expect(page.next?.beforeAt).toContain(".123407+00");
   });
 });

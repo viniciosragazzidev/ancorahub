@@ -276,14 +276,13 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
   for (const document of documents) pendingDocumentsByLead.set(document.leadId, (pendingDocumentsByLead.get(document.leadId) ?? 0) + 1);
   const pendingQuotesByLead = new Set(quotes.map((quote) => quote.leadId));
 
-  const priorityLeads: BrokerWorkspacePriorityLead[] = leads.map(({ sourceChannel, firstContactHours, ...lead }) => {
+  const priorityLeads: BrokerWorkspacePriorityLead[] = leads.map(({ firstContactHours, ...lead }) => {
     const latestMessage = latestMessageByLead.get(lead.id);
-    const teamList = isTeamListLead(sourceChannel);
     return {
       ...lead,
-      // Lista da equipe: entra "em atendimento" sem primeiro contato gravado; conversa ou etapa que andou contam como contato.
-      firstContactAt: lead.firstContactAt ?? (teamList ? latestMessage?.sentAt ?? (lead.status !== "in_contact" ? lead.stageEnteredAt : null) : null),
-      importedFirstContactHours: teamList ? importedFirstContactHours({ firstContactHours }) : null,
+      sourceChannel: lead.sourceChannel,
+      hasAnyMessage: Boolean(latestMessage),
+      importedFirstContactHours: isTeamListLead(lead.sourceChannel) ? importedFirstContactHours({ firstContactHours }) : null,
       lastIncomingAt: latestMessage?.direction === "incoming" ? latestMessage.sentAt : null,
       hasPendingQuote: pendingQuotesByLead.has(lead.id),
       pendingDocumentCount: pendingDocumentsByLead.get(lead.id) ?? 0,

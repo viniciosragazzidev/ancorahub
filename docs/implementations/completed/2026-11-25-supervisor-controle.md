@@ -10,13 +10,13 @@ Pedido direto de Vinicios em 25/11. A supervisora precisa ver a operacao atual d
 2. A lista antiga de atencao usava estado/idade de leads quentes sem avaliar oferta aberta, dono atual e prazo de primeiro contato no mesmo ponto.
 3. A tela de equipe mostrava contagens gerais, mas `acceptedToday` ficava sempre em zero.
 4. Tarefas futuras nao devem ser atraso; o novo recorte exige `dueAt < agora`, tarefa aberta e texto de retorno/follow-up.
-5. Lead ja contatado nao deve gerar cobranca: o recorte confere `firstContactAt` e mensagens validas, ignorando falhas, historias do WhatsApp e eventos sem conteudo.
+5. A regra de primeiro contato é compartilhada entre corretor e supervisor. Lead quente usa `firstContactAt` e o SLA em qualquer etapa ativa; lista importada considera mensagem elegível (inclusive com envio falho ou removido) e avanços de etapa, conforme `imported-first-contact.ts`.
 
 ## Escopo e decisao de produto
 
 - Rota `/equipe/controle`: resumo por corretor, disponibilidade existente, escala ativa/presenca, leads em atendimento, aceites e primeiros contatos de hoje; ofertas sem aceite apos cinco minutos, primeiro contato vencido e retorno vencido.
 - Rota `/equipe/observacoes`: texto integral, etapa, autor, data/hora e lead, mais recentes primeiro, filtro por corretor e etapa, cursor de data/id.
-- Ficha `/leads/[id]`: observacoes do corretor atualmente responsavel; nao exibe anotacoes de um antigo responsavel.
+- Ficha `/leads/[id]`: observações de qualquer corretor ativo da equipe atual do supervisor, no mesmo tenant e unidade; autor e responsável do lead precisam continuar na equipe ativa.
 - Polling de 60 s somente quando a aba estiver visivel. O projeto nao tem heartbeat de presenca do navegador; `available`, `paused` e `offline` sao exibidos como a disponibilidade atual, separados do plantao e da confirmacao de presenca.
 - Sem migration ou nova flag. O gate existente do Supervisor Lite e o escopo ativo de tenant/equipe/unidade controlam as rotas.
 - Composicao usa PeoplePage, PeopleSection, PeopleStats, Badge e Button existentes. Nao cria token, primitive ou animacao.
@@ -39,3 +39,11 @@ Pedido direto de Vinicios em 25/11. A supervisora precisa ver a operacao atual d
 - A atualizacao tem ate 60 s de atraso e interrompe consultas em aba escondida.
 - O recorte de mensagens segue os sinais persistidos existentes; dados antigos sem `firstContactAt` e sem mensagem valida nao provam contato.
 - Rollback: reverter os commits da feature; nao ha migration nem escrita em banco.
+
+## Revis?o do Maestro (25/11)
+
+- O SLA de primeiro contato agora usa o mesmo resolvedor puro no painel do corretor e no painel do supervisor. Para leads importados, mensagens eleg?veis continuam contando mesmo com envio falho ou removido; para lead quente, mensagem sem `firstContactAt` n?o apaga o atraso.
+- A consulta de m?tricas inclui candidatos de primeiro contato por agregado e conta via `count(*) filter`; a decis?o final fica no resolvedor compartilhado. Ofertas e retornos trazem contagem e lista numa consulta por motivo, e a consulta separada de mensagens foi removida.
+- A pagina??o usa o ?ltimo registro bruto da p?gina e `created_at::text`, preservando microssegundos no cursor; com `hasMore`, a pr?xima posi??o sempre existe.
+- Testes focados: 29 passaram em quatro arquivos; TypeScript e ESLint focado passaram. A verifica??o global executou 1.040 arquivos aprovados e 35 ignorados, com falhas preexistentes em 10 arquivos de outras ?reas; o lint global foi bloqueado por 952 ocorr?ncias de mojibake em tr?s arquivos fora do escopo. O build n?o foi alcan?ado porque o harness interrompeu ap?s falhas globais de teste.
+- Esta revis?o n?o criou migration nem escreveu no banco.
