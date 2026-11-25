@@ -1,7 +1,7 @@
 "use client";
 
 import { plantaoDone, plantaoFailed } from "./plantao-feedback";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { use, useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
@@ -344,6 +344,25 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
           })}
         </div>
       )}
+    </section>
+  );
+}
+
+type QueueOrderPreviews = DutyQueueOrderPreview[] | null;
+
+/** Velocidade (25/11/2026): a prévia leva cerca de 1 s; a aba Plantão aparece antes e ela chega depois. */
+export function StreamedDutyQueueOrderBoard({ previews, canReorder }: { previews: Promise<QueueOrderPreviews>; canReorder: boolean }) {
+  return <DutyQueueOrderBoard previews={use(previews)} canReorder={canReorder} />;
+}
+
+export function DutyQueueOrderBoardLoading() {
+  return (
+    <section className={styles.board} aria-labelledby="duty-queue-order-title" aria-busy="true">
+      <div className={styles.intro}>
+        <h2 id="duty-queue-order-title">Quem recebe o próximo lead</h2>
+        <p>Prévia da fila de cada plantão em andamento. A escolha final é recalculada quando o lead chega.</p>
+      </div>
+      <p className={styles.empty} role="status">Montando a prévia da fila.</p>
     </section>
   );
 }

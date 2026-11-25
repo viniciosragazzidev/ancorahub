@@ -70,6 +70,8 @@ export async function getEssentialDashboard(
   );
   const today = getSaoPauloDateKey(now);
 
+  // Velocidade (25/11/2026): os três blocos não dependem um do outro; antes rodavam em fila (~1 s).
+  const [{ welcome, duties }, queues, whatsapp] = await Promise.all([(async () => {
   // Bloco 1: plantões rodando agora, com leads da fila de cada plantão e corretores confirmados hoje.
   const welcome = await getDashboardWelcome(context, now, { branchId: unit });
   const running = welcome.runningDuties ?? [];
@@ -133,7 +135,8 @@ export async function getEssentialDashboard(
     distributedBySchedule,
     confirmedBySchedule,
   );
-
+  return { welcome, duties };
+  })(), (async () => {
   // Bloco 2: leads por fila no período (entraram, temperatura, em qualificação e requalificação dos frios).
   const [leadGroups, queueNames, coldLeads] = await Promise.all([
     db.select({ queueId: schema.leads.queueId, status: schema.leads.qualificationStatus, leads: count() })
@@ -167,7 +170,8 @@ export async function getEssentialDashboard(
     [],
     coldLeads.map((row): ColdLeadRow => ({ queueId: row.queueId, attempts: Number(row.attempts) })),
   );
-
+  return queues;
+  })(), (async () => {
   // Bloco 3: WhatsApp dos corretores na janela do dia (fixa, não segue o período) e atendimentos das últimas 24h.
   const brokerScope = brokerWhatsAppMembershipScope({ role: context.role, branchId: context.branchId, supervisedBrokerIds: scope.supervisedBrokerIds });
   const brokers = brokerScope === null
@@ -192,6 +196,8 @@ export async function getEssentialDashboard(
     responding: whatsappRows?.responding.get(broker.id) ?? 0,
     active: whatsappRows?.active.get(broker.id) ?? 0,
   })));
+  return whatsapp;
+  })()]);
 
   return {
     generatedAt: now.toISOString(),
