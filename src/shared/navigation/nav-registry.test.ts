@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { routeCatalog } from "@/features/custom-roles/routes";
 
-import { NAV_AREAS, NAV_GROUPS, canShowNavTab, groupNavItems, isNavTabRoot, resolveNavLocation, visibleNavAreas, type NavAccessUser } from "./nav-registry";
+import { NAV_AREAS, NAV_GROUPS, canShowNavTab, groupNavItems, isNavTabRoot, navRowTabs, resolveNavLocation, visibleNavAreas, type NavAccessUser } from "./nav-registry";
 
 const DASHBOARD_DIR = path.join(process.cwd(), "src", "app", "(dashboard)");
 
@@ -120,6 +120,26 @@ describe("nav-registry", () => {
     expect(resolveNavLocation("/qualificacao/turbo")).toMatchObject({ tab: { id: "turbo" } });
     expect(resolveNavLocation("/atendimento")).toMatchObject({ area: { id: "atendimento-ia" }, tab: { id: "situacoes" } });
     expect(resolveNavLocation("/atendimento/fluxo")).toMatchObject({ tab: { id: "perguntas" } });
+  });
+
+  it("Atendimento IA: the menu opens the hub /ia and its screens belong to the area", () => {
+    expect(visibleNavAreas(director).find((item) => item.area.id === "atendimento-ia")?.href).toBe("/ia");
+    expect(resolveNavLocation("/ia")).toMatchObject({ area: { id: "atendimento-ia" }, tab: { id: "inicio" } });
+    expect(resolveNavLocation("/ia/alertas")).toMatchObject({ area: { id: "atendimento-ia" }, tab: { id: "alertas" } });
+    expect(resolveNavLocation("/ia/execucoes?falhas=1")).toMatchObject({ area: { id: "atendimento-ia" }, tab: { id: "execucoes" } });
+    expect(resolveNavLocation("/qualificacao/leads")).toMatchObject({ tab: { id: "leads-qualificacao" } });
+    expect(isNavTabRoot("/ia/alertas")).toBe(true);
+  });
+
+  it("Atendimento IA: only the daily tabs stay on top, a hub tab joins the row while open", () => {
+    const area = NAV_AREAS.find((item) => item.id === "atendimento-ia")!;
+    const fullDirector: NavAccessUser = { ...director, permissions: [...(director.permissions ?? []), "acessar_ferramentas"] };
+    expect(navRowTabs(area, fullDirector, "inicio").map((tab) => tab.id)).toEqual(["inicio", "leads-qualificacao", "alertas", "execucoes"]);
+    expect(navRowTabs(area, fullDirector, "simulador").map((tab) => tab.id)).toEqual(["inicio", "leads-qualificacao", "alertas", "execucoes", "simulador"]);
+    expect(area.tabs.filter((tab) => !tab.hub).map((tab) => tab.id)).toEqual(["inicio", "leads-qualificacao", "alertas", "execucoes"]);
+    // Other areas have no hub tabs: their row is unchanged.
+    const comercial = NAV_AREAS.find((item) => item.id === "comercial")!;
+    expect(navRowTabs(comercial, director, "vendas")).toEqual(comercial.tabs.filter((tab) => canShowNavTab(tab, director)));
   });
 
   it("Distribuição: views by ?view=, the old /leads/distribuicao address and the duty detail", () => {
