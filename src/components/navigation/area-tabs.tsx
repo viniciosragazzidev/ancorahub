@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { LiteRouteTabs } from "@/components/lite/page/route-tabs";
 import { RouteSectionTabs } from "@/components/ui/route-section-tabs";
-import { resolveNavLocation, visibleNavTabs } from "@/shared/navigation/nav-registry";
+import { navRowTabs, resolveNavLocation } from "@/shared/navigation/nav-registry";
 
 import { useNavFlags, useNavUser } from "./nav-access";
 
@@ -38,7 +38,8 @@ export function AreaTabs() {
   // Na prévia de desenvolvimento o endereço simulado (com a query) vem do shell.
   const location = previewPathname ? resolveNavLocation(previewPathname) : resolveNavLocation(currentPathname, searchParams);
   if (!location || !user) return null;
-  const tabs = visibleNavTabs(location.area, { ...user, negotiationsEnabled, postSaleAuditEnabled, autoSaleEnabled, erpPaths });
+  // Abas do hub (ex.: Atendimento IA) ficam fora da fileira; aberta, a aba do hub entra no fim para mostrar onde a pessoa está.
+  const tabs = navRowTabs(location.area, { ...user, negotiationsEnabled, postSaleAuditEnabled, autoSaleEnabled, erpPaths }, location.tab.id);
   if (tabs.length < 2 || !tabs.some((tab) => tab.id === location.tab.id)) return null;
 
   const items = tabs.map((tab) => ({ id: tab.id, label: tab.label, href: tab.href }));

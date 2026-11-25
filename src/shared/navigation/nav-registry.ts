@@ -43,6 +43,11 @@ export type NavTab = {
   cargoCapability?: string;
   /** Só para quem não tem cargo (a página recusa quem tem, ex.: /equipe/cargos). */
   noCargo?: boolean;
+  /**
+   * Mora no hub da área (ex.: /ia): fica fora da fileira de abas do topo, mas continua dona do endereço (título,
+   * busca Ctrl+K e permissão seguem valendo). Aberta, aparece no fim da fileira para a pessoa saber onde está.
+   */
+  hub?: boolean;
 };
 
 export type NavArea = {
@@ -161,19 +166,24 @@ export const NAV_AREAS: readonly NavArea[] = [
     fullLabel: "Qualificação por IA, roteiros e mensagens",
     section: "Crescimento",
     tabs: [
-      { id: "comportamento", label: "Prompt e comportamento", href: "/qualificacao", permission: "acessar_qualificacao_ia", inPlace: true },
-      { id: "permissoes", label: "Permissões", href: "/qualificacao?tab=agent_triggers", permission: "acessar_qualificacao_ia", inPlace: true, aliases: { tab: ["mcp_governance"] } },
-      { id: "follow-up", label: "Follow-up", href: "/qualificacao?tab=followup_rules", permission: "acessar_qualificacao_ia", inPlace: true },
-      { id: "conectividade", label: "Conectividade", href: "/qualificacao?tab=whatsapp_diag", permission: "acessar_qualificacao_ia", inPlace: true },
-      { id: "simulador", label: "Simulador", href: "/qualificacao?tab=simulator", permission: "acessar_qualificacao_ia", inPlace: true, aliases: { tab: ["alerts"] } },
-      { id: "turbo", label: "Qualificação turbo", href: "/qualificacao/turbo", permission: "acessar_qualificacao_ia" },
+      // 25/11/2026: a fileira do topo mostra só o dia a dia (Início, Leads na qualificação, Alertas, Execuções).
+      // As demais (hub: true) abrem pelo hub /ia e continuam donas dos seus endereços.
+      { id: "inicio", label: "Início", href: "/ia", permission: "acessar_qualificacao_ia" },
       { id: "leads-qualificacao", label: "Leads na qualificação", href: "/qualificacao/leads", permission: "acessar_qualificacao_ia" },
-      { id: "recuperacao", label: "Recuperação", href: "/qualificacao/recuperacao", permission: "acessar_qualificacao_ia" },
-      { id: "situacoes", label: "Situações", href: "/atendimento/situacoes", permission: "acessar_qualificacao_ia", paths: ["/atendimento"] },
-      { id: "mensagens", label: "Mensagens", href: "/atendimento/mensagens", permission: "acessar_qualificacao_ia" },
-      { id: "perguntas", label: "Fluxo de atendimento", href: "/atendimento/fluxo", permission: "acessar_qualificacao_ia" },
-      { id: "fluxos", label: "Fluxos de WhatsApp", href: "/fluxos-whatsapp", permission: "acessar_qualificacao_ia", roles: ["director"] },
-      { id: "base", label: "Materiais das operadoras", href: "/ferramentas/materiais-operadoras", permission: "acessar_ferramentas", roles: ["director"] },
+      { id: "alertas", label: "Alertas", href: "/ia/alertas", permission: "acessar_qualificacao_ia" },
+      { id: "execucoes", label: "Execuções", href: "/ia/execucoes", permission: "acessar_qualificacao_ia" },
+      { id: "comportamento", label: "Prompt e comportamento", href: "/qualificacao", permission: "acessar_qualificacao_ia", inPlace: true, hub: true },
+      { id: "permissoes", label: "Permissões", href: "/qualificacao?tab=agent_triggers", permission: "acessar_qualificacao_ia", inPlace: true, aliases: { tab: ["mcp_governance"] }, hub: true },
+      { id: "follow-up", label: "Follow-up", href: "/qualificacao?tab=followup_rules", permission: "acessar_qualificacao_ia", inPlace: true, hub: true },
+      { id: "conectividade", label: "Conectividade", href: "/qualificacao?tab=whatsapp_diag", permission: "acessar_qualificacao_ia", inPlace: true, hub: true },
+      { id: "simulador", label: "Simulador", href: "/qualificacao?tab=simulator", permission: "acessar_qualificacao_ia", inPlace: true, aliases: { tab: ["alerts"] }, hub: true },
+      { id: "turbo", label: "Qualificação turbo", href: "/qualificacao/turbo", permission: "acessar_qualificacao_ia", hub: true },
+      { id: "recuperacao", label: "Recuperação", href: "/qualificacao/recuperacao", permission: "acessar_qualificacao_ia", hub: true },
+      { id: "situacoes", label: "Situações", href: "/atendimento/situacoes", permission: "acessar_qualificacao_ia", paths: ["/atendimento"], hub: true },
+      { id: "mensagens", label: "Mensagens", href: "/atendimento/mensagens", permission: "acessar_qualificacao_ia", hub: true },
+      { id: "perguntas", label: "Fluxo de atendimento", href: "/atendimento/fluxo", permission: "acessar_qualificacao_ia", hub: true },
+      { id: "fluxos", label: "Fluxos de WhatsApp", href: "/fluxos-whatsapp", permission: "acessar_qualificacao_ia", roles: ["director"], hub: true },
+      { id: "base", label: "Materiais das operadoras", href: "/ferramentas/materiais-operadoras", permission: "acessar_ferramentas", roles: ["director"], hub: true },
     ],
   },
   {
@@ -286,6 +296,17 @@ export function canShowNavTab(tab: NavTab, user: NavAccessUser | null) {
 
 export function visibleNavTabs(area: NavArea, user: NavAccessUser | null) {
   return area.tabs.filter((tab) => canShowNavTab(tab, user));
+}
+
+/**
+ * Abas da fileira do topo: as visíveis que não moram no hub e, se a pessoa está numa aba do hub, essa aba no fim
+ * (marcada como atual).
+ */
+export function navRowTabs(area: NavArea, user: NavAccessUser | null, currentTabId?: string | null) {
+  const visible = visibleNavTabs(area, user);
+  const row = visible.filter((tab) => !tab.hub);
+  const current = visible.find((tab) => tab.id === currentTabId);
+  return current?.hub ? [...row, current] : row;
 }
 
 /** Áreas que o usuário enxerga, cada uma com o destino da primeira aba visível. */

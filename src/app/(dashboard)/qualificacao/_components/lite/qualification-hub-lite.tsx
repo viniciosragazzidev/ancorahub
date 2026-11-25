@@ -15,7 +15,6 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import page from "@/components/lite/page/lite-page.module.css";
 import { LiteActionButton } from "@/components/lite/controls";
 import {
-  acknowledgeAlertAction,
   deleteFollowUpRuleAction,
   saveFollowUpRuleAction,
   toggleQualificationEnabledAction,
@@ -62,7 +61,8 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
   const { status, run, invalid, clear } = useActionStatus();
   const [rules, setRules] = useState(initialRules);
   const [tools, setTools] = useState(initialTools);
-  const [alerts, setAlerts] = useState(initialAlerts);
+  // Os alertas têm tela própria (/ia/alertas): aqui só contam para o resumo e o link do Simulador.
+  const alerts = initialAlerts;
   const [draft, setDraft] = useState<FollowUpDraft>({ name: "", trigger: "qualification_abandoned", delay: 120, messageMode: "fixed", messageText: "Olá! Ainda posso te ajudar com a cotação do seu plano?" });
   const [simMemory, setSimMemory] = useState<SimMemory>({});
   const [simConversation, setSimConversation] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
@@ -181,14 +181,6 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
     });
   };
 
-  const acknowledge = async (id: string) => {
-    await run("alerts", async () => {
-      const updated = await acknowledgeAlertAction(id);
-      setAlerts(updated);
-      return updated;
-    }, { done: "Alerta resolvido", fallback: "Não deu para resolver o alerta agora.", keeps: "O alerta continua ativo." });
-  };
-
   const sendSim = async (event: FormEvent) => {
     event.preventDefault();
     if (!simInput.trim() || simLoading) return;
@@ -242,7 +234,7 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
           {activeTab === "whatsapp_diag" ? <DiagnosticTabLite diagnostic={whatsappDiagnostic} /> : null}
           {activeTab === "agent_triggers" ? <PermissionsTabLite tools={tools} onToggle={toggleTool} status={status} /> : null}
           {activeTab === "followup_rules" ? <FollowUpTabLite rules={rules} draft={draft} onDraft={(patch) => { setDraft((current) => ({ ...current, ...patch })); if (status.rule?.state !== "busy") clear("rule"); }} onSubmit={saveRule} onDelete={deleteRule} ruleStatus={status.rule} rulesStatus={status.rules} /> : null}
-          {activeTab === "simulator" ? <SimulatorTabLite alerts={alerts} onAcknowledge={acknowledge} alertsStatus={status.alerts} messages={simMessages} input={simInput} onInput={setSimInput} onSend={sendSim} loading={simLoading} memory={simMemory} /> : null}
+          {activeTab === "simulator" ? <SimulatorTabLite activeAlerts={activeAlerts} messages={simMessages} input={simInput} onInput={setSimInput} onSend={sendSim} loading={simLoading} memory={simMemory} /> : null}
         </div>
       </main>
     </>

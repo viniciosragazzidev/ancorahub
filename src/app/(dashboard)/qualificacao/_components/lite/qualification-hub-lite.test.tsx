@@ -70,13 +70,12 @@ describe("hub de qualificação Lite", () => {
     expect(actions.deleteFollowUpRuleAction).toHaveBeenCalledWith("rule-1");
   });
 
-  it("simulador: alerta ativo aparece na aba e resolve pela mesma ação", async () => {
+  it("simulador: os alertas saíram da aba, fica só o link para /ia/alertas", () => {
     search.value = "tab=alerts";
     render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Resolver alerta" }));
-    });
-    expect(actions.acknowledgeAlertAction).toHaveBeenCalledWith("alert-1");
+    expect(screen.queryByRole("button", { name: "Resolver alerta" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Ver alertas/ })).toHaveAttribute("href", "/ia/alertas");
+    expect(actions.acknowledgeAlertAction).not.toHaveBeenCalled();
   });
 
   it("salvar: confirma no próprio botão só depois do servidor, sem toast", async () => {

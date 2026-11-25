@@ -1,35 +1,26 @@
 "use client";
 
 /**
- * Aba "Simulador" do hub de qualificação no visual Lite: alertas operacionais (resolver com a mesma ação) e o
- * simulador com bolhas de conversa e o inspetor da memória extraída. A conversa e a memória vêm do hub.
+ * Aba "Simulador" do hub de qualificação no visual Lite: o simulador com bolhas de conversa e o inspetor da memória
+ * extraída. A conversa e a memória vêm do hub. Os alertas moraram aqui até 25/11/2026; agora têm tela própria
+ * (/ia/alertas) e aqui fica só o link.
  */
-import { useState, type FormEvent } from "react";
+import type { FormEvent } from "react";
 import { Send } from "lucide-react";
 import Link from "next/link";
 
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
-import type { QualificationAlertRecord } from "@/features/ai-qualification/alerts-service";
 
 import type { SimMemory } from "../simulator-memory";
-import { ActionNote, BusyLabel, type ActionStatus } from "./action-status-lite";
 import styles from "./qualification-lite.module.css";
 
 const MEMORY_FIELDS: Array<[keyof SimMemory, string]> = [["nome", "Nome"], ["plano", "Plano"], ["vidas", "Vidas"], ["idade", "Idade"], ["cidade", "Cidade"], ["email", "E-mail"]];
-const LEVEL_LABEL: Record<string, string> = { critical: "Crítico", warning: "Atenção", info: "Informação" };
-const ALERT_TITLE: Record<string, string> = {
-  queue_no_broker: "Lead sem corretor",
-  ai_send_failed: "IA sem conseguir responder",
-  qualified_without_routing: "Qualificado sem fila",
-  whatsapp_latency_spike: "WhatsApp lento",
-};
 
-export function SimulatorTabLite({ alerts, onAcknowledge, alertsStatus, messages, input, onInput, onSend, loading, memory }: {
-  alerts: QualificationAlertRecord[];
-  onAcknowledge: (id: string) => void;
-  alertsStatus?: ActionStatus;
+export function SimulatorTabLite({ activeAlerts, messages, input, onInput, onSend, loading, memory }: {
+  /** Alertas abertos, só para o texto do link. */
+  activeAlerts: number;
   messages: Array<{ sender: "user" | "bot"; text: string }>;
   input: string;
   onInput: (value: string) => void;
@@ -37,38 +28,11 @@ export function SimulatorTabLite({ alerts, onAcknowledge, alertsStatus, messages
   loading: boolean;
   memory: SimMemory;
 }) {
-  const active = alerts.filter((alert) => alert.status === "active").length;
-  const [resolving, setResolving] = useState<string | null>(null);
   return (
     <>
-      {alerts.length ? (
-        <section className={sections.group} aria-labelledby="alerts-title">
-          <div className={sections.row}>
-            <div className={sections.rowText}>
-              <h2 id="alerts-title" className={sections.rowTitle}>Alertas operacionais ({active} ativos)</h2>
-              <p className={sections.rowDescription}>Filas sem corretor, desconexões e problemas de operação.</p>
-              <ActionNote status={alertsStatus} />
-            </div>
-          </div>
-          <ul className={sections.list}>
-            {alerts.map((alert) => (
-              <li key={alert.id} className={sections.item} style={alert.status === "active" ? undefined : { opacity: 0.7 }}>
-                <span className={sections.rowText}>
-                  <span className={sections.badges} style={{ alignItems: "center" }}>
-                    <span className={page.badge} data-tone={alert.level === "critical" ? "danger" : "warning"}>{LEVEL_LABEL[alert.level] ?? alert.level}</span>
-                    <span className={sections.rowTitle}>{ALERT_TITLE[alert.alertType] ?? "Alerta da operação"}</span>
-                  </span>
-                  <span className={sections.rowDescription}>{alert.message}</span>
-                  {alert.suggestedAction ? <span className={sections.itemSub}>O que fazer: {alert.suggestedAction}</span> : null}
-                  {alert.live ? <span className={sections.itemSub}>Some sozinho quando o problema acabar.</span> : null}
-                </span>
-                {alert.href ? <Link href={alert.href} className={page.button}>Abrir</Link> : null}
-                {alert.status === "active" && !alert.live ? <button type="button" className={page.button} disabled={alertsStatus?.state === "busy"} aria-busy={(alertsStatus?.state === "busy" && resolving === alert.id) || undefined} onClick={() => { setResolving(alert.id); onAcknowledge(alert.id); }}><BusyLabel busy={alertsStatus?.state === "busy" && resolving === alert.id} label="Resolvendo…">Resolver alerta</BusyLabel></button> : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <Link href="/ia/alertas" className={sections.link}>
+        Ver alertas{activeAlerts > 0 ? ` (${activeAlerts.toLocaleString("pt-BR")} ${activeAlerts === 1 ? "aberto" : "abertos"})` : ""}
+      </Link>
       <div className={`${styles.columns} ${styles.sim}`}>
         <section className={sections.group} aria-labelledby="simulator-title">
           <div className={sections.row}>
