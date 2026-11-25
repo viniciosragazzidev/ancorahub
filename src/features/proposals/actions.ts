@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -15,6 +15,8 @@ import type { ProposalStatus } from "@/shared/db/schema";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
 import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-service";
+import { getProposalDefaults } from "./defaults";
+import { buildProposalWhatsAppMessage, canSendProposalOnWhatsApp, defaultValidUntilInput, proposalPublicPath, validUntilFromDateInput } from "./proposal-rules";
 
 async function assertFeatureEnabled() {
   const enabled = await getSystemSetting("feature_proposals_enabled");
@@ -54,18 +56,21 @@ export async function createProposalAction(
     const title = formData.get("title")?.toString().trim();
     const leadId = formData.get("leadId")?.toString();
     const quoteId = formData.get("quoteId")?.toString() || null;
-    const validUntilStr = formData.get("validUntil")?.toString();
-    const notes = formData.get("notes")?.toString().trim() || null;
+    const validUntilStr = formData.get("validUntil")?.toString().trim();
+    const notesInput = formData.get("notes");
     const documentIdsJson = formData.get("documentIds")?.toString() || "[]";
 
-    if (!title || !leadId || !validUntilStr) {
-      return { error: "Titulo, lead e data de validade sao obrigatorios." };
+    if (!title || !leadId) {
+      return { error: "Titulo e lead sao obrigatorios." };
     }
 
-    const validUntil = new Date(validUntilStr);
-    if (isNaN(validUntil.getTime())) {
+    // Validade e condições padrão da corretora entram quando o campo vem vazio (ou nem vem, como na criação pelo Sasá).
+    const defaults = !validUntilStr || notesInput === null ? await getProposalDefaults(context.tenantId) : null;
+    const validUntil = validUntilFromDateInput(validUntilStr || defaultValidUntilInput(defaults?.validDays ?? 0));
+    if (!validUntil) {
       return { error: "Data de validade invalida." };
     }
+    const notes = (notesInput === null ? defaults?.conditions ?? "" : notesInput.toString().trim()) || null;
 
     const documentIds = JSON.parse(documentIdsJson) as string[];
 
@@ -221,6 +226,138 @@ export async function updateProposalStatusAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Erro ao atualizar status da proposta.",
+    };
+  }
+}
+
+export type SendProposalWhatsAppResult =
+  | { success: true; status: ProposalStatus; link: string }
+  | { success: false; error: string; reason: "denied" | "status" | "no_link" | "no_channel" | "not_marked"; link?: string };
+
+function publicBaseUrl() {
+  return (process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || "https://crm.ancorasaude.cloud").replace(/\/$/, "");
+}
+
+/**
+ * "Enviar no WhatsApp": manda o link público e uma frase curta para a conversa do lead pelo mesmo envio das
+ * conversas (`sendLeadMessageAction`: número oficial da corretora ou o WhatsApp conectado, com as mesmas regras de
+ * quem pode responder e de opt-out) e só depois marca a proposta como enviada. Sem canal, devolve a causa e o link
+ * para a tela oferecer "Copiar link".
+ */
+export async function sendProposalWhatsAppAction(proposalId: string): Promise<SendProposalWhatsAppResult> {
+  try {
+    await assertFeatureEnabled();
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+
+    const [proposal] = await db
+      .select({
+        id: schema.proposals.id,
+        leadId: schema.proposals.leadId,
+        quoteId: schema.proposals.quoteId,
+        title: schema.proposals.title,
+        status: schema.proposals.status,
+        validUntil: schema.proposals.validUntil,
+        createdBy: schema.proposals.createdBy,
+        publicToken: schema.quotes.publicToken,
+      })
+      .from(schema.proposals)
+      .leftJoin(schema.quotes, and(eq(schema.proposals.quoteId, schema.quotes.id), eq(schema.quotes.tenantId, schema.proposals.tenantId)))
+      .where(and(eq(schema.proposals.id, proposalId), eq(schema.proposals.tenantId, context.tenantId)))
+      .limit(1);
+    if (!proposal) return { success: false, reason: "denied", error: "Proposta não encontrada." };
+
+    const leadScope = buildStrictRoleLeadScope(context, await resolveReportDataScope(context));
+    const [lead] = await db
+      .select({ id: schema.leads.id, nome: schema.leads.nome })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, proposal.leadId), leadScope))
+      .limit(1);
+    if (!lead || (context.role === "broker" && proposal.createdBy !== context.userId)) {
+      return { success: false, reason: "denied", error: "Acesso negado para esta proposta." };
+    }
+    if (!canSendProposalOnWhatsApp(proposal.status)) {
+      return { success: false, reason: "status", error: "Só proposta em rascunho ou enviada vai pelo WhatsApp." };
+    }
+
+    const path = proposalPublicPath(proposal.publicToken);
+    if (!path) {
+      return { success: false, reason: "no_link", error: "Esta proposta não tem cotação vinculada, então ainda não tem link público." };
+    }
+    const link = `${publicBaseUrl()}${path}`;
+    if (proposal.validUntil < new Date()) {
+      return { success: false, reason: "status", error: "Esta proposta já venceu. Ajuste a validade antes de enviar.", link };
+    }
+
+    const [item] = proposal.quoteId
+      ? await db
+        .select({ snapshot: schema.quoteItems.snapshot })
+        .from(schema.quoteItems)
+        .where(eq(schema.quoteItems.quoteId, proposal.quoteId))
+        .orderBy(desc(schema.quoteItems.recommended), asc(schema.quoteItems.createdAt))
+        .limit(1)
+      : [];
+    const planName = (item?.snapshot as { planName?: unknown } | undefined)?.planName;
+
+    const text = buildProposalWhatsAppMessage({
+      leadName: lead.nome,
+      planName: typeof planName === "string" ? planName : null,
+      validUntil: proposal.validUntil,
+      link,
+    });
+    // O mesmo envio das conversas (carregado só aqui: a cadeia do WhatsApp não pesa nas outras ações).
+    const { sendLeadMessageAction } = await import("@/features/leads/actions/send-lead-message");
+    const sent = await sendLeadMessageAction(lead.id, text, `proposal:${proposal.id}:${randomUUID()}`);
+    if (!sent.success) {
+      return { success: false, reason: "no_channel", error: sent.error ?? "Não deu para enviar pelo WhatsApp agora.", link };
+    }
+
+    try {
+      const now = new Date();
+      await db.transaction(async (tx) => {
+        if (proposal.status === "rascunho") {
+          await tx
+            .update(schema.proposals)
+            .set({ status: "enviada", updatedAt: now })
+            .where(and(eq(schema.proposals.id, proposal.id), eq(schema.proposals.tenantId, context.tenantId)));
+          // Mesmo retorno de 48 horas que a troca manual para "Enviada" cria.
+          await tx.insert(schema.leadTasks).values({
+            id: randomUUID(),
+            tenantId: context.tenantId,
+            leadId: proposal.leadId,
+            title: `Retorno de proposta: ${proposal.title}`,
+            dueAt: new Date(now.getTime() + 48 * 60 * 60 * 1000),
+            priority: "urgent",
+            assignedTo: proposal.createdBy,
+            createdBy: context.userId,
+            description: "Tarefa automatica criada apos o envio da proposta comercial.",
+          });
+        }
+        if (proposal.quoteId) {
+          await tx
+            .update(schema.quotes)
+            .set({ sharedAt: now, status: "shared", updatedAt: now })
+            .where(and(eq(schema.quotes.id, proposal.quoteId), eq(schema.quotes.tenantId, context.tenantId)));
+        }
+        await tx.insert(schema.platformAuditLogs).values({
+          id: randomUUID(),
+          actorUserId: context.userId,
+          action: "send_proposal_whatsapp",
+          targetType: "proposal",
+          targetId: proposal.id,
+          metadata: { tenantId: context.tenantId, leadId: proposal.leadId, oldStatus: proposal.status, newStatus: "enviada" },
+        });
+      });
+    } catch {
+      return { success: false, reason: "not_marked", error: "A mensagem foi enviada, mas não deu para marcar a proposta como enviada.", link };
+    }
+
+    return { success: true, status: "enviada", link };
+  } catch (error) {
+    return {
+      success: false,
+      reason: "no_channel",
+      error: error instanceof Error ? error.message : "Não deu para enviar pelo WhatsApp agora.",
     };
   }
 }

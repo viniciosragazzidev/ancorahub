@@ -9,12 +9,18 @@
  * Feedback (FEEDBACK.md, nível 1): trocar status, criar proposta e fechar venda mostram o envio no botão e confirmam
  * no próprio objeto (a lista ou o painel) depois do servidor; a falha mostra a causa e "Tentar de novo". Copiar o
  * link é nível 0: a confirmação aparece na lista, sem som. Nenhum toast repete o que já está na tela.
+ *
+ * Propostas renovadas (25/11, DeskComm §7.2): "Enviar no WhatsApp" na linha de rascunho ou enviada (LiteActionButton,
+ * nível 1 com som discreto) manda o link público para a conversa do lead e marca como enviada; sem canal, a causa
+ * aparece no botão e "Copiar link" fica ao lado. O que pede ação (em revisão, expirando em até 3 dias) vem primeiro,
+ * com o resumo no topo. A criação já vem com a validade e as condições padrão da corretora.
  */
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent } from "react";
-import { CheckCircle2, Link2, Plus, ShieldCheck } from "lucide-react";
+import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { CheckCircle2, Link2, MessageCircle, Plus, ShieldCheck } from "lucide-react";
 
 import { LiteSelect } from "@/components/lite/controls";
+import { LiteActionButton } from "@/components/lite/controls/action-button";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
@@ -23,8 +29,18 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
-import { convertProposalToSaleAction, createProposalAction, getQuotesForLeadAction, updateProposalStatusAction } from "@/features/proposals/actions";
+import { convertProposalToSaleAction, createProposalAction, getQuotesForLeadAction, sendProposalWhatsAppAction, updateProposalStatusAction } from "@/features/proposals/actions";
 import type { ProposalRecord } from "@/features/proposals/queries";
+import {
+  canSendProposalOnWhatsApp,
+  DEFAULT_PROPOSAL_VALID_DAYS,
+  defaultValidUntilInput,
+  proposalAttention,
+  proposalPublicPath,
+  sortProposalsByAttention,
+  summarizeProposalAttention,
+  type ProposalDefaults,
+} from "@/features/proposals/proposal-rules";
 import type { ProposalStatus } from "@/shared/db/schema";
 
 import { formatLeadPhone } from "@/features/leads/format-lead-phone";
@@ -48,13 +64,23 @@ const shortDate = liteDateFormatter({ dateStyle: "short" });
 type PaymentMethod = "boleto" | "debito_automatico" | "cartao_credito" | "desconto_folha" | "outro";
 type RenewalType = "reajuste_operadora" | "portabilidade" | "manutencao" | "nova_contratacao";
 
-export function PropostasLite({ initialProposals, expiringProposals, leads }: {
+const NO_LINK = "Esta proposta não tem cotação vinculada, então ainda não tem link público.";
+const FALLBACK_DEFAULTS: ProposalDefaults = { validDays: DEFAULT_PROPOSAL_VALID_DAYS, conditions: "" };
+
+export function PropostasLite({ initialProposals, expiringProposals, leads, defaults = FALLBACK_DEFAULTS, now: nowProp }: {
   initialProposals: ProposalRecord[];
   expiringProposals: ProposalRecord[];
   leads: Array<{ id: string; name: string }>;
+  /** Validade e condições padrão da corretora (configuração da empresa), para pré-preencher a criação. */
+  defaults?: ProposalDefaults;
+  /** Instante do servidor: a ordem por atenção sai igual no servidor e no navegador. */
+  now?: number;
 }) {
   const router = useRouter();
   const [proposals, setProposals] = useState(initialProposals);
+  const [now] = useState(() => nowProp ?? Date.now());
+  /** Envio sem canal: o link fica à mão para "Copiar link". */
+  const [fallbackLinks, setFallbackLinks] = useState<Record<string, string | undefined>>({});
   const [createOpen, setCreateOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [selected, setSelected] = useState<ProposalRecord | null>(null);
@@ -74,7 +100,15 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
   const { status: feedback, run, invalid, fail, clear, show } = useActionStatus();
   const converting = feedback.convert?.state === "busy";
 
-  const openProposals = proposals.filter((proposal) => !["aprovada", "perdida", "expirada"].includes(proposal.status));
+  // O que pede ação (em revisão, expirando em até 3 dias) vem primeiro em todas as visões.
+  const nowDate = useMemo(() => new Date(now), [now]);
+  const sortedProposals = useMemo(() => sortProposalsByAttention(proposals, nowDate), [proposals, nowDate]);
+  const sortedExpiring = useMemo(() => {
+    const current = new Map(proposals.map((proposal) => [proposal.id, proposal]));
+    return sortProposalsByAttention(expiringProposals.map((proposal) => current.get(proposal.id) ?? proposal), nowDate);
+  }, [expiringProposals, proposals, nowDate]);
+  const attentionSummary = summarizeProposalAttention(proposals, nowDate);
+  const openProposals = sortedProposals.filter((proposal) => !["aprovada", "perdida", "expirada"].includes(proposal.status));
   const totalValueOpen = openProposals.reduce((sum, proposal) => sum + Number(proposal.totalMonthly), 0);
 
   async function changeLead(nextLeadId: string) {
@@ -136,14 +170,34 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
   }
 
   // Copiar é nível 0: a confirmação aparece na lista, sem som nem vibração.
-  async function copyLink(proposalId: string) {
-    const title = proposals.find((item) => item.id === proposalId)?.title ?? "proposta";
+  // O link público é o PDF da cotação vinculada (o mesmo que o cliente abre sem login).
+  async function copyLink(proposalId: string, knownLink?: string) {
+    const proposal = proposals.find((item) => item.id === proposalId);
+    const title = proposal?.title ?? "proposta";
+    const path = proposalPublicPath(proposal?.publicToken);
+    const link = knownLink ?? (path ? `${window.location.origin}${path}` : null);
+    if (!link) {
+      show("list", { state: "error", message: NO_LINK });
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/cotacao/${proposalId}`);
+      await navigator.clipboard.writeText(link);
       show("list", { state: "done", label: `Link de ${title} copiado` });
     } catch {
       show("list", { state: "error", message: "Não deu para copiar o link. A proposta continua publicada." });
     }
+  }
+
+  // Enviar no WhatsApp (nível 1, ação ocasional com som discreto): o sucesso só depois que o servidor envia e marca.
+  async function sendWhatsApp(proposalId: string) {
+    const result = await sendProposalWhatsAppAction(proposalId);
+    if (!result.success) {
+      setFallbackLinks((current) => ({ ...current, [proposalId]: result.link }));
+      return { ok: false as const, error: result.error };
+    }
+    setFallbackLinks((current) => ({ ...current, [proposalId]: undefined }));
+    setProposals((current) => current.map((item) => (item.id === proposalId ? { ...item, status: result.status } : item)));
+    return { ok: true as const };
   }
 
   async function submitConvert() {
@@ -189,12 +243,42 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
     },
     { id: "status", label: "Status", render: (proposal) => <span className={page.badge} data-tone={STATUS[proposal.status]?.tone}>{STATUS[proposal.status]?.label ?? proposal.status}</span> },
     { id: "value", label: "Valor mensal", numeric: true, render: (proposal) => <span className={page.numeric}>{currency.format(Number(proposal.totalMonthly))}</span> },
-    { id: "valid", label: "Validade", render: (proposal) => <span className={page.numeric}>{shortDate.format(new Date(proposal.validUntil))}</span> },
+    {
+      id: "valid",
+      label: "Validade",
+      render: (proposal) => (
+        <span>
+          <span className={page.numeric}>{shortDate.format(new Date(proposal.validUntil))}</span>
+          {proposalAttention(proposal, nowDate) === "expiring" ? <span className={page.cellSub}>Expira em até 3 dias</span> : null}
+        </span>
+      ),
+    },
     {
       id: "actions",
       label: "Ações",
       render: (proposal) => (
         <span className={styles.actions}>
+          {canSendProposalOnWhatsApp(proposal.status) ? (
+            <LiteActionButton
+              size="sm"
+              tone="secondary"
+              icon={<MessageCircle aria-hidden="true" size={16} />}
+              aria-label={`Enviar ${proposal.title} no WhatsApp`}
+              busyLabel="Enviando…"
+              doneLabel="Enviada"
+              confirmSound
+              errorFallback="Não deu para enviar pelo WhatsApp agora."
+              keeps="A proposta continua como estava."
+              onAction={() => sendWhatsApp(proposal.id)}
+            >
+              Enviar no WhatsApp
+            </LiteActionButton>
+          ) : null}
+          {fallbackLinks[proposal.id] ? (
+            <button type="button" className={page.button} onClick={() => void copyLink(proposal.id, fallbackLinks[proposal.id])}>
+              <Link2 aria-hidden="true" size={16} /> Copiar link
+            </button>
+          ) : null}
           <button type="button" className={styles.iconButton} aria-label={`Copiar link público de ${proposal.title}`} title="Copiar link público" onClick={() => void copyLink(proposal.id)}>
             <Link2 aria-hidden="true" size={16} />
           </button>
@@ -213,13 +297,14 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
   ];
 
   const views = [
-    { value: "todas", label: "Todas", rows: proposals },
+    { value: "todas", label: "Todas", rows: sortedProposals },
     { value: "abertas", label: "Abertas", rows: openProposals },
-    { value: "expirando", label: "Expirando", rows: expiringProposals },
+    { value: "expirando", label: "Expirando", rows: sortedExpiring },
   ];
 
   return (
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
+      {attentionSummary ? <p className={`${page.muted} ${page.numeric}`} data-testid="proposals-attention">{attentionSummary}</p> : null}
       <div className={page.stats} data-onboarding="quote-results">
         <Stat label="Abertas" value={String(openProposals.length)} hint="Propostas em negociação ou enviadas" />
         <Stat label="Volume mensal estimado" value={currency.format(totalValueOpen)} hint="Total das propostas abertas no funil" />
@@ -266,11 +351,12 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
           </div>
           <label className={form.field}>
             <span className={form.label}>Data limite de validade</span>
-            <input name="validUntil" type="date" required className={form.input} />
+            <input name="validUntil" type="date" required className={form.input} defaultValue={defaultValidUntilInput(defaults.validDays, nowDate)} />
+            <span className={form.hint}>Padrão da corretora: {defaults.validDays} {defaults.validDays === 1 ? "dia" : "dias"}.</span>
           </label>
           <label className={form.field}>
             <span className={form.label}>Observações comerciais</span>
-            <textarea name="notes" className={form.textarea} placeholder="Condições específicas, descontos, regras de coparticipação" />
+            <textarea name="notes" className={form.textarea} defaultValue={defaults.conditions} placeholder="Condições específicas, descontos, regras de coparticipação" />
           </label>
           {documents.length > 0 ? (
             <div className={form.field}>

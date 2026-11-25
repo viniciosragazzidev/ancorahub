@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getProposals, getExpiringProposals, getLeadsForProposals } from "@/features/proposals/queries";
+import { getProposalDefaults } from "@/features/proposals/defaults";
 import { PropostasClient } from "./_components/propostas-client";
 import { PropostasLite } from "./_components/propostas-lite";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -11,6 +12,11 @@ export const metadata: Metadata = {
   title: "Propostas Comerciais — AncoraHub",
   description: "Acompanhe e gerencie as propostas comerciais, validades, estados de negociacao e fechamento comercial.",
 };
+
+/** Instante do servidor para a ordem por atenção sair igual no servidor e no navegador. */
+function serverNow() {
+  return Date.now();
+}
 
 export default async function PropostasPage() {
   const [proposals, expiringProposals, leads] = await Promise.all([
@@ -25,11 +31,12 @@ export default async function PropostasPage() {
   // Chave do diretor: a mesma tela no visual Lite, com o título no topo da moldura.
   const context = await getRequiredTenantContext();
   if (await isDirectorLitePageOnServer(context, "/propostas")) {
+    const defaults = await getProposalDefaults(context.tenantId);
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Propostas" summary={pageSummary} />
         <main className={litePage.stack}>
-          <PropostasLite initialProposals={proposals} expiringProposals={expiringProposals} leads={leads} />
+          <PropostasLite initialProposals={proposals} expiringProposals={expiringProposals} leads={leads} defaults={defaults} now={serverNow()} />
         </main>
       </>
     );

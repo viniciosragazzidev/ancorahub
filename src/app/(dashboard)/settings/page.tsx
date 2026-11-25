@@ -51,6 +51,8 @@ import { LiteRelatedLinks } from "@/components/lite/page/related-links";
 import { SettingsLite, type SettingsLiteSection } from "./_components/lite/settings-lite";
 import { AccountLite } from "./_components/lite/account-lite";
 import { EmpresaLite } from "./_components/lite/empresa-lite";
+import { ProposalsDefaultsLite } from "./_components/lite/proposals-defaults-lite";
+import { getProposalDefaults } from "@/features/proposals/defaults";
 import { UnitLite, WhatsappLite } from "./_components/lite/unit-lite";
 import { FeedbackLite, StageModeLite } from "./_components/lite/atendimento-lite";
 import { IntegrationsLite } from "./_components/lite/integrations-lite";
@@ -239,7 +241,12 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const voiceSection: SettingsLiteSection | null = context.role === "director"
       ? { id: "voz-sasa", title: "Voz do Sasá", description: "Respostas por voz com a conta do ElevenLabs da empresa", node: <SasaVoiceSettings /> }
       : null;
-    const sections = [...tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section)), ...(voiceSection ? [voiceSection] : [])];
+    // Propostas (25/11): validade e condições padrão da corretora, só o diretor; a action confere o papel de novo.
+    const proposalsSection: SettingsLiteSection | null = context.role === "director"
+      ? { id: "propostas", title: "Propostas", description: "Validade e condições padrão das propostas", node: <ProposalsDefaultsLite defaults={await getProposalDefaults(context.tenantId)} /> }
+      : null;
+    const extraSections = [proposalsSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
+    const sections = [...tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section)), ...extraSections];
     return (
       <>
         <DashboardHeader breadcrumb="Administração" title="Configurações" />

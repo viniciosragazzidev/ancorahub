@@ -11,6 +11,7 @@ const actions = vi.hoisted(() => ({
   updateProposalStatusAction: vi.fn(async () => ({ success: true })),
   convertProposalToSaleAction: vi.fn(async () => ({ success: true, saleId: "s" })),
   getQuotesForLeadAction: vi.fn(async () => ({ success: true, quotes: [{ id: "q1", title: "Cotação Amil", totalMonthly: "100" }], docs: [] })),
+  sendProposalWhatsAppAction: vi.fn(async (): Promise<unknown> => ({ success: true, status: "enviada", link: "https://crm.test/api/quotes/tok-6/pdf" })),
 }));
 vi.mock("@/features/proposals/actions", () => actions);
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -43,7 +44,7 @@ describe("propostas Lite", () => {
     await act(async () => {
       fireEvent.click(within(table()).getByRole("button", { name: "Copiar link público de Hapvida Mix individual" }));
     });
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining("/cotacao/prop-6"));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining("/api/quotes/tok-6/pdf"));
     expect(screen.getByRole("status")).toHaveTextContent("Link de Hapvida Mix individual copiado");
     expect(fire).not.toHaveBeenCalled();
     fireEvent.click(within(table()).getByRole("button", { name: /^Status de Hapvida Mix individual/ }));
@@ -96,5 +97,59 @@ describe("propostas Lite", () => {
     expect(actions.convertProposalToSaleAction).toHaveBeenCalledTimes(2);
     expect(fire).toHaveBeenCalledWith("confirm", { sound: true });
     expect(screen.getByRole("status")).toHaveTextContent("venda registrada");
+  });
+
+  // 29/10/2026: Unimed está em revisão, Porto e Hapvida expiram em até 3 dias.
+  const NOW = Date.UTC(2026, 9, 29, 12);
+
+  it("o que pede ação vem primeiro, com o resumo no topo", () => {
+    render(<PropostasLite initialProposals={PROPOSAL_FIXTURES} expiringProposals={expiring} leads={PROPOSAL_LEADS} now={NOW} />);
+    expect(screen.getByTestId("proposals-attention")).toHaveTextContent("1 em revisão e 3 expiram esta semana");
+    const titles = within(table()).getAllByRole("row").slice(1, 4).map((row) => row.textContent ?? "");
+    expect(titles[0]).toContain("Unimed Rio Pleno adesão");
+    expect(titles[1]).toContain("Porto Seguro Saúde 400");
+    expect(titles[2]).toContain("Hapvida Mix individual");
+    expect(within(table()).getAllByText("Expira em até 3 dias")).toHaveLength(2);
+  });
+
+  it("Enviar no WhatsApp manda pelo servidor e só então marca como enviada", async () => {
+    render(<PropostasLite initialProposals={PROPOSAL_FIXTURES} expiringProposals={expiring} leads={PROPOSAL_LEADS} now={NOW} />);
+    // Só rascunho e enviada têm a ação.
+    expect(within(table()).queryByRole("button", { name: "Enviar Unimed Rio Pleno adesão no WhatsApp" })).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(within(table()).getByRole("button", { name: "Enviar Hapvida Mix individual no WhatsApp" }));
+    });
+    expect(actions.sendProposalWhatsAppAction).toHaveBeenCalledWith("prop-6");
+    expect(fire).toHaveBeenCalledWith("tap");
+    expect(fire).toHaveBeenCalledWith("confirm", expect.objectContaining({ sound: true }));
+    const row = within(table()).getAllByRole("row").find((item) => item.textContent?.includes("Hapvida Mix individual"))!;
+    expect(within(row).getByRole("button", { name: /^Status de Hapvida Mix individual/ })).toHaveTextContent("Enviada");
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("sem canal mostra a causa e oferece Copiar link", async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => undefined) } });
+    actions.sendProposalWhatsAppAction.mockResolvedValueOnce({ success: false, reason: "no_channel", error: "Conecte o WhatsApp e aguarde o status Conectado.", link: "https://crm.test/api/quotes/tok-6/pdf" });
+    render(<PropostasLite initialProposals={PROPOSAL_FIXTURES} expiringProposals={expiring} leads={PROPOSAL_LEADS} now={NOW} />);
+    await act(async () => {
+      fireEvent.click(within(table()).getByRole("button", { name: "Enviar Hapvida Mix individual no WhatsApp" }));
+    });
+    expect(await within(table()).findByText("Conecte o WhatsApp e aguarde o status Conectado. A proposta continua como estava.")).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("error");
+    await act(async () => {
+      fireEvent.click(within(table()).getByRole("button", { name: "Copiar link" }));
+    });
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://crm.test/api/quotes/tok-6/pdf");
+    const row = within(table()).getAllByRole("row").find((item) => item.textContent?.includes("Hapvida Mix individual"))!;
+    expect(within(row).getByRole("button", { name: /^Status de Hapvida Mix individual/ })).toHaveTextContent("Rascunho");
+  });
+
+  it("criar proposta já vem com a validade e as condições padrão da corretora", () => {
+    render(<PropostasLite initialProposals={PROPOSAL_FIXTURES} expiringProposals={expiring} leads={PROPOSAL_LEADS} now={NOW} defaults={{ validDays: 15, conditions: "Carência conforme contrato." }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Criar proposta" }));
+    const panel = screen.getByRole("dialog", { name: "Criar proposta comercial" });
+    expect(panel.querySelector<HTMLInputElement>('input[name="validUntil"]')!.value).toBe("2026-11-13");
+    expect(panel.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!.value).toBe("Carência conforme contrato.");
+    expect(within(panel).getByText("Padrão da corretora: 15 dias.")).toBeInTheDocument();
   });
 });

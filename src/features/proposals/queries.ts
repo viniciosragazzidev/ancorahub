@@ -34,7 +34,36 @@ export type ProposalRecord = {
   beneficiaryCount: number;
   createdAt: Date;
   updatedAt: Date;
+  /** Token público da cotação vinculada: o link que vai para o cliente. Sem cotação, null. */
+  publicToken: string | null;
 };
+
+/** Colunas de toda lista de propostas (uma vez só, para as quatro consultas não divergirem). */
+function proposalColumns() {
+  return {
+    id: schema.proposals.id,
+    tenantId: schema.proposals.tenantId,
+    leadId: schema.proposals.leadId,
+    leadName: schema.proposals.leadName,
+    leadPhone: schema.proposals.leadPhone,
+    quoteId: schema.proposals.quoteId,
+    title: schema.proposals.title,
+    status: schema.proposals.status,
+    version: schema.proposals.version,
+    validUntil: schema.proposals.validUntil,
+    notes: schema.proposals.notes,
+    documentIds: schema.proposals.documentIds,
+    createdBy: schema.proposals.createdBy,
+    createdByName: schema.user.name,
+    convertedAt: schema.proposals.convertedAt,
+    convertedSaleId: schema.proposals.convertedSaleId,
+    totalMonthly: schema.proposals.totalMonthly,
+    beneficiaryCount: schema.proposals.beneficiaryCount,
+    createdAt: schema.proposals.createdAt,
+    updatedAt: schema.proposals.updatedAt,
+    publicToken: schema.quotes.publicToken,
+  };
+}
 
 export async function getProposals(): Promise<ProposalRecord[]> {
   const context = await getRequiredTenantContext();
@@ -50,31 +79,11 @@ export async function getProposals(): Promise<ProposalRecord[]> {
   }
 
   const rows = await db
-    .select({
-      id: schema.proposals.id,
-      tenantId: schema.proposals.tenantId,
-      leadId: schema.proposals.leadId,
-      leadName: schema.proposals.leadName,
-      leadPhone: schema.proposals.leadPhone,
-      quoteId: schema.proposals.quoteId,
-      title: schema.proposals.title,
-      status: schema.proposals.status,
-      version: schema.proposals.version,
-      validUntil: schema.proposals.validUntil,
-      notes: schema.proposals.notes,
-      documentIds: schema.proposals.documentIds,
-      createdBy: schema.proposals.createdBy,
-      createdByName: schema.user.name,
-      convertedAt: schema.proposals.convertedAt,
-      convertedSaleId: schema.proposals.convertedSaleId,
-      totalMonthly: schema.proposals.totalMonthly,
-      beneficiaryCount: schema.proposals.beneficiaryCount,
-      createdAt: schema.proposals.createdAt,
-      updatedAt: schema.proposals.updatedAt,
-    })
+    .select(proposalColumns())
     .from(schema.proposals)
     .innerJoin(schema.leads, and(eq(schema.proposals.leadId, schema.leads.id), eq(schema.proposals.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.proposals.createdBy, schema.user.id))
+    .leftJoin(schema.quotes, and(eq(schema.proposals.quoteId, schema.quotes.id), eq(schema.quotes.tenantId, schema.proposals.tenantId)))
     .where(and(...conditions))
     .orderBy(desc(schema.proposals.createdAt));
 
@@ -103,31 +112,11 @@ export async function getProposalById(id: string): Promise<ProposalRecord | null
   }
 
   const [row] = await db
-    .select({
-      id: schema.proposals.id,
-      tenantId: schema.proposals.tenantId,
-      leadId: schema.proposals.leadId,
-      leadName: schema.proposals.leadName,
-      leadPhone: schema.proposals.leadPhone,
-      quoteId: schema.proposals.quoteId,
-      title: schema.proposals.title,
-      status: schema.proposals.status,
-      version: schema.proposals.version,
-      validUntil: schema.proposals.validUntil,
-      notes: schema.proposals.notes,
-      documentIds: schema.proposals.documentIds,
-      createdBy: schema.proposals.createdBy,
-      createdByName: schema.user.name,
-      convertedAt: schema.proposals.convertedAt,
-      convertedSaleId: schema.proposals.convertedSaleId,
-      totalMonthly: schema.proposals.totalMonthly,
-      beneficiaryCount: schema.proposals.beneficiaryCount,
-      createdAt: schema.proposals.createdAt,
-      updatedAt: schema.proposals.updatedAt,
-    })
+    .select(proposalColumns())
     .from(schema.proposals)
     .innerJoin(schema.leads, and(eq(schema.proposals.leadId, schema.leads.id), eq(schema.proposals.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.proposals.createdBy, schema.user.id))
+    .leftJoin(schema.quotes, and(eq(schema.proposals.quoteId, schema.quotes.id), eq(schema.quotes.tenantId, schema.proposals.tenantId)))
     .where(and(...conditions))
     .limit(1);
 
@@ -158,31 +147,11 @@ export async function getProposalsByLead(leadId: string): Promise<ProposalRecord
   }
 
   const rows = await db
-    .select({
-      id: schema.proposals.id,
-      tenantId: schema.proposals.tenantId,
-      leadId: schema.proposals.leadId,
-      leadName: schema.proposals.leadName,
-      leadPhone: schema.proposals.leadPhone,
-      quoteId: schema.proposals.quoteId,
-      title: schema.proposals.title,
-      status: schema.proposals.status,
-      version: schema.proposals.version,
-      validUntil: schema.proposals.validUntil,
-      notes: schema.proposals.notes,
-      documentIds: schema.proposals.documentIds,
-      createdBy: schema.proposals.createdBy,
-      createdByName: schema.user.name,
-      convertedAt: schema.proposals.convertedAt,
-      convertedSaleId: schema.proposals.convertedSaleId,
-      totalMonthly: schema.proposals.totalMonthly,
-      beneficiaryCount: schema.proposals.beneficiaryCount,
-      createdAt: schema.proposals.createdAt,
-      updatedAt: schema.proposals.updatedAt,
-    })
+    .select(proposalColumns())
     .from(schema.proposals)
     .innerJoin(schema.leads, and(eq(schema.proposals.leadId, schema.leads.id), eq(schema.proposals.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.proposals.createdBy, schema.user.id))
+    .leftJoin(schema.quotes, and(eq(schema.proposals.quoteId, schema.quotes.id), eq(schema.quotes.tenantId, schema.proposals.tenantId)))
     .where(and(...conditions))
     .orderBy(desc(schema.proposals.createdAt));
 
@@ -222,31 +191,11 @@ export async function getExpiringProposals(): Promise<ProposalRecord[]> {
   }
 
   const rows = await db
-    .select({
-      id: schema.proposals.id,
-      tenantId: schema.proposals.tenantId,
-      leadId: schema.proposals.leadId,
-      leadName: schema.proposals.leadName,
-      leadPhone: schema.proposals.leadPhone,
-      quoteId: schema.proposals.quoteId,
-      title: schema.proposals.title,
-      status: schema.proposals.status,
-      version: schema.proposals.version,
-      validUntil: schema.proposals.validUntil,
-      notes: schema.proposals.notes,
-      documentIds: schema.proposals.documentIds,
-      createdBy: schema.proposals.createdBy,
-      createdByName: schema.user.name,
-      convertedAt: schema.proposals.convertedAt,
-      convertedSaleId: schema.proposals.convertedSaleId,
-      totalMonthly: schema.proposals.totalMonthly,
-      beneficiaryCount: schema.proposals.beneficiaryCount,
-      createdAt: schema.proposals.createdAt,
-      updatedAt: schema.proposals.updatedAt,
-    })
+    .select(proposalColumns())
     .from(schema.proposals)
     .innerJoin(schema.leads, and(eq(schema.proposals.leadId, schema.leads.id), eq(schema.proposals.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.proposals.createdBy, schema.user.id))
+    .leftJoin(schema.quotes, and(eq(schema.proposals.quoteId, schema.quotes.id), eq(schema.quotes.tenantId, schema.proposals.tenantId)))
     .where(and(...conditions))
     .orderBy(desc(schema.proposals.validUntil));
 
