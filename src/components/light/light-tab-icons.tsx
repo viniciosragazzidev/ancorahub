@@ -1,12 +1,13 @@
-import { Ellipsis, House, ListChecks, MessageSquareText, type LucideIcon } from "lucide-react";
+import { DotsIcon, HouseIcon, ListChecksIcon, MessageSquareIcon, type MarkerIconProps } from "@/components/icons/marker-icons";
 
 import type { LightTabId } from "./light-routes";
 
-export const LIGHT_TAB_ICONS: Record<LightTabId, LucideIcon> = {
-  inicio: House,
-  fila: ListChecks,
-  insights: MessageSquareText,
-  mais: Ellipsis,
+// Ícones de marcador (25/11/2026), desenhados com a skill draw-icons.
+export const LIGHT_TAB_ICONS: Record<LightTabId, (props: MarkerIconProps) => React.ReactElement> = {
+  inicio: HouseIcon,
+  fila: ListChecksIcon,
+  insights: MessageSquareIcon,
+  mais: DotsIcon,
 };
 
 export function formatQueueBadge(count: number) {

@@ -10,6 +10,7 @@ import { SPLASH_BOOT_SCRIPT } from "@/components/splash-boot";
 import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { RouteViewTransition } from "@/components/motion/route-view-transition";
 import { SkipToContent } from "@/components/skip-to-content";
+import { MarkerFilterDefs } from "@/components/icons/marker-icons";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { isDirectorF2DevPreview } from "@/components/light/director-f2-dev-preview";
@@ -143,6 +144,7 @@ export default async function RootLayout({
         <Script id="ancora-splash-boot" strategy="beforeInteractive">{SPLASH_BOOT_SCRIPT}</Script>
       </head>
       <body className="min-h-full flex flex-col">
+        <MarkerFilterDefs />
         <SkipToContent />
         <SplashScreen />
         <InterfaceMotionProvider enabled={isDirectorDevPreview ? false : undefined}>

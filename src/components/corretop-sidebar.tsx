@@ -10,22 +10,28 @@ import { motion } from "motion/react";
 import { toast } from "@/components/ui/sonner";
 
 import {
-  SquaresFour,
-  ChatCircleDots,
-  Lightbulb,
-  PresentationChart,
-  CurrencyCircleDollar,
-  UsersThree,
-  Sparkle,
   CaretDown,
   SignOut,
   SlidersHorizontal,
   UserCircle,
   ShieldCheck,
-  Wallet,
-  Megaphone,
-  PhoneCall,
 } from "@phosphor-icons/react";
+// Ícones de marcador (25/11/2026): áreas do menu desenhadas com a skill draw-icons.
+import {
+  BanknoteIcon,
+  ChatCircleIcon,
+  LightbulbIcon,
+  MegaphoneIcon,
+  PresentationIcon,
+  ShieldCheckIcon,
+  SlidersIcon,
+  SmartphoneIcon,
+  SparkleIcon,
+  SquaresFourIcon,
+  UsersIcon,
+  WalletIcon,
+  type MarkerIconProps,
+} from "@/components/icons/marker-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,7 +77,7 @@ type NavItemConfig = {
   fullLabel: string;
   url: string;
   section: string;
-  icon: typeof SquaresFour;
+  icon: (props: MarkerIconProps) => React.ReactElement;
   iconTone: string;
   isWhatsApp?: boolean;
   beta?: boolean;
@@ -80,17 +86,17 @@ type NavItemConfig = {
 
 /** Ícone e cor de cada área; quais áreas e abas existem vem de nav-registry. */
 const areaPresentation: Record<NavAreaId, Pick<NavItemConfig, "icon" | "iconTone">> = {
-  inicio: { icon: SquaresFour, iconTone: "text-sky-600 dark:text-sky-300" },
-  conversas: { icon: ChatCircleDots, iconTone: "text-violet-600 dark:text-violet-300" },
-  leads: { icon: Lightbulb, iconTone: "text-amber-600 dark:text-amber-300" },
-  distribuicao: { icon: PresentationChart, iconTone: "text-emerald-600 dark:text-emerald-300" },
-  comercial: { icon: CurrencyCircleDollar, iconTone: "text-orange-600 dark:text-orange-300" },
-  equipe: { icon: UsersThree, iconTone: "text-cyan-600 dark:text-cyan-300" },
-  "atendimento-ia": { icon: Sparkle, iconTone: "text-fuchsia-600 dark:text-fuchsia-300" },
-  marketing: { icon: Megaphone, iconTone: "text-blue-600 dark:text-blue-300" },
-  configuracoes: { icon: SlidersHorizontal, iconTone: "text-slate-600 dark:text-slate-300" },
-  financeiro: { icon: Wallet, iconTone: "text-teal-600 dark:text-teal-300" },
-  erp: { icon: ShieldCheck, iconTone: "text-primary" },
+  inicio: { icon: SquaresFourIcon, iconTone: "text-sky-600 dark:text-sky-300" },
+  conversas: { icon: ChatCircleIcon, iconTone: "text-violet-600 dark:text-violet-300" },
+  leads: { icon: LightbulbIcon, iconTone: "text-amber-600 dark:text-amber-300" },
+  distribuicao: { icon: PresentationIcon, iconTone: "text-emerald-600 dark:text-emerald-300" },
+  comercial: { icon: BanknoteIcon, iconTone: "text-orange-600 dark:text-orange-300" },
+  equipe: { icon: UsersIcon, iconTone: "text-cyan-600 dark:text-cyan-300" },
+  "atendimento-ia": { icon: SparkleIcon, iconTone: "text-fuchsia-600 dark:text-fuchsia-300" },
+  marketing: { icon: MegaphoneIcon, iconTone: "text-blue-600 dark:text-blue-300" },
+  configuracoes: { icon: SlidersIcon, iconTone: "text-slate-600 dark:text-slate-300" },
+  financeiro: { icon: WalletIcon, iconTone: "text-teal-600 dark:text-teal-300" },
+  erp: { icon: ShieldCheckIcon, iconTone: "text-primary" },
 };
 
 export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false, postSaleAuditEnabled = false, callAncoraEnabled = false, erpPaths = [] }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; callAncoraEnabled?: boolean; erpPaths?: readonly string[] }) {
@@ -172,10 +178,9 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                       )}
                     >
                       <Icon
-                        weight={isActive ? "fill" : "regular"}
                         className={cn(
-                          // PROTOTYPE: Director Lite glyph at 80%; keep the icon circle and menu hit target unchanged.
-                          directorLite ? "size-[0.92rem] text-(--text-secondary)" : "size-[1.15rem]",
+                          // Ícones de marcador só nos tamanhos desenhados (16 e 20 px); o círculo e o alvo do menu não mudam.
+                          directorLite ? "size-4 text-(--text-secondary)" : "size-5",
                           "shrink-0 transition-[color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
                           directorLite ? undefined : isActive ? "text-sidebar-primary" : item.isWhatsApp ? "text-emerald-600 dark:text-emerald-300" : item.iconTone,
                         )}
@@ -391,7 +396,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                   }>
                     <NavPending className="text-primary" />
                     <div data-slot="sidebar-nav-icon" className={cn("relative flex size-8 shrink-0 items-center justify-center rounded-full", directorLite ? "director-nav-icon" : "bg-sidebar-accent/55 text-sky-600 dark:text-sky-300", pathname === "/call-ancora" && "bg-primary/8 text-primary")}>
-                      <PhoneCall weight={pathname === "/call-ancora" ? "fill" : "regular"} className="size-[1.15rem] shrink-0" />
+                      <SmartphoneIcon className={cn(directorLite ? "size-4" : "size-5", "shrink-0")} />
                     </div>
                     <span data-slot="sidebar-nav-label" className={cn("min-w-0 flex-1 truncate text-sm leading-tight tracking-tight", pathname === "/call-ancora" ? "font-semibold text-primary" : "font-medium text-sidebar-foreground/72", !isMobile && "group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0")}>Call Âncora</span>
                   </TooltipTrigger>
@@ -425,7 +430,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                 />
               }
             >
-              <Sparkle weight="fill" className="size-[1.15rem] shrink-0" />
+              <SparkleIcon className={cn(directorLite ? "size-4" : "size-5", "shrink-0")} />
               <span className="truncate text-sm font-medium transition-[max-width,opacity,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">Agente IA</span>
             </TooltipTrigger>
             <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-semibold text-popover-foreground shadow-none">

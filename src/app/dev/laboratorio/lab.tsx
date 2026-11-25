@@ -25,6 +25,8 @@ import { DevLabProvider, type DevLab } from "@/lib/dev-lab";
 import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
 import { TeamListsView } from "@/features/supervisor-workspace/lead-import/team-lists-view";
+import * as MarkerIcons from "@/components/icons/marker-icons";
+import { LightBottomNav } from "@/components/light/light-bottom-nav";
 import { SaleChat, type SaleChatServices } from "@/features/post-sale/components/sale-chat";
 import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-ancora-workspace";
@@ -46,7 +48,7 @@ import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, 
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 import { SasaVoiceSettings } from "@/features/sasa-voice/components/sasa-voice-settings";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa" | "formulario" | "posVendaConversa" | "entreiEmContato";
+type Flow = "icones" | "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao" | "accordee" | "agenteDiretor" | "telefone" | "vozSasa" | "formulario" | "posVendaConversa" | "entreiEmContato";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -56,6 +58,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "sasa", label: "Sasá: pedidos por texto e voz" },
   { id: "botao", label: "Botão do Sasá" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
+  { id: "icones", label: "Ícones de marcador" },
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
   { id: "callAncora", label: "Call Âncora (celular simulado)" },
@@ -338,6 +341,8 @@ export function FlowLab() {
             />
             <SasaVoiceButton pathname="/dashboard" chat={false} />
           </>
+        ) : flow === "icones" ? (
+          <LabMarkerIcons />
         ) : flow === "lista" ? (
           <LabTeamLists />
         ) : flow === "movimento" ? (
@@ -454,4 +459,23 @@ function LabTeamLists() {
   const current = LAB_LISTS.find((list) => list.id === open) ?? null;
   const rows = current ? LAB_LIST.filter((row) => row.listId === current.id) : LAB_LIST;
   return <TeamListManager key={open} rows={rows} totals={totalsOf(rows)} team={LAB_TEAM} switcher={null} folders={{ current, all: LAB_LISTS, onOpenList: setOpen }} />;
+}
+
+/** Ícones de marcador (25/11/2026): o conjunto nos tamanhos desenhados e a barra inferior real, sem login. */
+function LabMarkerIcons() {
+  const icons = Object.entries(MarkerIcons).filter(([name]) => name.endsWith("Icon")) as Array<[string, (props: MarkerIcons.MarkerIconProps) => React.ReactElement]>;
+  return (
+    <div className="arc-venancor" style={{ padding: 24, display: "grid", gap: 24, maxWidth: 720 }}>
+      <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>Ícones de marcador</h1>
+      {[16, 20, 24].map((size) => (
+        <section key={size} aria-label={`${size} px`} style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+          <span style={{ width: 48, fontSize: 12, color: "var(--text-secondary)" }}>{size} px</span>
+          {icons.map(([name, Icon]) => <span key={name} title={name.replace(/Icon$/, "")}><Icon size={size} /></span>)}
+        </section>
+      ))}
+      <div style={{ position: "relative", height: 96 }}>
+        <LightBottomNav activeTab="inicio" queueBadgeCount={3} moreOpen={false} onOpenMore={() => undefined} />
+      </div>
+    </div>
+  );
 }
