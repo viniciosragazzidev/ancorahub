@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { routeCatalog } from "@/features/custom-roles/routes";
 
-import { NAV_AREAS, canShowNavTab, isNavTabRoot, resolveNavLocation, visibleNavAreas, type NavAccessUser } from "./nav-registry";
+import { NAV_AREAS, NAV_GROUPS, canShowNavTab, groupNavItems, isNavTabRoot, resolveNavLocation, visibleNavAreas, type NavAccessUser } from "./nav-registry";
 
 const DASHBOARD_DIR = path.join(process.cwd(), "src", "app", "(dashboard)");
 
@@ -205,5 +205,20 @@ describe("nav-registry", () => {
     const mainRoutes = routeCatalog.filter((route) => !("legacyOpen" in route && route.legacyOpen)).map((route) => route.path);
     const missing = mainRoutes.filter((route) => !resolveNavLocation(route));
     expect(missing).toEqual([]);
+  });
+  it("groups the director menu from operation to settings, each area in one group only", () => {
+    const grouped = groupNavItems(visibleNavAreas(director).map(({ area }) => ({ id: area.id })));
+    expect(grouped.map(({ group, items }) => [group.label, items.map((item) => item.id)])).toEqual([
+      ["Início", ["inicio"]],
+      ["Conversas", ["conversas"]],
+      ["Leads", ["leads", "distribuicao"]],
+      ["Comercial", ["comercial"]],
+      ["Crescimento", ["atendimento-ia", "marketing"]],
+      ["Equipe", ["equipe"]],
+      ["Configurações", ["configuracoes"]],
+    ]);
+    const all = NAV_GROUPS.flatMap((group) => group.areas);
+    expect(new Set(all).size).toBe(all.length);
+    expect([...all].sort()).toEqual(NAV_AREAS.map((area) => area.id).sort());
   });
 });

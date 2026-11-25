@@ -297,18 +297,23 @@ export function visibleNavAreas(user: NavAccessUser | null) {
 }
 
 /**
- * Menu lateral em 6 entradas (20/11/2026, skill `interface-enxuta`): agrupa áreas sem mudar nomes, abas nem rotas.
+ * Menu lateral (skill `interface-enxuta`): agrupa áreas sem mudar nomes, abas nem rotas.
  * A primeira área visível do grupo é o destino da entrada; as demais aparecem como subitens.
+ *
+ * 25/11/2026 (docs/research/deskcomm-crm-engenharia-reversa.md): a ordem segue o dia do diretor, do que se opera
+ * para o que se ajusta, como no DeskComm. Configurações guarda só ajustes; Atendimento IA e Marketing operam leads
+ * todo dia e ficam em Crescimento; Financeiro e Operação ERP ficam junto do Comercial, onde o dinheiro nasce.
  */
 export type NavGroup = { id: string; label: string; areas: readonly NavAreaId[] };
 
 export const NAV_GROUPS: readonly NavGroup[] = [
   { id: "inicio", label: "Início", areas: ["inicio"] },
   { id: "conversas", label: "Conversas", areas: ["conversas"] },
-  { id: "leads", label: "Leads", areas: ["leads", "distribuicao", "marketing"] },
-  { id: "comercial", label: "Comercial", areas: ["comercial"] },
+  { id: "leads", label: "Leads", areas: ["leads", "distribuicao"] },
+  { id: "comercial", label: "Comercial", areas: ["comercial", "financeiro", "erp"] },
+  { id: "crescimento", label: "Crescimento", areas: ["atendimento-ia", "marketing"] },
   { id: "equipe", label: "Equipe", areas: ["equipe"] },
-  { id: "configuracoes", label: "Configurações", areas: ["configuracoes", "atendimento-ia", "financeiro", "erp"] },
+  { id: "configuracoes", label: "Configurações", areas: ["configuracoes"] },
 ];
 
 /** Agrupa itens já filtrados por área; área fora dos grupos vira um grupo próprio no fim. Grupos vazios somem. */
