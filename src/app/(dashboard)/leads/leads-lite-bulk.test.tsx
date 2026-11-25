@@ -16,6 +16,10 @@ const actions = vi.hoisted(() => ({
   bulkRevertToQualificationAction: vi.fn(async () => ({ success: true, mutationId: "m1", message: "2 leads devolvidos.", changedLeadIds: ["l1", "l2"] })),
 }));
 vi.mock("./status-actions", () => actions);
+const exportActions = vi.hoisted(() => ({
+  exportSelectedLeadsAction: vi.fn(async (_ids: string[]): Promise<Record<string, unknown>> => ({ ok: true, csv: "﻿Nome", filename: "leads.csv", exported: 2, requested: 2 })),
+}));
+vi.mock("./export-actions", () => exportActions);
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast }));
 
@@ -95,6 +99,31 @@ describe("seleção em massa na lista Lite", () => {
     const bar = within(screen.getByRole("region", { name: "Ações em lote" }));
     expect(bar.queryByRole("button", { name: "Alterar status" })).not.toBeInTheDocument();
     expect(bar.getByRole("button", { name: "Exportar CSV" })).toBeInTheDocument();
+  });
+
+  it("exportar CSV pede ao servidor só os ids e baixa o arquivo", async () => {
+    const createObjectURL = vi.fn(() => "blob:x");
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    renderList({ selectedIds: ["l1", "l2"], role: "broker" });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    });
+    expect(exportActions.exportSelectedLeadsAction).toHaveBeenCalledWith(["l1", "l2"]);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledWith("2 leads exportados.");
+    click.mockRestore();
+  });
+
+  it("falha ao exportar: causa e Tentar de novo no aviso", async () => {
+    exportActions.exportSelectedLeadsAction.mockResolvedValueOnce({ ok: false, error: "Nenhum dos leads selecionados está no seu acesso." });
+    renderList({ selectedIds: ["l1"] });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Nenhum dos leads selecionados está no seu acesso. Seus leads seguem iguais.", expect.objectContaining({ action: expect.objectContaining({ label: "Tentar de novo" }) }));
   });
 
   it("alterar status abre o diálogo atual de status em lote", () => {

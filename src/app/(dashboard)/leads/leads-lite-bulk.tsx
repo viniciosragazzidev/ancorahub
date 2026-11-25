@@ -17,6 +17,7 @@ import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import { bulkChangeLeadStatusAction, bulkRevertToQualificationAction } from "./status-actions";
 import { buildPostSaleAudienceHref } from "@/features/post-sale-audit/bulk-navigation";
+import { useExportSelectedLeads } from "./use-export-selected-leads";
 
 export type LeadsLiteBulkConfig = {
   role?: string;
@@ -40,6 +41,7 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
   const count = selectedIds.length;
   const postSaleHref = config.postSaleEnabled ? buildPostSaleAudienceHref(selectedIds) : null;
   const fire = useFeedback();
+  const { exporting, exportLeads } = useExportSelectedLeads();
 
   const actions: BulkAction[] = [];
   if (canManage) {
@@ -49,8 +51,14 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
     actions.push({ id: "revert", label: "Devolver para qualificação", shortLabel: "Devolver", tone: "danger", onRun: () => { if (!reverting) setConfirmRevert(true); } });
     if (config.postSaleEnabled) actions.push({ id: "post-sale", label: "Enviar pós-venda", shortLabel: "Pós-venda", disabled: !postSaleHref, onRun: () => { if (postSaleHref) window.location.assign(postSaleHref); } });
   }
-  // A tabela atual oferece "Exportar CSV" na seleção; a Lite mantém o mesmo comportamento.
-  actions.push({ id: "export", label: "Exportar CSV", shortLabel: "Exportar", onRun: () => alert(`Exportando ${count} lead(s)...`) });
+  // "Exportar CSV" para todos: o servidor só devolve os leads que o usuário pode ver.
+  actions.push({
+    id: "export",
+    label: exporting ? "Exportando…" : "Exportar CSV",
+    shortLabel: exporting ? "Exportando…" : "Exportar",
+    disabled: exporting,
+    onRun: () => { void exportLeads(selectedIds); },
+  });
 
   const cancelRevert = useCallback(() => setConfirmRevert(false), []);
   // Feedback nível 1 (FEEDBACK.md): o toque vibra; o resultado vem do servidor. Lote mexe em vários leads e a

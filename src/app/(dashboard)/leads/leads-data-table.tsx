@@ -10,6 +10,7 @@ import type { LeadWorkspaceItem, QualifyingLeadItem } from "./leads-workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
+import { useExportSelectedLeads } from "./use-export-selected-leads";
 
 export interface LeadsDataTableProps {
   leads: LeadWorkspaceItem[];
@@ -125,6 +126,7 @@ export function LeadsDataTable({
   });
 
   const selectedRows = table.getFilteredSelectedRowModel().rows;
+  const { exporting, exportLeads } = useExportSelectedLeads();
 
   return (
     <DataTable
@@ -148,11 +150,13 @@ export function LeadsDataTable({
               variant="outline"
               size="xs"
               className="text-xs"
+              disabled={exporting}
+              aria-busy={exporting}
               onClick={() => {
-                alert(`Exportando ${selectedRows.length} lead(s)...`);
+                void exportLeads(selectedRows.map((row) => row.original.id));
               }}
             >
-              Exportar CSV
+              {exporting ? "Exportando…" : "Exportar CSV"}
             </Button>
             <Button
               variant="ghost"
