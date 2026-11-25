@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 
 import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
-import { getFeatureFlag } from "@/features/system-settings/queries";
+import { getFeatureFlag, getSystemSetting } from "@/features/system-settings/queries";
 import { isPostSaleBusinessHours, nextPostSaleBusinessOpening } from "./business-calendar";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -20,10 +20,13 @@ import {
   AUTO_RULE_LIMITS,
   AUTO_RULE_OPEN_STATUSES,
   AUTO_RULE_SKIP_LABELS,
+  allocateAutoRuleQuotas,
   autoRuleMilestoneFloor,
   autoRuleRemainingCapacity,
   decideAutoRuleCandidate,
   effectiveAutoRuleDailyLimit,
+  parseTenantAutoDailyLimit,
+  postSaleAutoDailyLimitKey,
   saoPauloDateKey,
   type AutoRuleKey,
   type AutoRuleSettings,
@@ -207,6 +210,11 @@ export async function selectAutoRuleRecipients(input: {
   return selection;
 }
 
+/** Limite da empresa por dia (25/11): o que o diretor escolheu, ou o padrão. */
+export async function loadTenantAutoDailyLimit(tenantId: string) {
+  return parseTenantAutoDailyLimit(await getSystemSetting(postSaleAutoDailyLimitKey(tenantId)).catch(() => null));
+}
+
 /** Quantas conversas a régua já abriu no dia de envio, por regra (campanhas do dia). */
 async function usageForDay(tenantId: string, sendDay: string) {
   const campaignIds = AUTO_RULE_KEYS.map((key) => autoRuleCampaignId(tenantId, key, sendDay));
@@ -357,25 +365,40 @@ async function runTenant(tenantId: string, now: Date, deadline: number, result: 
   const { sendAt, sendDay } = autoRuleSchedule(now);
   result.scheduled ||= Boolean(sendAt);
   const usage = await usageForDay(tenantId, sendDay);
+  const tenantDailyLimit = await loadTenantAutoDailyLimit(tenantId);
   let usedByTenant = usage.total;
-  if (!filter.ignoreLimits && usedByTenant >= AUTO_RULE_LIMITS.tenantDailyLimit) return;
+  if (!filter.ignoreLimits && usedByTenant >= tenantDailyLimit) return;
   const systemUserId = await resolveSystemUserId(tenantId);
   const context = tenantWideContext(tenantId, systemUserId);
   const [config] = await db.select({ assistantName: schema.aiQualificationConfigs.assistantName }).from(schema.aiQualificationConfigs).where(eq(schema.aiQualificationConfigs.tenantId, tenantId)).limit(1);
   const companyName = tenant.name?.trim() || "nossa equipe";
   const assistantName = config?.assistantName?.trim() || "equipe de qualidade";
 
+  // 1) Seleciona todas as regras ligadas. 2) Divide as vagas do dia entre elas (25/11: antes a R1 ocupava tudo).
+  // 3) Envia cada regra até a parte dela.
+  const planned: Array<{ settings: AutoRuleSettings; selection: AutoRuleSelection; stats: { candidates: number; eligible: number; started: number; limitReached: boolean } }> = [];
   for (const settings of enabled) {
-    if (Date.now() > deadline) { result.budgetExhausted = true; return; }
-    let usedByRule = usage.byRule.get(settings.key) ?? 0;
+    if (Date.now() > deadline) { result.budgetExhausted = true; break; }
+    const usedByRule = usage.byRule.get(settings.key) ?? 0;
     const stats = { candidates: 0, eligible: 0, started: 0, limitReached: false };
     result.rules[settings.key] = stats;
-    if (!filter.ignoreLimits && autoRuleRemainingCapacity({ settings, usedByRule, usedByTenant }) <= 0) { stats.limitReached = true; continue; }
+    if (!filter.ignoreLimits && autoRuleRemainingCapacity({ settings, usedByRule, usedByTenant, tenantDailyLimit }) <= 0) { stats.limitReached = true; continue; }
     const selection = await selectAutoRuleRecipients({ tenantId, settings, sendDay, now, context });
     if (filter.milestoneDay) selection.recipients = selection.recipients.filter((recipient) => saoPauloDateKey(recipient.milestoneAt) === filter.milestoneDay);
     stats.candidates = selection.candidates;
     stats.eligible = selection.recipients.length;
-    if (!selection.recipients.length) continue;
+    if (selection.recipients.length) planned.push({ settings, selection, stats });
+  }
+  const quotas = allocateAutoRuleQuotas(tenantDailyLimit - usedByTenant, planned.map(({ settings, selection }) => ({
+    key: settings.key,
+    wanted: Math.min(selection.recipients.length, Math.max(0, effectiveAutoRuleDailyLimit(settings) - (usage.byRule.get(settings.key) ?? 0))),
+  })));
+
+  for (const { settings, selection, stats } of planned) {
+    if (Date.now() > deadline) { result.budgetExhausted = true; return; }
+    let usedByRule = usage.byRule.get(settings.key) ?? 0;
+    let quotaLeft = filter.ignoreLimits ? Number.POSITIVE_INFINITY : quotas.get(settings.key) ?? 0;
+    if (quotaLeft <= 0) { stats.limitReached = true; continue; }
     const brokerIds = [...new Set(selection.recipients.map((recipient) => recipient.brokerId))];
     const brokers = await db.select({ id: schema.user.id, name: schema.user.name }).from(schema.user).where(inArray(schema.user.id, brokerIds));
     const brokerNames = new Map(brokers.map((broker) => [broker.id, firstName(broker.name)]));
@@ -383,7 +406,7 @@ async function runTenant(tenantId: string, now: Date, deadline: number, result: 
 
     for (const recipient of selection.recipients) {
       if (Date.now() > deadline) { result.budgetExhausted = true; return; }
-      if (!filter.ignoreLimits && autoRuleRemainingCapacity({ settings, usedByRule, usedByTenant }) <= 0) { stats.limitReached = true; break; }
+      if (!filter.ignoreLimits && (quotaLeft <= 0 || autoRuleRemainingCapacity({ settings, usedByRule, usedByTenant, tenantDailyLimit }) <= 0)) { stats.limitReached = true; break; }
       campaignId ??= await ensureAutoCampaign(tenantId, settings.key, sendDay, systemUserId, now);
       const surveyId = autoRuleSurveyId(tenantId, recipient.leadId, settings.key, recipient.milestoneAt);
       const brokerName = brokerNames.get(recipient.brokerId) ?? "nosso corretor";
@@ -408,6 +431,7 @@ async function runTenant(tenantId: string, now: Date, deadline: number, result: 
       if (!inserted) { result.alreadyStarted += 1; continue; }
       usedByRule += 1;
       usedByTenant += 1;
+      quotaLeft -= 1;
 
       const idempotencyKey = `post-sale:${campaignId}:${recipient.leadId}`;
       try {
@@ -422,6 +446,7 @@ async function runTenant(tenantId: string, now: Date, deadline: number, result: 
         if (failed || outbound.status === "skipped") {
           usedByRule -= 1;
           usedByTenant -= 1;
+          quotaLeft += 1;
           result.enqueueFailed += 1;
           continue;
         }
@@ -433,6 +458,7 @@ async function runTenant(tenantId: string, now: Date, deadline: number, result: 
         console.warn("[post-sale-auto] enqueue_failed", { tenantId, leadId: recipient.leadId, rule: settings.key, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
         usedByRule -= 1;
         usedByTenant -= 1;
+        quotaLeft += 1;
         result.enqueueFailed += 1;
         continue;
       }
@@ -474,7 +500,7 @@ export type AutoRulePreview = {
 export async function previewAutoRule(context: TenantContext, settings: AutoRuleSettings, now = new Date()): Promise<AutoRulePreview> {
   const sendDay = addBusinessDaysToDateKey(saoPauloDateKey(now), 1);
   const selection = await selectAutoRuleRecipients({ tenantId: context.tenantId, settings, sendDay, now, context, ignoreEnabled: true });
-  const limit = Math.min(effectiveAutoRuleDailyLimit(settings), AUTO_RULE_LIMITS.tenantDailyLimit);
+  const limit = Math.min(effectiveAutoRuleDailyLimit(settings), await loadTenantAutoDailyLimit(context.tenantId));
   const ignored: AutoRuleSkipReason[] = ["early", "stale", "disabled"];
   return {
     key: settings.key,
@@ -512,13 +538,13 @@ export type AutoRuleTodayItem = {
 export async function previewAutoRulesToday(context: TenantContext, now = new Date()): Promise<{ ready: boolean; sendDay: string; withinHours: boolean; tenantUsed: number; tenantLimit: number; rules: AutoRuleTodayItem[] }> {
   const state = await loadAutoRules(context.tenantId);
   const { sendDay, within } = autoRuleSchedule(now);
-  if (!state.ready) return { ready: false, sendDay, withinHours: within, tenantUsed: 0, tenantLimit: AUTO_RULE_LIMITS.tenantDailyLimit, rules: [] };
+  const tenantLimit = await loadTenantAutoDailyLimit(context.tenantId);
+  if (!state.ready) return { ready: false, sendDay, withinHours: within, tenantUsed: 0, tenantLimit, rules: [] };
   const usage = await usageForDay(context.tenantId, sendDay);
-  let usedByTenant = usage.total;
   const rules: AutoRuleTodayItem[] = [];
   for (const settings of state.rules) {
     const alreadySent = usage.byRule.get(settings.key) ?? 0;
-    const limit = Math.min(effectiveAutoRuleDailyLimit(settings), AUTO_RULE_LIMITS.tenantDailyLimit);
+    const limit = Math.min(effectiveAutoRuleDailyLimit(settings), tenantLimit);
     const base: AutoRuleTodayItem = { key: settings.key, label: AUTO_RULE_DEFINITIONS[settings.key].label, enabled: settings.enabled, sendDay, alreadySent, eligible: 0, wouldSend: 0, limit, byMilestoneDay: [] };
     if (!settings.enabled) { rules.push(base); continue; }
     const selection = await selectAutoRuleRecipients({ tenantId: context.tenantId, settings, sendDay, now, context });
@@ -527,10 +553,13 @@ export async function previewAutoRulesToday(context: TenantContext, now = new Da
       const day = saoPauloDateKey(recipient.milestoneAt);
       days.set(day, (days.get(day) ?? 0) + 1);
     }
-    const capacity = autoRuleRemainingCapacity({ settings, usedByRule: alreadySent, usedByTenant });
-    const wouldSend = Math.min(selection.recipients.length, capacity);
-    usedByTenant += wouldSend;
-    rules.push({ ...base, eligible: selection.recipients.length, wouldSend, byMilestoneDay: [...days].map(([day, count]) => ({ day, count })).sort((a, b) => b.day.localeCompare(a.day)) });
+    rules.push({ ...base, eligible: selection.recipients.length, byMilestoneDay: [...days].map(([day, count]) => ({ day, count })).sort((a, b) => b.day.localeCompare(a.day)) });
   }
-  return { ready: true, sendDay, withinHours: within, tenantUsed: usage.total, tenantLimit: AUTO_RULE_LIMITS.tenantDailyLimit, rules };
+  // Mesma divisão do motor (25/11): cada regra ligada ganha a parte dela das vagas que sobram no dia.
+  const quotas = allocateAutoRuleQuotas(tenantLimit - usage.total, rules.filter((rule) => rule.enabled).map((rule) => {
+    const settings = state.rules.find((item) => item.key === rule.key)!;
+    return { key: rule.key, wanted: Math.min(rule.eligible, Math.max(0, effectiveAutoRuleDailyLimit(settings) - rule.alreadySent)) };
+  }));
+  for (const rule of rules) rule.wouldSend = quotas.get(rule.key) ?? 0;
+  return { ready: true, sendDay, withinHours: within, tenantUsed: usage.total, tenantLimit, rules };
 }

@@ -156,7 +156,7 @@ describe("limites", () => {
   it("o que sobra é o menor entre a regra e a empresa", () => {
     const pilot = { dailyLimit: 60, pilot: { queueIds: ["q1"], brokerIds: [] } };
     expect(autoRuleRemainingCapacity({ settings: pilot, usedByRule: 5, usedByTenant: 10 })).toBe(15);
-    expect(autoRuleRemainingCapacity({ settings: pilot, usedByRule: 5, usedByTenant: 55 })).toBe(5);
+    expect(autoRuleRemainingCapacity({ settings: pilot, usedByRule: 5, usedByTenant: 55, tenantDailyLimit: 60 })).toBe(5);
     expect(autoRuleRemainingCapacity({ settings: pilot, usedByRule: 25, usedByTenant: 25 })).toBe(0);
   });
 });
@@ -171,7 +171,7 @@ describe("configuração", () => {
   it("linha inválida volta ao padrão e nunca quebra", () => {
     expect(parseAutoRuleRow("R1", null)).toEqual(defaultAutoRuleSettings("R1"));
     const parsed = parseAutoRuleRow("R3", { enabled: true, delayBusinessDays: -2, dailyLimit: 500, filters: { queueIds: ["a", "a", 3], leadTypes: ["PJ", "X"] }, pilot: "bad" });
-    expect(parsed).toMatchObject({ enabled: true, delayBusinessDays: 3, dailyLimit: 60, filters: { queueIds: ["a"], branchIds: [], leadTypes: ["PJ"] }, pilot: { queueIds: [], brokerIds: [] } });
+    expect(parsed).toMatchObject({ enabled: true, delayBusinessDays: 3, dailyLimit: 300, filters: { queueIds: ["a"], branchIds: [], leadTypes: ["PJ"] }, pilot: { queueIds: [], brokerIds: [] } });
   });
 
   it("valida a entrada do diretor", () => {

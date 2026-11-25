@@ -50,7 +50,7 @@ function postSaleData(brokers: string[]): WorkspaceData {
     // O gestor vê a régua e a regra R0, mas só o diretor edita (getPostSaleWorkspaceAction devolve canEdit falso).
     r0: { enabled: false, queueIds: [], canEdit: false },
     ruleFilter: "all",
-    autoRules: { ready: true, canEdit: false, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)) },
+    autoRules: { ready: true, canEdit: false, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)), tenantDailyLimit: 150 },
   } as WorkspaceData;
 }
 

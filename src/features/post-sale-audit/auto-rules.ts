@@ -30,8 +30,12 @@ export const AUTO_RULE_DEFINITIONS: Record<AutoRuleKey, {
 export const AUTO_RULE_LIMITS = {
   /** Limite padrão por regra e por dia. */
   dailyLimit: 60,
-  /** Limite por empresa e por dia, somando todas as regras automáticas. */
-  tenantDailyLimit: 60,
+  /** Teto do limite por regra que o diretor pode escolher (25/11: era 60). */
+  ruleDailyLimitMax: 300,
+  /** Limite padrão por empresa e por dia, somando todas as regras automáticas (25/11: era 60 fixo). */
+  tenantDailyLimit: 150,
+  /** Teto do limite da empresa que o diretor pode escolher. */
+  tenantDailyLimitMax: 300,
   /** Em modo piloto (filas ou corretores liberados), no máximo isso por dia. */
   pilotDailyLimit: 20,
   /** No máximo 1 conversa de pós-venda por lead nesse intervalo (manual, R0 e régua somados). */
@@ -77,7 +81,7 @@ export const autoRuleSettingsInputSchema = z.object({
     branchIds: idList.default([]),
     leadTypes: z.array(z.enum(["PF", "PJ"])).max(2).default([]),
   }),
-  dailyLimit: z.number().int().min(1, "O limite diário precisa ser de pelo menos 1.").max(AUTO_RULE_LIMITS.dailyLimit, `O limite diário pode ser de até ${AUTO_RULE_LIMITS.dailyLimit}.`),
+  dailyLimit: z.number().int().min(1, "O limite diário precisa ser de pelo menos 1.").max(AUTO_RULE_LIMITS.ruleDailyLimitMax, `O limite diário pode ser de até ${AUTO_RULE_LIMITS.ruleDailyLimitMax}.`),
   pilot: z.object({
     queueIds: idList.default([]),
     brokerIds: idList.default([]),
@@ -154,7 +158,7 @@ export function parseAutoRuleRow(key: AutoRuleKey, row: {
   const filters = row.filters && typeof row.filters === "object" ? row.filters as Record<string, unknown> : {};
   const pilot = row.pilot && typeof row.pilot === "object" ? row.pilot as Record<string, unknown> : {};
   const delay = typeof row.delayBusinessDays === "number" && Number.isInteger(row.delayBusinessDays) && row.delayBusinessDays >= 1 && row.delayBusinessDays <= AUTO_RULE_LIMITS.maxDelayBusinessDays ? row.delayBusinessDays : fallback.delayBusinessDays;
-  const limit = typeof row.dailyLimit === "number" && Number.isInteger(row.dailyLimit) && row.dailyLimit >= 1 ? Math.min(row.dailyLimit, AUTO_RULE_LIMITS.dailyLimit) : fallback.dailyLimit;
+  const limit = typeof row.dailyLimit === "number" && Number.isInteger(row.dailyLimit) && row.dailyLimit >= 1 ? Math.min(row.dailyLimit, AUTO_RULE_LIMITS.ruleDailyLimitMax) : fallback.dailyLimit;
   const updatedAt = row.updatedAt instanceof Date ? row.updatedAt.toISOString() : typeof row.updatedAt === "string" ? row.updatedAt : null;
   return {
     key,
@@ -269,7 +273,7 @@ export function matchesAutoRulePilot(lead: Pick<AutoRuleLeadFacts, "queueId" | "
 
 /** Limite diário da regra: em piloto, nunca mais que 20. */
 export function effectiveAutoRuleDailyLimit(settings: Pick<AutoRuleSettings, "dailyLimit" | "pilot">) {
-  const base = Math.max(0, Math.min(settings.dailyLimit, AUTO_RULE_LIMITS.dailyLimit));
+  const base = Math.max(0, Math.min(settings.dailyLimit, AUTO_RULE_LIMITS.ruleDailyLimitMax));
   return isAutoRulePilotMode(settings.pilot) ? Math.min(base, AUTO_RULE_LIMITS.pilotDailyLimit) : base;
 }
 
@@ -278,6 +282,58 @@ export function autoRuleRemainingCapacity(input: { settings: Pick<AutoRuleSettin
   const rule = effectiveAutoRuleDailyLimit(input.settings) - input.usedByRule;
   const tenant = (input.tenantDailyLimit ?? AUTO_RULE_LIMITS.tenantDailyLimit) - input.usedByTenant;
   return Math.max(0, Math.min(rule, tenant));
+}
+
+/**
+ * Limite da empresa por dia (25/11), escolhido pelo diretor e guardado em system_settings
+ * (`post_sale_auto_daily_limit_<tenantId>`). Sem valor ou valor inválido: o padrão.
+ */
+export function postSaleAutoDailyLimitKey(tenantId: string) {
+  return `post_sale_auto_daily_limit_${tenantId}`;
+}
+
+export function parseTenantAutoDailyLimit(raw: string | null | undefined) {
+  const value = Number(raw);
+  if (!raw || !Number.isInteger(value) || value < 1) return AUTO_RULE_LIMITS.tenantDailyLimit;
+  return Math.min(value, AUTO_RULE_LIMITS.tenantDailyLimitMax);
+}
+
+export const tenantAutoDailyLimitInputSchema = z.object({
+  limit: z.number().int().min(1, "O limite da empresa precisa ser de pelo menos 1 por dia.").max(AUTO_RULE_LIMITS.tenantDailyLimitMax, `O limite da empresa pode ser de até ${AUTO_RULE_LIMITS.tenantDailyLimitMax} por dia.`),
+});
+
+/**
+ * Divisão das vagas do dia entre as regras (25/11). Antes a R1 rodava primeiro e ocupava o limite inteiro, e
+ * R2 a R5 nunca saíam. Agora cada regra com gente para receber ganha uma parte igual do que sobra da empresa;
+ * o que uma regra não usa (tem menos gente ou bateu o próprio limite) vai para as outras. A sobra da divisão
+ * (resto) fica com as regras na ordem R1, R2, R3...
+ * `wanted` já é o menor entre os prontos da regra e o que sobra do limite dela.
+ */
+export function allocateAutoRuleQuotas(tenantRemaining: number, demands: ReadonlyArray<{ key: AutoRuleKey; wanted: number }>): Map<AutoRuleKey, number> {
+  const quotas = new Map<AutoRuleKey, number>(demands.map((demand) => [demand.key, 0]));
+  let left = Math.max(0, Math.floor(tenantRemaining));
+  let open = demands.filter((demand) => demand.wanted > 0).map((demand) => ({ key: demand.key, need: Math.floor(demand.wanted) }));
+  while (left > 0 && open.length) {
+    const share = Math.floor(left / open.length);
+    if (share === 0) {
+      // Menos vagas que regras: uma para cada, na ordem.
+      for (const demand of open) {
+        if (left <= 0) break;
+        quotas.set(demand.key, (quotas.get(demand.key) ?? 0) + 1);
+        demand.need -= 1;
+        left -= 1;
+      }
+    } else {
+      for (const demand of open) {
+        const give = Math.min(share, demand.need);
+        quotas.set(demand.key, (quotas.get(demand.key) ?? 0) + give);
+        demand.need -= give;
+        left -= give;
+      }
+    }
+    open = open.filter((demand) => demand.need > 0);
+  }
+  return quotas;
 }
 
 function normalize(text: string | null | undefined) {

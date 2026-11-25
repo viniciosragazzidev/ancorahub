@@ -50,7 +50,7 @@ function data(overrides: Partial<WorkspaceData> = {}): WorkspaceData {
     periodDays: 30,
     r0: { enabled: false, queueIds: [], canEdit: true },
     ruleFilter: "all",
-    autoRules: { ready: true, canEdit: true, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)) },
+    autoRules: { ready: true, canEdit: true, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)), tenantDailyLimit: 150 },
     ...overrides,
   } as WorkspaceData;
 }
@@ -166,7 +166,7 @@ describe("régua automática: a chave salva na hora", () => {
   });
 
   it("gestor vê as regras sem poder mudar", () => {
-    render(<PostSaleWorkspace initialData={data({ r0: { enabled: false, queueIds: [], canEdit: false }, autoRules: { ready: true, canEdit: false, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)) } })} initialTab="automacoes" />);
+    render(<PostSaleWorkspace initialData={data({ r0: { enabled: false, queueIds: [], canEdit: false }, autoRules: { ready: true, canEdit: false, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)), tenantDailyLimit: 150 } })} initialTab="automacoes" />);
     for (const toggle of screen.getAllByRole("switch")) expect(toggle).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText("Só a direção pode alterar as automações.")).toBeVisible();
   });

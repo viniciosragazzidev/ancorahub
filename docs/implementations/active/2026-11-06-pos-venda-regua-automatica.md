@@ -220,3 +220,18 @@ Problema real na R1 de 24/11: a IA não entendia resposta com nuance e repetia "
 - **Laboratório:** `/dev/laboratorio`, fluxo "Pós-venda: conversa e troca de corretor", com Toinha, Carmen, sem contato, resposta vaga e conversa livre, troca ligada e desligada.
 - **Pendências:** (1) ok do Vinicios para ligar a troca na Âncora; (2) template Meta novo sem gênero (`pos_venda_apresentacao_v2`, corpo "...e {{3}} ficou responsável pelo seu atendimento...") para aprovar na WABA e depois trocar o contrato.
 - Validação: Vitest de pós-venda, distribuição e laboratório (`handoff-conversation.test.ts` com as conversas reais); `tsc --noEmit` limpo. Nenhum banco acessado e nada enviado.
+
+## Limite maior e vagas divididas entre as regras (25/11/2026)
+
+Pedido do Vinicios ao ver que só a R1 saía: em 24 e 25/11 a R1 ocupou sozinha as 60 vagas da empresa e R2 a R5,
+ligadas desde 23/11, nunca abriram conversa.
+
+- **Limite da empresa:** padrão de 60 para 150 por dia; o diretor ajusta de 1 a 300 em Equipe > Pós-venda >
+  Automações ("Limite da empresa por dia"). Fica em `system_settings` (`post_sale_auto_daily_limit_<tenantId>`), sem
+  migration. Auditoria `post_sale.auto_rule.daily_limit_updated` com o valor anterior e o novo.
+- **Limite por regra:** o padrão continua 60; o teto que o diretor pode escolher passou de 60 para 300. Piloto segue em 20.
+- **Divisão (`allocateAutoRuleQuotas`):** o motor seleciona todas as regras ligadas antes de enviar. As vagas que sobram
+  no dia se dividem em partes iguais entre as regras com gente pronta; o que uma regra não usa (menos gente ou limite
+  próprio) vai para as outras; o resto da divisão fica com R1, R2... na ordem. "O que sai hoje" e a prévia usam a mesma conta.
+- Envio forçado do diretor segue sem limite, como antes.
+- Validação: `auto-rules-quota.test.ts` e os testes da régua; `tsc --noEmit` limpo. Nenhum banco alterado.

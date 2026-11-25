@@ -24,9 +24,9 @@ import { sendPostSaleNudge } from "./conversation";
 import { parseR0Settings, postSaleR0SettingKey, serializeR0Settings, type R0Settings } from "./r0-rules";
 import { parsePostSaleHandoffSettings, postSaleHandoffSettingKey, serializePostSaleHandoffSettings, type PostSaleHandoffSettings } from "./handoff-rules";
 import { POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
-import { AUTO_RULE_KEYS, autoRuleSettingsInputSchema, parsePostSaleRuleFilter, type AutoRuleSettings, type PostSaleRuleFilter } from "./auto-rules";
+import { AUTO_RULE_KEYS, autoRuleSettingsInputSchema, parsePostSaleRuleFilter, postSaleAutoDailyLimitKey, tenantAutoDailyLimitInputSchema, type AutoRuleSettings, type PostSaleRuleFilter } from "./auto-rules";
 import { AutoRulesTableMissingError, loadAutoRules, saveAutoRule } from "./auto-rules-store";
-import { forcePostSaleAutoRuleForMilestoneDay, previewAutoRule, previewAutoRulesToday, type AutoRulePreview } from "./auto-sweep";
+import { forcePostSaleAutoRuleForMilestoneDay, loadTenantAutoDailyLimit, previewAutoRule, previewAutoRulesToday, type AutoRulePreview } from "./auto-sweep";
 import { postSaleViewAuditId } from "./view-audit";
 import { emptyPostSaleCampaignCounts, type PostSaleCampaignCounts, type PostSaleRetryResult } from "./campaign-retry";
 import { loadPostSaleCampaignCounts, retryFailedPostSaleSurveys } from "./campaign-retry-service";
@@ -366,7 +366,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
   periodDays: number;
   r0: R0Settings & { canEdit: boolean };
   ruleFilter: PostSaleRuleFilter;
-  autoRules: { ready: boolean; canEdit: boolean; rules: AutoRuleSettings[] };
+  autoRules: { ready: boolean; canEdit: boolean; rules: AutoRuleSettings[]; tenantDailyLimit: number };
 }>> {
   try {
     const context = await authorizedContext();
@@ -392,6 +392,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
         .orderBy(schema.branches.name),
       loadAutoRules(context.tenantId),
     ]);
+    const tenantDailyLimit = await loadTenantAutoDailyLimit(context.tenantId);
     const campaignCounts = await loadPostSaleCampaignCounts(context.tenantId, campaigns.map((row) => row.id));
     await recordPostSaleViewAudit({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: "workspace", action: "post_sale_report.viewed", metadata: { periodDays, surveys: surveys.length, openAlerts: alerts.length } });
     return { ok: true, data: {
@@ -404,7 +405,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
       r0: { ...r0Settings, canEdit: context.role === "director" },
       ruleFilter,
       branches,
-      autoRules: { ready: autoRules.ready, canEdit: context.role === "director" && autoRules.ready, rules: autoRules.rules },
+      autoRules: { ready: autoRules.ready, canEdit: context.role === "director" && autoRules.ready, rules: autoRules.rules, tenantDailyLimit },
     } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
@@ -683,6 +684,24 @@ export async function savePostSaleAutoRuleAction(raw: unknown): Promise<ActionRe
       pilot: { queues: saved.pilot.queueIds.length, brokers: saved.pilot.brokerIds.length },
     } });
     return { ok: true, data: saved };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/**
+ * Limite da empresa por dia na régua automática (25/11): soma de R1 a R5, dividido entre as regras ligadas.
+ * Só diretor. Fica em system_settings (`post_sale_auto_daily_limit_<tenantId>`) e cada mudança é auditada.
+ */
+export async function savePostSaleAutoDailyLimitAction(raw: unknown): Promise<ActionResult<{ limit: number }>> {
+  try {
+    const context = await authorizedContext();
+    if (context.role !== "director") throw new PostSaleActionError("Apenas diretores podem alterar o limite da régua automática.");
+    const { limit } = tenantAutoDailyLimitInputSchema.parse(raw);
+    const previous = await loadTenantAutoDailyLimit(context.tenantId);
+    await setSystemSetting(postSaleAutoDailyLimitKey(context.tenantId), String(limit));
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_rule", entityId: "daily_limit", action: "post_sale.auto_rule.daily_limit_updated", metadata: { previous, limit } });
+    return { ok: true, data: { limit } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }

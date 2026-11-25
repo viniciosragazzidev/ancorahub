@@ -105,9 +105,9 @@ describe("savePostSaleAutoRuleAction com o que a tela manda", () => {
     expect(result).toEqual({ ok: true, data: expect.objectContaining({ enabled: true, pilot: { queueIds: ["queue-1"], brokerIds: [] }, dailyLimit: 20 }) });
   });
 
-  it("limite acima de 60 volta com mensagem clara (visível na tela)", async () => {
-    const result = await savePostSaleAutoRuleAction(autoRuleSavePayload(defaultAutoRuleSettings("R1"), { delay: "1", limit: "80", enabled: true }));
-    expect(result).toEqual({ ok: false, error: "O limite diário pode ser de até 60." });
+  it("limite acima de 300 volta com mensagem clara (visível na tela)", async () => {
+    const result = await savePostSaleAutoRuleAction(autoRuleSavePayload(defaultAutoRuleSettings("R1"), { delay: "1", limit: "301", enabled: true }));
+    expect(result).toEqual({ ok: false, error: "O limite diário pode ser de até 300." });
   });
 
   it("gestor não salva", async () => {

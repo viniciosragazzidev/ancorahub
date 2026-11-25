@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { previewPostSaleAutoRuleAction, savePostSaleAutoRuleAction } from "@/features/post-sale-audit/actions";
+import { previewPostSaleAutoRuleAction, savePostSaleAutoDailyLimitAction, savePostSaleAutoRuleAction } from "@/features/post-sale-audit/actions";
 import {
   AUTO_RULE_DEFINITIONS,
   AUTO_RULE_LIMITS,
@@ -22,7 +22,7 @@ type Preview = Extract<Awaited<ReturnType<typeof previewPostSaleAutoRuleAction>>
 export type RowFeedback = { text: string; tone: "ok" | "error" } | null;
 
 type AutoRulesProps = {
-  initial: { ready: boolean; canEdit: boolean; rules: AutoRuleSettings[] };
+  initial: { ready: boolean; canEdit: boolean; rules: AutoRuleSettings[]; tenantDailyLimit: number };
   queues: Option[];
   branches: Option[];
   brokers: Option[];
@@ -127,8 +127,48 @@ export function PostSaleAutoRules({ initial, queues, branches, brokers, onSaved 
   return (
     <div className="grid gap-3" id="regua-automatica">
       {!initial.ready ? <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">A régua ainda não foi ativada no banco (SQL 0224). Todas as regras seguem desligadas.</p> : null}
+      {initial.ready ? <TenantDailyLimitRow initial={initial.tenantDailyLimit} canEdit={initial.canEdit} /> : null}
       {initial.rules.map((rule) => <AutoRuleRow key={rule.key} rule={rule} canEdit={initial.canEdit} queues={queues} branches={branches} brokers={brokers} onSaved={onSaved} />)}
     </div>
+  );
+}
+
+/**
+ * Limite da empresa por dia (25/11): soma das regras R1 a R5. As vagas se dividem entre as regras ligadas
+ * (parte igual para cada; o que uma não usa vai para as outras). Confirmação só depois do servidor.
+ */
+function TenantDailyLimitRow({ initial, canEdit }: { initial: number; canEdit: boolean }) {
+  const [saved, setSaved] = useState(initial);
+  const [value, setValue] = useState(String(initial));
+  const [feedback, setFeedback] = useState<RowFeedback>(null);
+  const [busy, startTransition] = useTransition();
+  const parsed = Number(value);
+  const dirty = Number.isInteger(parsed) && parsed !== saved;
+
+  function save() {
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await savePostSaleAutoDailyLimitAction({ limit: parsed });
+      if (!result.ok) { setFeedback({ tone: "error", text: `Não salvou: ${result.error} O limite continua em ${saved} por dia.` }); return; }
+      setSaved(result.data.limit);
+      setValue(String(result.data.limit));
+      setFeedback({ tone: "ok", text: `Limite da empresa salvo: até ${result.data.limit} conversas por dia, divididas entre as regras ligadas.` });
+    });
+  }
+
+  return (
+    <section className="rounded-2xl border border-border" aria-labelledby="regua-limite-titulo">
+      <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+        <label className="grid min-w-0 flex-1 gap-1 text-sm font-medium">
+          <span id="regua-limite-titulo">Limite da empresa por dia</span>
+          <span className="text-xs font-normal text-muted-foreground">Soma de R1 a R5. Cada regra ligada ganha uma parte igual; o que uma não usa vai para as outras.</span>
+          <Input className="mt-1 max-w-32" type="number" inputMode="numeric" min={1} max={AUTO_RULE_LIMITS.tenantDailyLimitMax} value={value} onChange={(event) => setValue(event.target.value)} disabled={!canEdit || busy} aria-describedby="regua-limite-teto" />
+          <span id="regua-limite-teto" className="text-xs font-normal text-muted-foreground">Até {AUTO_RULE_LIMITS.tenantDailyLimitMax} por dia.</span>
+        </label>
+        {canEdit ? <Button type="button" onClick={save} loading={busy} disabled={!dirty}>{feedback?.tone === "error" ? "Tentar de novo" : "Salvar limite"}</Button> : null}
+      </div>
+      <RowMessage feedback={feedback} />
+    </section>
   );
 }
 
@@ -213,7 +253,7 @@ export function AutoRuleRow({ rule, canEdit, queues, branches, brokers, onSaved 
           <Input type="number" inputMode="numeric" min={1} max={AUTO_RULE_LIMITS.maxDelayBusinessDays} value={delay} onChange={(event) => setDelay(event.target.value)} disabled={disabled} />
         </label>
         <label className="grid gap-2 text-sm font-medium">Limite por dia
-          <Input type="number" inputMode="numeric" min={1} max={AUTO_RULE_LIMITS.dailyLimit} value={limit} onChange={(event) => setLimit(event.target.value)} disabled={disabled} />
+          <Input type="number" inputMode="numeric" min={1} max={AUTO_RULE_LIMITS.ruleDailyLimitMax} value={limit} onChange={(event) => setLimit(event.target.value)} disabled={disabled} />
           {isAutoRulePilotMode(draft.pilot) ? <span className="text-xs font-normal text-muted-foreground">Em piloto, no máximo {AUTO_RULE_LIMITS.pilotDailyLimit} por dia.</span> : null}
         </label>
       </div>
