@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" data-aliases="alert-circle aviso info" data-waive-off-grid="o ponto é um traço de .01, a ponta redonda faz o ponto">
+  <circle cx="12" cy="12" r="9.75"/>
+  <path d="M12 7v4.5"/>
+  <path d="M12 16h.01"/>
+</svg>

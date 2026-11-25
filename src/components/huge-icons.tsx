@@ -4,6 +4,7 @@ import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
 import { cn } from "@/lib/utils";
+import * as Marker from "@/components/icons/marker-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Alert02Icon,
@@ -339,6 +340,76 @@ function resolveIcon(name: string): HugeIconProps["icon"] {
   return (icon ?? fallback) as HugeIconProps["icon"];
 }
 
+// ── Ícones de marcador (25/11/2026) ───────────────────────────────────
+// Desenhados com a skill draw-icons (`icons.yaml`). Quando o nome exportado tem desenho de marcador, o wrapper
+// mostra ele (mesmo tamanho e mesma caixa) no lugar do Hugeicons; os outros continuam Hugeicons até ganharem o seu.
+const MARKER_ICONS: Partial<Record<string, (props: Marker.MarkerIconProps) => React.ReactElement>> = {
+  CheckCircle: Marker.CheckCircleIcon,
+  CircleCheckIcon: Marker.CheckCircleIcon,
+  Check: Marker.CheckIcon,
+  CheckIcon: Marker.CheckIcon,
+  ArrowRight: Marker.ArrowRightIcon,
+  ArrowLeft: Marker.ArrowLeftIcon,
+  Plus: Marker.PlusIcon,
+  Trash: Marker.TrashIcon,
+  Clock: Marker.ClockIcon,
+  Users: Marker.UsersIcon,
+  UsersThree: Marker.UsersIcon,
+  Buildings: Marker.BuildingIcon,
+  X: Marker.XIcon,
+  XIcon: Marker.XIcon,
+  FileText: Marker.FileTextIcon,
+  File: Marker.FileTextIcon,
+  FileArrowDown: Marker.DownloadIcon,
+  ArrowsClockwise: Marker.RefreshIcon,
+  Warning: Marker.WarningIcon,
+  TriangleAlertIcon: Marker.WarningIcon,
+  ChatCircleText: Marker.MessageSquareIcon,
+  Phone: Marker.PhoneIcon,
+  LockKey: Marker.LockIcon,
+  XCircle: Marker.XCircleIcon,
+  Target: Marker.TargetIcon,
+  Sparkle: Marker.SparkleIcon,
+  MagnifyingGlass: Marker.MagnifierIcon,
+  Copy: Marker.CopyIcon,
+  PencilSimple: Marker.PencilIcon,
+  CurrencyCircleDollar: Marker.BanknoteIcon,
+  ChevronDownIcon: Marker.ChevronDownIcon,
+  ChartBar: Marker.ChartBarIcon,
+  WarningCircle: Marker.WarningCircleIcon,
+  ShieldCheck: Marker.ShieldCheckIcon,
+  ListChecks: Marker.ListChecksIcon,
+  Bell: Marker.BellIcon,
+  BellRinging: Marker.BellIcon,
+  ArrowUpRight: Marker.ArrowUpRightIcon,
+  SlidersHorizontal: Marker.SlidersIcon,
+  Gear: Marker.GearIcon,
+  ChartLineUp: Marker.TrendUpIcon,
+  TrendUp: Marker.TrendUpIcon,
+  CalendarBlank: Marker.CalendarIcon,
+  CalendarCheck: Marker.CalendarIcon,
+  House: Marker.HouseIcon,
+  SquaresFour: Marker.SquaresFourIcon,
+  Megaphone: Marker.MegaphoneIcon,
+  SignOut: Marker.SignOutIcon,
+  UserCircle: Marker.UserCircleIcon,
+  MoreHorizontalIcon: Marker.DotsIcon,
+};
+
+function markerWrapper(name: string, Icon: (props: Marker.MarkerIconProps) => React.ReactElement) {
+  function MarkerHugeIcon({ weight, strokeWidth, size, className, ...props }: CompatIconProps & { strokeWidth?: number | string; size?: number | string }) {
+    void weight;
+    void strokeWidth;
+    return (
+      <span className={cn("inline-flex shrink-0 items-center justify-center", className)}>
+        <Icon {...(props as Marker.MarkerIconProps)} size={size ?? 24} className="size-full" />
+      </span>
+    );
+  }
+  MarkerHugeIcon.displayName = `${name}MarkerIcon`;
+  return MarkerHugeIcon;
+}
+
 // ── Wrappers ───────────────────────────────────────────────────────────
 
 /**
@@ -349,6 +420,8 @@ function animated(
   name: string,
   Component: AnimatedIconComponent,
 ) {
+  const marker = MARKER_ICONS[name];
+  if (marker) return markerWrapper(name, marker);
   const AnimatedWrapper = ({ weight, ...props }: CompatIconProps) => {
     const iconRef = useRef<AnimatedIconHandle>(null);
     const wrapperRef = useRef<HTMLSpanElement>(null);
@@ -407,6 +480,8 @@ function animated(
  * The animation triggers on hover of the **parent element**.
  */
 function staticAnimated(name: string) {
+  const marker = MARKER_ICONS[name];
+  if (marker) return markerWrapper(name, marker);
   function StaticMotionIcon({ weight, ...props }: CompatIconProps) {
     const spanRef = useRef<HTMLSpanElement>(null);
     const [isHovered, setIsHovered] = useState(false);

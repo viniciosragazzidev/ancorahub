@@ -17,9 +17,16 @@ Pedido: redesenhar os ícones do sistema com a skill `draw-icons` (instalada glo
 - Desenhados e ainda não ligados: `chevron-down`, `sign-out`, `user-circle` (menu da conta, que usa 12 e 16 px; entram no próximo lote).
 - Laboratório: `/dev/laboratorio`, fluxo "Ícones de marcador" (conjunto em 16/20/24 px e a barra inferior real).
 
+## Lote 2: os mais usados (27 novos, 46 no total)
+
+- Novos: check-circle, check, x, x-circle, plus, arrow-right, arrow-left, arrow-up-right, trash, clock, building, file-text, download, refresh, warning, phone, lock, target, magnifier, copy, pencil, chart-bar, trend-up, warning-circle, bell, gear, calendar.
+- Ligados dentro de `src/components/huge-icons.tsx` (mapa `MARKER_ICONS`): quando o nome exportado tem desenho de marcador, o wrapper mostra ele no lugar do Hugeicons, na mesma caixa. Assim cada ícone desenhado vale para os ~245 arquivos que importam de `@/components/huge-icons` sem mexer neles. Ex.: CheckCircle, ArrowRight, Plus, Trash, Clock, Users, Buildings, X, FileText, FileArrowDown, ArrowsClockwise, Warning, ChatCircleText, Phone, LockKey, XCircle, Target, Sparkle, MagnifyingGlass, Copy, PencilSimple, ChartBar, WarningCircle, ShieldCheck, Bell, Gear, CalendarBlank, TrendUp.
+- Ficam como estão: o logo do WhatsApp (marca), o spinner (`Loader2Icon`) e os ícones de outros conceitos ainda sem desenho.
+- O snapshot de `bulk-dialogs.legacy.test.tsx` foi atualizado: muda só o SVG do ícone.
+
 ## Falta
 
-Os outros ~310 ícones (lucide 175, Hugeicons 120, Phosphor 33 no total) em ~500 arquivos, em lotes por área.
+Os ~70 nomes restantes do `huge-icons.tsx` e os ícones importados direto de `lucide-react` (175 nomes em 236 arquivos) e `@phosphor-icons/react` (33), em lotes. Para o lucide, o caminho com menos risco é o mesmo do `huge-icons`: um módulo intermediário com os mesmos nomes.
 
 ## Verificação
 

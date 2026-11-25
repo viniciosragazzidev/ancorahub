@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" data-aliases="configuracoes ajustes" data-waive-off-grid="as pontas em 45° caem fora da grade de 0,25 por natureza" data-waive-detail-budget="as 8 pontas da engrenagem são o que faz ela ser lida como engrenagem">
+  <circle cx="12" cy="12" r="6.5"/>
+  <circle cx="12" cy="12" r="2"/>
+  <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.28 5.28l2.12 2.12M16.6 16.6l2.12 2.12M5.28 18.72l2.12-2.12M16.6 7.4l2.12-2.12"/>
+</svg>

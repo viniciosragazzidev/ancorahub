@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" data-aliases="calendar-blank agenda data">
+  <path d="M12 4.5L18 4.5A3 3 0 0 1 21 7.5L21 18.5A3 3 0 0 1 18 21.5L6 21.5A3 3 0 0 1 3 18.5L3 7.5A3 3 0 0 1 6 4.5Z"/>
+  <path d="M8 2.25V5.5M16 2.25V5.5"/>
+  <path d="M3 10h18"/>
+</svg>

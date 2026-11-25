@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" data-aliases="buildings empresa unidade" data-waive-off-grid="o ponto é um traço de .01, a ponta redonda faz o ponto">
+  <path d="M12 2.5L16 2.5A3 3 0 0 1 19 5.5L19 18.25A3 3 0 0 1 16 21.25L8 21.25A3 3 0 0 1 5 18.25L5 5.5A3 3 0 0 1 8 2.5Z"/>
+  <path d="M9.5 7.5h.01M14.5 7.5h.01"/>
+  <path d="M9.5 12h.01M14.5 12h.01"/>
+  <path d="M12 21.25V17"/>
+</svg>
