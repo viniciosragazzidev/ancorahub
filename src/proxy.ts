@@ -4,7 +4,6 @@ import type { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
-import { updateSession } from "@/utils/supabase/middleware";
 import { getDatabase, schema } from "@/shared/db/client";
 import { isNavigationPrefetch } from "@/shared/http/navigation-prefetch";
 import { isSameOriginRequest, needsSameOriginCheck } from "@/shared/http/same-origin";
@@ -120,34 +119,10 @@ function clearRevokedSessionCookies(request: NextRequest, response: NextResponse
   }
 }
 
-function hasSupabaseSessionCookie(request: NextRequest) {
-  return request.cookies
-    .getAll()
-    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"));
-}
-
-async function getSafeSupabaseResponse(request: NextRequest) {
-  const fallback = NextResponse.next({ request: { headers: request.headers } });
-
-  // Better Auth is the CRM access authority. Do not make every App Router
-  // navigation wait for Supabase when the browser has no Supabase session.
-  // This prevents an external token refresh from leaving the entire product on
-  // its loading boundary.
-  if (!hasSupabaseSessionCookie(request)) return fallback;
-
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      updateSession(request),
-      new Promise<NextResponse>((resolve) => {
-        timer = setTimeout(() => resolve(fallback), 500);
-      }),
-    ]);
-  } catch {
-    return fallback;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+// 25/11: o login é só Better Auth. A renovação de sessão do Supabase saiu (resto sem uso),
+// passo para tirar o app do Supabase.
+function baseResponse(request: NextRequest) {
+  return NextResponse.next({ request: { headers: request.headers } });
 }
 
 export async function proxy(request: NextRequest) {
@@ -188,9 +163,7 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  const supabaseStartMs = performance.now();
-  const supabaseResponse = await getSafeSupabaseResponse(request);
-  logMiddlewareSpan(timing, "middleware.supabase_session", supabaseStartMs);
+  const supabaseResponse = baseResponse(request);
   const session = SESSION_COOKIE_NAMES.map((name) => request.cookies.get(name)).find(Boolean);
   const hasSessionCookie = Boolean(session?.value);
   // The cookie is signed ("token.signature"); the session table holds the token only.

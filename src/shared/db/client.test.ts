@@ -12,7 +12,8 @@ describe("usesPostgresJsDriver", () => {
       expect(usesPostgresJsDriver(`postgres://erp_test@${host}:5442/erp_test`)).toBe(true);
     }
     expect(usesPostgresJsDriver("https://localhost:5442/erp_test")).toBe(false);
-    expect(usesPostgresJsDriver("postgres://user@localhost.evil.example/db")).toBe(false);
+    // Banco próprio na VPS (Coolify): o host é o nome do container.
+    expect(usesPostgresJsDriver("postgres://app:secret@ancorahub-db:5432/ancorahub")).toBe(true);
     expect(usesPostgresJsDriver("postgresql://user:password@ep-example.us-east-2.aws.neon.tech/neondb")).toBe(false);
     expect(usesPostgresJsDriver("not-a-database-url")).toBe(false);
   });
