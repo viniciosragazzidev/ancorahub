@@ -159,4 +159,20 @@ describe("filtros Lite de /leads (chave ligada)", () => {
     renderLite();
     expect(replace).toHaveBeenCalledWith("/leads?branch=b1", { scroll: false });
   });
+
+  it("'Com tarefa atrasada' liga e desliga o ?tarefa=atrasada na hora", () => {
+    params.current = new URLSearchParams("view=kanban&page=2");
+    renderLite();
+    const toggle = screen.getByRole("button", { name: "Com tarefa atrasada" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle);
+    expect(push).toHaveBeenLastCalledWith("/leads?view=kanban&tarefa=atrasada", { scroll: false });
+    cleanup();
+    params.current = new URLSearchParams("tarefa=atrasada");
+    renderLite();
+    const pressed = screen.getByRole("button", { name: "Com tarefa atrasada" });
+    expect(pressed).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(pressed);
+    expect(push).toHaveBeenLastCalledWith("/leads", { scroll: false });
+  });
 });

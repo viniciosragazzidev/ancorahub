@@ -330,3 +330,37 @@
 
 /* Dica do atalho "/" dentro da busca (20/11/2026). */
 .searchKbd { flex: none; margin-right: var(--space-2); color: var(--text-muted); }
+
+/* Com tarefa atrasada (25/11/2026): alternância de 44px ao lado dos seletores; ligada usa a cor de seleção. */
+.toggleButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toggleButton:hover {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.toggleButton[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+}
+
+.toggleButton:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
+}

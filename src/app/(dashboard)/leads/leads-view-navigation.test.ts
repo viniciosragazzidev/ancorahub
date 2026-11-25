@@ -13,4 +13,9 @@ describe("leads view navigation", () => {
     expect(leadsViewRequiresServerData("sem-atribuicao", "list")).toBe(true);
     expect(leadsViewRequiresServerData("list", "sem-atribuicao")).toBe(true);
   });
+
+  it("a visão Esfriando busca os leads parados no servidor", () => {
+    expect(leadsViewRequiresServerData("esfriando", "kanban")).toBe(true);
+    expect(leadsViewRequiresServerData("kanban", "esfriando")).toBe(true);
+  });
 });

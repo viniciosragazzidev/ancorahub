@@ -44,6 +44,8 @@ import { LeadsFilters } from "./_components/leads-filters";
 import type { LeadsFiltersProps } from "./_components/use-lead-filters";
 import { LeadsListSwitch, QualifyingLeadsListSwitch } from "./leads-lite-list";
 import { LeadsLiteKanban } from "./leads-lite-kanban";
+import { LeadsLiteCooling } from "./leads-lite-cooling";
+import { stageActorFor } from "./lead-card-stage";
 import litePageStyles from "./leads-lite-page.module.css";
 import { computeSlaInfo, type SlaInfo } from "./lead-sla";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
@@ -238,6 +240,7 @@ export function LeadsWorkspace({
   queueTabs,
   liteFilters,
   classicFilters,
+  coolingLeads,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -280,6 +283,8 @@ export function LeadsWorkspace({
   liteFilters?: Omit<LeadsFiltersProps, "trailing">;
   /** Filtros do modo normal, renderizados embaixo das abas (anatomia de página). */
   classicFilters?: React.ReactNode;
+  /** Visão "Esfriando" (?view=esfriando): carregada no servidor só quando a visão está aberta. */
+  coolingLeads?: LeadWorkspaceItem[] | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -677,6 +682,7 @@ export function LeadsWorkspace({
     <TabsList aria-label="Visualização de leads" variant="segment" className="w-max">
       <TabsTrigger value="list">Todos os leads{leadCount > 0 ? <span className={litePageStyles.tabCount}>{leadCount.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
       <TabsTrigger value="kanban">Kanban</TabsTrigger>
+      <TabsTrigger value="esfriando">Esfriando{coolingLeads?.length ? <span className={litePageStyles.tabCount}>{coolingLeads.length.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
       <TabsTrigger value="qualificacoes">Qualificação IA{qualifyingLeads.length > 0 ? <span className={litePageStyles.tabCount}>{qualifyingLeads.length.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
       <TabsTrigger value="radar">Radar IA</TabsTrigger>
       <TabsTrigger value="perdidos">Perdidos{lostCount > 0 ? <span className={litePageStyles.tabCount}>{lostCount.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
@@ -803,6 +809,8 @@ export function LeadsWorkspace({
               hideArrival={contextRole === "broker"}
               slaFirstContactMinutes={slaFirstContactMinutes}
               slaStagnantDays={slaStagnantDays}
+              stageActor={(lead) => stageActorFor(contextRole, lead, { branchId: contextBranchId })}
+              onStageCommitted={handleBulkStatusCommitted}
             />
           ) : (
           <>
@@ -872,6 +880,15 @@ export function LeadsWorkspace({
             Arraste as colunas para reordenar. Use o botão &quot;Colunas&quot; para exibir/ocultar etapas.
           </p>
           </>
+          )}
+        </TabsContent>
+
+        {/* ─── ESFRIANDO (radar de leads parados) ─── */}
+        <TabsContent value="esfriando" className={directorLite ? litePageStyles.region : "mt-4"}>
+          {coolingLeads ? (
+            <LeadsLiteCooling leads={coolingLeads} onOpen={setSelectedLead} />
+          ) : (
+            <p className="text-sm text-muted-foreground" role="status">Carregando leads parados…</p>
           )}
         </TabsContent>
 

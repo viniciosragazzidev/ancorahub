@@ -104,6 +104,15 @@ export function LeadsLiteFilters(props: LeadsFiltersProps) {
     else next.set("period", value);
     startNavigation(() => router.replace(`${pathname ?? "/leads"}${next.toString() ? `?${next.toString()}` : ""}`, { scroll: false }));
   };
+  // Com tarefa atrasada (?tarefa=atrasada): liga e desliga na hora, como a fila; "Limpar tudo" também tira.
+  const overdueOnly = urlParams.get("tarefa") === "atrasada";
+  const toggleOverdue = () => {
+    const next = new URLSearchParams(urlParams.toString());
+    if (overdueOnly) next.delete("tarefa");
+    else next.set("tarefa", "atrasada");
+    next.delete("page");
+    startNavigation(() => router.push(next.size ? `${pathname}?${next}` : (pathname ?? "/leads"), { scroll: false }));
+  };
   const showQueues = Boolean(queueTabs && queueTabs.tabs.length > 2);
   const panelWrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -283,8 +292,11 @@ export function LeadsLiteFilters(props: LeadsFiltersProps) {
               />
             </div>
           ) : null}
+          <button type="button" className={styles.toggleButton} aria-pressed={overdueOnly} onClick={toggleOverdue}>
+            Com tarefa atrasada
+          </button>
         </div>
-        {hasAnyFilter ? (
+        {hasAnyFilter || overdueOnly ? (
           <button type="button" className={styles.ghostButton} onClick={handleReset}>
             <span className={styles.longLabel}>Limpar tudo</span>
             <span className={styles.shortLabel}>Limpar</span>

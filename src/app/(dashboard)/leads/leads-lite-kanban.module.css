@@ -300,3 +300,114 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Área de funil (25/11/2026): confirmação do ⋯, interesse, dono com inicial, último contato e faixa de parado. */
+.notice:empty {
+  display: none;
+}
+
+.interest {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ownerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--text-xs);
+}
+
+.ownerRow .owner {
+  flex: 1 1 auto;
+  color: var(--foreground);
+}
+
+.avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.lastContact {
+  flex: none;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Faixa discreta: status só com texto e o token de status existente. */
+.stripe {
+  display: block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--warning-subtle);
+  color: var(--warning);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stageDialog {
+  display: grid;
+  gap: 0;
+}
+
+.stageFields {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stageField {
+  display: grid;
+  gap: 6px;
+}
+
+.stageLabel {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.stageTextarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.stageTextarea:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
+}
+
+@media (max-width: 767px) {
+  .stageTextarea {
+    font-size: var(--text-base);
+  }
+}
+
+.stageHint {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}

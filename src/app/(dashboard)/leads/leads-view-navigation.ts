@@ -1,7 +1,7 @@
-const SERVER_BACKED_VIEWS = new Set(["sem-atribuicao"]);
+const SERVER_BACKED_VIEWS = new Set(["sem-atribuicao", "esfriando"]);
 
 /**
- * Views other than "Sem atribuição" are projections of the leads already
+ * Views other than "Sem atribuição" and "Esfriando" are projections of the leads already
  * present in the current server payload. They must not trigger another RSC
  * render just to switch tabs.
  */

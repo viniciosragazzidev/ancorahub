@@ -25,6 +25,10 @@ export type LeadWorkspaceItem = {
   stageEnteredAt: string | null;
   serviceStartedAt: string | null;
   firstContactAt: string | null;
+  /** Última mensagem (qualquer direção) ou 1º contato; vem da consulta de /leads. */
+  lastContactAt?: string | null;
+  /** Prazo da próxima tarefa aberta no futuro (retorno marcado); só na visão Esfriando. */
+  nextOpenTaskDueAt?: string | null;
   corretorId: string | null;
   corretorNome: string | null;
   isPlantaoAtivo?: boolean;

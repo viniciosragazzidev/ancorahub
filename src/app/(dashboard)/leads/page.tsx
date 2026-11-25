@@ -58,6 +58,7 @@ import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-e
 import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { buildLeadScopeWhere, buildUnassignedLeadWhere } from "@/features/leads/lead-authorization";
+import { OVERDUE_TASK_VALUE, leadLastContactAtSql, listCoolingLeads, overdueTaskLeadFilter } from "@/features/leads/cooling-radar-query";
 import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
 import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
 import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
@@ -140,6 +141,8 @@ async function LeadsPageContent({
     eligibleCampaigns?: string;
     view?: string;
     fila?: string;
+    /** "atrasada": só leads com tarefa aberta e prazo vencido. */
+    tarefa?: string;
   }>;
 }) {
   await connection();
@@ -277,7 +280,7 @@ async function LeadsPageContent({
   const filters = await searchParams;
   const db = getDatabase();
   const canViewUnassigned = context.role === "director";
-  const allowedViews = new Set(["list", "kanban", "qualificacoes", "radar", "perdidos", "sem-atribuicao"]);
+  const allowedViews = new Set(["list", "kanban", "esfriando", "qualificacoes", "radar", "perdidos", "sem-atribuicao"]);
   const requestedView = filters.view && allowedViews.has(filters.view) ? filters.view : undefined;
   const initialView = requestedView === "sem-atribuicao" && !canViewUnassigned ? "list" : requestedView;
 
@@ -404,6 +407,8 @@ async function LeadsPageContent({
     : null;
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
+  // Com tarefa atrasada (?tarefa=atrasada): tarefa aberta com prazo vencido.
+  const overdueTaskFilter = filters.tarefa === OVERDUE_TASK_VALUE ? overdueTaskLeadFilter() : null;
   // Queue tabs (?fila=): a queue id or "sem-fila".
   const queueTab = readQueueTab(filters.fila);
   const queueFilter = queueTab?.kind === "none" ? isNull(schema.leads.queueId) : queueTab?.kind === "queue" ? eq(schema.leads.queueId, queueTab.queueId) : null;
@@ -480,6 +485,7 @@ async function LeadsPageContent({
     ...(tagFilter ? [tagFilter] : []),
     ...(qualificationFilter ? [qualificationFilter] : []),
     ...(corretorFilter ? [corretorFilter] : []),
+    ...(overdueTaskFilter ? [overdueTaskFilter] : []),
     ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
     ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : [])
   );
@@ -505,6 +511,7 @@ async function LeadsPageContent({
         ...(tagFilter ? [tagFilter] : []),
         ...(qualificationFilter ? [qualificationFilter] : []),
         ...(corretorFilter ? [corretorFilter] : []),
+        ...(overdueTaskFilter ? [overdueTaskFilter] : []),
         ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
         ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : []),
       )
@@ -583,6 +590,7 @@ async function LeadsPageContent({
         queueId: schema.leads.queueId,
         queueName: schema.leadQueues.name,
         queueColorHue: schema.leadQueues.colorHue,
+        lastContactAt: leadLastContactAtSql,
       })
       .from(schema.leads)
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
@@ -803,10 +811,15 @@ async function LeadsPageContent({
     filters.tipo ||
     filters.qualification ||
     filters.fila ||
+    filters.tarefa === OVERDUE_TASK_VALUE ||
     eligibleCampaignsOnly
     || (canViewUnassigned && initialView === "sem-atribuicao")
   );
-  const hasWorkspace = Boolean(leads.length || qualifyingLeads.length || unassignedRows.length);
+  // Esfriando (?view=esfriando): o radar dos leads parados, com o mesmo escopo e os mesmos filtros da tela.
+  const coolingRows = initialView === "esfriando"
+    ? await withPerfSpan("leads.cooling", () => listCoolingLeads(context, { requestedBranchId: filters.branch, extra: commonWhere }))
+    : null;
+  const hasWorkspace = Boolean(leads.length || qualifyingLeads.length || unassignedRows.length || initialView === "esfriando");
   // Props simples (serializáveis): no Lite o LeadsWorkspace (client) monta o LeadsFilters com as abas no fim da barra.
   const leadsFiltersProps = {
     branches,
@@ -904,6 +917,7 @@ async function LeadsPageContent({
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
                 serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
                 firstContactAt: lead.firstContactAt?.toISOString() ?? null,
+                lastContactAt: lead.lastContactAt?.toISOString() ?? null,
                 qualificationDetails: (lead.qualificationDetails as Record<string, unknown>) ?? null,
                 ...resolveLeadCommercialValues({
                   lead: { monthlyValue: lead.monthlyValue, livesCount: lead.livesCount ?? legacyLeadLivesCount(lead.qualificationDetails) },
@@ -912,6 +926,24 @@ async function LeadsPageContent({
                   activeSaleMonthlyValue: lead.activeSaleMonthlyValue,
                 }),
               })))}
+              coolingLeads={coolingRows ? stripLeadOriginForRole(context.role, coolingRows.map((lead) => ({
+                ...lead,
+                tags: [],
+                sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
+                isTeamList: lead.sourceChannel === TEAM_LIST_SOURCE,
+                queueName: teamQueueName(lead),
+                createdAt: lead.createdAt.toISOString(),
+                assignedAt: lead.assignedAt?.toISOString() ?? null,
+                stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
+                serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
+                firstContactAt: lead.firstContactAt?.toISOString() ?? null,
+                lastContactAt: lead.lastContactAt?.toISOString() ?? null,
+                nextOpenTaskDueAt: lead.nextOpenTaskDueAt?.toISOString() ?? null,
+                qualificationDetails: (lead.qualificationDetails as Record<string, unknown>) ?? null,
+                ...resolveLeadCommercialValues({
+                  lead: { monthlyValue: lead.monthlyValue, livesCount: lead.livesCount ?? legacyLeadLivesCount(lead.qualificationDetails) },
+                }),
+              }))) : null}
               qualifyingLeads={stripLeadOriginForRole(context.role, qualifyingLeads.map((lead) => ({
                 ...lead,
                 tags: tagsByLead.get(lead.id) ?? [],

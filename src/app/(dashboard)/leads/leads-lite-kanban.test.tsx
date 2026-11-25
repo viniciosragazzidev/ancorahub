@@ -8,8 +8,14 @@ import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 
 import { LeadsLiteKanban } from "./leads-lite-kanban";
 
+const actions = vi.hoisted(() => ({
+  changeLeadStatusAction: vi.fn(async () => ({ success: true })),
+  bulkChangeLeadStatusAction: vi.fn(async (_state: unknown, form: FormData) => ({ success: true, changedLeadIds: form.getAll("leadIds") })),
+}));
+
 vi.mock("./status-actions", () => ({
-  bulkChangeLeadStatusAction: vi.fn(),
+  changeLeadStatusAction: actions.changeLeadStatusAction,
+  bulkChangeLeadStatusAction: actions.bulkChangeLeadStatusAction,
   bulkReassignLeadsAction: vi.fn(),
   bulkReassignBranchAction: vi.fn(),
   bulkRevertToQualificationAction: vi.fn(),
@@ -63,7 +69,7 @@ describe("kanban Lite de /leads", () => {
     expect(screen.getByRole("heading", { name: "Em atendimento" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Cotação enviada" })).toBeInTheDocument();
     expect(screen.getByText("Ana Souza")).toBeInTheDocument();
-    expect(screen.getByText("Aguardando distribuição")).toBeInTheDocument();
+    expect(screen.getByText("Sem corretor")).toBeInTheDocument();
     expect(screen.getAllByText(/restantes|atrasado/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Abrir WhatsApp de Maria Nova" })).toHaveAttribute("href", "https://wa.me/5521900000101");
   });
@@ -78,7 +84,8 @@ describe("kanban Lite de /leads", () => {
     });
 
     expect(screen.getByText((text) => text.includes("1.234,56") && text.includes("2 vidas"))).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Fazer cotação" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ações de Maria Nova" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Fazer cotação" }));
     expect(onQuote).toHaveBeenCalledWith(lead);
   });
 
@@ -133,5 +140,49 @@ describe("kanban Lite de /leads", () => {
     expect(props.onOpen).not.toHaveBeenCalled();
     fireEvent.click(open);
     expect(props.onOpen).toHaveBeenCalledWith(carlos);
+  });
+
+  it("cabeçalho da coluna soma valor e vidas; cartão mostra interesse, corretor e último contato", () => {
+    const lead = { ...carlos, monthlyValue: "500", livesCount: 3, lastContactAt: "2026-10-22T15:00:00.000Z" };
+    renderKanban({ groupedLeads: { new: [], in_contact: [lead], quote_sent: [] }, commercialValuesEnabled: true });
+    const column = screen.getByRole("region", { name: "Em atendimento" });
+    expect(within(column).getByText((text) => text.includes("500,00") && text.includes("3 vidas"))).toBeInTheDocument();
+    expect(within(column).getByText("PME · 3 vidas")).toBeInTheDocument();
+    expect(within(column).getByText("há 2 dias")).toBeInTheDocument();
+  });
+
+  it("faixa 'Sem resposta há X' quando passou do SLA de parado", () => {
+    const lead = { ...carlos, status: "quote_sent", stageEnteredAt: "2026-10-18T15:00:00.000Z", lastContactAt: "2026-10-19T15:00:00.000Z" };
+    renderKanban({ groupedLeads: { new: [], in_contact: [], quote_sent: [lead] } });
+    expect(screen.getByText("Sem resposta há 5 dias")).toBeInTheDocument();
+  });
+
+  it("⋯ do cartão: próxima etapa pelo fluxo da gestão, com confirmação depois do servidor", async () => {
+    const onStageCommitted = vi.fn();
+    const lead = { ...carlos, status: "quote_sent" };
+    renderKanban({ groupedLeads: { new: [], in_contact: [], quote_sent: [lead] }, stageActor: () => "management", onStageCommitted });
+    fireEvent.click(screen.getByRole("button", { name: "Ações de Carlos Mendes" }));
+    expect(screen.getByRole("menuitem", { name: "Abrir" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Marcar perdido…" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Próxima etapa: Negociação" }));
+    expect(await screen.findByText("Carlos Mendes foi para Negociação.")).toBeInTheDocument();
+    const form = actions.bulkChangeLeadStatusAction.mock.calls[0]![1] as FormData;
+    expect(form.get("newStatus")).toBe("negotiation");
+    expect(onStageCommitted).toHaveBeenCalledWith({ leadIds: ["l2"], newStatus: "negotiation" });
+  });
+
+  it("Marcar perdido abre o seletor de motivo", () => {
+    renderKanban({ stageActor: () => "owner" });
+    fireEvent.click(screen.getByRole("button", { name: "Ações de Carlos Mendes" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Marcar perdido…" }));
+    expect(screen.getByRole("dialog", { name: "Marcar como perdido" })).toBeInTheDocument();
+    expect(screen.getByText("Motivo da perda")).toBeInTheDocument();
+  });
+
+  it("sem papel para mover, o ⋯ só abre", () => {
+    renderKanban();
+    fireEvent.click(screen.getByRole("button", { name: "Ações de Carlos Mendes" }));
+    expect(screen.queryByRole("menuitem", { name: /Próxima etapa/ })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Marcar perdido…" })).toBeNull();
   });
 });
