@@ -14,7 +14,7 @@ import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history";
-import { dutyAttendanceOverrideProblem, getRelevantDutyWindow, parseDutyLeadsSince, parseUnitPresencePhotoDefault, presencePhotoChoiceToStore, presencePhotoRequiredToStore } from "./duty-presence-domain";
+import { dutyAttendanceOverrideProblem, dutyLeadsCutSettingKey, getRelevantDutyWindow, parseDutyLeadsSince, parseUnitPresencePhotoDefault, presencePhotoChoiceToStore, presencePhotoRequiredToStore } from "./duty-presence-domain";
 import { loadSchedulePhotoRequirement, saveSchedulePhotoRequirement, saveUnitPhotoDefault } from "./duty-photo-setting";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
@@ -23,7 +23,7 @@ import { assertScheduleInManagerUnit } from "./manager-unit-scope-server";
 import { dropScheduleFromMonthlyPlans, saoPauloToday } from "./monthly-duty-plan-assignments";
 import { isTypeUsableByUnit } from "./manager-unit-scope";
 import { isHotLeadEarlyDistributionEnabled, notHeldByRunningQualificationSql } from "./qualification-hold";
-import { getSystemSetting } from "@/features/system-settings/queries";
+import { getSystemSetting, setSystemSetting } from "@/features/system-settings/queries";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { preconfirmContiguousDutyTarget } from "./duty-presence-preconfirm";
 
@@ -1065,5 +1065,33 @@ export async function setUnitPresencePhotoDefaultAction(input: unknown): Promise
     return { ok: true };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível salvar a foto da unidade." };
+  }
+}
+
+/**
+ * Horário de corte dos leads de um plantão (25/11): a janela começa nesse horário do dia útil anterior.
+ * Padrão 19:00; vale para a página do plantão (janela, "Ontem" e "Sexta") e para a atribuição à mão.
+ * A distribuição automática não filtra por esta janela. Diretor ou gestor da unidade.
+ */
+export async function saveDutyLeadsCutAction(scheduleId: string, rawCutAt: string): Promise<{ ok: true; cutAt: string } | { ok: false; reason: string }> {
+  try {
+    const parsedScheduleId = z.string().uuid().safeParse(scheduleId);
+    if (!parsedScheduleId.success) return { ok: false, reason: "Plantão inválido." };
+    const parsedCut = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).safeParse(rawCutAt);
+    if (!parsedCut.success) return { ok: false, reason: "Informe um horário entre 00:00 e 23:59." };
+    const { context, db, schedule } = await findScheduleForMutation(parsedScheduleId.data);
+    await setSystemSetting(dutyLeadsCutSettingKey(schedule.id), parsedCut.data);
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "unit_duty_schedule",
+      entidadeId: schedule.id,
+      acao: "duty_schedule.leads_cut_updated",
+      metadata: { tenantId: context.tenantId, cutAt: parsedCut.data },
+      createdAt: new Date(),
+    });
+    return { ok: true, cutAt: parsedCut.data };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível salvar o horário agora." };
   }
 }

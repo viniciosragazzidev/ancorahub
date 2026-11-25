@@ -4,6 +4,8 @@ import {
   extraShiftWindow,
   presenceOccurrenceKey,
   dutyLeadsSinceStart,
+  formatDutyLeadsCut,
+  parseDutyLeadsCut,
   effectiveAttendanceMode,
   findRunningDutySchedule,
   getSelfDutyConfirmationWindowState,
@@ -140,6 +142,33 @@ describe("duty presence occurrence windows", () => {
     const window = getRelevantDutyWindow({ ...shift, timezone: "America/New_York", startsAt: "09:00", endsAt: "11:00" }, now);
     expect(window?.startsAt.toISOString()).toBe("2026-09-23T13:00:00.000Z");
     expect(formatDutyStartHour(window!.startsAt, "America/New_York")).toBe("09:00");
+  });
+});
+
+describe("horário de corte dos leads por plantão", () => {
+  const monday = { dayOfWeek: 1, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
+
+  it("aceita só HH:MM válido e volta para 19:00 no resto", () => {
+    expect(parseDutyLeadsCut("18:30")).toBe("18:30");
+    expect(parseDutyLeadsCut(" 07:05 ")).toBe("07:05");
+    expect(parseDutyLeadsCut(undefined)).toBe("19:00");
+    expect(parseDutyLeadsCut("24:00")).toBe("19:00");
+    expect(parseDutyLeadsCut("9:00")).toBe("19:00");
+    expect(formatDutyLeadsCut("19:00")).toBe("19h");
+    expect(formatDutyLeadsCut("18:30")).toBe("18h30");
+  });
+
+  it("a janela começa no corte escolhido do dia útil anterior (segunda pega desde sexta)", () => {
+    const now = new Date("2026-10-05T14:00:00.000Z"); // seg 11:00 SP
+    expect(getDutyOccurrenceLeadWindow(monday, [monday], now, "17:00")).toEqual({ since: new Date("2026-10-02T20:00:00.000Z"), until: null });
+    expect(getDutyOccurrenceLeadWindow(monday, [monday], now)).toEqual({ since: new Date("2026-10-02T22:00:00.000Z"), until: null });
+  });
+
+  it("\"Ontem\" e \"Sexta\" usam o mesmo corte", () => {
+    const now = new Date("2026-10-07T14:00:00.000Z"); // qua 11:00 SP
+    expect(dutyLeadsSinceStart("ontem", now, "America/Sao_Paulo", "18:00")).toEqual(new Date("2026-10-06T21:00:00.000Z"));
+    expect(dutyLeadsSinceStart("sexta", now, "America/Sao_Paulo", "18:00")).toEqual(new Date("2026-10-02T21:00:00.000Z"));
+    expect(dutyLeadsSinceStart("ontem", now)).toEqual(new Date("2026-10-06T22:00:00.000Z"));
   });
 });
 

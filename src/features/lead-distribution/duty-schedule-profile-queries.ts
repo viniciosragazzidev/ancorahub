@@ -8,7 +8,8 @@ import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/querie
 import { selectEffectiveDutyAssignments } from "./dated-duty-roster";
 import { loadDutyPhotoRules } from "./duty-photo-setting";
 import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
-import { dutyLeadsSinceStart, effectiveAttendanceMode, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, presenceOccurrenceKey, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { dutyLeadsCutSettingKey, dutyLeadsSinceStart, parseDutyLeadsCut, effectiveAttendanceMode, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, presenceOccurrenceKey, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
 import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
 import { normalizeOfferPacing } from "./offer-pacing";
@@ -194,14 +195,16 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // The occurrence must be one the plantão really has: a one-day plantão still
   // ahead ("PME 28/09" seen on 26/09) shows its own date, and an ended one is
   // read as of its last valid moment — never last week's same weekday.
+  // Horário de corte deste plantão (padrão 19:00), escolhido na página do plantão.
+  const leadsCutAt = parseDutyLeadsCut(await getSystemSetting(dutyLeadsCutSettingKey(schedule.id)).catch(() => null));
   const firstShift = firstValidShift(schedule);
   const referenceNow = schedule.validUntil && now >= schedule.validUntil ? new Date(schedule.validUntil.getTime() - 1) : now;
   const occurrenceWindow: { since: Date; until: Date | null; upcomingStartsAt?: Date } = firstShift && firstShift.start > referenceNow
     ? { since: firstShift.start, until: firstShift.end, upcomingStartsAt: firstShift.start }
-    : getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, referenceNow);
+    : getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, referenceNow, leadsCutAt);
   // The manager may widen or narrow it ("considerar leads a partir de"): then
   // every lead since that moment counts, with no end.
-  const leadsSinceOverride = dutyLeadsSinceStart(options.leadsSince ?? "plantao", now, schedule.timezone ?? undefined);
+  const leadsSinceOverride = dutyLeadsSinceStart(options.leadsSince ?? "plantao", now, schedule.timezone ?? undefined, leadsCutAt);
   const windowBounds = leadsSinceOverride ? { since: leadsSinceOverride, until: null } : resolveDutyLeadWindowBounds(occurrenceWindow, now);
   // A plantão fed only by queues with "Liberação dos leads frios" switched on has no time
   // window (23/10): those leads go out at 2 days old, always before the occurrence, so the
@@ -603,6 +606,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     leadsSince: since,
     leadsUntil: until,
     leadsUpcomingStartsAt: upcomingStartsAt,
+    leadsCutAt,
     liveStatusEnabled: Boolean(operatingQueue) || sharedWaitingQueues.length > 0,
   };
   // Intervalo de início de plantão (11/11): mesma regra da distribuição, para o cartão bater com ela.

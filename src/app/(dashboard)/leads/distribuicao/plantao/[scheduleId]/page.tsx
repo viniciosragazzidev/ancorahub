@@ -15,7 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getDutyScheduleProfile } from "@/features/lead-distribution/duty-schedule-profile-queries";
 import { getDutyOccurrenceHistory } from "@/features/lead-distribution/duty-occurrence-history";
 import { firstValidShift, isSingleOccurrencePlantao } from "@/features/lead-distribution/monthly-duty-plan";
-import { getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows, parseDutyLeadsSince, type DutyLeadsSinceOption } from "@/features/lead-distribution/duty-presence-domain";
+import { formatDutyLeadsCut, getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows, parseDutyLeadsSince, type DutyLeadsSinceOption } from "@/features/lead-distribution/duty-presence-domain";
+import { DutyLeadsCutControl } from "../_components/duty-leads-cut-control";
 import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDutyCoverage, isHeldByRunningQualification } from "@/features/lead-distribution/domain";
 import { isHotLeadEarlyDistributionEnabled } from "@/features/lead-distribution/qualification-hold";
@@ -92,12 +93,16 @@ function DutyProfileHeader({
   </section>;
 }
 
-const LEADS_SINCE_CHOICES: Array<{ value: DutyLeadsSinceOption; label: string }> = [
-  { value: "plantao", label: "Janela do plantão" },
-  { value: "hoje", label: "Hoje" },
-  { value: "ontem", label: "Ontem 19h" },
-  { value: "sexta", label: "Sexta 19h" },
-];
+/** Rótulos com o horário de corte do plantão (padrão 19h). */
+function leadsSinceChoices(cutAt: string): Array<{ value: DutyLeadsSinceOption; label: string }> {
+  const cut = formatDutyLeadsCut(cutAt);
+  return [
+    { value: "plantao", label: "Janela do plantão" },
+    { value: "hoje", label: "Hoje" },
+    { value: "ontem", label: `Ontem ${cut}` },
+    { value: "sexta", label: `Sexta ${cut}` },
+  ];
+}
 
 export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string; canal?: string; fila?: string; desde?: string }> }) {
   const context = await getRequiredTenantContext();
@@ -114,7 +119,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     redirect("/leads/distribuicao?view=plantao");
   }
 
-  const { schedule, roster, linkedQueues, leads: allLeads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled, coldQueueWithoutWindow, startInterval } = profile;
+  const { schedule, roster, linkedQueues, leads: allLeads, leadsSince, leadsUntil, leadsUpcomingStartsAt, leadsCutAt, presenceEnabled, liveStatusEnabled, coldQueueWithoutWindow, startInterval } = profile;
   // Resumo da barra do topo (anatomia de página), com o perfil já carregado acima.
   const pageSummary = `${roster.length.toLocaleString("pt-BR")} ${roster.length === 1 ? "corretor" : "corretores"} · ${allLeads.length.toLocaleString("pt-BR")} ${allLeads.length === 1 ? "lead" : "leads"}`;
   // Invited brokers without an account yet: on the plantão as "Convite pendente".
@@ -495,7 +500,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             actions={<div className="flex flex-col items-end gap-2">
             {coldQueueWithoutWindow ? null : <nav aria-label="Considerar leads sem distribuição a partir de" className="flex flex-wrap items-center justify-end gap-2">
               <span className="text-xs text-muted-foreground" title="Muda só o que você vê aqui e o que atribui à mão. A distribuição automática segue a janela do plantão.">Considerar leads a partir de (só para ver e atribuir à mão)</span>
-              {LEADS_SINCE_CHOICES.map((choice) => (
+              {leadsSinceChoices(leadsCutAt).map((choice) => (
                 <Button
                   key={choice.value}
                   render={<Link href={leadsHref({ desde: choice.value })} />}
@@ -506,6 +511,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   {choice.label}
                 </Button>
               ))}
+              <DutyLeadsCutControl scheduleId={schedule.id} cutAt={leadsCutAt} />
             </nav>}
             <nav aria-label="Filtrar leads por situação" className="flex flex-wrap gap-2">
               {filters.map((item) => (

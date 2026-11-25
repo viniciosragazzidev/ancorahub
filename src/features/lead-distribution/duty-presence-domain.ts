@@ -301,20 +301,41 @@ function findTodaysUpcomingOccurrence(input: WeeklyWindowInput, now: Date): Duty
  * Falls back to "show everything" (epoch, no upper bound) if the schedule
  * never had a completed occurrence yet — brand new today, for example.
  */
-export function getDutyOccurrenceLeadWindow(schedule: WeeklyWindowInput, _family: WeeklyWindowInput[], now: Date): { since: Date; until: Date | null; upcomingStartsAt?: Date } {
+export function getDutyOccurrenceLeadWindow(schedule: WeeklyWindowInput, _family: WeeklyWindowInput[], now: Date, cutAt = DUTY_LEADS_FROM_PREVIOUS_DAY_AT): { since: Date; until: Date | null; upcomingStartsAt?: Date } {
   const current = getRelevantDutyWindow(schedule, now, 0);
   const active = isDutyWindowActive(current, now);
   if (!active) {
     const upcoming = findTodaysUpcomingOccurrence(schedule, now);
-    if (upcoming) return { since: previousEveningOf(upcoming, schedule.timezone), until: null, upcomingStartsAt: upcoming.startsAt };
+    if (upcoming) return { since: previousEveningOf(upcoming, schedule.timezone, cutAt), until: null, upcomingStartsAt: upcoming.startsAt };
   }
   const relevant = active ? current! : findMostRecentCompletedOccurrence(schedule, now);
   if (!relevant) return { since: new Date(0), until: null };
-  return { since: previousEveningOf(relevant, schedule.timezone), until: active ? null : relevant.endsAt };
+  return { since: previousEveningOf(relevant, schedule.timezone, cutAt), until: active ? null : relevant.endsAt };
 }
 
-/** The leads of an occurrence start at 19:00 of the day before it (the evening's leads go to the next plantão). */
+/**
+ * The leads of an occurrence start at 19:00 of the day before it (the evening's leads go to the next plantão).
+ * Padrão; desde 25/11 cada plantão pode ter o próprio horário de corte, escolhido na página do plantão.
+ */
 export const DUTY_LEADS_FROM_PREVIOUS_DAY_AT = "19:00";
+
+/** Horário de corte salvo ("HH:MM", 00:00 a 23:59). Qualquer outra coisa volta ao padrão (19:00). */
+export function parseDutyLeadsCut(value: string | null | undefined) {
+  const text = (value ?? "").trim();
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(text);
+  return match ? `${match[1]}:${match[2]}` : DUTY_LEADS_FROM_PREVIOUS_DAY_AT;
+}
+
+/** "19:00" vira "19h"; "18:30" vira "18h30". */
+export function formatDutyLeadsCut(cutAt: string) {
+  const [hour, minute] = cutAt.split(":");
+  return minute === "00" ? `${Number(hour)}h` : `${Number(hour)}h${minute}`;
+}
+
+/** Chave em system_settings do horário de corte de um plantão (o id do plantão é único entre empresas). */
+export function dutyLeadsCutSettingKey(scheduleId: string) {
+  return `duty_leads_cut_${scheduleId}`;
+}
 
 /**
  * How many calendar days back the lead window reaches. Monday's plantão takes
@@ -350,12 +371,12 @@ export function daysBackForLeadWindowOn(dutyDate: string) {
   return 1;
 }
 
-function previousEveningOf(occurrence: DutyWindow, timezone: string) {
+function previousEveningOf(occurrence: DutyWindow, timezone: string, cutAt = DUTY_LEADS_FROM_PREVIOUS_DAY_AT) {
   const day = zonedParts(occurrence.startsAt, timezone);
   const key = dateKey(day.year, day.month, day.day);
   return localTimeToUtc(
     addCalendarDays(key, -daysBackForLeadWindowOn(key)),
-    DUTY_LEADS_FROM_PREVIOUS_DAY_AT,
+    cutAt,
     timezone,
   );
 }
@@ -373,15 +394,15 @@ export function parseDutyLeadsSince(value: string | null | undefined): DutyLeads
  * today 00:00, yesterday 19:00 or the last Friday 19:00 (before today), in the
  * plantão's timezone. Null keeps the plantão window.
  */
-export function dutyLeadsSinceStart(option: DutyLeadsSinceOption, now: Date, timezone = "America/Sao_Paulo"): Date | null {
+export function dutyLeadsSinceStart(option: DutyLeadsSinceOption, now: Date, timezone = "America/Sao_Paulo", cutAt = DUTY_LEADS_FROM_PREVIOUS_DAY_AT): Date | null {
   if (option === "plantao") return null;
   const today = zonedParts(now, timezone);
   const todayKey = dateKey(today.year, today.month, today.day);
   if (option === "hoje") return localTimeToUtc(todayKey, "00:00", timezone);
-  if (option === "ontem") return localTimeToUtc(addCalendarDays(todayKey, -1), DUTY_LEADS_FROM_PREVIOUS_DAY_AT, timezone);
+  if (option === "ontem") return localTimeToUtc(addCalendarDays(todayKey, -1), cutAt, timezone);
   const weekday = new Date(`${todayKey}T12:00:00Z`).getUTCDay();
   const back = ((weekday - 5 + 7) % 7) || 7;
-  return localTimeToUtc(addCalendarDays(todayKey, -back), DUTY_LEADS_FROM_PREVIOUS_DAY_AT, timezone);
+  return localTimeToUtc(addCalendarDays(todayKey, -back), cutAt, timezone);
 }
 
 export function isDutyWindowActive(window: DutyWindow | null, now: Date) {
