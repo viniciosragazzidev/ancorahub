@@ -1,0 +1,53 @@
+/* /tarefas no Lite: só tokens do .arc-venancor (nenhuma cor, raio ou tipografia nova). */
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.groupCount {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.doneBox {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-block: -12px;
+  cursor: pointer;
+}
+
+.doneBox[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.doneInput {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: inherit;
+}
+
+.doneInput:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
+}
+
+.title[data-done="true"] {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}

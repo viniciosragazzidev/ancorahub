@@ -22,6 +22,8 @@ export const MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   new RegExp(`^/plantoes/corretor/${ID}$`),
   // Lead da unidade aberto a partir do perfil do corretor (a página confere a unidade do lead).
   new RegExp(`^/leads/(?!dashboard$|arquivados$|distribuicao$|novo$|importar$)${ID}$`),
+  // Tarefas dos leads da unidade (25/11): a página escopa pela unidade da sessão; o painel /tarefas/dashboard segue fora.
+  /^\/tarefas$/,
   /^\/notificacoes$/,
   /^\/settings$/,
   /^\/primeiro-acesso(\/.*)?$/,

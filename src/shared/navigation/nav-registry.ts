@@ -86,6 +86,8 @@ export const NAV_AREAS: readonly NavArea[] = [
     tabs: [
       { id: "leads", label: "Leads", href: "/leads", permission: "acessar_leads" },
       { id: "arquivados", label: "Arquivados", href: "/leads/arquivados", permission: "acessar_leads", roles: ["director"] },
+      // Tarefas por prazo (25/11, DeskComm §7.2): Minhas e Da equipe. O antigo /tarefas/dashboard fica sob esta aba.
+      { id: "tarefas", label: "Tarefas", href: "/tarefas", permission: "acessar_tarefas" },
     ],
   },
   {

@@ -10,6 +10,8 @@ export const LIGHT_ALLOWED_PREFIXES = [
   "/minha-fila",
   "/jornada",
   "/agenda",
+  // Tarefas por prazo (25/11): o corretor vê só as suas (a página força "Minhas").
+  "/tarefas",
   "/desempenho",
   "/cotacao",
   "/plantoes",
@@ -54,6 +56,8 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/gestao\/equipes\/[^/]+$/,
   new RegExp(`^/equipe/(?!cargos$|convidar$|dashboard$|recuperacoes$)${ID}$`),
   /^\/relacionamento$/,
+  // Tarefas da equipe (25/11): a página escopa aos corretores do supervisor.
+  /^\/tarefas$/,
   /^\/notificacoes$/,
   /^\/settings$/,
   /^\/primeiro-acesso(\/.*)?$/,
@@ -228,6 +232,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/meu-financeiro"), route: { title: "Meu financeiro", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/call-ancora"), route: { title: "Call Âncora", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/agenda"), route: { title: "Agenda", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/tarefas"), route: { title: "Tarefas", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/desempenho"), route: { title: "Desempenho", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null, chat: true, hidesTabBar: true } },
   { test: under("/dashboard/c"), route: { title: "Conversa", tab: "inicio", isRoot: false, parentHref: "/dashboard", chat: true, hidesTabBar: true } },

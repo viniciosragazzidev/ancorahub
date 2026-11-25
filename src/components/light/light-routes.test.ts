@@ -8,6 +8,13 @@ import {
 } from "./light-routes";
 
 describe("Light routes", () => {
+  it("abre /tarefas para corretor e supervisor Lite, com título próprio (25/11)", () => {
+    expect(isLightRouteAllowed("/tarefas")).toBe(true);
+    expect(isLightRouteAllowed("/tarefas", "supervisor")).toBe(true);
+    expect(isLightRouteAllowed("/tarefas/dashboard", "supervisor")).toBe(false);
+    expect(resolveLightRoute("/tarefas")).toMatchObject({ title: "Tarefas", tab: "mais", parentHref: "/dashboard" });
+  });
+
   it("gates Minha jornada in Mais, keeps it broker-only and gives Placar its own title", () => {
     expect(isLightRouteAllowed("/jornada")).toBe(true);
     expect(isLightRouteAllowed("/jornada", "supervisor")).toBe(false);

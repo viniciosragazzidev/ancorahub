@@ -64,7 +64,6 @@ const OUTSIDE_AREAS: Record<string, string> = {
   "/distribuicao/dashboard": "tela morta, sai na limpeza final",
   "/vendas/dashboard": "tela morta, sai na limpeza final",
   "/equipe/dashboard": "tela morta, sai na limpeza final",
-  "/tarefas/dashboard": "tela morta, sai na limpeza final",
   "/settings/waha-diagnostic": "entra em Configurações > WhatsApp numa fase própria",
 };
 

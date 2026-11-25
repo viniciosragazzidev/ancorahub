@@ -16,6 +16,8 @@ const ALLOWED = [
   "/plantoes/corretor/broker-1",
   "/plantoes/corretor/broker-1?plantao=schedule-1",
   "/leads/7f1c2b9e-0000-4000-8000-000000000002",
+  "/tarefas",
+  "/tarefas?escopo=minhas",
   "/notificacoes",
   "/settings",
   "/settings?tab=seguranca",
@@ -36,7 +38,7 @@ const BLOCKED = [
   "/equipe/cargos", "/equipe/recuperacoes", "/equipe/dashboard", "/equipe/minha",
   "/equipe/plantao", "/equipe/desempenho", "/equipe/transferencia", "/equipe/repassar", "/gestao", "/gestao/equipes/abc",
   "/relacionamento", "/noc", "/assinatura", "/guia", "/guia/webhook", "/relatorios", "/relatorios/drill/abc",
-  "/empresas", "/integridade", "/tarefas", "/cotacao", "/plantoes", "/plantoes/agora", "/filiais", "/roadmap",
+  "/empresas", "/integridade", "/tarefas/dashboard", "/cotacao", "/plantoes", "/plantoes/agora", "/filiais", "/roadmap",
   "/dashboard/drill/abc", "/dashboard/c/jornada", "/extensao", "/internal/design-system",
 ];
 
@@ -69,10 +71,11 @@ function userFor(role: "director" | "manager" | "supervisor" | "broker"): NavAcc
 }
 
 describe("menu do gestor (10/11)", () => {
-  it("mostra só Início (Painel), Equipe (Pessoas, Plantões da unidade e Pós-venda com a chave) e Configurações (Ajustes)", () => {
+  it("mostra só Início (Painel), Tarefas (25/11), Equipe (Pessoas, Plantões da unidade e Pós-venda com a chave) e Configurações (Ajustes)", () => {
     const areas = visibleNavAreas(userFor("manager"));
     expect(areas.map(({ area, tabs }) => [area.id, tabs.map((tab) => tab.id)])).toEqual([
       ["inicio", ["painel"]],
+      ["leads", ["tarefas"]],
       ["equipe", ["pessoas", "plantoes-unidade", "pos-venda"]],
       ["configuracoes", ["ajustes"]],
     ]);
