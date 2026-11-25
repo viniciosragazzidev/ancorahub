@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { effectiveAttendanceMode, EXTENDED_SHIFT_EXPLANATION, EXTENDED_SHIFT_NAME, EXTENDED_SHIFT_ONLINE_NOTE, getExtraShiftConfirmationWindowState, getSelfDutyConfirmationWindowState, isExtraShiftRecord } from "@/features/lead-distribution/duty-presence-domain";
 import { getDatabase, schema } from "@/shared/db";
+import { loadSchedulePhotoRequirement } from "@/features/lead-distribution/duty-photo-setting";
 import { ConfirmPresenceView } from "./confirm-presence-view";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,8 @@ export default async function ConfirmPresencePage({ searchParams }: { searchPara
   const confirmationId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id ?? "") ? id! : null;
   const [record] = confirmationId ? await getDatabase().select({
     id: schema.dutyPresenceConfirmations.id,
+    tenantId: schema.dutyPresenceConfirmations.tenantId,
+    scheduleId: schema.dutyPresenceConfirmations.scheduleId,
     assignmentId: schema.dutyPresenceConfirmations.assignmentId,
     status: schema.dutyPresenceConfirmations.status,
     brokerName: schema.user.name,
@@ -49,9 +52,13 @@ export default async function ConfirmPresencePage({ searchParams }: { searchPara
   const active = windowState === "available";
   const late = windowState === "late";
   const confirmed = record?.status === "confirmed";
+  // "Exigir foto na confirmação" (25/11): a escolha do plantão decide se o link pede a foto no app.
+  const photoRequired = record ? await loadSchedulePhotoRequirement(record.tenantId, record.scheduleId) : null;
+  // A modalidade (presencialShift) não muda com a foto; o passo com foto (photoStep) sim (25/11).
   const presencialShift = record ? effectiveAttendanceMode(record.assignmentAttendanceMode, record.attendanceMode) === "presencial" : false;
+  const photoStep = record ? effectiveAttendanceMode(record.assignmentAttendanceMode, record.attendanceMode, photoRequired) === "presencial" : false;
   // The Horário Estendido is always online, with one tap (28/10).
-  const presencial = presencialShift && !extra;
+  const presencial = photoStep && !extra;
   const extendedNote = extra ? `${EXTENDED_SHIFT_EXPLANATION}${presencialShift ? ` ${EXTENDED_SHIFT_ONLINE_NOTE}` : ""}` : undefined;
-  return <ConfirmPresenceView valid={Boolean(confirmationId && record)} record={record ? { id: record.id, assignmentId: record.assignmentId, brokerName: record.brokerName, scheduleName: extra ? `${record.scheduleName} ${EXTENDED_SHIFT_NAME}` : record.scheduleName, branchName: record.branchName, timezone: record.timezone, shiftStartsAt: record.shiftStartsAt } : null} confirmed={confirmed} late={late} active={active} presencial={presencial} extendedNote={extendedNote} notOpen={windowState === "not_open"} />;
+  return <ConfirmPresenceView valid={Boolean(confirmationId && record)} record={record ? { id: record.id, assignmentId: record.assignmentId, brokerName: record.brokerName, scheduleName: extra ? `${record.scheduleName} ${EXTENDED_SHIFT_NAME}` : record.scheduleName, branchName: record.branchName, timezone: record.timezone, shiftStartsAt: record.shiftStartsAt } : null} confirmed={confirmed} late={late} active={active} presencial={presencial} onSite={presencialShift} extendedNote={extendedNote} notOpen={windowState === "not_open"} />;
 }

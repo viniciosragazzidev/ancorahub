@@ -51,6 +51,8 @@ import { DeleteLeadControl } from "./delete-lead-control";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-workspace/components/light-lead-detail";
 import { lightContactFields, redactClientInfo } from "@/features/broker-workspace/lead-contact-privacy";
+import { listLeadObservations } from "@/features/leads/lead-observations";
+import { importedFirstContactDueAt, importedFirstContactHours, isTeamListLead } from "@/features/broker-workspace/imported-first-contact";
 import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qualifying-lead-actions";
 import { AiConversationInsightCard } from "@/features/conversation-intelligence";
 import type { AiAutoMove } from "@/features/conversation-intelligence/ai-move";
@@ -400,7 +402,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
     const adContextPromise = loadBrokerAdContext(context.tenantId, lead);
     // One wave for the whole Lite screen: the record (?ficha=1) needs the broker's
     // name; the conversation needs the timeline and the WhatsApp mirror.
-    const [[redistributionNotice], brokerUserRows, lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers, timelineRows, waMessages] = await Promise.all([
+    const [[redistributionNotice], brokerUserRows, lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers, timelineRows, waMessages, lightObservations] = await Promise.all([
       redistributionNoticePromise,
       ficha
         ? db
@@ -425,6 +427,10 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
           .orderBy(desc(schema.whatsappMessages.sentAt))
           .limit(100)
         : Promise.resolve([]),
+      // Histórico de observações (25/11): só para o corretor responsável; a consulta refaz o escopo sozinha.
+      lead.corretorId === context.userId
+        ? listLeadObservations({ tenantId: context.tenantId, userId: context.userId }, lead.id).catch(() => undefined)
+        : Promise.resolve(undefined),
     ]);
     const [brokerUser] = brokerUserRows;
     const adContext = await adContextPromise;
@@ -466,6 +472,9 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
       assignedAt: lead.assignedAt,
       dutyName: lead.dutyScheduleName,
       slaFirstContactMinutes: 15,
+      observations: lightObservations,
+      // Lista da equipe (25/11): o primeiro contato só vira pendência depois do prazo da importação.
+      firstContactDueAt: isTeamListLead(lead.sourceChannel) ? importedFirstContactDueAt(lead.assignedAt, importedFirstContactHours(lead.sourceMetadata)) : null,
       isCurrentBroker: lead.corretorId === context.userId,
       tipo: lead.tipo,
       origem: null,

@@ -19,6 +19,7 @@ import { stageLabel } from "./format";
 import { ClosingOutcomeCard } from "./closing-outcome-card";
 import { ClientInfoCard, IdentityHeader } from "./identity-zone";
 import { LeadNotices } from "./lead-notices";
+import { ObservationsSection } from "./observations-section";
 import { PeopleDataSection, PeopleReadOnly } from "./people-data-section";
 import { useQuickSaleAutoOpen } from "./quick-sale-auto-open";
 import { SaleDocSheet } from "./sale-doc-sheet";
@@ -124,6 +125,7 @@ export function LightLeadDetail({
       lastBrokerAt: activity?.lastBrokerAt ?? null,
       nextAction: activity?.nextAction ?? null,
       now,
+      firstContactDueAt: lead.firstContactDueAt ? new Date(lead.firstContactDueAt) : null,
     });
     const statusTone = c.isDistributed ? "info" : c.leadStatus === "converted" ? "success" : "neutral";
     return (
@@ -135,6 +137,8 @@ export function LightLeadDetail({
           header={<LeadHeaderBar name={lead.nome} statusLabel={stageLabel(c.leadStatus)} statusTone={statusTone} arrival={arrival} compact />}
           // One card: what to do now and its buttons (Aceitar, WhatsApp, Etapa) right under it.
           next={<NextStepCard step={step} />}
+          // Observações a um toque, ao lado de "Dados" (25/11).
+          headerAction={lead.observations ? (className) => <ObservationsSection observations={lead.observations ?? []} compactClassName={className} /> : undefined}
           details={
             <div className="flex flex-col gap-4">
               <LeadHeaderBar name={lead.nome} statusLabel={stageLabel(c.leadStatus)} statusTone={statusTone} arrival={arrival} />
@@ -182,6 +186,7 @@ export function LightLeadDetail({
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 pb-[calc(112px+var(--mobile-safe-bottom))] pt-2 sm:px-6">
         <LeadNotices lead={lead} />
         <IdentityHeader lead={lead} c={c} />
+        {lead.observations ? <ObservationsSection observations={lead.observations} /> : null}
         <ClosingOutcomeCard lead={lead} c={c} />
         <AdOriginCard ad={lead.adContext} />
         <ClientInfoCard lead={lead} c={c} />

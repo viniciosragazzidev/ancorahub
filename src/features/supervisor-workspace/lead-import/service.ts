@@ -3,7 +3,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
-import { publishNotification } from "@/features/notifications/send-push-helper";
+import { publishInAppNotification, publishNotification } from "@/features/notifications/send-push-helper";
+import { cleanFirstContactHours, firstContactHoursLabel, groupExpiredImportBatches, importedFirstContactHours } from "@/features/broker-workspace/imported-first-contact";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -173,6 +174,8 @@ export async function importSupervisorContacts(context: TenantContext, input: {
   rejected?: number;
   /** Contatos que a tela já viu no CRM no "Conferir" e nem mandou. Só conta no primeiro bloco. */
   duplicatesBefore?: number;
+  /** "Prazo para o primeiro contato" (25/11): horas sem virar pendência para o corretor. Padrão 24. */
+  firstContactHours?: number | null;
 }) {
   await assertSupervisor(context);
   if (!input.consent) throw new SupervisorImportError("Confirme que você tem autorização para contatar essas pessoas.");
@@ -221,7 +224,7 @@ export async function importSupervisorContacts(context: TenantContext, input: {
         tipo: "PF" as const,
         sourceChannel: SUPERVISOR_IMPORT_SOURCE,
         sourceCampaign: "Lista da equipe",
-        sourceMetadata: { import: "supervisor_list", importId: input.importId, supervisorId: context.userId },
+        sourceMetadata: { import: "supervisor_list", importId: input.importId, supervisorId: context.userId, firstContactHours: cleanFirstContactHours(input.firstContactHours) },
         status: "new" as const,
         qualificationStatus: "qualified" as const,
         qualificationState: "COMPLETED" as const,
@@ -375,13 +378,76 @@ export async function renameSupervisorLeadList(context: TenantContext, input: { 
   return { id: current.id, name };
 }
 
-/** Texto do aviso no CRM (sem WhatsApp, pedido do Vinicios em 16/11). */
-export function teamListNotice(received: number) {
-  const leads = received === 1 ? "O lead que veio para você já está" : `Os ${received} leads que vieram para você já estão`;
+/**
+ * Texto do aviso no CRM (sem WhatsApp, pedido do Vinicios em 16/11). Desde 25/11 é um resumo quieto, um por
+ * entrega: fica no sino, sem push, sem som e sem pendência (a lista só pesa depois do prazo).
+ */
+export function teamListNotice(received: number, hours = 24) {
+  const contacts = received === 1 ? "1 contato" : `${received.toLocaleString("pt-BR")} contatos`;
   return {
     title: "Lista interna da equipe",
-    message: `Sua supervisão importou uma lista de leads interna da equipe. ${leads} na área de leads do seu CRM.`,
+    message: `Seu supervisor enviou ${contacts}. Eles estão em Leads e viram pendência só se ficarem ${firstContactHoursLabel(hours)} sem primeiro contato.`,
   };
+}
+
+/** Aviso único quando o prazo de um lote passa: "N contatos da lista esperam o primeiro contato". */
+export function teamListDueNotice(count: number) {
+  const contacts = count === 1 ? "1 contato da lista da equipe espera" : `${count.toLocaleString("pt-BR")} contatos da lista da equipe esperam`;
+  return { title: "Lista da equipe", message: `${contacts} o seu primeiro contato. O prazo passou.` };
+}
+
+/**
+ * Varredura do SLA (25/11): o lote da lista da equipe que passou do prazo sem primeiro contato gera UM aviso por
+ * corretor e entrega (push uma vez, sem lead no aviso, para não abrir a oferta de lead novo nem tocar por lead).
+ * A chave de idempotência impede repetir o aviso nas próximas varreduras.
+ */
+export async function notifyExpiredTeamListBatches(tenantId: string, now = new Date()) {
+  const longest = 72 * 3_600_000;
+  const rows = await getDatabase().select({
+    brokerId: schema.leads.corretorId,
+    assignedAt: schema.leads.assignedAt,
+    firstContactHours: sql<string | null>`${schema.leads.sourceMetadata}->>'firstContactHours'`,
+    contacted: sql<boolean>`(${schema.leads.firstContactAt} is not null or exists (
+      select 1 from ${schema.whatsappMessages}
+      where ${schema.whatsappMessages.tenantId} = ${schema.leads.tenantId} and ${schema.whatsappMessages.leadId} = ${schema.leads.id}
+    ))`,
+  }).from(schema.leads).where(and(
+    eq(schema.leads.tenantId, tenantId),
+    eq(schema.leads.sourceChannel, SUPERVISOR_IMPORT_SOURCE),
+    eq(schema.leads.status, "in_contact"),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
+    sql`${schema.leads.corretorId} is not null`,
+    // Só lotes que venceram há pouco (prazo mínimo 4 h, máximo 72 h, mais um dia de folga para a varredura).
+    sql`${schema.leads.assignedAt} <= ${new Date(now.getTime() - 4 * 3_600_000).toISOString()}`,
+    gte(schema.leads.assignedAt, new Date(now.getTime() - longest - 24 * 3_600_000)),
+  )).limit(5000);
+  const batches = groupExpiredImportBatches(rows.flatMap((row) => row.brokerId && row.assignedAt
+    ? [{ brokerId: row.brokerId, assignedAt: row.assignedAt, hours: importedFirstContactHours({ firstContactHours: row.firstContactHours }), contacted: Boolean(row.contacted) }]
+    : []), now);
+  const sent = await Promise.allSettled(batches.map((batch) => {
+    const notice = teamListDueNotice(batch.count);
+    return publishNotification({
+      capability: "team_list_distributed",
+      tenantId,
+      recipientUserId: batch.brokerId,
+      type: "team_list_due",
+      title: notice.title,
+      message: notice.message,
+      url: "/leads",
+      tag: "corretop-leads",
+      idempotencyKey: `team-list-due:${batch.brokerId}:${batch.assignedAt.getTime()}`,
+    });
+  }));
+  return sent.filter((result) => result.status === "fulfilled" && result.value).length;
+}
+
+/** O prazo do aviso: o da lista distribuída (o menor, se o lote misturar listas). */
+async function distributedFirstContactHours(context: TenantContext, only: ReturnType<typeof and>) {
+  const [row] = await getDatabase().select({ hours: sql<string | null>`min((${schema.leads.sourceMetadata}->>'firstContactHours')::int)::text` })
+    .from(schema.leads)
+    .where(and(ownImport(context), only, gte(schema.leads.assignedAt, new Date(Date.now() - 60_000))));
+  return importedFirstContactHours({ firstContactHours: row?.hours ?? null });
 }
 
 /**
@@ -440,19 +506,18 @@ export async function distributeSupervisorLeads(context: TenantContext, input: {
     });
   });
 
-  // Um aviso no CRM por corretor (push e sino), nunca pelo número oficial.
+  // Um resumo quieto por corretor (só o sino, sem push nem som), nunca pelo número oficial (25/11).
   const batch = randomUUID();
+  const hours = await distributedFirstContactHours(context, only);
   await Promise.allSettled([...received].map(([brokerId, total]) => {
-    const notice = teamListNotice(total);
-    return publishNotification({
+    const notice = teamListNotice(total, hours);
+    return publishInAppNotification({
       capability: "team_list_distributed",
       tenantId: context.tenantId,
       recipientUserId: brokerId,
       type: "team_list_distributed",
       title: notice.title,
       message: notice.message,
-      url: "/leads",
-      tag: "corretop-leads",
       idempotencyKey: `team-list:${batch}:${brokerId}`,
     });
   }));

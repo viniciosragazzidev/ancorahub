@@ -63,9 +63,32 @@ export type DutyAttendanceMode = "online" | "presencial";
  * has none, the plantão's mode. Every presence and eligibility reader goes
  * through this, so the override can never apply in one place and not another.
  */
-export function effectiveAttendanceMode(assignmentMode: string | null | undefined, scheduleMode: string | null | undefined): DutyAttendanceMode {
+export function effectiveAttendanceMode(assignmentMode: string | null | undefined, scheduleMode: string | null | undefined, photoRequired?: boolean | null): DutyAttendanceMode {
   if (assignmentMode === "online" || assignmentMode === "presencial") return assignmentMode;
+  // "Exigir foto na confirmação" (25/11): ligado, a confirmação é a do presencial (foto e liberação), mesmo no
+  // online; desligado, é a do online (um toque), mesmo no presencial. Vazio: segue a modalidade.
+  if (photoRequired === true) return "presencial";
+  if (photoRequired === false) return "online";
   return scheduleMode === "presencial" ? "presencial" : "online";
+}
+
+/** O padrão do interruptor "Exigir foto na confirmação": ligado no presencial, desligado no online. */
+export function defaultPresencePhotoRequired(scheduleMode: string | null | undefined) {
+  return scheduleMode === "presencial";
+}
+
+/** O que vale para o plantão: o escolhido pelo diretor ou, sem escolha, o padrão da modalidade. */
+export function resolvePresencePhotoRequired(scheduleMode: string | null | undefined, stored: boolean | null | undefined) {
+  return typeof stored === "boolean" ? stored : defaultPresencePhotoRequired(scheduleMode);
+}
+
+/**
+ * O que gravar: null quando a escolha é o padrão da modalidade (trocar a modalidade depois leva o padrão junto),
+ * true/false só quando o diretor mudou. Sem o campo no formulário (formulário antigo), undefined: não mexe.
+ */
+export function presencePhotoRequiredToStore(scheduleMode: string, wanted: boolean | undefined): boolean | null | undefined {
+  if (wanted === undefined) return undefined;
+  return wanted === defaultPresencePhotoRequired(scheduleMode) ? null : wanted;
 }
 
 /**

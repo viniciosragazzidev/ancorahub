@@ -56,7 +56,7 @@ export type TeamListApi = {
    * Um bloco de até SUPERVISOR_IMPORT_CHUNK. `importId` junta os blocos da mesma lista e é o id da lista (DEC-191).
    * `listName` e `rejected` (os que ficaram de fora na tela) só contam no primeiro bloco.
    */
-  importContacts: (input: { consent: boolean; importId: string; contacts: Array<Omit<ContactDraft, "line">>; listName?: string | null; rejected?: number; duplicatesBefore?: number }) => Promise<Result<{ imported: number; duplicates: number; listId?: string | null; listName?: string | null }>>;
+  importContacts: (input: { consent: boolean; importId: string; contacts: Array<Omit<ContactDraft, "line">>; listName?: string | null; rejected?: number; duplicatesBefore?: number; firstContactHours?: number | null }) => Promise<Result<{ imported: number; duplicates: number; listId?: string | null; listName?: string | null }>>;
   /** Quantos leads cada corretor recebe. O servidor escolhe os mais antigos da lista (ou só da lista `listId`). */
   distribute: (input: { counts: Record<string, number>; leadIds?: string[]; listId?: string | null }) => Promise<Result<{ distributed: number; left: number; perBroker: Record<string, number> }>>;
   /** Renomear uma lista de importação (DEC-191). */

@@ -14,6 +14,7 @@ import { isAcceptedOfferAssignment, shouldReleaseUnacceptedProvisionalOwner } fr
 import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { SUPERVISOR_IMPORT_SOURCE, notifyExpiredTeamListBatches } from "@/features/supervisor-workspace/lead-import/service";
 
 const activeStatuses = ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 type SlaKind = "lead_unworked" | "lead_warning_10m" | "lead_stalled";
@@ -55,6 +56,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       stageEnteredAt: schema.leads.stageEnteredAt,
       webhookCredentialId: schema.leads.webhookCredentialId,
       redistributionCount: schema.leads.redistributionCount,
+      sourceChannel: schema.leads.sourceChannel,
     })
       .from(schema.leads).where(
         and(
@@ -77,6 +79,11 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
         )
       );
     
+    // Lista da equipe (25/11): um aviso por lote que passou do prazo, nunca um por lead.
+    notifications += await notifyExpiredTeamListBatches(tenant.id, new Date(now)).catch((error) => {
+      console.error("[sla] team list due notices failed", error instanceof Error ? error.message : error);
+      return 0;
+    });
     if (!leads.length) continue;
     
     const recipients = await db.select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId })
@@ -252,8 +259,9 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
         }
       }
 
-      // For stalled leads, also notify the broker who owns the lead
-      if (kind === "lead_stalled" && lead.corretorId) {
+      // For stalled leads, also notify the broker who owns the lead. Not for the team list (25/11): a whole
+      // imported batch stalls on the same day, and a per-lead notice would ring once per lead.
+      if (kind === "lead_stalled" && lead.corretorId && lead.sourceChannel !== SUPERVISOR_IMPORT_SOURCE) {
         const brokerKey = `${lead.corretorId}:${lead.id}:${kind}`;
         if (!existingKeys.has(brokerKey)) {
           existingKeys.add(brokerKey);

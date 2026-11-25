@@ -50,6 +50,7 @@ const importSchema = z.object({
   listName: z.string().max(200).nullable().optional(),
   rejected: z.number().int().min(0).max(SUPERVISOR_IMPORT_MAX * 10).optional(),
   duplicatesBefore: z.number().int().min(0).max(SUPERVISOR_IMPORT_MAX * 10).optional(),
+  firstContactHours: z.number().int().min(1).max(720).nullable().optional(),
 });
 
 export async function importTeamListAction(input: z.infer<typeof importSchema>) {

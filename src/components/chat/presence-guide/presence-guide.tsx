@@ -53,7 +53,8 @@ export type PresenceGuideConnection = {
   codeIssuedAt?: number | null;
 };
 
-export type PresenceGuideDuty = { key: string; scheduleName: string; branchName: string | null; mode: "online" | "presencial"; until: string };
+/** `mode`: como confirma ("presencial" = com foto). `modality`: a modalidade mostrada, que não muda com a foto. */
+export type PresenceGuideDuty = { key: string; scheduleName: string; branchName: string | null; mode: "online" | "presencial"; modality?: "online" | "presencial"; until: string };
 
 export type PresenceGuidePresence = {
   stage: ConfirmStage;
@@ -684,7 +685,7 @@ function PlatformSwitch({ value, onChange }: { value: GuidePlatform; onChange: (
 function DutyCard({ duty, done = false }: { duty: PresenceGuideDuty; done?: boolean }) {
   return (
     <div className={styles.duty}>
-      <span className={styles.dutyPill}>{duty.mode === "presencial" ? "Plantão presencial" : "Plantão online"} · até {duty.until}</span>
+      <span className={styles.dutyPill}>{(duty.modality ?? duty.mode) === "presencial" ? "Plantão presencial" : "Plantão online"} · até {duty.until}</span>
       <span className={styles.dutyName}>{duty.scheduleName}</span>
       {duty.branchName || done ? <span className={styles.dutyMeta}>{[duty.branchName, done ? "presença confirmada" : null].filter(Boolean).join(" · ")}</span> : null}
     </div>

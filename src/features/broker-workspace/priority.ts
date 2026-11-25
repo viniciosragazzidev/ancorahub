@@ -1,3 +1,5 @@
+import { importedFirstContactDueAt } from "./imported-first-contact";
+
 export type BrokerWorkspaceActionKind =
   | "awaiting_response"
   | "sla_overdue"
@@ -22,6 +24,11 @@ export type BrokerWorkspacePriorityLead = {
   lastIncomingAt: Date | null;
   hasPendingQuote: boolean;
   pendingDocumentCount: number;
+  /**
+   * Lead da lista interna da equipe (importado pelo supervisor): o prazo do primeiro contato, em horas, escolhido
+   * na importação. Dentro dele o lead não é pendência; o SLA da empresa vale só para lead quente. Vazio: lead quente.
+   */
+  importedFirstContactHours?: number | null;
 };
 
 export type BrokerWorkspacePriorityTask = {
@@ -122,7 +129,13 @@ export function prioritizeBrokerWorkspace(input: BrokerWorkspacePriorityInput): 
       addLeadPriority(priorities, lead, "awaiting_response", "critical", lead.lastIncomingAt, null, "Cliente aguardando resposta.");
     }
 
-    if (!lead.firstContactAt && lead.assignedAt) {
+    if (!lead.firstContactAt && lead.assignedAt && lead.importedFirstContactHours) {
+      // Lista fria: sem "perto do limite"; só vira pendência quando o prazo da importação passa sem contato.
+      const dueAt = importedFirstContactDueAt(lead.assignedAt, lead.importedFirstContactHours);
+      if (dueAt && dueAt.getTime() <= now.getTime()) {
+        addLeadPriority(priorities, lead, "sla_overdue", "critical", lead.assignedAt, dueAt, "Prazo do primeiro contato da lista venceu.");
+      }
+    } else if (!lead.firstContactAt && lead.assignedAt) {
       const slaAt = new Date(lead.assignedAt.getTime() + safeSlaMinutes * 60 * 1000);
       if (slaAt.getTime() <= now.getTime()) {
         addLeadPriority(priorities, lead, "sla_overdue", "critical", lead.assignedAt, slaAt, "SLA de primeiro contato vencido.");

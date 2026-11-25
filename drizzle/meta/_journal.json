@@ -1219,6 +1219,13 @@
                         "when":  1794900000000,
                         "tag":  "0237_lead_status_contacted",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  174,
+                        "version":  "7",
+                        "when":  1795000000000,
+                        "tag":  "0239_duty_presence_photo",
+                        "breakpoints":  true
                     }
                 ]
 }

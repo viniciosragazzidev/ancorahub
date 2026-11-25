@@ -24,7 +24,7 @@ function BackButton({ fallbackHref }: { fallbackHref: string }) {
 }
 
 /** Conversation first. The eye owns all lead context, at every screen width. */
-export function LeadSocialLayout({ header, next, details, side, conversation, detailOverlayActive = false, actions, backHref }: {
+export function LeadSocialLayout({ header, next, details, side, conversation, detailOverlayActive = false, actions, backHref, headerAction }: {
   header: ReactNode;
   next: ReactNode;
   details?: ReactNode;
@@ -34,6 +34,8 @@ export function LeadSocialLayout({ header, next, details, side, conversation, de
   actions?: ReactNode;
   /** Where the back button goes when there is no previous screen of the app (opened from a link or a notification). */
   backHref?: string;
+  /** One more button beside "Dados" (25/11: Observações), with the same look; it gets the button class. */
+  headerAction?: (className: string) => ReactNode;
 }) {
   const eye = useRef<HTMLButtonElement>(null);
   const previousOverlay = useRef(detailOverlayActive);
@@ -49,6 +51,7 @@ export function LeadSocialLayout({ header, next, details, side, conversation, de
       <div className={styles.focusIdentity}>
         {backHref ? <BackButton fallbackHref={backHref} /> : null}
         <div className={styles.phoneHeaderMain}>{header}</div>
+        {!detailOverlayActive && headerAction ? headerAction(styles.dataButton) : null}
         {!detailOverlayActive && (next || details || side) ? (
           <BottomSheet className="arc-venancor" trigger={<Button ref={eye} variant="ghost" size="sm" className={styles.dataButton} aria-label="Ver dados do cliente" title="Ver dados do cliente"><Eye size={18} aria-hidden="true" /><span className={styles.dataShort} aria-hidden="true">Dados</span><span className={styles.dataLong} aria-hidden="true">Dados do lead</span></Button>}
             title="Dados do cliente" closeLabel="Fechar dados do cliente" detents={[0.92]}>

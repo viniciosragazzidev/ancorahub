@@ -8,6 +8,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { DEFAULT_EXTRA_SHIFT_STARTS_AT, effectiveAttendanceMode, extendedShiftHourLabel, extraShiftWindow, findDutyOccurrenceConfirmation, formatDutyPresenceHourLabel, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 import { saveOwnDutyPresenceAnswer, type SelfDutyPresenceAnswer } from "./duty-presence-self-confirm";
+import { loadSchedulePhotoRequirement, loadSchedulePhotoRequirements } from "./duty-photo-setting";
 
 export { SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "./duty-presence-domain";
 
@@ -78,9 +79,11 @@ export async function getPresenceEligibleAssignments(input: {
       gt(schema.dutyPresenceConfirmations.shiftEndsAt, input.now),
       inArray(schema.dutyPresenceConfirmations.assignmentId, occurrences.map(({ assignment }) => assignment.id)),
     ));
+  // "Exigir foto na confirmação" (25/11): quem precisa de foto só recebe depois da liberação, como no presencial.
+  const photoBySchedule = await loadSchedulePhotoRequirements(input.tenantId, occurrences.map(({ schedule }) => schedule.id));
   const eligible = occurrences.filter(({ assignment, schedule, window }) => {
       const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
-      const attendanceMode = effectiveAttendanceMode(assignment.attendanceMode, schedule.attendanceMode);
+      const attendanceMode = effectiveAttendanceMode(assignment.attendanceMode, schedule.attendanceMode, photoBySchedule.get(schedule.id));
       return isDutyBrokerEligible({ attendanceMode, presenceRequired, status: confirmation?.status ?? null, confirmedBy: confirmation?.confirmedBy ?? null })
         && (!(presenceRequired || attendanceMode === "presencial") || isConfirmationForActiveOccurrence({ confirmation, assignment, window, now: input.now }));
     });
@@ -325,7 +328,7 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
     eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt),
     eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
   );
-  const presencial = effectiveAttendanceMode(assignment.assignmentAttendanceMode, assignment.attendanceMode) === "presencial";
+  const presencial = effectiveAttendanceMode(assignment.assignmentAttendanceMode, assignment.attendanceMode, await loadSchedulePhotoRequirement(input.tenantId, assignment.scheduleId)) === "presencial";
   const [current] = presencial
     ? await db.select({ hasPhoto: sql<boolean>`${schema.dutyPresenceConfirmations.photoStorageKey} is not null`, photoTakenAt: schema.dutyPresenceConfirmations.photoTakenAt }).from(schema.dutyPresenceConfirmations).where(occurrence).limit(1)
     : [];
@@ -505,7 +508,9 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
     eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt), eq(schema.dutyPresenceConfirmations.status, "absent"),
   )).limit(1);
   if (absence) return { ok: false, reason: "absent" };
-  return { ok: true, occurrence: { assignmentId: row.id, scheduleId: row.scheduleId, mode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode), window, joinedAt: row.joinedAt } };
+  // "Exigir foto na confirmação" (25/11): o servidor decide se a foto é obrigatória, não a tela.
+  const photoRequired = await loadSchedulePhotoRequirement(input.tenantId, row.scheduleId);
+  return { ok: true, occurrence: { assignmentId: row.id, scheduleId: row.scheduleId, mode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode, photoRequired), window, joinedAt: row.joinedAt } };
 }
 
 /**

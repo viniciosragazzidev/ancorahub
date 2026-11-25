@@ -18,6 +18,7 @@ import { LIST_NAME_MAX } from "./list-names";
 import { applyTableAnswer, applyTextAnswer, organizeTable, organizeText, tableRequest, textRequest, textToTable, type Organized, type SourceTable } from "./organize";
 import { SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX, SUPERVISOR_IMPORT_CHUNK, SUPERVISOR_IMPORT_MAX, planShares, vcardToLines, type ParsedContact, type TeamListApi } from "./parse-contacts";
 import styles from "./team-list-import.module.css";
+import { IMPORTED_FIRST_CONTACT_HOURS, IMPORTED_FIRST_CONTACT_OPTIONS, firstContactHoursLabel } from "@/features/broker-workspace/imported-first-contact";
 
 export type TeamListBroker = { id: string; name: string; availability: string };
 
@@ -81,6 +82,7 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
   const [review, setReview] = useState<Review | null>(null);
   const [consent, setConsent] = useState(false);
   const [listName, setListName] = useState("");
+  const [firstContactHours, setFirstContactHours] = useState<number>(IMPORTED_FIRST_CONTACT_HOURS);
   // A lista que recebe o Distribuir: a da página ou a que acabou de ser importada.
   const [targetListId, setTargetListId] = useState<string | null>(listId);
   const [pendingCount, setPendingCount] = useState(pending);
@@ -222,6 +224,7 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
         consent,
         importId: state.importId,
         contacts: chunk.map((contact) => ({ name: contact.name, phone: contact.phone!, email: contact.email, note: contact.note })),
+        firstContactHours,
         // Nome e números da tela só no primeiro bloco: os outros caem na mesma lista.
         ...(state.upTo === 0 ? { listName: listName.trim() || null, rejected: view.rejected, duplicatesBefore: view.inCrm } : {}),
       }).catch(() => ({ ok: false as const, error: "A conexão caiu no meio da importação." }));
@@ -352,6 +355,15 @@ export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectio
                 <p className={form.hint}>Cada importação vira uma lista separada, como uma pasta. Dá para renomear depois.</p>
               </div>
             ) : null}
+            <div className={form.field}>
+              <label className={form.label} htmlFor="team-list-first-contact">Prazo para o primeiro contato</label>
+              <select id="team-list-first-contact" className={form.input} value={firstContactHours} onChange={(event) => setFirstContactHours(Number(event.target.value))}>
+                {IMPORTED_FIRST_CONTACT_OPTIONS.map((hours) => (
+                  <option key={hours} value={hours}>{firstContactHoursLabel(hours)}{hours === IMPORTED_FIRST_CONTACT_HOURS ? " (padrão)" : ""}</option>
+                ))}
+              </select>
+              <p className={form.hint}>Os contatos chegam ao corretor sem som e só viram pendência se passarem desse prazo sem primeiro contato.</p>
+            </div>
             <label className={styles.consent}>
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
               <span>Tenho autorização para contatar essas pessoas.</span>
