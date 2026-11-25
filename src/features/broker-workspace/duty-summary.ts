@@ -5,6 +5,7 @@ import { and, asc, eq, gte, gt, isNotNull, lt, lte, or, sql, isNull } from "driz
 import { effectiveAttendanceMode, getDutyWindowOnDate } from "@/features/lead-distribution/duty-presence-domain";
 import { getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 import { getDatabase, schema } from "@/shared/db";
+import { loadSchedulePhotoRequirements } from "@/features/lead-distribution/duty-photo-setting";
 import { isBrokerReadyToReceive } from "./workspace-data-domain";
 import type { BrokerActiveDuty, DutyPresenceAsk } from "./queries";
 
@@ -134,6 +135,8 @@ export function buildDutySummary(input: {
   availabilityStatus: "available" | "paused" | "offline";
   /** Days from today to read (0 = today). The broker home reads today and the next seven days. */
   dayOffsets?: number[];
+  /** "Exigir foto na confirmação" de cada plantão (25/11). Ausente: lido do banco. */
+  photoRequiredBySchedule?: Map<string, boolean | null>;
 }) {
   const today = getSaoPauloDateKey(input.now);
   const dates = (input.dayOffsets ?? Array.from({ length: 8 }, (_, offset) => offset)).map((offset) => addCalendarDays(today, offset));
@@ -146,15 +149,19 @@ export function buildDutySummary(input: {
     }
   }
 
+  const photoBySchedule = input.photoRequiredBySchedule
+    ? Promise.resolve(input.photoRequiredBySchedule)
+    : loadSchedulePhotoRequirements(input.tenantId, input.rows.map((row) => row.scheduleId)).catch(() => new Map<string, boolean | null>());
   const occurrences = dates.flatMap((dutyDate) => {
     const publishedScheduleIds = input.monthlySchedulingEnabled ? publishedByDate.get(dutyDate) ?? new Set<string>() : null;
-    return resolveEffectiveDutyAssignments(input.tenantId, input.rows, input.now, { dutyDate, publishedScheduleIds })
-      .then((effectiveRows) => effectiveRows.flatMap((row) => {
+    return Promise.all([resolveEffectiveDutyAssignments(input.tenantId, input.rows, input.now, { dutyDate, publishedScheduleIds }), photoBySchedule])
+      .then(([effectiveRows, photo]) => effectiveRows.flatMap((row) => {
         const weekday = row.dutyDate ? weekdayForDate(dutyDate) : row.dayOfWeek;
         const window = getDutyWindowOnDate({ dayOfWeek: weekday, startsAt: row.startsAt, endsAt: row.endsAt, timezone: row.timezone }, dutyDate);
         if (!window || window.startsAt < row.validFrom || (row.validUntil && window.startsAt >= row.validUntil)) return [];
         // From here on `attendanceMode` is the mode this broker works the occurrence in.
-        return [{ row: { ...row, attendanceMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode) }, ...window }];
+        // "Exigir foto na confirmação" (25/11): com foto, a confirmação é a do presencial; sem, a do online.
+        return [{ row: { ...row, attendanceMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode, photo.get(row.scheduleId)) }, ...window }];
       }));
   });
 

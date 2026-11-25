@@ -14,7 +14,8 @@ import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history";
-import { dutyAttendanceOverrideProblem, getRelevantDutyWindow, parseDutyLeadsSince } from "./duty-presence-domain";
+import { dutyAttendanceOverrideProblem, getRelevantDutyWindow, parseDutyLeadsSince, presencePhotoRequiredToStore } from "./duty-presence-domain";
+import { loadSchedulePhotoRequirement, saveSchedulePhotoRequirement } from "./duty-photo-setting";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 import { assignLeadToBroker } from "./service";
@@ -290,6 +291,8 @@ async function activeQueueIds(db: ReturnType<typeof getDatabase>, tenantId: stri
   return ids;
 }
 
+const PHOTO_SETTING_PENDING = "A opção de foto na confirmação ainda não está ligada no banco: por enquanto o plantão segue a modalidade.";
+
 function revalidateDutyWorkspace() {
 }
 
@@ -402,6 +405,9 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
         for (const scheduleId of scheduleIds) await relinkScheduleQueues(tx, context, scheduleId, receivingQueueIds);
         if (unifiedInterval !== null) await unifyQueueOfferInterval(tx, context, receivingQueueIds, unifiedInterval);
       }
+      // "Exigir foto na confirmação" (25/11): só grava quando o diretor mudou o padrão da modalidade.
+      const photo = presencePhotoRequiredToStore(parsed.data.attendanceMode, parsed.data.presencePhotoRequired);
+      if (photo != null && !(await saveSchedulePhotoRequirement(tx, { tenantId: context.tenantId, scheduleIds, value: photo }))) sharedWarnings.add(PHOTO_SETTING_PENDING);
     });
     revalidateDutyWorkspace();
     return { success: true, scheduleId: scheduleIds[0], scheduleIds, message: [...sharedWarnings].join(" ") || (ownBranchId ? `${scheduleIds.length} plantão(ões) criado(s) para a sua unidade.` : `${scheduleIds.length} plantão(ões) criado(s) para todas as unidades.`) };
@@ -474,6 +480,9 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         webhookCredentialId,
         updatedAt: new Date(),
       }).where(and(eq(schema.unitDutySchedules.id, schedule.id), eq(schema.unitDutySchedules.tenantId, context.tenantId)));
+      // "Exigir foto na confirmação" (25/11): volta ao padrão (null) quando bate com a modalidade.
+      const photo = presencePhotoRequiredToStore(formData.has("attendanceMode") ? parsed.data.attendanceMode : schedule.attendanceMode, parsed.data.presencePhotoRequired);
+      if (photo !== undefined && !(await saveSchedulePhotoRequirement(tx, { tenantId: context.tenantId, scheduleIds: [schedule.id], value: photo })) && photo !== null) sharedWarnings.add(PHOTO_SETTING_PENDING);
       // The weekly roster keeps a copy of the plantão's validity (distribution
       // and presence read it): it must follow the plantão, or a shortened
       // plantão keeps its brokers "on duty" in later weeks.
@@ -576,6 +585,8 @@ export async function duplicateDutyScheduleAction(_previous: DutyActionState, fo
     const now = new Date();
     await db.transaction(async (tx) => {
       await tx.insert(schema.unitDutySchedules).values(buildDuplicateDutyScheduleValues(schedule, cloneId, context.userId, now));
+      const photo = await loadSchedulePhotoRequirement(context.tenantId, schedule.id);
+      if (photo !== null) await saveSchedulePhotoRequirement(tx, { tenantId: context.tenantId, scheduleIds: [cloneId], value: photo });
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: cloneId, acao: "duty_schedule.duplicated",
       });

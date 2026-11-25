@@ -19,6 +19,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { defaultPresencePhotoRequired } from "@/features/lead-distribution/duty-presence-domain";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { AppSelect } from "@/components/ui/select";
@@ -229,6 +231,9 @@ function DutyFormSheet({
     maximumBrokers: schedule?.maximumBrokers == null ? "" : String(schedule.maximumBrokers),
   }));
   const setField = (patch: Partial<typeof fields>) => setFields((current) => ({ ...current, ...patch }));
+  // "Exigir foto na confirmação" (25/11): segue a modalidade até o diretor mexer (presencial ligado, online desligado).
+  const [photoChoice, setPhotoChoice] = useState<boolean | null>(() => schedule && schedule.presencePhotoRequired !== defaultPresencePhotoRequired(schedule.attendanceMode) ? schedule.presencePhotoRequired : null);
+  const photoRequired = photoChoice ?? defaultPresencePhotoRequired(fields.attendanceMode);
   function chooseType(id: string) {
     setTypeId(id);
     const type = snapshot.types.find((item) => item.id === id);
@@ -401,6 +406,20 @@ function DutyFormSheet({
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">No presencial, o gestor confirma cada corretor na unidade antes de ele receber leads.</p>
+              <input type="hidden" name="presencePhotoRequired" value={String(photoRequired)} />
+              <label className="mt-1 flex items-start justify-between gap-3 rounded-[var(--radius-card)] border border-border p-3">
+                <span className="grid gap-0.5">
+                  <span className="text-sm font-medium">Exigir foto na confirmação</span>
+                  <span className="text-xs text-muted-foreground">
+                    {!snapshot.photoSettingReady
+                      ? "Disponível depois da atualização do banco. Até lá, presencial pede foto e online não."
+                      : photoRequired
+                        ? "O corretor confirma com uma foto do local e é liberado depois de aprovado."
+                        : "O corretor confirma a presença com um toque, sem foto."}
+                  </span>
+                </span>
+                <Switch checked={photoRequired} disabled={!snapshot.photoSettingReady} onCheckedChange={(checked) => setPhotoChoice(checked === true)} aria-label="Exigir foto na confirmação" />
+              </label>
             </div>
             <div className="grid gap-3 rounded-[var(--radius-card)] border border-border p-3">
               <div className="flex items-center justify-between gap-2">

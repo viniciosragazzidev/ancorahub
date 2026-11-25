@@ -25,6 +25,8 @@ const dutyScheduleFields = z.object({
   /** Saved plantão type (DEC-138). Wins over the legacy free-text typeName. */
   typeId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable()),
   attendanceMode: z.enum(["online", "presencial"]).default("online"),
+  /** "Exigir foto na confirmação" (25/11). Ausente (formulário antigo) = não mexe; o padrão segue a modalidade. */
+  presencePhotoRequired: z.preprocess((value) => value === "true" || value === true ? true : value === "false" || value === false ? false : undefined, z.boolean().optional()),
   dayOfWeek: z.coerce.number().int().min(0).max(6),
   startsAt: z.string(),
   endsAt: z.string(),
