@@ -13,6 +13,7 @@ import type { ConfirmationDocument, LightLeadDetailData, LiteRequirement } from 
 import type { TeamConversationDetail } from "@/features/team-conversations/types";
 import { ManagerLeadTransferForm, type TransferBroker } from "@/features/manager-workspace/manager-lead-transfer-form";
 import { ManagerLeadStatusSheet } from "@/features/manager-workspace/manager-lead-status-sheet";
+import { isSupervisorTeamBrokerObservation, readSupervisorObservation, readSupervisorObservationStage } from "./observations-core";
 
 
 import { TeamLeadConversation } from "./team-lead-conversation";
@@ -34,7 +35,7 @@ function timelineLabel(tipo: string) {
   return timelineLabels[tipo] ?? "Atualização";
 }
 
-type TimelineItem = { id: string; tipo: string; conteudo: string | null; userName: string | null; createdAt: Date | string };
+type TimelineItem = { id: string; tipo: string; conteudo: string | null; metadata?: unknown; userId?: string | null; userName: string | null; actorRole?: string | null; actorIsInSupervisorTeam?: boolean; createdAt: Date | string };
 type TaskItem = { id: string; title: string; dueAt: Date | null; completedAt: Date | null; priority: string };
 type DocumentItem = { id: string; filename: string; status: string; requirementName: string | null };
 
@@ -69,6 +70,23 @@ function LeadTimeline({ items }: { items: TimelineItem[] }) {
       {item.conteudo ? <p className="break-words text-sm text-(--text-secondary)">{item.conteudo}</p> : null}
       <time className="text-xs text-(--text-muted)" dateTime={new Date(item.createdAt).toISOString()}>{item.userName ? `${item.userName} · ` : ""}{dateFormat.format(new Date(item.createdAt))}</time>
     </li>)}</ol> : <EmptyState title="Ainda não há atualizações neste lead" description="As próximas atividades aparecem aqui." />}
+  </section>;
+}
+
+function BrokerObservations({ items }: { items: TimelineItem[] }) {
+  const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+  const observations = items.flatMap((item) => {
+    if (!isSupervisorTeamBrokerObservation({ actorRole: item.actorRole ?? null, isCurrentTeamMember: item.actorIsInSupervisorTeam === true })) return [];
+    const text = readSupervisorObservation(item.metadata, item.conteudo);
+    return text ? [{ ...item, text, observationStage: readSupervisorObservationStage(item.metadata, item.conteudo) }] : [];
+  });
+  return <section className="flex flex-col gap-3" aria-labelledby="broker-observations-title">
+    <h2 id="broker-observations-title" className="text-base font-semibold text-(--foreground)">Observações do corretor</h2>
+    {observations.length ? <ol className="grid gap-3">{observations.map((item) => <li key={item.id} className="border-b border-(--border) pb-3 last:border-b-0">
+      <p className="text-xs text-(--text-muted)">Etapa: {item.observationStage ? stageLabel(item.observationStage) : "Etapa não identificada"}</p>
+      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-(--text-secondary)">{item.text}</p>
+      <time className="mt-1 block text-xs text-(--text-muted)" dateTime={new Date(item.createdAt).toISOString()}>{item.userName ? `${item.userName} Â· ` : ""}{dateFormat.format(new Date(item.createdAt))}</time>
+    </li>)}</ol> : <p className="text-sm text-(--text-secondary)">O corretor ainda não registrou observações neste lead.</p>}
   </section>;
 }
 
@@ -152,6 +170,7 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
             {lead.ownerId && !isManager ? <Link className="w-max text-sm font-medium text-(--chat-action-text)" href={`/equipe/${encodeURIComponent(lead.ownerId)}`}>Ver corretor</Link> : null}
             {postSaleCard}
             {tasks && documents ? <LeadTasksAndDocuments tasks={tasks} documents={documents} /> : null}
+            <BrokerObservations items={timeline} />
             <LeadTimeline items={timeline} />
           </div>
         }

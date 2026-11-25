@@ -6,7 +6,7 @@ describe("manager Lite routes", () => {
     for (const path of ["/dashboard", "/negociacoes", "/leads", "/leads/abc", "/notificacoes", "/settings", "/primeiro-acesso", "/equipe", "/equipe/member-1", "/clientes", "/clientes/client-1", "/empresas", "/unidades/branch-1", "/distribuicao", "/leads/distribuicao", "/leads/distribuicao/plantao/schedule-1"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(true);
     }
-    for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/distribuicao/dashboard", "/leads/a/b", "/leads/distribuicao/plantao", "/leads/distribuicao/plantao/a/b", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/plantao", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/clientes/a/b", "/empresas/abc", "/empresas/abc/leads", "/unidades", "/unidades/branch-1/subpage", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
+    for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/distribuicao/dashboard", "/leads/a/b", "/leads/distribuicao/plantao", "/leads/distribuicao/plantao/a/b", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/plantao", "/equipe/controle", "/equipe/observacoes", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/clientes/a/b", "/empresas/abc", "/empresas/abc/leads", "/unidades", "/unidades/branch-1/subpage", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(false);
     }
     // 23 com o Call Âncora (b6c5041f), que tem acesso controlado pela própria chave.

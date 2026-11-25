@@ -90,11 +90,27 @@ export function usesPostgresJsDriver(databaseUrl: string): boolean {
   try {
     const url = new URL(databaseUrl);
     if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return false;
-    const hostname = url.hostname.toLowerCase();
-    return hostname.endsWith(".supabase.com") || ["localhost", "127.0.0.1", "[::1]"].includes(hostname);
+    // 25/11: só a Neon usa o driver serverless (websocket). Qualquer outro Postgres (Supabase,
+    // localhost ou o banco próprio na VPS, com o nome do container como host) vai por postgres.js.
+    return !url.hostname.toLowerCase().endsWith(".neon.tech");
   } catch {
     return false;
   }
+}
+
+/**
+ * Conexão dedicada para LISTEN (avisos em tempo real). O modo transação do pooler do Supabase
+ * (6543) não mantém LISTEN; o modo sessão do mesmo host (5432) mantém. No banco próprio a URL
+ * já é direta. REALTIME_DATABASE_URL, se definida, vence.
+ */
+export function getListenDatabaseUrl(): string {
+  const explicit = process.env.REALTIME_DATABASE_URL?.trim();
+  if (explicit) return explicit;
+  const databaseUrl = getDatabaseUrl();
+  if (!isTransactionPooler(databaseUrl)) return databaseUrl;
+  const url = new URL(databaseUrl);
+  url.port = "5432";
+  return url.toString();
 }
 
 /**

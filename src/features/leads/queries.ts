@@ -57,9 +57,17 @@ export async function getLeadTimeline(leadId: string) {
       userId: schema.leadInteractions.userId,
       createdAt: schema.leadInteractions.createdAt,
       userName: schema.user.name,
+      actorRole: schema.tenantMemberships.role,
+      actorIsInSupervisorTeam: context.role === "supervisor" && context.supervisorTeamScope && context.branchId
+        ? sql<boolean>`(${schema.tenantMemberships.role} = 'broker' and ${schema.tenantMemberships.status} = 'active' and ${schema.tenantMemberships.supervisorId} = ${context.userId} and ${schema.tenantMemberships.branchId} = ${context.branchId})`
+        : sql<boolean>`false`,
     })
     .from(schema.leadInteractions)
     .leftJoin(schema.user, eq(schema.leadInteractions.userId, schema.user.id))
+    .leftJoin(schema.tenantMemberships, and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      eq(schema.tenantMemberships.userId, schema.leadInteractions.userId),
+    ))
     .where(
       and(
         eq(schema.leadInteractions.leadId, leadId),

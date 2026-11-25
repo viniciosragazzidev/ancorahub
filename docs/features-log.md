@@ -1,5 +1,11 @@
 # Histórico de Funcionalidades Adicionadas (Features Log)
 
+## 25/11/2026 - Controle do Supervisor Lite
+
+- O Supervisor acompanha disponibilidade, plantão/presença, leads em atendimento, aceites e primeiros contatos por corretor. A lista separa ofertas sem aceite por mais de cinco minutos, primeiro contato vencido (24 h para `supervisor_import`, conforme prazo confirmado) e retorno vencido. A tela atualiza a cada 60 s quando visível.
+- `/equipe/observacoes` reúne texto integral, etapa, autor, data/hora e lead, com filtros de corretor/etapa, paginação e escopo da unidade/equipe. A ficha do lead mostra observações do corretor que segue responsável.
+- Sem migration ou escrita em banco. Validação dirigida: 31 testes passaram; type-check, ESLint focado e build Webpack passaram. O harness completo encontrou falhas preexistentes de encoding/lint e da suíte geral, fora dos arquivos desta feature. Registro: `implementations/completed/2026-11-25-supervisor-controle.md`.
+
 ## 23/11/2026 - Corretor troca o próprio telefone
 
 - Em Configurações > Meu telefone (Lite), o corretor digita o celular novo e troca. O servidor valida o celular brasileiro (DDD existente, 9 depois do DDD), grava como 55 + DDD + 9 dígitos e recusa número que já é de outra pessoa da empresa, comparando também cadastros antigos sem 55 ou sem o 9. A troca fica no log de auditoria (`broker_profile / alterou_telefone_proprio`, com o número antigo e o novo) e aparece em /integridade. Nenhuma mensagem é enviada ao número novo. Avisos de lead, plantão, recuperação de senha, OpenWA, WAHA e Call Âncora já leem `broker_profiles.phone` na hora. Testável em /dev/laboratorio > "Trocar meu telefone". Sem migration.

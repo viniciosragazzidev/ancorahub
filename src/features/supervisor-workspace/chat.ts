@@ -212,6 +212,7 @@ function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
       ...(needing[0] ? [{ id: "open-needing", label: `Ver ${firstName(needing[0].name)}`, action: { kind: "href" as const, href: `/equipe/${needing[0].userId}` } }] : []),
       { id: "message", label: "Mandar recado para a equipe", hint: "Pela Central de relacionamento", action: { kind: "href", href: "/relacionamento" } },
       { id: "team-page", label: data.teamIdentity ? `Abrir ${data.teamIdentity.name}` : "Minha equipe", hint: "Perfil, membros e convites", action: { kind: "href", href: "/equipe/minha" } },
+      { id: "team-control", label: "Controle da equipe", hint: "Quem está no plantão e o que precisa de ação", action: { kind: "href", href: "/equipe/controle" } },
     ],
   });
   const teamLabel = data.teamIdentity?.name;

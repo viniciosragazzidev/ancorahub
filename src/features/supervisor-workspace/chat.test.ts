@@ -71,7 +71,8 @@ describe("supervisor Lite chat", () => {
     const list = script.blocks.find((block) => block.type === "list");
     expect(list && list.type === "list" ? list.items.map((item) => item.href) : []).toEqual(["/equipe/b1", "/equipe/b2"]);
     const choice = script.blocks.find((block) => block.id === "equipe-choice");
-    expect(choice && choice.type === "question" ? choice.choices.map((item) => item.id) : []).toEqual(["open-needing", "message", "team-page"]);
+    expect(choice && choice.type === "question" ? choice.choices.map((item) => item.id) : []).toEqual(["open-needing", "message", "team-page", "team-control"]);
+    expect(choice && choice.type === "question" ? choice.choices.find((item) => item.id === "team-control")?.action : null).toEqual({ kind: "href", href: "/equipe/controle" });
   });
 
   it("performance ranks only inside the team", () => {

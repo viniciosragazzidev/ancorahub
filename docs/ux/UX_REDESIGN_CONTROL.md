@@ -1,3 +1,9 @@
+## 2026-11-25: controle operacional do Supervisor Lite
+
+Pedido explicito de Vinicios para `/equipe/controle` e `/equipe/observacoes`, com supervisao restrita a equipe ativa e unidade efetiva. Acao principal: localizar pendencias com motivo e abrir o lead; observacoes completas ficam numa lista separada e no detalhe. A lista de corretores mostra disponibilidade atual, plantao/presenca, leads em atendimento, aceites e primeiros contatos de hoje. Pendencias agrupam somente oferta sem aceite ha mais de cinco minutos, primeiro contato vencido e retorno vencido. Atualizacao por polling visivel de 60 segundos, sem refresh da pagina.
+
+Composicao segue PeoplePage/PeopleSection/PeopleStats, Badge, Button e tokens Lite existentes. Sem token, primitive, variante ou movimento novo. O pedido e especifico ao papel Supervisor e nao reativa a proposta rejeitada de painel do Corretor de 13/11. A disponibilidade usa o campo existente (`available`, `paused`, `offline`); o sistema nao tem heartbeat de presenca do navegador. Nao avanca UX-M1.10.
+
 ## 2026-11-18: Capitão maior no banner mobile de Plantões
 
 Papel: corretor Lite em `/plantoes`. Objetivo: dar mais presença ao Capitão na dica

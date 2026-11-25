@@ -1,4 +1,4 @@
-﻿# Documentação do CorreTop
+# Documentação do CorreTop
 
 ## Como usar este diretório
 
@@ -31,6 +31,7 @@
 | `whatsapp-review-service.md` | Fronteira Fastify, controles e implantação do envio de revisão da Meta | Norma de integração vigente |
 | `plugin-first-architecture.md` | Direção arquitetural modular, contratos de domínio, plugins, eventos e hosts | Norma arquitetural vigente |
 | `crm-enterprise-grade.md` | Requisitos, automação e arquitetura para CRM enterprise de grandes equipes | Visão funcional & roadmap |
+| `implementations/completed/2026-11-25-supervisor-controle.md` | Painel de controle e observações da equipe no Supervisor Lite | Concluído; prazo de 24 h para lista importada |
 | `features-log.md` | Histórico de funcionalidades adicionadas ao sistema por versão/etapa | Histórico de controle vigente |
 | `../src/utils/README.md` | Convenções do núcleo de utilitários compartilhados e seus limites | Norma de organização de código |
 | `adr/` | Decisões de arquitetura imutáveis | Criar quando houver decisão relevante |
