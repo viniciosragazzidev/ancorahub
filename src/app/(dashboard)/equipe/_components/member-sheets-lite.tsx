@@ -20,6 +20,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 import type { TenantRole } from "@/shared/db/schema";
 
 import { setMemberAgentAccessAction } from "@/features/agent/access-actions";
+import { formatLastAccess, formatLastAccessDetail } from "@/features/team/last-access";
 
 import { deleteTeamMemberAction, generateResetPasswordLinkAction, transferLeadsAction, updateTeamMemberAction } from "../actions";
 import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
@@ -44,6 +45,8 @@ export type TeamMemberLite = {
   canManage: boolean;
   /** Agente IA desta pessoa (só vem para diretor, visto por diretor). */
   agentEnabled?: boolean;
+  /** Sessão mais recente (ISO); null quando nunca entrou. */
+  lastAccessAt?: string | null;
 };
 
 export type BranchOption = { id: string; name: string };
@@ -157,6 +160,15 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
     <LiteSidePanel open={open} onOpenChange={onOpenChange} title="Editar membro" description="Atualize os dados, a unidade e o papel operacional desse acesso.">
       <form action={submit} className={form.form}>
         <input type="hidden" name="memberId" value={member.id} />
+        {member.userId ? (
+          <div className={form.field}>
+            <span className={form.label}>Último acesso</span>
+            <span className={styles.locked}>
+              <span className={page.numeric}>{formatLastAccessDetail(member.lastAccessAt)}</span>
+              {member.lastAccessAt ? <span>&nbsp;· {formatLastAccess(member.lastAccessAt)}</span> : null}
+            </span>
+          </div>
+        ) : null}
         <label className={form.field}>
           <span className={form.label}>Nome</span>
           <input className={form.input} name="name" defaultValue={member.name ?? ""} required disabled={pending} />

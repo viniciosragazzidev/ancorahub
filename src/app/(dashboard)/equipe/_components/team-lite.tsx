@@ -26,6 +26,7 @@ import { useMultiSelect } from "@/hooks/use-multi-select";
 import { setBrokersAvailabilityAction } from "@/features/branches/actions";
 import { decideBrokerTransferAction, type PendingTransferRequest } from "@/features/supervisor-workspace/transfer-actions";
 import { formatLeadPhone } from "@/features/leads/format-lead-phone";
+import { compareLastAccess, formatLastAccess, formatLastAccessDetail, isLastAccessStale } from "@/features/team/last-access";
 import type { TenantRole } from "@/shared/db/schema";
 
 import { bulkToggleTeamMemberStatusAction, resendInviteAction, revokeInviteAction, toggleTeamMemberStatusAction } from "../actions";
@@ -110,8 +111,15 @@ function TransferRequestsLite({ initial }: { initial: PendingTransferRequest[] }
 }
 
 type Sheet = { kind: "edit" | "delete" | "transfer" | "password"; member: TeamMemberLite } | null;
+/** Ordem da lista: nome (padrão do servidor) ou último acesso, para achar quem não abre o sistema. */
+type MemberOrder = "name" | "access-old" | "access-new";
+const ORDER_OPTIONS: Array<{ value: MemberOrder; label: string }> = [
+  { value: "name", label: "Ordem por nome" },
+  { value: "access-old", label: "Sem entrar há mais tempo" },
+  { value: "access-new", label: "Entrou mais recente" },
+];
 
-export function TeamLite({ members, branches, customRoles, stats, transferRequests, showTransfers, currentRole, currentBranchId, currentUserId, canViewProfile }: {
+export function TeamLite({ members, branches, customRoles, stats, transferRequests, showTransfers, currentRole, currentBranchId, currentUserId, canViewProfile, renderedAt }: {
   members: TeamMemberLite[];
   branches: BranchOption[];
   customRoles: CustomRoleOption[];
@@ -122,10 +130,14 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
   currentBranchId: string | null;
   currentUserId: string;
   canViewProfile: boolean;
+  /** Hora do servidor (ISO): o "há 3 h" sai igual no servidor e no navegador, sem quebrar a hidratação. */
+  renderedAt?: string;
 }) {
   const router = useRouter();
+  const [now] = useState(() => (renderedAt ? new Date(renderedAt) : new Date()));
   const [query, setQuery] = useState("");
   const [branchFilter, setBranchFilter] = useState("all");
+  const [order, setOrder] = useState<MemberOrder>("name");
   const [sheet, setSheet] = useState<Sheet>(null);
   const [overrides, setOverrides] = useState<Record<string, TeamMemberLite["status"]>>({});
   const [busy, startTransition] = useTransition();
@@ -142,8 +154,9 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
       .filter((member) => !needle
         || (member.name ?? "").toLocaleLowerCase("pt-BR").includes(needle)
         || member.email.toLocaleLowerCase("pt-BR").includes(needle)
-        || (digits.length > 0 && (member.phone ?? "").includes(digits)));
-  }, [displayed, branchFilter, query]);
+        || (digits.length > 0 && (member.phone ?? "").includes(digits)))
+      .sort((a, b) => order === "name" ? 0 : order === "access-old" ? compareLastAccess(a.lastAccessAt, b.lastAccessAt) : compareLastAccess(b.lastAccessAt, a.lastAccessAt));
+  }, [displayed, branchFilter, query, order]);
   const { pageRows, pagination } = useLitePages(rows, 10);
   const memberIds = useMemo(() => members.map((member) => member.id), [members]);
   const multiSelect = useMultiSelect(memberIds);
@@ -297,6 +310,13 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
       ),
     },
     { id: "branch", label: "Unidade", nowrap: true, render: (member) => <span title={member.branchName ?? undefined}>{member.branchId ? member.branchName ?? "Unidade vinculada" : "Geral da empresa"}</span> },
+    {
+      id: "lastAccess",
+      label: "Último acesso",
+      nowrap: true,
+      // Mais de 7 dias sem entrar (ou nunca): texto secundário, sem cor nova.
+      render: (member) => <span className={isLastAccessStale(member.lastAccessAt, now) ? page.muted : undefined} title={formatLastAccessDetail(member.lastAccessAt)}>{formatLastAccess(member.lastAccessAt, now)}</span>,
+    },
     { id: "status", label: "Status", render: (member) => <span className={page.badge} data-tone={STATUS_TONE[member.status]}>{STATUS_LABELS[member.status]}</span> },
     { id: "actions", label: "Ações", numeric: true, render: (member) => <LiteMenu label={`Ações de ${member.name ?? member.email}`} items={menuItems(member)} /> },
   ];
@@ -327,6 +347,9 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
             <Search aria-hidden="true" size={18} className={page.searchIcon} />
             <input type="search" className={page.searchInput} aria-label="Buscar colaborador" placeholder="Buscar por nome, e-mail ou WhatsApp" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
+          <div className={page.select}>
+            <LiteSelect label="Ordenar lista" hideLabel value={order} onChange={(value) => setOrder(value as MemberOrder)} options={ORDER_OPTIONS} />
+          </div>
           {currentRole === "director" ? (
             <div className={page.select}>
               <LiteSelect label="Filtrar por unidade" hideLabel value={branchFilter} onChange={setBranchFilter} options={[{ value: "all", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))]} />
