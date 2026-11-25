@@ -214,6 +214,15 @@ export default async function LeadDistributionPage({
   const loadFor = <T,>(views: readonly DistributionView[], load: () => PromiseLike<T>, empty: T): Promise<T> =>
     tabShows(views) ? Promise.resolve(load()) : Promise.resolve(empty);
 
+  // Velocidade (25/11/2026): a prévia vai como promessa; a aba aparece sem esperar por ela.
+  // The queue preview is a side panel: if it fails, the Plantão tab still loads (null = "could not build").
+  const dutyQueueOrders = view === "plantao"
+    ? getDutyQueueOrderPreviews(context).catch((error: unknown) => {
+      console.error("[distribuicao] duty_queue_order_failed", { tenantId: context.tenantId, error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 400) : String(error).slice(0, 400), stack: error instanceof Error ? error.stack?.split("\n").slice(0, 6).join(" | ") : undefined });
+      return null;
+    })
+    : Promise.resolve([]);
+
   // Single consolidated Promise.all for fast TTFB
   const [
     brokers,
@@ -238,7 +247,6 @@ export default async function LeadDistributionPage({
     routingRules,
     brokerSummary,
     dutyRoster,
-    dutyQueueOrders,
     tenantSlaSettings,
     holdDisqualifiedLeads,
     dddRoutingSettings,
@@ -568,13 +576,6 @@ export default async function LeadDistributionPage({
       branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
     }), NOT_LOADED),
     loadFor(["plantao"], () => getDutyRosterSnapshot(context), NOT_LOADED),
-    // The queue preview is a side panel: if it fails, the Plantão tab still loads (null = "could not build").
-    view === "plantao"
-      ? getDutyQueueOrderPreviews(context).catch((error: unknown) => {
-        console.error("[distribuicao] duty_queue_order_failed", { tenantId: context.tenantId, error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 400) : String(error).slice(0, 400), stack: error instanceof Error ? error.stack?.split("\n").slice(0, 6).join(" | ") : undefined });
-        return null;
-      })
-      : Promise.resolve([]),
     loadFor(["filas"], () => db
       .select({
         slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,

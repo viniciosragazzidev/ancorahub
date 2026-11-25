@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { conversationDayGroup } from "./conversation-day-group";
+import { useIncrementalRows } from "./use-incremental-rows";
 import styles from "./conversas-lite.module.css";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
@@ -485,6 +486,8 @@ export function ConversationsWorkspace({
       return matchesQuery && matchesFilter && matchesBranch && matchesTag;
     });
   }, [branchFilter, conversations, filter, query, tagFilter]);
+  const listRows = useIncrementalRows(filtered.length, `${query}|${filter}|${branchFilter}|${tagFilter}`);
+  const visibleRows = filtered.slice(0, listRows.count);
 
   function updateSelectedLeadInUrl(leadId: string | null) {
     const params = new URLSearchParams(searchParams.toString());
@@ -794,7 +797,7 @@ export function ConversationsWorkspace({
           ) : null}
           <ScrollArea className="min-h-0 flex-1">
             <div className="p-2">
-              {filtered.map((conversation, index) => (
+              {visibleRows.map((conversation, index) => (
                 <Fragment key={conversation.id}>
                 {directorSkinEnabled ? (() => {
                   // Grupos por data como no demo (estilo Accordee, 21/11/2026): o rótulo aparece quando muda.
@@ -819,6 +822,7 @@ export function ConversationsWorkspace({
                 </motion.div>
                 </Fragment>
               ))}
+              {listRows.hasMore ? <div ref={listRows.sentinelRef} aria-hidden="true" className="h-px" /> : null}
               {!filtered.length ? <EmptyConversationList hasQuery={Boolean(query || filter !== "all" || branchFilter !== "all" || tagFilter !== "all")} /> : null}
             </div>
           </ScrollArea>

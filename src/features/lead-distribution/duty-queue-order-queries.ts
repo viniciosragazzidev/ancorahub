@@ -69,7 +69,11 @@ function summarizeBrokerHistory(
   for (const brokerId of brokerIds) {
     const leads = leadsByBroker.get(brokerId);
     const attempts = attemptsByBroker.get(brokerId);
-    const timestamps = [leads?.idleSince, attempts?.idleSince].filter((value): value is Date => Boolean(value));
+    // `max(...)` em sql cru chega como texto pelo postgres-js, não como Date: sem converter,
+    // `idleSince.getTime()` quebrava e a prévia "Quem recebe o próximo lead" nunca aparecia.
+    const timestamps = [leads?.idleSince, attempts?.idleSince]
+      .map((value) => (value ? new Date(value) : null))
+      .filter((value): value is Date => value !== null && !Number.isNaN(value.getTime()));
     result.set(brokerId, {
       conversionRate: leads?.total ? leads.converted / leads.total : 0,
       slaRate: attempts?.total ? attempts.onTime / attempts.total : 0,
