@@ -460,7 +460,8 @@ export async function fetchFreeMessageTemplatesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { getDatabase, schema } = await import("@/shared/db");
-  const { and, desc, eq } = await import("drizzle-orm");
+  const { and, desc, eq, ne } = await import("drizzle-orm");
+  const { TEAM_QUICK_REPLY_CATEGORY } = await import("@/features/message-library/team-quick-replies");
 
   const db = getDatabase();
   const rows = await db
@@ -478,7 +479,8 @@ export async function fetchFreeMessageTemplatesAction() {
     .where(
       and(
         eq(schema.messageTemplates.tenantId, context.tenantId),
-        eq(schema.messageTemplates.active, true)
+        eq(schema.messageTemplates.active, true),
+        ne(schema.messageTemplates.category, TEAM_QUICK_REPLY_CATEGORY)
       )
     )
     .orderBy(desc(schema.messageTemplates.updatedAt));

@@ -1,5 +1,5 @@
 import { DashboardHeader } from "@/components/dashboard-header";
-import { getMessageLibrary } from "@/features/message-library/service";
+import { ensureTeamQuickRepliesSeeded, getMessageLibrary } from "@/features/message-library/service";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { MessagesWorkspace } from "./_components/messages-workspace";
@@ -24,6 +24,10 @@ export default async function AtendimentoMensagensPage() {
   if (context.role !== "director" && context.role !== "manager") {
     throw new AuthorizationError("Apenas Diretores e Gestores podem gerenciar as mensagens do atendimento.");
   }
+  // As 4 respostas rápidas da equipe viram texto editável na primeira visita.
+  await ensureTeamQuickRepliesSeeded(context.tenantId, context.userId).catch((error) => {
+    console.warn("[mensagens] team_quick_replies_seed_failed", { errorType: error instanceof Error ? error.name : "unknown" });
+  });
   const [messages, dutyReminderEnabled] = await Promise.all([
     getMessageLibrary(context.tenantId),
     isDutyShiftReminderEnabled(context.tenantId),

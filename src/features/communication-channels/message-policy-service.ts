@@ -2,7 +2,8 @@ import "server-only";
 
 import { isRecoveryMarketingTemplate } from "@/features/lead-recovery/marketing-exception";
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, ne } from "drizzle-orm";
+import { TEAM_QUICK_REPLY_CATEGORY } from "@/features/message-library/team-quick-replies";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -199,6 +200,8 @@ export async function listMessageEventPolicies(tenantId: string) {
     }).from(schema.messageTemplates).where(and(
       eq(schema.messageTemplates.tenantId, tenantId),
       eq(schema.messageTemplates.active, true),
+      // Resposta rápida da equipe é do composer de /conversas, não de situação.
+      ne(schema.messageTemplates.category, TEAM_QUICK_REPLY_CATEGORY),
     )).orderBy(schema.messageTemplates.name).catch((error) => {
       console.warn("[message-policy] free_messages_read_unavailable", {
         errorType: error instanceof Error ? error.name : "unknown",

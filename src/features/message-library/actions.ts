@@ -1,12 +1,14 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { hasPermission } from "@/shared/auth/permissions";
 import { acceptSuggestedVariations, QUICK_REPLY_SITUATIONS, QUICK_REPLY_VARIABLES, textVariables } from "./catalog";
+import { buildStoredVariables, normalizeShortcut, shortcutFromVariables, TEAM_QUICK_REPLY_CATEGORY, TEAM_QUICK_REPLY_VARIABLES, type TeamQuickReply } from "./team-quick-replies";
 
 type Result<T extends object = object> = ({ success: true } & T) | { success: false; error: string };
 
@@ -62,6 +64,79 @@ export async function resetQuickReplyTextAction(ruleKey: string): Promise<Result
     return { success: true };
   } catch (error) {
     return failure(error, "Não foi possível voltar ao texto padrão.");
+  }
+}
+
+const allowedTeamQuickReplyVariables = new Set(TEAM_QUICK_REPLY_VARIABLES.map((variable) => variable.key));
+
+/** Cria ou altera uma resposta rápida da equipe. Só {{nome}} e {{primeiro_nome}} são preenchidos. */
+export async function saveTeamQuickReplyAction(input: { id?: string; name: string; shortcut?: string | null; content: string }): Promise<Result<{ id: string }>> {
+  try {
+    const context = await requireMessageManager();
+    const name = input.name.trim();
+    const content = input.content.trim();
+    const shortcut = normalizeShortcut(input.shortcut);
+    if (name.length < 2 || name.length > 80) return { success: false, error: "O título precisa ter entre 2 e 80 caracteres." };
+    if (content.length < 3 || content.length > 2000) return { success: false, error: "O texto precisa ter entre 3 e 2000 caracteres." };
+    const unknown = textVariables(content).filter((variable) => !allowedTeamQuickReplyVariables.has(variable));
+    if (unknown.length) return { success: false, error: `Variável não disponível aqui: ${unknown.map((variable) => `{{${variable}}}`).join(", ")}. Use {{primeiro_nome}} ou {{nome}}.` };
+
+    const db = getDatabase();
+    const others = await db.select({ id: schema.messageTemplates.id, variables: schema.messageTemplates.variables }).from(schema.messageTemplates)
+      .where(and(
+        eq(schema.messageTemplates.tenantId, context.tenantId),
+        eq(schema.messageTemplates.category, TEAM_QUICK_REPLY_CATEGORY),
+        eq(schema.messageTemplates.active, true),
+        ...(input.id ? [ne(schema.messageTemplates.id, input.id)] : []),
+      ));
+    if (shortcut && others.some((row) => shortcutFromVariables(row.variables) === shortcut)) return { success: false, error: `O atalho /${shortcut} já é de outra resposta. Escolha outro.` };
+
+    const now = new Date();
+    const variables = buildStoredVariables(content, shortcut);
+    let id = input.id;
+    if (id) {
+      const updated = await db.update(schema.messageTemplates).set({ name, content, variables, updatedAt: now })
+        .where(and(eq(schema.messageTemplates.id, id), eq(schema.messageTemplates.tenantId, context.tenantId), eq(schema.messageTemplates.category, TEAM_QUICK_REPLY_CATEGORY)))
+        .returning({ id: schema.messageTemplates.id });
+      if (!updated.length) return { success: false, error: "Resposta não encontrada. Recarregue a página." };
+    } else {
+      id = randomUUID();
+      await db.insert(schema.messageTemplates).values({ id, tenantId: context.tenantId, name, category: TEAM_QUICK_REPLY_CATEGORY, content, variables, active: true, createdBy: context.userId, createdAt: now, updatedAt: now });
+    }
+    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "message_template", entidadeId: id, acao: input.id ? "team_quick_reply.updated" : "team_quick_reply.created" });
+    revalidatePath("/atendimento/mensagens");
+    return { success: true, id };
+  } catch (error) {
+    return failure(error, "Não foi possível salvar a resposta.");
+  }
+}
+
+/** Tira uma resposta rápida da equipe do composer (desativa, não apaga). */
+export async function removeTeamQuickReplyAction(id: string): Promise<Result> {
+  try {
+    const context = await requireMessageManager();
+    const db = getDatabase();
+    const updated = await db.update(schema.messageTemplates).set({ active: false, updatedAt: new Date() })
+      .where(and(eq(schema.messageTemplates.id, id), eq(schema.messageTemplates.tenantId, context.tenantId), eq(schema.messageTemplates.category, TEAM_QUICK_REPLY_CATEGORY)))
+      .returning({ id: schema.messageTemplates.id });
+    if (!updated.length) return { success: false, error: "Resposta não encontrada. Recarregue a página." };
+    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "message_template", entidadeId: id, acao: "team_quick_reply.removed" });
+    revalidatePath("/atendimento/mensagens");
+    return { success: true };
+  } catch (error) {
+    return failure(error, "Não foi possível remover a resposta.");
+  }
+}
+
+/** As respostas rápidas da empresa para o composer de /conversas: quem atende conversas pode ler. */
+export async function listTeamQuickRepliesAction(): Promise<Result<{ replies: TeamQuickReply[] }>> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (!hasPermission(context.role, "acessar_conversas")) return { success: false, error: "Sem acesso às conversas." };
+    const { listTeamQuickReplies } = await import("./service");
+    return { success: true, replies: await listTeamQuickReplies(context.tenantId) };
+  } catch (error) {
+    return failure(error, "Não foi possível carregar as respostas rápidas.");
   }
 }
 

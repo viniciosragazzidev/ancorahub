@@ -29,7 +29,7 @@ type KindFilter = "all" | MessageKind;
 function channelLabels(message: LibraryMessage) {
   const short: Record<string, string> = {
     "meta:always": "Meta",
-    "meta:window": message.kind === "quick_reply" ? "Meta · na conversa" : "Meta · 24h",
+    "meta:window": message.kind === "quick_reply" || message.kind === "team_quick_reply" ? "Meta · na conversa" : "Meta · 24h",
     "company_number:always": "WhatsApp da empresa",
     "company_number:window": "WhatsApp da empresa · na conversa",
   };
@@ -56,9 +56,10 @@ export function MessagesWorkspaceLite({ messages, dutyReminderEnabled = false }:
     meta_template: messages.filter((message) => message.kind === "meta_template").length,
     free_message: messages.filter((message) => message.kind === "free_message").length,
     quick_reply: messages.filter((message) => message.kind === "quick_reply").length,
+    team_quick_reply: messages.filter((message) => message.kind === "team_quick_reply").length,
   }), [messages]);
   const needle = normalize(query.trim());
-  const rows = (filter === "all" ? messages : messages.filter((message) => message.kind === filter)).filter((message) => !needle || normalize(message.name).includes(needle));
+  const rows = (filter === "all" ? messages : messages.filter((message) => message.kind === filter)).filter((message) => !needle || normalize(message.name).includes(needle) || normalize(message.teamQuickReply?.shortcut ?? "").includes(needle));
   const pages = useLitePages(rows, 15);
   const inUse = messages.filter((message) => message.usages.length).length;
 
@@ -117,6 +118,7 @@ export function MessagesWorkspaceLite({ messages, dutyReminderEnabled = false }:
             { id: "meta_template", label: "Templates Meta", count: counts.meta_template },
             { id: "free_message", label: "Textos livres", count: counts.free_message },
             { id: "quick_reply", label: "Respostas da IA", count: counts.quick_reply },
+            { id: "team_quick_reply", label: "Respostas da equipe", count: counts.team_quick_reply },
           ]}
         />
         <LiteResponsiveData caption="Mensagens do atendimento" columns={columns} rows={pages.pageRows} rowKey={(message) => message.id} onRowOpen={(message) => setTarget({ mode: "view", message })} empty={<p className={page.emptyText}>Nenhuma mensagem encontrada.</p>} />
@@ -142,6 +144,14 @@ export function MessagesWorkspaceLite({ messages, dutyReminderEnabled = false }:
               <span className={sections.itemText}>
                 <span className={sections.rowTitle}>Texto livre</span>
                 <span className={sections.rowDescription}>WhatsApp da empresa a qualquer hora; Meta só na janela de 24h</span>
+              </span>
+            </button>
+          </li>
+          <li>
+            <button type="button" className={sections.itemButton} onClick={() => { setChooserOpen(false); setTarget({ mode: "new_team_quick_reply" }); }}>
+              <span className={sections.itemText}>
+                <span className={sections.rowTitle}>Resposta rápida (equipe)</span>
+                <span className={sections.rowDescription}>Quem atende insere na conversa pelo botão ou digitando /</span>
               </span>
             </button>
           </li>

@@ -8,6 +8,7 @@ import { effectiveNoticeSetting, teamNoticeByKey } from "@/features/team-notices
 import { getTenantChannelRouting } from "@/features/waha-cadence/tenant-channel-routing";
 import { getDatabase, schema } from "@/shared/db";
 import { channelValidity, MESSAGE_KIND_LABEL, QUICK_REPLY_SITUATIONS, textVariables, type ChannelValidity, type MessageKind, type MessageUsage } from "./catalog";
+import { buildStoredVariables, DEFAULT_TEAM_QUICK_REPLIES, shortcutFromVariables, TEAM_QUICK_REPLY_CATEGORY, textVariablesFromStored, type TeamQuickReply } from "./team-quick-replies";
 
 export type LibraryMessage = {
   id: string;
@@ -22,6 +23,8 @@ export type LibraryMessage = {
   usages: MessageUsage[];
   /** AI quick reply: the situation key, its default text and whether the tenant changed it. */
   quickReply?: { ruleKey: string; defaultText: string; customized: boolean };
+  /** Team quick reply: the optional shortcut typed after "/" in the composer. */
+  teamQuickReply?: { shortcut: string | null };
   /** Meta template details for the drawer. */
   meta?: { rawStatus: string; language: string; headerType: string; footerText: string | null; rejectedReason: string | null; qualityRating: string | null };
 };
@@ -75,6 +78,8 @@ export async function getMessageUsages(tenantId: string) {
   return usages;
 }
 
+const TEAM_QUICK_REPLY_USAGE: MessageUsage = { area: "conversation", label: "Respostas rápidas da central de conversas", channel: "conversation" };
+
 const META_STATUS_LABEL: Record<string, string> = { APPROVED: "Aprovado", REJECTED: "Rejeitado", PENDING: "Em análise", PAUSED: "Pausado", DISABLED: "Desativado" };
 
 /** Every message of the tenant with kind, validity per channel and where it is used. */
@@ -110,8 +115,19 @@ export async function getMessageLibrary(tenantId: string): Promise<LibraryMessag
     };
   });
 
+  const activeTexts = freeMessages.filter((message) => message.active);
+  const teamQuickReplies: LibraryMessage[] = activeTexts.filter((message) => message.category === TEAM_QUICK_REPLY_CATEGORY).map((message) => ({
+    id: message.id, kind: "team_quick_reply" as const, kindLabel: MESSAGE_KIND_LABEL.team_quick_reply, name: message.name,
+    status: "Ativa", category: message.category, text: message.content,
+    variables: textVariablesFromStored(message.variables).length ? textVariablesFromStored(message.variables) : textVariables(message.content),
+    validity: channelValidity("team_quick_reply"),
+    usages: [TEAM_QUICK_REPLY_USAGE],
+    teamQuickReply: { shortcut: shortcutFromVariables(message.variables) },
+  }));
+
   const rows: LibraryMessage[] = [
-    ...freeMessages.filter((message) => message.active).map((message) => ({
+    ...teamQuickReplies,
+    ...activeTexts.filter((message) => message.category !== TEAM_QUICK_REPLY_CATEGORY).map((message) => ({
       id: message.id, kind: "free_message" as const, kindLabel: MESSAGE_KIND_LABEL.free_message, name: message.name,
       status: "Ativa", category: message.category, text: message.content,
       variables: Array.isArray(message.variables) && message.variables.length ? message.variables.map(String) : textVariables(message.content),
@@ -127,4 +143,37 @@ export async function getMessageLibrary(tenantId: string): Promise<LibraryMessag
     ...quickReplies,
   ];
   return rows.sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name, "pt-BR"));
+}
+
+/**
+ * Respostas rápidas da equipe que o composer de /conversas oferece. Empresa
+ * que nunca teve nenhuma (nem removida) recebe as sugestões iniciais.
+ */
+export async function listTeamQuickReplies(tenantId: string): Promise<TeamQuickReply[]> {
+  const rows = await getDatabase()
+    .select({ id: schema.messageTemplates.id, name: schema.messageTemplates.name, content: schema.messageTemplates.content, variables: schema.messageTemplates.variables, active: schema.messageTemplates.active })
+    .from(schema.messageTemplates)
+    .where(and(eq(schema.messageTemplates.tenantId, tenantId), eq(schema.messageTemplates.category, TEAM_QUICK_REPLY_CATEGORY)))
+    .orderBy(schema.messageTemplates.name);
+  if (!rows.length) return DEFAULT_TEAM_QUICK_REPLIES.map(({ id, title, shortcut, text }) => ({ id, title, shortcut, text }));
+  return rows.filter((row) => row.active).map((row) => ({ id: row.id, title: row.name, shortcut: shortcutFromVariables(row.variables), text: row.content }));
+}
+
+/**
+ * Grava as sugestões iniciais como respostas editáveis, uma vez por empresa:
+ * só quando ela ainda não tem nenhuma (ativa ou removida). Ids fixos por
+ * empresa, então duas aberturas ao mesmo tempo não duplicam.
+ */
+export async function ensureTeamQuickRepliesSeeded(tenantId: string, userId: string) {
+  const db = getDatabase();
+  const [existing] = await db.select({ id: schema.messageTemplates.id }).from(schema.messageTemplates)
+    .where(and(eq(schema.messageTemplates.tenantId, tenantId), eq(schema.messageTemplates.category, TEAM_QUICK_REPLY_CATEGORY)))
+    .limit(1);
+  if (existing) return false;
+  const now = new Date();
+  await db.insert(schema.messageTemplates).values(DEFAULT_TEAM_QUICK_REPLIES.map((reply) => ({
+    id: `trq_${tenantId}_${reply.key}`, tenantId, name: reply.title, category: TEAM_QUICK_REPLY_CATEGORY,
+    content: reply.text, variables: buildStoredVariables(reply.text, reply.shortcut), active: true, createdBy: userId, createdAt: now, updatedAt: now,
+  }))).onConflictDoNothing();
+  return true;
 }

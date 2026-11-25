@@ -112,7 +112,8 @@ import {
 import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-message";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { ManualQualificationDialog } from "../leads/_components/manual-qualification-dialog";
-import { QuickResponsesPopover } from "@/features/conversations/components/quick-responses-popover";
+import { QuickResponsesPopover, SlashQuickReplyMenu, useTeamQuickReplies, type TeamQuickReply } from "@/features/conversations/components/quick-responses-popover";
+import { fillTeamQuickReply, filterTeamQuickReplies, slashQuery } from "@/features/message-library/team-quick-replies";
 import { deleteConversationHistoryAction } from "@/features/conversations/actions";
 import {
   MediaBubble,
@@ -864,6 +865,7 @@ export function ConversationsWorkspace({
               )}
               <ChatInput
                 leadId={selected.id}
+                leadName={selected.nome}
                 brokerName={brokerDisplayName(selected.corretorNome)}
                 phone={selected.telefone}
                 replyBlockedMessage={selected.replyBlockedMessage}
@@ -1556,6 +1558,7 @@ function ConversationHistory({ client, directorSkinEnabled }: { client: Conversa
 
 function ChatInput({
   leadId,
+  leadName,
   brokerName,
   phone,
   replyBlockedMessage,
@@ -1563,6 +1566,8 @@ function ChatInput({
   onMediaSent,
 }: {
   leadId: string;
+  /** Nome do lead: preenche {{nome}} e {{primeiro_nome}} das respostas rápidas. */
+  leadName?: string | null;
   /** Client phone: on mobile, a visible "Abrir no WhatsApp" stays available even with the in-app chat connected. */
   phone?: string | null;
   /** The lead's broker, suggested in the /contato shortcut. */
@@ -1585,6 +1590,14 @@ function ChatInput({
   const [contactOpen, setContactOpen] = useState(false);
   const [contactName, setContactName] = useState("");
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const quickReplies = useTeamQuickReplies();
+  const [slashDismissedFor, setSlashDismissedFor] = useState<string | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+  const slashText = slashQuery(text);
+  const slashMatches = slashText === null || slashDismissedFor === text ? [] : filterTeamQuickReplies(quickReplies.replies, slashText);
+  const slashOpen = slashMatches.length > 0 && !replyBlocked && !isPending;
+  const slashActive = Math.min(slashIndex, Math.max(slashMatches.length - 1, 0));
+  const slashMenuId = `quick-replies-${leadId}`;
 
   useLayoutEffect(() => {
     if (!directorSkinEnabled) return;
@@ -1643,8 +1656,50 @@ function ChatInput({
     return false;
   }
 
-  function handleAppendQuickResponse(quickText: string) {
-    setText((prev) => (prev ? `${prev}\n${quickText}` : quickText));
+  function focusComposerEnd() {
+    requestAnimationFrame(() => {
+      const input = messageInputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+  }
+
+  /** Botão: soma ao que já está escrito; um "/busca" no campo é trocado pela resposta. */
+  function handleAppendQuickResponse(reply: TeamQuickReply) {
+    const filled = fillTeamQuickReply(reply.text, leadName);
+    setText((prev) => (!prev.trim() || slashQuery(prev) !== null ? filled : `${prev}\n${filled}`));
+    focusComposerEnd();
+  }
+
+  function insertSlashReply(reply: TeamQuickReply) {
+    setText(fillTeamQuickReply(reply.text, leadName));
+    setSlashIndex(0);
+    focusComposerEnd();
+  }
+
+  /** Teclas da lista do "/". Devolve true quando a tecla foi usada pela lista. */
+  function handleSlashKey(event: React.KeyboardEvent<HTMLElement>) {
+    if (!slashOpen || event.nativeEvent.isComposing) return false;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setSlashIndex((slashActive + step + slashMatches.length) % slashMatches.length);
+      return true;
+    }
+    if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+      event.preventDefault();
+      const reply = slashMatches[slashActive];
+      if (reply) insertSlashReply(reply);
+      return true;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setSlashDismissedFor(text);
+      return true;
+    }
+    return false;
   }
 
   return (
@@ -1661,9 +1716,24 @@ function ChatInput({
           Abrir no WhatsApp
         </a>
       ) : null}
-      <form onSubmit={handleSend} className={cn("flex gap-2 items-center", directorSkinEnabled && "items-end")}>
+      <form onSubmit={handleSend} className={cn("relative flex gap-2 items-center", directorSkinEnabled && "items-end")}>
+        {slashOpen ? (
+          <SlashQuickReplyMenu
+            id={slashMenuId}
+            items={slashMatches}
+            activeIndex={slashActive}
+            onHover={setSlashIndex}
+            onPick={insertSlashReply}
+          />
+        ) : null}
         <MediaAttachButton leadId={leadId} onMediaSent={onMediaSent} disabled={replyBlocked || isPending} />
-        <QuickResponsesPopover onSelectResponse={handleAppendQuickResponse} />
+        <QuickResponsesPopover
+          replies={quickReplies.replies}
+          status={quickReplies.status}
+          onRetry={quickReplies.retry}
+          onSelectResponse={handleAppendQuickResponse}
+          disabled={replyBlocked || isPending}
+        />
         <div className="relative flex-1">
           {directorSkinEnabled ? (
             <Textarea
@@ -1671,8 +1741,11 @@ function ChatInput({
               data-conversations-part="composer-input"
               rows={1}
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => { setText(e.target.value); setSlashIndex(0); }}
+              aria-controls={slashOpen ? slashMenuId : undefined}
+              aria-activedescendant={slashOpen ? `${slashMenuId}-${slashActive}` : undefined}
               onKeyDown={(event) => {
+                if (handleSlashKey(event)) return;
                 if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.metaKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
                   event.currentTarget.form?.requestSubmit();
@@ -1686,7 +1759,8 @@ function ChatInput({
           ) : (
             <Input
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => { setText(e.target.value); setSlashIndex(0); }}
+              onKeyDown={(event) => { handleSlashKey(event); }}
               placeholder={`Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
               disabled={isPending || replyBlocked}
               className="h-10 text-sm"

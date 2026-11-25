@@ -17,7 +17,7 @@ vi.mock("@/shared/db", () => {
   };
 });
 
-import { saveQuickReplyTextAction } from "./actions";
+import { listTeamQuickRepliesAction, saveQuickReplyTextAction, saveTeamQuickReplyAction } from "./actions";
 
 describe("saving an AI quick reply text", () => {
   beforeEach(() => { state.role = "director"; state.writes = []; });
@@ -33,5 +33,22 @@ describe("saving an AI quick reply text", () => {
     state.role = "broker";
     expect((await saveQuickReplyTextAction({ ruleKey: "human.requested", body: "Olá!" })).success).toBe(false);
     expect(state.writes).toEqual([]);
+  });
+});
+
+describe("saving a team quick reply", () => {
+  beforeEach(() => { state.role = "director"; state.writes = []; });
+
+  it("refuses a variable the composer cannot fill and a broker, before writing", async () => {
+    expect(await saveTeamQuickReplyAction({ name: "Carência", shortcut: "carencia", content: "Oi {{resumo}}" })).toEqual({ success: false, error: expect.stringContaining("{{resumo}}") });
+    expect((await saveTeamQuickReplyAction({ name: "C", content: "Olá, tudo bem?" })).success).toBe(false);
+    state.role = "broker";
+    expect((await saveTeamQuickReplyAction({ name: "Carência", content: "Olá, {{primeiro_nome}}!" })).success).toBe(false);
+    expect(state.writes).toEqual([]);
+  });
+
+  it("does not list replies for a role without access to conversations", async () => {
+    state.role = "viewer";
+    expect((await listTeamQuickRepliesAction()).success).toBe(false);
   });
 });

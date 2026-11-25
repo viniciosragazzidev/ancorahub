@@ -28,13 +28,14 @@ const kindVariant: Record<MessageKind, "info" | "secondary" | "outline"> = {
   meta_template: "info",
   free_message: "secondary",
   quick_reply: "outline",
+  team_quick_reply: "outline",
 };
 
 /** Compact "where it is valid" for the table: one chip per channel it can use. */
 function ChannelChips({ message }: { message: LibraryMessage }) {
   const short: Record<string, string> = {
     "meta:always": "Meta",
-    "meta:window": message.kind === "quick_reply" ? "Meta · na conversa" : "Meta · 24h",
+    "meta:window": message.kind === "quick_reply" || message.kind === "team_quick_reply" ? "Meta · na conversa" : "Meta · 24h",
     "company_number:always": "WhatsApp da empresa",
     "company_number:window": "WhatsApp da empresa · na conversa",
   };

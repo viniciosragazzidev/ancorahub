@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { deleteFreeMessageTemplateAction, saveFreeMessageTemplateAction } from "@/features/ai-qualification/actions";
 import { MESSAGE_EVENT_CATALOG, messageEventsFor } from "@/features/communication-channels/message-event-catalog";
 import { QUICK_REPLY_VARIABLES, USAGE_CHANNEL_LABEL } from "@/features/message-library/catalog";
-import { resetQuickReplyTextAction, saveQuickReplyTextAction, suggestMessageVariationsAction } from "@/features/message-library/actions";
+import { removeTeamQuickReplyAction, resetQuickReplyTextAction, saveQuickReplyTextAction, saveTeamQuickReplyAction, suggestMessageVariationsAction } from "@/features/message-library/actions";
+import { fillTeamQuickReply, normalizeShortcut, TEAM_QUICK_REPLY_VARIABLES } from "@/features/message-library/team-quick-replies";
 import type { LibraryMessage } from "@/features/message-library/service";
 import { renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import type { ConversationMemory } from "@/features/ai-agent/memory";
@@ -28,7 +29,7 @@ export const PREVIEW_MEMORY: ConversationMemory = {
   collectedFields: ["customerName", "planType", "age", "city"],
 };
 
-export type DrawerTarget = { mode: "view"; message: LibraryMessage } | { mode: "new_free" } | null;
+export type DrawerTarget = { mode: "view"; message: LibraryMessage } | { mode: "new_free" } | { mode: "new_team_quick_reply" } | null;
 
 function Section({ title, description, action, children }: { title: string; description?: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -215,6 +216,74 @@ function FreeMessageBody({ message, onChanged, onClose }: { message: LibraryMess
   );
 }
 
+function TeamQuickReplyBody({ message, onChanged, onClose }: { message: LibraryMessage | null; onChanged: () => void; onClose: () => void }) {
+  const [name, setName] = useState(message?.name ?? "");
+  const [shortcut, setShortcut] = useState(message?.teamQuickReply?.shortcut ?? "");
+  const [text, setText] = useState(message?.text ?? "");
+  const [pending, startTransition] = useTransition();
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const normalizedShortcut = normalizeShortcut(shortcut);
+  const insert = (variable: string) => {
+    const element = textarea.current;
+    const token = `{{${variable}}}`;
+    if (!element) { setText((current) => `${current}${token}`); return; }
+    const start = element.selectionStart ?? text.length;
+    const end = element.selectionEnd ?? text.length;
+    setText(`${text.slice(0, start)}${token}${text.slice(end)}`);
+    requestAnimationFrame(() => { element.focus(); element.setSelectionRange(start + token.length, start + token.length); });
+  };
+  const unchanged = Boolean(message) && name.trim() === message!.name && text.trim() === message!.text.trim() && normalizedShortcut === (message!.teamQuickReply?.shortcut ?? null);
+  const save = () => startTransition(async () => {
+    const result = await saveTeamQuickReplyAction({ id: message?.id, name, shortcut, content: text });
+    if (!result.success) { toast.error(result.error); return; }
+    toast.success(message ? "Resposta salva. Já aparece nas conversas." : "Resposta criada. Já aparece nas conversas.");
+    onChanged();
+    if (!message) onClose();
+  });
+  const remove = () => startTransition(async () => {
+    if (!message) return;
+    const result = await removeTeamQuickReplyAction(message.id);
+    if (!result.success) { toast.error(result.error); return; }
+    toast.success("Resposta removida das conversas.");
+    onChanged();
+    onClose();
+  });
+
+  return (
+    <>
+      <Section title="Resposta" description="Quem atende insere este texto na conversa pelo botão de respostas rápidas ou digitando / no começo do campo.">
+        <label className="grid gap-1.5 text-xs font-medium text-foreground">Título
+          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Ligação sobre carência" maxLength={80} />
+        </label>
+        <label className="grid gap-1.5 text-xs font-medium text-foreground">Atalho (opcional)
+          <Input value={shortcut} onChange={(event) => setShortcut(event.target.value)} placeholder="Ex.: carencia" maxLength={30} autoCapitalize="none" autoCorrect="off" />
+        </label>
+        <p className="text-xs leading-5 text-muted-foreground">{normalizedShortcut ? `Na conversa, digite /${normalizedShortcut} e aperte Enter.` : "Sem atalho, a resposta aparece pela busca do título."}</p>
+        <label className="grid gap-1.5 text-xs font-medium text-foreground">Texto
+          <Textarea ref={textarea} value={text} onChange={(event) => setText(event.target.value)} rows={6} />
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {TEAM_QUICK_REPLY_VARIABLES.map((variable) => (
+            <Button key={variable.key} type="button" size="sm" variant="outline" title={`${variable.label}, ex.: ${variable.example}`} onClick={() => insert(variable.key)}>{`{{${variable.key}}}`}</Button>
+          ))}
+        </div>
+        <p className="text-xs leading-5 text-muted-foreground">Sem nome do cliente, a variável sai junto com a vírgula em volta.</p>
+        <Suggestions text={text} useLabel="Usar" onUse={setText} />
+      </Section>
+      <Section title="Prévia" description="Exemplo com o cliente Torquato Silva.">
+        <Preview text={fillTeamQuickReply(text, "Torquato Silva")} />
+      </Section>
+      <Section title="Prévia sem nome" description="Quando o lead ainda não tem nome.">
+        <Preview text={fillTeamQuickReply(text, null)} />
+      </Section>
+      <SheetFooter>
+        {message ? <Button type="button" variant="outline" disabled={pending} onClick={remove}><Trash className="size-3.5" /> Remover</Button> : null}
+        <Button type="button" disabled={pending || unchanged || name.trim().length < 2 || text.trim().length < 3} onClick={save}>{pending ? "Salvando…" : message ? "Salvar resposta" : "Criar resposta"}</Button>
+      </SheetFooter>
+    </>
+  );
+}
+
 function MetaTemplateBody({ message, onChanged, onClose, onUseInSituation, dutyReminderEnabled }: { message: LibraryMessage; onChanged: () => void; onClose: () => void; onUseInSituation: (templateId: string, eventKey: string) => void; dutyReminderEnabled: boolean }) {
   const meta = message.meta!;
   const [phone, setPhone] = useState("");
@@ -280,10 +349,12 @@ export function MessageDrawer({ target, onClose, onChanged, onUseInSituation, du
   dutyReminderEnabled?: boolean;
 }) {
   const message = target?.mode === "view" ? target.message : null;
-  const title = target?.mode === "new_free" ? "Nova mensagem livre" : message?.name ?? "";
+  const title = target?.mode === "new_free" ? "Nova mensagem livre" : target?.mode === "new_team_quick_reply" ? "Nova resposta rápida" : message?.name ?? "";
   const description = target?.mode === "new_free"
     ? "Texto próprio para avisos da equipe e situações."
-    : message ? `${message.kindLabel} · ${message.status}` : "";
+    : target?.mode === "new_team_quick_reply"
+      ? "Texto da equipe para inserir nas conversas."
+      : message ? `${message.kindLabel} · ${message.status}` : "";
 
   return (
     <Sheet open={Boolean(target)} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -297,6 +368,8 @@ export function MessageDrawer({ target, onClose, onChanged, onUseInSituation, du
             <SheetBody contentClassName="grid grid-cols-[minmax(0,1fr)] gap-4">
               {target.mode === "new_free" ? <FreeMessageBody key="new" message={null} onChanged={onChanged} onClose={onClose} /> : null}
               {message?.kind === "free_message" ? <FreeMessageBody key={message.id} message={message} onChanged={onChanged} onClose={onClose} /> : null}
+              {target.mode === "new_team_quick_reply" ? <TeamQuickReplyBody key="new-team" message={null} onChanged={onChanged} onClose={onClose} /> : null}
+              {message?.kind === "team_quick_reply" ? <TeamQuickReplyBody key={message.id} message={message} onChanged={onChanged} onClose={onClose} /> : null}
               {message?.kind === "quick_reply" ? <QuickReplyBody key={message.id} message={message} onChanged={onChanged} /> : null}
               {message?.kind === "meta_template" ? <MetaTemplateBody key={message.id} message={message} onChanged={onChanged} onClose={onClose} onUseInSituation={onUseInSituation} dutyReminderEnabled={dutyReminderEnabled} /> : null}
             </SheetBody>

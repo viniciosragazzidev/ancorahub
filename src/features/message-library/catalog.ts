@@ -7,8 +7,9 @@
  * - Free message: plain text. On Meta only inside the 24-hour window (after
  *   the person wrote); through the company number (WAHA) at any time.
  * - AI quick reply: fixed answer the AI sends inside a conversation.
+ * - Team quick reply: text a person inserts in the /conversas composer.
  */
-export type MessageKind = "meta_template" | "free_message" | "quick_reply";
+export type MessageKind = "meta_template" | "free_message" | "quick_reply" | "team_quick_reply";
 
 export type ChannelValidity = { channel: "meta" | "company_number"; label: string; valid: "always" | "window" | "never" };
 
@@ -16,6 +17,7 @@ export const MESSAGE_KIND_LABEL: Record<MessageKind, string> = {
   meta_template: "Template Meta",
   free_message: "Mensagem livre",
   quick_reply: "Resposta rápida da IA",
+  team_quick_reply: "Resposta rápida (equipe)",
 };
 
 export function channelValidity(kind: MessageKind): ChannelValidity[] {
@@ -31,6 +33,7 @@ export function channelValidity(kind: MessageKind): ChannelValidity[] {
         { channel: "company_number", label: "WhatsApp da empresa: a qualquer hora", valid: "always" },
       ];
     case "quick_reply":
+    case "team_quick_reply":
       return [
         { channel: "meta", label: "Meta: dentro da conversa", valid: "window" },
         { channel: "company_number", label: "WhatsApp da empresa: dentro da conversa", valid: "window" },
@@ -48,7 +51,7 @@ export const USAGE_CHANNEL_LABEL: Record<UsageChannel, string> = {
 };
 
 /** A place that uses a message; deleting or deactivating it changes what that place sends. */
-export type MessageUsage = { area: "team_notice" | "situation" | "follow_up" | "ai"; label: string; channel?: UsageChannel };
+export type MessageUsage = { area: "team_notice" | "situation" | "follow_up" | "ai" | "conversation"; label: string; channel?: UsageChannel };
 
 export function describeUsages(usages: readonly MessageUsage[]) {
   return usages.map((usage) => usage.label).join(" · ");
