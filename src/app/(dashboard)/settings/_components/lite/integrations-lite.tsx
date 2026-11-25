@@ -21,8 +21,10 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { createIntegrationAction, revokeIntegrationAction, toggleIntegrationAction, type IntegrationRecord } from "../../integrations-actions";
 import styles from "@/components/lite/page/lite-sections.module.css";
 import { useFeedback } from "@/lib/feedback/use-feedback";
+import { formatLastReceived } from "@/features/leads/webhooks/utils/webhook-delivery-view";
 
 import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
+import { IntegrationDeliveriesLite } from "./integration-deliveries-lite";
 
 type Branch = { id: string; name: string };
 
@@ -35,6 +37,12 @@ function useOrigin() {
   return useSyncExternalStore(noop, () => window.location.origin, () => FALLBACK_ORIGIN);
 }
 
+/** Minuto atual só no navegador: o "há X" não diverge entre o HTML do servidor e a hidratação. */
+const currentMinute = () => Math.floor(Date.now() / 60_000);
+function useNowMinute() {
+  return useSyncExternalStore(noop, currentMinute, () => null);
+}
+
 export function IntegrationsLite({ integrations, branches }: { integrations: IntegrationRecord[]; branches: Branch[] }) {
   const router = useRouter();
   const origin = useOrigin();
@@ -42,6 +50,8 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
   const [selectedId, setSelectedId] = useState<string | null>(integrations[0]?.id ?? null);
   const [createOpen, setCreateOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [deliveriesOpen, setDeliveriesOpen] = useState(false);
+  const nowMinute = useNowMinute();
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [createPending, setCreatePending] = useState(false);
@@ -227,6 +237,7 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
                     <span className={styles.itemText}>
                       <span className={styles.itemTitle}>{item.name}</span>
                       <span className={styles.itemSub}>{SOURCE_LABEL[item.source] ?? item.source} · {item.branchName ?? "Primeira filial ativa"}</span>
+                      {nowMinute !== null && !item.id.startsWith("temp-") ? <span className={styles.itemSub}>{formatLastReceived(item.lastReceivedAt ? new Date(item.lastReceivedAt) : null, new Date(nowMinute * 60_000))}</span> : null}
                     </span>
                     {item.id.startsWith("temp-") ? <span className={page.badge}>Sincronizando</span> : (
                       <span className={page.badge} data-tone={item.status === "active" ? "success" : undefined}>{item.status === "active" ? "Ativo" : "Inativo"}</span>
@@ -266,6 +277,13 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
               <button type="button" className={page.button} disabled={togglePendingId === selected.id} aria-busy={togglePendingId === selected.id || undefined} onClick={() => handleToggle(selected.id)}>
                 <BusyLabel busy={togglePendingId === selected.id} label="Salvando…">{selected.status === "active" ? "Desativar" : "Ativar"}</BusyLabel>
               </button>
+            </div>
+            <div className={styles.row}>
+              <div className={styles.rowText}>
+                <p className={styles.rowTitle}>Recebidos</p>
+                <p className={styles.rowDescription}>Os últimos 50 envios desta fonte e o motivo de cada um que não entrou.</p>
+              </div>
+              <button type="button" className={page.button} disabled={selected.id.startsWith("temp-")} onClick={() => setDeliveriesOpen(true)}>Ver recebidos</button>
             </div>
             <div className={styles.formBody}>
               <div className={styles.footer} style={{ padding: 0 }}>
@@ -346,6 +364,9 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
             <button type="submit" className={page.primaryButton} disabled={createPending} aria-busy={createPending || undefined}><BusyLabel busy={createPending} label="Gerando token…">Gerar token</BusyLabel></button>
           </div>
         </form>
+      </LiteSidePanel>
+      <LiteSidePanel open={deliveriesOpen && Boolean(selected)} onOpenChange={setDeliveriesOpen} title="Recebidos" description={selected ? selected.name : undefined}>
+        {selected && deliveriesOpen ? <IntegrationDeliveriesLite credentialId={selected.id} /> : null}
       </LiteSidePanel>
       <LiteSidePanel open={helpOpen} onOpenChange={setHelpOpen} title="Como integrar com a sua landing page" description="Cole um snippet no seu site e comece a receber leads na plataforma.">
         <IntegrationHelpLite />

@@ -11,6 +11,8 @@ import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { generateWebhookToken } from "@/features/leads/webhooks/utils/lead-webhook.utils";
+import { getLastReceivedByCredential, listWebhookDeliveries, type WebhookDeliveryItem } from "@/features/leads/webhooks/services/list-webhook-deliveries";
+import type { TenantContext } from "@/shared/auth/types";
 
 const sourceSchema = z.enum(["site_pixel", "landing_page"]);
 const createSchema = z.object({
@@ -29,6 +31,8 @@ export type IntegrationRecord = {
   status: "active" | "revoked";
   tokenPrefix: string;
   createdAt: Date;
+  /** Último envio que chegou nesta fonte, com ou sem lead; null quando nunca recebeu. */
+  lastReceivedAt?: Date | null;
 };
 
 export type IntegrationActionState = {
@@ -42,10 +46,13 @@ async function requireDirector() {
   return requireRole(await getRequiredTenantContext(), "director");
 }
 
+async function canViewIntegrations(context: TenantContext) {
+  return context.role === "director" || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
+}
+
 export async function getIntegrationsData() {
   const context = await getRequiredTenantContext();
-  const canView = context.role === "director" || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
-  if (!canView) throw new Error("Sem permissão para consultar integrações.");
+  if (!await canViewIntegrations(context)) throw new Error("Sem permissão para consultar integrações.");
   const db = getDatabase();
   const [integrations, branches] = await Promise.all([
     db.select({
@@ -64,7 +71,23 @@ export async function getIntegrationsData() {
       .from(schema.branches)
       .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active"))),
   ]);
-  return { integrations, branches };
+  const lastReceived = await getLastReceivedByCredential(context.tenantId, integrations.map((item) => item.id)).catch(() => new Map<string, Date>());
+  return { integrations: integrations.map((item) => ({ ...item, lastReceivedAt: lastReceived.get(item.id) ?? null })), branches };
+}
+
+export type IntegrationDeliveriesState = { success: true; deliveries: WebhookDeliveryItem[] } | { success: false; error: string };
+
+/** Aba "Recebidos": últimas 50 entregas da fonte, só da empresa (e da unidade, para quem tem uma). */
+export async function listIntegrationDeliveriesAction(input: { id: string; onlyProblems?: boolean }): Promise<IntegrationDeliveriesState> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (!await canViewIntegrations(context)) return { success: false, error: "Sem permissão para ver os recebidos." };
+    const { id } = idSchema.parse({ id: input.id });
+    const deliveries = await listWebhookDeliveries(context, id, { onlyProblems: input.onlyProblems === true });
+    return { success: true, deliveries };
+  } catch {
+    return { success: false, error: "Não foi possível carregar os recebidos." };
+  }
 }
 
 export async function createIntegrationAction(
