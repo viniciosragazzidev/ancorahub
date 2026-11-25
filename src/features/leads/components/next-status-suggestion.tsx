@@ -11,7 +11,8 @@ type NextStatusSuggestionProps = {
   disabled?: boolean;
 };
 
-const SUGGESTED_NEXT_MAP: Record<string, string> = {
+/** Próxima etapa sugerida do funil (também usada no ⋯ do cartão do kanban Lite). */
+export const SUGGESTED_NEXT_MAP: Record<string, string> = {
   new: "in_contact",
   distributed: "in_contact",
   in_contact: "contacted",

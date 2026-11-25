@@ -25,6 +25,8 @@ export type LiteKanbanProps<T> = {
   renderCard: (item: T) => ReactNode;
   /** Conteúdo de rodapé por coluna, calculado sobre os mesmos itens filtrados. */
   renderFooter?: (column: LiteKanbanColumn<T>) => ReactNode;
+  /** Linha curta abaixo do nome da etapa no cabeçalho (ex.: soma do valor e vidas). Nada quando devolve null. */
+  renderSummary?: (column: LiteKanbanColumn<T>) => ReactNode;
   /** Coluna `activeId` vai para o lugar da coluna `overId` (mesma regra do arrastar com o mouse). */
   onMoveColumn: (activeId: string, overId: string) => void;
   /** Texto da coluna vazia. */
@@ -35,7 +37,7 @@ type Picked = { id: string; from: number; to: number };
 
 const countLabel = (count: number) => (count === 1 ? "1 lead" : `${count} leads`);
 
-export function LiteKanban<T>({ label, columns, itemKey, renderCard, onMoveColumn, renderFooter, emptyText = "Nenhum lead nesta etapa" }: LiteKanbanProps<T>) {
+export function LiteKanban<T>({ label, columns, itemKey, renderCard, onMoveColumn, renderFooter, renderSummary, emptyText = "Nenhum lead nesta etapa" }: LiteKanbanProps<T>) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [dragging, setDragging] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
@@ -136,6 +138,7 @@ export function LiteKanban<T>({ label, columns, itemKey, renderCard, onMoveColum
                 }}
                 onHandleKey={onHandleKey(column.id)}
                 footer={renderFooter?.(column)}
+                summary={renderSummary?.(column)}
                 onHandleBlur={() => {
                   if (picked?.id === column.id) {
                     // O foco saiu da alça durante o movimento: cancela, como o Esc.
@@ -186,7 +189,7 @@ function previewOrder<T>(columns: LiteKanbanColumn<T>[], picked: Picked) {
   return next;
 }
 
-function SortableColumn<T>({ column, position, total, hintId, picked, dragging, handleRef, onHandleKey, onHandleBlur, footer, children }: {
+function SortableColumn<T>({ column, position, total, hintId, picked, dragging, handleRef, onHandleKey, onHandleBlur, footer, summary, children }: {
   column: LiteKanbanColumn<T>;
   position: number;
   total: number;
@@ -197,6 +200,7 @@ function SortableColumn<T>({ column, position, total, hintId, picked, dragging, 
   onHandleKey: (event: KeyboardEvent<HTMLButtonElement>) => void;
   onHandleBlur: () => void;
   footer?: ReactNode;
+  summary?: ReactNode;
   children: ReactNode;
 }) {
   const { listeners, setNodeRef, transform, transition } = useSortable({ id: column.id });
@@ -223,7 +227,10 @@ function SortableColumn<T>({ column, position, total, hintId, picked, dragging, 
         >
           <GripVertical aria-hidden="true" size={16} />
         </button>
-        <h2 id={titleId} className={styles.title}>{column.title}</h2>
+        <div className={styles.titleBlock}>
+          <h2 id={titleId} className={styles.title}>{column.title}</h2>
+          {summary ? <p className={styles.summary}>{summary}</p> : null}
+        </div>
         <span className={styles.count} aria-label={countLabel(column.items.length)}>{column.items.length}</span>
       </header>
       {children}

@@ -117,6 +117,24 @@
   color: var(--foreground);
 }
 
+.titleBlock {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Soma da etapa (valor e vidas) logo abaixo do nome, em números tabulares. */
+.summary {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .title {
   flex: 1 1 auto;
   min-width: 0;
