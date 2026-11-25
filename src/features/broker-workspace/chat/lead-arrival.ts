@@ -71,6 +71,8 @@ export function nextStepFor(input: {
   lastBrokerAt: Date | null;
   nextAction: string | null;
   now: Date;
+  /** Lead da lista da equipe: até esta hora o primeiro contato ainda não é pendência (imported-first-contact.ts). */
+  firstContactDueAt?: Date | null;
 }): NextStep {
   const management = input.viewer === "management";
   const owner = input.ownerName ?? "O corretor";
@@ -88,6 +90,12 @@ export function nextStepFor(input: {
       ? { kind: "wait", title: "Cliente aguardando resposta", detail: `Respondeu ${ago}. ${owner} ainda não respondeu.`, tone: "urgent" }
       // The broker does not see when the client wrote (26/10): only that the client waits.
       : { kind: "reply", title: "Responder o cliente", detail: "O cliente respondeu e espera sua resposta.", tone: "urgent" };
+  }
+  if (!input.lastBrokerAt && input.firstContactDueAt && input.firstContactDueAt.getTime() > input.now.getTime()) {
+    const due = `${dayKey(input.firstContactDueAt) === dayKey(input.now) ? "hoje" : dayMonth(input.firstContactDueAt)} às ${clock(input.firstContactDueAt)}`;
+    return management
+      ? { kind: "wait", title: "Lista da equipe, dentro do prazo", detail: `${owner} tem até ${due} para o primeiro contato.`, tone: "normal" }
+      : { kind: "whatsapp", title: "Chame o cliente quando puder", detail: `Contato da lista da equipe. Prazo para o primeiro contato: ${due}.`, tone: "normal" };
   }
   if (!input.lastBrokerAt) {
     return management

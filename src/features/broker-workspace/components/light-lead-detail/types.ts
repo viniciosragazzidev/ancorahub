@@ -1,5 +1,6 @@
 import type { AiAutoMove } from "@/features/conversation-intelligence/ai-move";
 import type { BrokerAdContext } from "@/features/leads/broker-ad-context";
+import type { LeadObservation } from "@/features/leads/lead-observations-core";
 
 export type ConfirmationDocument = {
   id: string;
@@ -49,6 +50,10 @@ export type LightLeadDetailData = {
   /** The plantão that handed the lead out (its name, as the broker knows it). */
   dutyName?: string | null;
   slaFirstContactMinutes?: number;
+  /** Histórico de observações das etapas (25/11), só para o corretor responsável. Ausente: a seção não aparece. */
+  observations?: LeadObservation[];
+  /** Lead da lista da equipe: até quando o primeiro contato ainda não é pendência. */
+  firstContactDueAt?: Date | string | null;
   isCurrentBroker: boolean;
   tipo?: string | null;
   origem?: string | null;

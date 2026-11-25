@@ -363,6 +363,8 @@ export function useLeadDetail({
         // Mudar etapa é ação de dezenas por dia: vibração de confirmação, sem som.
         fire("confirm");
         setStepNotice({ id: Date.now(), tone: "success", text: followupWhen ? "Etapa e acompanhamento registrados" : "Etapa atualizada" });
+        // A observação nova entra no histórico de observações da tela (25/11).
+        if (formData.has("observacao")) router.refresh();
       });
     }
 

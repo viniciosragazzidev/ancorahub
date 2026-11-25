@@ -17,6 +17,7 @@ import { buildBrokerWorkspaceTodayMetrics, getSaoPauloDayBounds } from "./worksp
 import { buildDutySummary, loadBrokerDutyRows } from "./duty-summary";
 import { listSchedulesInDutyStartInterval } from "@/features/lead-distribution/duty-start-interval-server";
 import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
+import { importedFirstContactHours, isTeamListLead } from "./imported-first-contact";
 
 const activeLeadStatuses = [
   "new",
@@ -135,6 +136,8 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
         assignedAt: schema.leads.assignedAt,
         firstContactAt: schema.leads.firstContactAt,
         stageEnteredAt: schema.leads.stageEnteredAt,
+        sourceChannel: schema.leads.sourceChannel,
+        firstContactHours: sql<string | null>`${schema.leads.sourceMetadata}->>'firstContactHours'`,
       })
       .from(schema.leads)
       .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), isNull(schema.leads.deletedAt), not(ilike(schema.leads.nome, "Lead WhatsApp (%)")), inArray(schema.leads.status, activeLeadStatuses)))
@@ -270,10 +273,14 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
   for (const document of documents) pendingDocumentsByLead.set(document.leadId, (pendingDocumentsByLead.get(document.leadId) ?? 0) + 1);
   const pendingQuotesByLead = new Set(quotes.map((quote) => quote.leadId));
 
-  const priorityLeads: BrokerWorkspacePriorityLead[] = leads.map((lead) => {
+  const priorityLeads: BrokerWorkspacePriorityLead[] = leads.map(({ sourceChannel, firstContactHours, ...lead }) => {
     const latestMessage = latestMessageByLead.get(lead.id);
+    const teamList = isTeamListLead(sourceChannel);
     return {
       ...lead,
+      // Lista da equipe: entra "em atendimento" sem primeiro contato gravado; conversa ou etapa que andou contam como contato.
+      firstContactAt: lead.firstContactAt ?? (teamList ? latestMessage?.sentAt ?? (lead.status !== "in_contact" ? lead.stageEnteredAt : null) : null),
+      importedFirstContactHours: teamList ? importedFirstContactHours({ firstContactHours }) : null,
       lastIncomingAt: latestMessage?.direction === "incoming" ? latestMessage.sentAt : null,
       hasPendingQuote: pendingQuotesByLead.has(lead.id),
       pendingDocumentCount: pendingDocumentsByLead.get(lead.id) ?? 0,
