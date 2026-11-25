@@ -6,7 +6,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { selectEffectiveDutyAssignments } from "./dated-duty-roster";
-import { loadSchedulePhotoRequirements } from "./duty-photo-setting";
+import { loadDutyPhotoRules } from "./duty-photo-setting";
 import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
 import { dutyLeadsSinceStart, effectiveAttendanceMode, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, presenceOccurrenceKey, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
 import { getSaoPauloDateKey } from "./dated-duty-roster";
@@ -293,11 +293,11 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   }));
   const attributionPresenceRequired = (await getFeatureFlag(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION)) === "true";
   // "Exigir foto na confirmação" (25/11): a mesma regra da distribuição.
-  const photoBySchedule = await loadSchedulePhotoRequirements(context.tenantId, [schedule.id, ...attributionSchedules.map((candidate) => candidate.id)]);
+  const photoRules = await loadDutyPhotoRules(context.tenantId, [schedule.id, ...attributionSchedules.map((candidate) => candidate.id)], [...attributionAssignmentIds, ...roster.map((entry) => entry.id)]);
   const candidateById = new Map(attributionSchedules.map((candidate) => [candidate.id, candidate]));
   const attributionEligibleIds = new Set(attributionAssignments.flatMap((row) => {
     const candidate = candidateById.get(row.scheduleId);
-    return candidate && (!(attributionPresenceRequired || effectiveAttendanceMode(row.attendanceMode, candidate.attendanceMode, photoBySchedule.get(candidate.id)) === "presencial") || confirmedAssignmentIds.has(row.id))
+    return candidate && (!(attributionPresenceRequired || effectiveAttendanceMode(row.attendanceMode, candidate.attendanceMode, photoRules.get(candidate.id, row.id)) === "presencial") || confirmedAssignmentIds.has(row.id))
       ? [row.id]
       : [];
   }));
@@ -528,7 +528,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       // The mode this broker works the occurrence in: online inside a presencial plantão when the director said so (20/10).
       const attendanceMode = effectiveAttendanceMode(assignmentAttendanceMode, schedule.attendanceMode);
       // A confirmação (com ou sem foto) segue "Exigir foto na confirmação"; a modalidade mostrada não muda (25/11).
-      const confirmMode = effectiveAttendanceMode(assignmentAttendanceMode, schedule.attendanceMode, photoBySchedule.get(schedule.id));
+      const confirmMode = effectiveAttendanceMode(assignmentAttendanceMode, schedule.attendanceMode, photoRules.get(schedule.id, entry.id));
       // Which shift this broker works (morning, afternoon, whole day) on a split plantão.
       const shift = assignmentShift(schedule, { startsAt, endsAt });
       const occurrence = occurrenceByAssignment.get(entry.id);

@@ -27,6 +27,11 @@ const dutyScheduleFields = z.object({
   attendanceMode: z.enum(["online", "presencial"]).default("online"),
   /** "Exigir foto na confirmação" (25/11). Ausente (formulário antigo) = não mexe; o padrão segue a modalidade. */
   presencePhotoRequired: z.preprocess((value) => value === "true" || value === true ? true : value === "false" || value === false ? false : undefined, z.boolean().optional()),
+  /**
+   * A escolha de três opções (25/11): "default" segue a unidade (e a unidade, a modalidade), "always"/"never" fixam.
+   * Presente, vence `presencePhotoRequired` (o interruptor antigo).
+   */
+  presencePhotoChoice: z.preprocess((value) => value === "" || value === null ? undefined : value, z.enum(["default", "always", "never"]).optional()),
   dayOfWeek: z.coerce.number().int().min(0).max(6),
   startsAt: z.string(),
   endsAt: z.string(),

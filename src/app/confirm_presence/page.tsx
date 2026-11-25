@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { effectiveAttendanceMode, EXTENDED_SHIFT_EXPLANATION, EXTENDED_SHIFT_NAME, EXTENDED_SHIFT_ONLINE_NOTE, getExtraShiftConfirmationWindowState, getSelfDutyConfirmationWindowState, isExtraShiftRecord } from "@/features/lead-distribution/duty-presence-domain";
 import { getDatabase, schema } from "@/shared/db";
-import { loadSchedulePhotoRequirement } from "@/features/lead-distribution/duty-photo-setting";
+import { loadDutyPhotoRule } from "@/features/lead-distribution/duty-photo-setting";
 import { ConfirmPresenceView } from "./confirm-presence-view";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ export default async function ConfirmPresencePage({ searchParams }: { searchPara
   const late = windowState === "late";
   const confirmed = record?.status === "confirmed";
   // "Exigir foto na confirmação" (25/11): a escolha do plantão decide se o link pede a foto no app.
-  const photoRequired = record ? await loadSchedulePhotoRequirement(record.tenantId, record.scheduleId) : null;
+  const photoRequired = record ? await loadDutyPhotoRule(record.tenantId, record.scheduleId, record.assignmentId) : null;
   // A modalidade (presencialShift) não muda com a foto; o passo com foto (photoStep) sim (25/11).
   const presencialShift = record ? effectiveAttendanceMode(record.assignmentAttendanceMode, record.attendanceMode) === "presencial" : false;
   const photoStep = record ? effectiveAttendanceMode(record.assignmentAttendanceMode, record.attendanceMode, photoRequired) === "presencial" : false;

@@ -14,8 +14,8 @@ import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history";
-import { dutyAttendanceOverrideProblem, getRelevantDutyWindow, parseDutyLeadsSince, presencePhotoRequiredToStore } from "./duty-presence-domain";
-import { loadSchedulePhotoRequirement, saveSchedulePhotoRequirement } from "./duty-photo-setting";
+import { dutyAttendanceOverrideProblem, getRelevantDutyWindow, parseDutyLeadsSince, parseUnitPresencePhotoDefault, presencePhotoChoiceToStore, presencePhotoRequiredToStore } from "./duty-presence-domain";
+import { loadSchedulePhotoRequirement, saveSchedulePhotoRequirement, saveUnitPhotoDefault } from "./duty-photo-setting";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 import { assignLeadToBroker } from "./service";
@@ -405,8 +405,8 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
         for (const scheduleId of scheduleIds) await relinkScheduleQueues(tx, context, scheduleId, receivingQueueIds);
         if (unifiedInterval !== null) await unifyQueueOfferInterval(tx, context, receivingQueueIds, unifiedInterval);
       }
-      // "Exigir foto na confirmação" (25/11): só grava quando o diretor mudou o padrão da modalidade.
-      const photo = presencePhotoRequiredToStore(parsed.data.attendanceMode, parsed.data.presencePhotoRequired);
+      // "Exigir foto na confirmação" (25/11): "padrão" (null) segue a unidade; só grava escolha fixa.
+      const photo = parsed.data.presencePhotoChoice ? presencePhotoChoiceToStore(parsed.data.presencePhotoChoice) : presencePhotoRequiredToStore(parsed.data.attendanceMode, parsed.data.presencePhotoRequired);
       if (photo != null && !(await saveSchedulePhotoRequirement(tx, { tenantId: context.tenantId, scheduleIds, value: photo }))) sharedWarnings.add(PHOTO_SETTING_PENDING);
     });
     revalidateDutyWorkspace();
@@ -480,8 +480,11 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         webhookCredentialId,
         updatedAt: new Date(),
       }).where(and(eq(schema.unitDutySchedules.id, schedule.id), eq(schema.unitDutySchedules.tenantId, context.tenantId)));
-      // "Exigir foto na confirmação" (25/11): volta ao padrão (null) quando bate com a modalidade.
-      const photo = presencePhotoRequiredToStore(formData.has("attendanceMode") ? parsed.data.attendanceMode : schedule.attendanceMode, parsed.data.presencePhotoRequired);
+      // "Exigir foto na confirmação" (25/11): "padrão" grava null (segue a unidade e, sem ela, a modalidade).
+      // O interruptor antigo (sem presencePhotoChoice) volta ao padrão quando bate com a modalidade.
+      const photo = parsed.data.presencePhotoChoice
+        ? presencePhotoChoiceToStore(parsed.data.presencePhotoChoice)
+        : presencePhotoRequiredToStore(formData.has("attendanceMode") ? parsed.data.attendanceMode : schedule.attendanceMode, parsed.data.presencePhotoRequired);
       if (photo !== undefined && !(await saveSchedulePhotoRequirement(tx, { tenantId: context.tenantId, scheduleIds: [schedule.id], value: photo })) && photo !== null) sharedWarnings.add(PHOTO_SETTING_PENDING);
       // The weekly roster keeps a copy of the plantão's validity (distribution
       // and presence read it): it must follow the plantão, or a shortened
@@ -1029,5 +1032,38 @@ export async function toggleDutyRosterPauseAction(scheduleId: string, assignment
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar a pausa." };
+  }
+}
+
+const unitPhotoDefaultSchema = z.object({
+  branchId: z.string().uuid(),
+  value: z.enum(["default", "always", "never"]),
+}).strict();
+
+/**
+ * Padrão de foto da unidade (25/11): "Padrão da modalidade", "Sempre exigir foto" ou "Nunca exigir foto".
+ * Mesma permissão de criar/editar plantão: Diretor em qualquer unidade do tenant, Gestor só na dele.
+ * Plantão com escolha fixa continua vencendo; o resto passa a seguir a unidade na hora.
+ */
+export async function setUnitPresencePhotoDefaultAction(input: unknown): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const parsed = unitPhotoDefaultSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, reason: "Dados inválidos para a foto da unidade." };
+    const { context, db } = await assertBatchDutyAccess();
+    const { branchId, value } = parsed.data;
+    if (context.role === "manager" && context.branchId !== branchId) return { ok: false, reason: "Você só pode mudar a sua unidade." };
+    const [branch] = await db.select({ id: schema.branches.id }).from(schema.branches)
+      .where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+    if (!branch) return { ok: false, reason: "Unidade não encontrada." };
+    await saveUnitPhotoDefault({ tenantId: context.tenantId, branchId, value: parseUnitPresencePhotoDefault(value) });
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(), userId: context.userId, entidade: "branch", entidadeId: branchId, acao: `duty_presence_photo_unit:${value}`,
+    });
+    // "Nunca exigir foto" libera o online de um toque: quem esperava recebe a vez.
+    if (value === "never") await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
+    revalidateDutyWorkspace();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível salvar a foto da unidade." };
   }
 }

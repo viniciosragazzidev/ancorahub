@@ -5,7 +5,7 @@ import { and, asc, eq, gte, gt, isNotNull, lt, lte, or, sql, isNull } from "driz
 import { effectiveAttendanceMode, getDutyWindowOnDate } from "@/features/lead-distribution/duty-presence-domain";
 import { getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 import { getDatabase, schema } from "@/shared/db";
-import { loadSchedulePhotoRequirements } from "@/features/lead-distribution/duty-photo-setting";
+import { loadDutyPhotoRules, type DutyPhotoRules } from "@/features/lead-distribution/duty-photo-setting";
 import { isBrokerReadyToReceive } from "./workspace-data-domain";
 import type { BrokerActiveDuty, DutyPresenceAsk } from "./queries";
 
@@ -135,8 +135,8 @@ export function buildDutySummary(input: {
   availabilityStatus: "available" | "paused" | "offline";
   /** Days from today to read (0 = today). The broker home reads today and the next seven days. */
   dayOffsets?: number[];
-  /** "Exigir foto na confirmação" de cada plantão (25/11). Ausente: lido do banco. */
-  photoRequiredBySchedule?: Map<string, boolean | null>;
+  /** "Exigir foto na confirmação" (25/11): plantão > unidade > modalidade. Ausente: lido do banco. */
+  photoRequiredBySchedule?: DutyPhotoRules;
 }) {
   const today = getSaoPauloDateKey(input.now);
   const dates = (input.dayOffsets ?? Array.from({ length: 8 }, (_, offset) => offset)).map((offset) => addCalendarDays(today, offset));
@@ -151,7 +151,7 @@ export function buildDutySummary(input: {
 
   const photoBySchedule = input.photoRequiredBySchedule
     ? Promise.resolve(input.photoRequiredBySchedule)
-    : loadSchedulePhotoRequirements(input.tenantId, input.rows.map((row) => row.scheduleId)).catch(() => new Map<string, boolean | null>());
+    : loadDutyPhotoRules(input.tenantId, input.rows.map((row) => row.scheduleId), input.rows.map((row) => row.assignmentId)).catch((): DutyPhotoRules => new Map<string, boolean | null>());
   const occurrences = dates.flatMap((dutyDate) => {
     const publishedScheduleIds = input.monthlySchedulingEnabled ? publishedByDate.get(dutyDate) ?? new Set<string>() : null;
     return Promise.all([resolveEffectiveDutyAssignments(input.tenantId, input.rows, input.now, { dutyDate, publishedScheduleIds }), photoBySchedule])
@@ -162,7 +162,7 @@ export function buildDutySummary(input: {
         // From here on `attendanceMode` is the mode this broker works the occurrence in.
         // "Exigir foto na confirmação" (25/11): com foto, a confirmação é a do presencial; sem, a do online.
         // `attendanceMode` decide a confirmação; `venueMode` é a modalidade que a tela mostra (não muda com a foto).
-        return [{ row: { ...row, attendanceMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode, photo.get(row.scheduleId)), venueMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode) }, ...window }];
+        return [{ row: { ...row, attendanceMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode, photo.get(row.scheduleId, row.assignmentId)), venueMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode) }, ...window }];
       }));
   });
 

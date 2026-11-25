@@ -6,8 +6,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { getRosterBrokerAccountFilter, pendingBrokerPlanningEnabled } from "./roster-broker-account-filter";
 import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
 import { isTypeUsableByUnit } from "./manager-unit-scope";
-import { isDutyPhotoSettingReady, loadSchedulePhotoRequirements } from "./duty-photo-setting";
-import { resolvePresencePhotoRequired } from "./duty-presence-domain";
+import { isDutyPhotoSettingReady, loadSchedulePhotoRequirements, loadUnitPhotoDefaults } from "./duty-photo-setting";
+import { presencePhotoChoiceFromStored, resolvePresencePhotoRequired, type UnitPresencePhotoDefault } from "./duty-presence-domain";
 
 export type DutyRosterSnapshot = Awaited<ReturnType<typeof getDutyRosterSnapshot>>;
 
@@ -22,7 +22,7 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     .where(branchCondition)
     .orderBy(asc(schema.branches.name));
   const branchIds = branches.map((branch) => branch.id);
-  if (!branchIds.length || (context.role === "manager" && !context.branchId)) return { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], pendingBrokers: [], assignments: [], publishedAssignments: [], history: [], photoSettingReady: false };
+  if (!branchIds.length || (context.role === "manager" && !context.branchId)) return { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], pendingBrokers: [], assignments: [], publishedAssignments: [], history: [], photoSettingReady: false, unitPhotoDefaults: {} as Record<string, UnitPresencePhotoDefault> };
 
   const [queues, allCredentials, allSchedules, brokers, allAssignments, campaignOrigins, typeRows] = await Promise.all([
     db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, name: schema.leadQueues.name })
@@ -279,13 +279,21 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     }
   }
   // "Exigir foto na confirmação" (25/11): o valor que vale (escolha ou padrão da modalidade) e se a escolha já pode ser gravada.
-  const [photoBySchedule, photoSettingReady] = await Promise.all([
+  // Padrão da unidade (25/11): plantão > unidade > modalidade. Só as unidades que esta pessoa vê.
+  const [photoBySchedule, photoSettingReady, allUnitPhotoDefaults] = await Promise.all([
     loadSchedulePhotoRequirements(context.tenantId, schedules.map((schedule) => schedule.id)),
     isDutyPhotoSettingReady(),
+    loadUnitPhotoDefaults(context.tenantId),
   ]);
+  const unitPhotoDefaults: Record<string, UnitPresencePhotoDefault> = Object.fromEntries(branchIds.flatMap((id) => {
+    const value = allUnitPhotoDefaults.get(id);
+    return value ? [[id, value] as const] : [];
+  }));
   const displaySchedules = schedules.map((schedule) => ({
     ...schedule,
-    presencePhotoRequired: resolvePresencePhotoRequired(schedule.attendanceMode, photoBySchedule.get(schedule.id)),
+    presencePhotoRequired: resolvePresencePhotoRequired(schedule.attendanceMode, photoBySchedule.get(schedule.id), schedule.branchId ? unitPhotoDefaults[schedule.branchId] : null),
+    /** A escolha gravada no próprio plantão: "default" segue a unidade. */
+    presencePhotoChoice: presencePhotoChoiceFromStored(photoBySchedule.get(schedule.id)),
     branchName: schedule.branchName ?? "Todas as unidades",
     linkedQueues: linkedQueuesBySchedule.get(schedule.id) ?? [],
     linkedQueueId: linkedQueuesBySchedule.get(schedule.id)?.[0]?.id ?? null,
@@ -295,5 +303,5 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     typeBranchIds: (schedule.typeId ? typeById.get(schedule.typeId)?.branchIds : null) ?? [],
   }));
 
-  return { branches, queues, credentials: displayCredentials, types, schedules: displaySchedules, brokers, pendingBrokers, assignments, publishedAssignments, history, photoSettingReady };
+  return { branches, queues, credentials: displayCredentials, types, schedules: displaySchedules, brokers, pendingBrokers, assignments, publishedAssignments, history, photoSettingReady, unitPhotoDefaults };
 }

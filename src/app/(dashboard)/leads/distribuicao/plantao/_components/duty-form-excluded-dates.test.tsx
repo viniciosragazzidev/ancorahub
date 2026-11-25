@@ -23,7 +23,7 @@ vi.mock("@/features/lead-distribution/duty-queue-order-actions", () => ({}));
 import { createDutyScheduleAction } from "@/features/lead-distribution/duty-actions";
 import { DutyOperationsWorkspace } from "./duty-operations-workspace";
 
-const snapshot = { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], pendingBrokers: [], assignments: [], publishedAssignments: [], history: [] };
+const snapshot = { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], pendingBrokers: [], assignments: [], publishedAssignments: [], history: [], unitPhotoDefaults: {} };
 
 beforeEach(() => {
   vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, media: "", onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn() })));

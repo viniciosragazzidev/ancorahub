@@ -77,9 +77,42 @@ export function defaultPresencePhotoRequired(scheduleMode: string | null | undef
   return scheduleMode === "presencial";
 }
 
-/** O que vale para o plantão: o escolhido pelo diretor ou, sem escolha, o padrão da modalidade. */
-export function resolvePresencePhotoRequired(scheduleMode: string | null | undefined, stored: boolean | null | undefined) {
-  return typeof stored === "boolean" ? stored : defaultPresencePhotoRequired(scheduleMode);
+/**
+ * Padrão de foto da unidade (25/11): "always" = sempre exigir foto, "never" = nunca exigir. Sem valor (null)
+ * a unidade segue a modalidade. Gravado em system_settings (ver duty-photo-setting.ts).
+ */
+export type UnitPresencePhotoDefault = "always" | "never";
+
+export function parseUnitPresencePhotoDefault(value: unknown): UnitPresencePhotoDefault | null {
+  return value === "always" || value === "never" ? value : null;
+}
+
+/**
+ * A regra única de "Exigir foto na confirmação" (25/11). Precedência: escolha explícita do plantão >
+ * padrão da unidade > padrão da modalidade. Devolve só a escolha (true/false) ou null quando nada foi
+ * configurado e vale a modalidade; é o que `effectiveAttendanceMode` recebe.
+ */
+export function resolveDutyPhotoOverride(schedule: boolean | null | undefined, unit: UnitPresencePhotoDefault | null | undefined): boolean | null {
+  if (typeof schedule === "boolean") return schedule;
+  if (unit === "always") return true;
+  if (unit === "never") return false;
+  return null;
+}
+
+/** O que vale de fato: plantão > unidade > modalidade (presencial com foto, online sem). */
+export function resolvePresencePhotoRequired(scheduleMode: string | null | undefined, stored: boolean | null | undefined, unit?: UnitPresencePhotoDefault | null) {
+  return resolveDutyPhotoOverride(stored, unit) ?? defaultPresencePhotoRequired(scheduleMode);
+}
+
+/** Escolha do plantão no formulário: "default" segue a unidade (grava null), "always"/"never" fixam. */
+export type SchedulePresencePhotoChoice = "default" | "always" | "never";
+
+export function presencePhotoChoiceToStore(choice: SchedulePresencePhotoChoice): boolean | null {
+  return choice === "always" ? true : choice === "never" ? false : null;
+}
+
+export function presencePhotoChoiceFromStored(stored: boolean | null | undefined): SchedulePresencePhotoChoice {
+  return stored === true ? "always" : stored === false ? "never" : "default";
 }
 
 /**

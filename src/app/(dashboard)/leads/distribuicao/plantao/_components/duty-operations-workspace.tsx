@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { defaultPresencePhotoRequired } from "@/features/lead-distribution/duty-presence-domain";
+import { defaultPresencePhotoRequired, resolvePresencePhotoRequired, type SchedulePresencePhotoChoice, type UnitPresencePhotoDefault } from "@/features/lead-distribution/duty-presence-domain";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { AppSelect } from "@/components/ui/select";
@@ -80,6 +80,7 @@ import { DutyQueueOrderBoard, DutyQueueOrderBoardLoading, StreamedDutyQueueOrder
 import type { DutyQueueOrderPreview } from "@/features/lead-distribution/duty-queue-order-queries";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import directorLiteStyles from "./director-duty-operations.module.css";
+import { UNIT_PHOTO_OPTIONS, UnitPhotoDefaultsButton } from "./unit-photo-defaults-dialog";
 
 type Snapshot = DutyRosterSnapshot;
 type Schedule = Snapshot["schedules"][number];
@@ -199,6 +200,36 @@ function StatusBadge({ status }: { status: string }) {
 
 type PendingPerson = { id: string; name: string; internalCode: string | null; branchName: string | null };
 
+const UNIT_PHOTO_LABEL = Object.fromEntries(UNIT_PHOTO_OPTIONS.map((option) => [option.value, option.label])) as Record<UnitPresencePhotoDefault, string>;
+const PHOTO_EFFECT = (required: boolean) => (required ? "exige foto" : "sem foto");
+
+/**
+ * O que a opção "Padrão" do plantão vai valer de fato (25/11): a regra da unidade ou, sem ela, a modalidade.
+ * Plantão de todas as unidades: cada corretor segue a regra da unidade dele.
+ */
+function presencePhotoDefaultSummary(snapshot: Snapshot, branchId: string | null, mode: "online" | "presencial") {
+  const byMode = defaultPresencePhotoRequired(mode);
+  const unitDefaults: Record<string, UnitPresencePhotoDefault> = snapshot.unitPhotoDefaults ?? {};
+  const modeHint = `segue a modalidade (${mode === "presencial" ? "presencial com foto" : "online com um toque"})`;
+  if (branchId) {
+    const unit = unitDefaults[branchId] ?? null;
+    const required = resolvePresencePhotoRequired(mode, null, unit);
+    return {
+      label: `Padrão da unidade: ${PHOTO_EFFECT(required)}`,
+      hint: unit ? `A unidade está em "${UNIT_PHOTO_LABEL[unit]}". Mudou lá, muda aqui.` : `A unidade não tem regra própria: ${modeHint}.`,
+    };
+  }
+  const configured = snapshot.branches.filter((branch) => unitDefaults[branch.id]);
+  if (!configured.length) return { label: `Padrão da unidade: ${PHOTO_EFFECT(byMode)}`, hint: `Nenhuma unidade tem regra própria: ${modeHint}.` };
+  const names = (value: UnitPresencePhotoDefault) => configured.filter((branch) => unitDefaults[branch.id] === value).map((branch) => branch.name).join(", ");
+  const always = names("always");
+  const never = names("never");
+  return {
+    label: "Padrão da unidade de cada corretor",
+    hint: [always ? `Exige foto: ${always}.` : "", never ? `Sem foto: ${never}.` : "", `As outras unidades: ${PHOTO_EFFECT(byMode)}.`].filter(Boolean).join(" "),
+  };
+}
+
 function DutyFormSheet({
   open,
   onOpenChange,
@@ -231,9 +262,9 @@ function DutyFormSheet({
     maximumBrokers: schedule?.maximumBrokers == null ? "" : String(schedule.maximumBrokers),
   }));
   const setField = (patch: Partial<typeof fields>) => setFields((current) => ({ ...current, ...patch }));
-  // "Exigir foto na confirmação" (25/11): segue a modalidade até o diretor mexer (presencial ligado, online desligado).
-  const [photoChoice, setPhotoChoice] = useState<boolean | null>(() => schedule && schedule.presencePhotoRequired !== defaultPresencePhotoRequired(schedule.attendanceMode) ? schedule.presencePhotoRequired : null);
-  const photoRequired = photoChoice ?? defaultPresencePhotoRequired(fields.attendanceMode);
+  // "Exigir foto na confirmação" (25/11): plantão > unidade > modalidade. "Padrão" segue a unidade.
+  const [photoChoice, setPhotoChoice] = useState<SchedulePresencePhotoChoice>(() => schedule?.presencePhotoChoice ?? "default");
+  const photoDefault = presencePhotoDefaultSummary(snapshot, schedule?.branchId ?? (snapshot.branches.length === 1 ? snapshot.branches[0].id : null), fields.attendanceMode);
   function chooseType(id: string) {
     setTypeId(id);
     const type = snapshot.types.find((item) => item.id === id);
@@ -406,20 +437,30 @@ function DutyFormSheet({
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">No presencial, o gestor confirma cada corretor na unidade antes de ele receber leads.</p>
-              <input type="hidden" name="presencePhotoRequired" value={String(photoRequired)} />
-              <label className="mt-1 flex items-start justify-between gap-3 rounded-[var(--radius-card)] border border-border p-3">
-                <span className="grid gap-0.5">
-                  <span className="text-sm font-medium">Exigir foto na confirmação</span>
-                  <span className="text-xs text-muted-foreground">
-                    {!snapshot.photoSettingReady
-                      ? "Disponível depois da atualização do banco. Até lá, presencial pede foto e online não."
-                      : photoRequired
-                        ? "O corretor confirma com uma foto do local e é liberado depois de aprovado."
-                        : "O corretor confirma a presença com um toque, sem foto."}
-                  </span>
+              <input type="hidden" name="presencePhotoChoice" value={photoChoice} />
+              <div className="mt-1 grid gap-1.5 rounded-[var(--radius-card)] border border-border p-3">
+                <Label htmlFor="duty-photo-choice" className="text-sm font-medium">Exigir foto na confirmação</Label>
+                <AppSelect
+                  id="duty-photo-choice"
+                  value={photoChoice}
+                  disabled={!snapshot.photoSettingReady}
+                  onValueChange={(value) => setPhotoChoice(value === "always" || value === "never" ? value : "default")}
+                  options={[
+                    { value: "default", label: photoDefault.label },
+                    { value: "always", label: "Sempre exigir foto" },
+                    { value: "never", label: "Nunca exigir foto" },
+                  ]}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {!snapshot.photoSettingReady
+                    ? "Disponível depois da atualização do banco. Até lá, presencial pede foto e online não."
+                    : photoChoice === "default"
+                      ? photoDefault.hint
+                      : photoChoice === "always"
+                        ? "O corretor confirma com uma foto do local e é liberado depois de aprovado, mesmo se a unidade mudar."
+                        : "O corretor confirma a presença com um toque, sem foto, mesmo se a unidade mudar."}
                 </span>
-                <Switch checked={photoRequired} disabled={!snapshot.photoSettingReady} onCheckedChange={(checked) => setPhotoChoice(checked === true)} aria-label="Exigir foto na confirmação" />
-              </label>
+              </div>
             </div>
             <div className="grid gap-3 rounded-[var(--radius-card)] border border-border p-3">
               <div className="flex items-center justify-between gap-2">
@@ -1600,6 +1641,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
               Tipos de plantão
             </Button>
           ) : null}
+          <UnitPhotoDefaultsButton branches={snapshot.branches} defaults={snapshot.unitPhotoDefaults ?? {}} />
           <Button onClick={() => openCreate()}>
             <Plus />
             Novo plantão
