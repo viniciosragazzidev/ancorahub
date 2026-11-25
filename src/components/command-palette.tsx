@@ -11,6 +11,8 @@ import { FEATURE_SEARCH_INDEX, type FeatureIndexItem } from "@/shared/feature-se
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { canShowNavigationItem } from "@/shared/navigation-access";
+import { useNavFlags } from "@/components/navigation/nav-access";
+import { normalizeSearchText, searchNavPages } from "@/shared/navigation/nav-search";
 
 type SearchItem = { id: string; title: string; subtitle: string | null; href: string };
 type SearchGroup = { type: string; label: string; items: SearchItem[] };
@@ -68,6 +70,16 @@ export function CommandPalette() {
     };
   }, [directorLite, open, query]);
 
+  const navFlags = useNavFlags();
+  // Páginas do menu (mesmo cadastro da barra lateral): aparecem na hora, antes da busca no servidor.
+  const navPages = directorLite && query.trim().length >= 2 && user
+    ? searchNavPages(query, { ...user, negotiationsEnabled: navFlags.negotiationsEnabled, postSaleAuditEnabled: navFlags.postSaleAuditEnabled, autoSaleEnabled: navFlags.autoSaleEnabled, erpPaths: navFlags.erpPaths })
+    : [];
+  const navPageHrefs = new Set(navPages.map((page) => page.href));
+  const resultGroups = searchGroups
+    .map((group) => group.type === "features" ? { ...group, items: group.items.filter((item) => !navPageHrefs.has(item.href)) } : group)
+    .filter((group) => group.items.length > 0);
+
   const userPermissions = user?.permissions ?? [];
   const allowedFeatures = FEATURE_SEARCH_INDEX.filter((item) =>
     directorLite ? canShowNavigationItem(item, user) : userPermissions.includes(item.permission),
@@ -75,12 +87,12 @@ export function CommandPalette() {
 
   const filteredFeatures = allowedFeatures.filter((item) => {
     if (!query.trim()) return true;
-    const q = query.toLowerCase().trim();
+    const q = normalizeSearchText(query);
     return (
-      item.title.toLowerCase().includes(q) ||
-      item.description.toLowerCase().includes(q) ||
-      item.domain.toLowerCase().includes(q) ||
-      item.keywords.some((k) => k.toLowerCase().includes(q))
+      normalizeSearchText(item.title).includes(q) ||
+      normalizeSearchText(item.description).includes(q) ||
+      normalizeSearchText(item.domain).includes(q) ||
+      item.keywords.some((k) => normalizeSearchText(k).includes(q))
     );
   });
 
@@ -136,9 +148,20 @@ export function CommandPalette() {
         <ScrollArea className={directorLite ? "max-h-[min(70vh,520px)] p-2" : "max-h-[380px] p-2"}>
           {directorLite && query.trim().length >= 2 ? (
             <section aria-label="Resultados da busca global" className="space-y-1 p-1">
+              {navPages.length > 0 ? (
+                <div className="space-y-1">
+                  <p className="px-3 py-1 text-xs font-medium text-muted-foreground">Páginas</p>
+                  {navPages.map((page) => (
+                    <button key={`page-${page.id}`} type="button" onClick={() => handleSelect(page.href)} className="director-command-result">
+                      <span className="min-w-0 flex-1"><span className="block truncate">{page.title}</span><span className="block truncate text-xs text-muted-foreground">{page.subtitle}</span></span>
+                      <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {searchLoading ? <p role="status" className="px-3 py-4 text-sm text-muted-foreground">Buscando no CRM…</p> : null}
-              {!searchLoading && searchGroups.length === 0 ? <p className="px-3 py-4 text-sm text-muted-foreground">Nenhum resultado encontrado.</p> : null}
-              {searchGroups.map((group) => (
+              {!searchLoading && resultGroups.length === 0 && navPages.length === 0 ? <p className="px-3 py-4 text-sm text-muted-foreground">Nenhum resultado encontrado.</p> : null}
+              {resultGroups.map((group) => (
                 <div key={group.type} className="space-y-1">
                   <p className="px-3 py-1 text-xs font-medium text-muted-foreground">{group.label}</p>
                   {group.items.map((item) => (

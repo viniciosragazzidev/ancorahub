@@ -1050,3 +1050,21 @@
   margin-inline: auto;
   padding: 24px clamp(16px, 4vw, 32px) 96px;
 }
+
+/* Contador do menu (25/11/2026): número neutro que pede ação; some no zero e no menu recolhido. */
+.arc-venancor[data-skin="diretor"] :is(.director-sidebar, .director-mobile-sidebar) [data-slot="sidebar-nav-count"] {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-resting);
+  color: var(--foreground);
+  font-size: var(--text-xs, 12px);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}

@@ -18,6 +18,7 @@ vi.mock("@/components/ui/badge", () => ({ Badge: ({ children }: { children: Reac
 
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 import { CommandPalette } from "./command-palette";
+import { getUserDisplayInfo } from "@/shared/auth/actions";
 
 afterEach(() => {
   cleanup();
@@ -61,5 +62,19 @@ describe("paleta do diretor", () => {
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
 
     expect(screen.getByRole("textbox")).toHaveValue("lead");
+  });
+  it("mostra as páginas do menu na hora, sem acento, antes dos resultados do servidor", async () => {
+    vi.mocked(getUserDisplayInfo).mockResolvedValueOnce({ roleKey: "director", jobTitle: null, permissions: ["acessar_vendas", "ver_comissionamento"] } as never);
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(<ArcScopeProvider enabled><CommandPalette /></ArcScopeProvider>);
+
+    await waitFor(() => expect(getUserDisplayInfo).toHaveBeenCalled());
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.change(screen.getByPlaceholderText("Buscar páginas, leads e clientes..."), { target: { value: "comissoes" } });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Comercial: Comissões/ })).toBeInTheDocument());
+    expect(screen.getByText("Páginas")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Comercial: Comissões/ }));
+    expect(navigation.push).toHaveBeenCalledWith("/settings?tab=comissoes");
   });
 });

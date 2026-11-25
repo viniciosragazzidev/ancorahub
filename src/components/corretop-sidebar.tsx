@@ -64,6 +64,8 @@ import { ViewAsButton } from "@/features/super-admin/components/view-as";
 import { cn } from "@/lib/utils";
 import { groupNavItems, resolveNavLocation, visibleNavAreas, type NavAreaId } from "@/shared/navigation/nav-registry";
 import { useNavUser } from "@/components/navigation/nav-access";
+import { useNavCounts } from "@/components/navigation/use-nav-counts";
+import { describeNavCount, formatNavCount, sumNavCounts } from "@/shared/navigation/nav-counters";
 
 type NavItemConfig = {
   id: NavAreaId;
@@ -122,6 +124,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
     pathname.startsWith("/leads/distribuicao/plantao");
 
   const activeAreaId = resolveNavLocation(pathname)?.area.id ?? null;
+  const navCounts = useNavCounts(Boolean(user) && roleKey !== "broker");
   const visibleItems: NavItemConfig[] = visibleNavAreas(user ? { ...user, negotiationsEnabled, postSaleAuditEnabled, erpPaths } : null).map(({ area, href }) => ({
     id: area.id,
     label: area.label,
@@ -131,8 +134,9 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
     ...areaPresentation[area.id],
   }));
 
-  const renderNavLink = (item: NavItemConfig, isActive: boolean, hideMarker = false) => {
+  const renderNavLink = (item: NavItemConfig, isActive: boolean, hideMarker = false, count?: { value: number; label: string | null }) => {
     const Icon = item.icon;
+    const shownCount = formatNavCount(count?.value);
     const itemTargetUrl = item.url;
     return (
                   <Tooltip>
@@ -201,6 +205,12 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                       {item.label}
                     </span>
 
+                    {shownCount ? (
+                      <span data-slot="sidebar-nav-count" className={cn("director-nav-count shrink-0 rounded-full bg-sidebar-accent px-1.5 text-xs tabular-nums group-data-[collapsible=icon]:hidden", hideMarker && "mr-7")} aria-label={count?.label ?? undefined}>
+                        {shownCount}
+                      </span>
+                    ) : null}
+
                     {item.beta && directorLite ? <ArcBadge data-slot="director-nav-beta" tone="info" size="sm">Beta</ArcBadge> : null}
                     {item.beta && !directorLite ? (
                       <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.08em] text-primary uppercase group-data-[collapsible=icon]:hidden">
@@ -214,7 +224,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                     )}
                   </TooltipTrigger>
                   <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-medium text-popover-foreground shadow-none">
-                    {item.fullLabel || item.label}
+                    {count?.label ? `${item.fullLabel || item.label} · ${count.label}` : item.fullLabel || item.label}
                   </TooltipContent>
                   </Tooltip>
     );
@@ -327,10 +337,15 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
               const hasChildren = items.length > 1;
               const open = hasChildren && (openGroups[group.id] ?? groupActive);
               const head = { ...items[0]!, label: hasChildren && group.label ? group.label : items[0]!.label };
+              // Grupo aberto: cada subitem mostra o seu número; fechado (ou de uma área só), a cabeça mostra a soma.
+              const headCount = open ? undefined : {
+                value: sumNavCounts(navCounts, items.map((entry) => entry.id)),
+                label: items.map((entry) => describeNavCount(entry.id, navCounts[entry.id])).filter(Boolean).join(", ") || null,
+              };
               return (
                 <div key={group.id} className="flex flex-col">
                   <div className="relative">
-                    {renderNavLink(head, groupActive, hasChildren)}
+                    {renderNavLink(head, groupActive, hasChildren, headCount)}
                     {hasChildren ? (
                       <button
                         type="button"
@@ -348,6 +363,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                     <ul data-slot="sidebar-nav-sub" className="mt-0.5 mb-1 flex flex-col gap-0.5 group-data-[collapsible=icon]:hidden">
                       {items.map((child) => {
                         const childActive = child.id === activeAreaId;
+                        const childCount = formatNavCount(navCounts[child.id]);
                         return (
                           <li key={child.id}>
                             <Link
@@ -361,7 +377,12 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                                 childActive ? "bg-primary/8 font-semibold text-primary" : "font-medium text-sidebar-foreground/65",
                               )}
                             >
-                              <span className="truncate">{child.label}</span>
+                              <span className="min-w-0 flex-1 truncate">{child.label}</span>
+                              {childCount ? (
+                                <span data-slot="sidebar-nav-count" className="director-nav-count shrink-0 rounded-full bg-sidebar-accent px-1.5 text-xs tabular-nums" aria-label={describeNavCount(child.id, navCounts[child.id]) ?? undefined}>
+                                  {childCount}
+                                </span>
+                              ) : null}
                             </Link>
                           </li>
                         );
