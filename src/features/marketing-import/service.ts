@@ -11,22 +11,17 @@ import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/
 import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { leadPhoneLockKey, lockLeadCreationByPhone, sameLeadPhone } from "@/features/leads/phone-dedup-lock";
 import type { DatabaseExecutor } from "@/shared/db";
+import { MARKETING_IMPORT_PF_COLUMNS, MARKETING_IMPORT_PME_COLUMNS, normalizeImportHeader, type MarketingImportType } from "./columns";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const BATCH_SIZE = 200;
 const IMPORT_LOCK_KEY = "IMPORT_META";
 
-// Shared columns for both PF and PME
-const sharedColumns = [
-  "nome", "email", "telefone", "operadora",
-  "nome da campanha", "nome do conjunto de anúncio", "nome do anúncio",
-  "id", "data",
-] as const;
+// Colunas aceitas (PF e PME): fonte única com a planilha modelo da tela.
+const pfColumns = MARKETING_IMPORT_PF_COLUMNS;
+const pmeColumns = MARKETING_IMPORT_PME_COLUMNS;
 
-const pfColumns = [...sharedColumns, "tipo de plano"] as const;
-const pmeColumns = [...sharedColumns, "tipo de cnpj"] as const;
-
-type ImportType = "pf" | "pme";
+type ImportType = MarketingImportType;
 
 interface RawRow {
   nome: string;
@@ -66,13 +61,7 @@ export interface ImportResult {
   errors: Array<{ row: number; message: string }>;
 }
 
-function normalizeHeader(header: string): string {
-  return header
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
+const normalizeHeader = normalizeImportHeader;
 
 function detectImportType(headers: string[]): ImportType {
   const hasTipoPlano = headers.some((h) => normalizeHeader(h) === "tipo de plano");
@@ -371,6 +360,13 @@ export async function importMetaLeads(
             tipo: "system_alert",
             conteudo: `Lead importado do Meta Ads (${type === "pf" ? "PF" : "PME"}). Campanha: ${item.normalized.campanha || "N/A"}`,
             metadata: sourceMetadata,
+          });
+
+          // A linha criada também fica no resultado, para a gaveta do histórico mostrar a planilha inteira.
+          await tx.insert(schema.marketingImportResults).values({
+            id: randomUUID(), importId, leadId: item.leadId, rowIndex: item.index,
+            status: "created", externalLeadId: item.normalized.externalId || null, nome: item.normalized.nome,
+            telefone: item.normalized.telefone, email: item.normalized.email,
           });
 
           committedIds.push(item.leadId);

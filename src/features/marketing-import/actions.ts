@@ -11,6 +11,8 @@ import { hasCapability } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { importMetaLeads, computeFileHash, checkExistingImport } from "./service";
+import { loadImportResults } from "./results-query";
+import type { ImportResultDetail } from "./results";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -108,6 +110,29 @@ export async function getImportHistoryAction(): Promise<ImportHistoryItem[]> {
     .where(eq(schema.marketingImports.tenantId, context.tenantId))
     .orderBy(desc(schema.marketingImports.createdAt))
     .limit(50);
+}
+
+export type ImportResultsResponse =
+  | { ok: true; detail: ImportResultDetail }
+  | { ok: false; error: string };
+
+/** Resultado linha a linha de uma importação do histórico: mesma permissão da tela e só a empresa de quem pede. */
+export async function getImportResultsAction(importId: string): Promise<ImportResultsResponse> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (!hasCapability(context.role, "importar_leads_meta", context.jobTitle)) {
+      throw new AuthorizationError("Apenas Diretor e Marketing podem ver importações de leads Meta.");
+    }
+    const id = z.string().min(1).max(64).parse(importId);
+    const detail = await loadImportResults(getDatabase(), context, id);
+    if (!detail) return { ok: false, error: "Importação não encontrada." };
+    return { ok: true, detail };
+  } catch (error) {
+    if (error instanceof AuthorizationError) return { ok: false, error: error.message };
+    if (error instanceof z.ZodError) return { ok: false, error: "Importação não encontrada." };
+    console.error("[marketing-import] results error:", error);
+    return { ok: false, error: "Não deu para carregar o resultado agora." };
+  }
 }
 
 export async function getLastImportAction(): Promise<ImportHistoryItem | null> {

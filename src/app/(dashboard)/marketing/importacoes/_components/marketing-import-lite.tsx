@@ -8,15 +8,18 @@
  * é a confirmação (sem toast repetindo os números) e a falha fica no painel, com a causa e "Tentar de novo".
  */
 import { useRef, useState, type DragEvent } from "react";
-import { CheckCircle2, Clock, FileDown, Plus, XCircle } from "lucide-react";
+import { Download, FileDown, Plus } from "lucide-react";
 
 import { LiteSelect } from "@/components/lite/controls";
+import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import { formatLiteDate } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
 import { uploadMetaLeadsAction, type ImportHistoryItem } from "@/features/marketing-import/actions";
+import { downloadMarketingImportTemplate, type MarketingImportType } from "@/features/marketing-import/columns";
 import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
 import { useFeedback } from "@/lib/feedback/use-feedback";
+import { ImportResultPanel, type ImportResultTarget } from "./import-result-panel";
 import styles from "./marketing-import-lite.module.css";
 
 type Branch = { id: string; name: string };
@@ -48,11 +51,35 @@ function statusTone(status: string) {
   return "warning";
 }
 
-function StatusIcon({ status }: { status: string }) {
-  if (status === "completed") return <CheckCircle2 aria-hidden="true" size={18} className={styles.iconSuccess} />;
-  if (status === "failed") return <XCircle aria-hidden="true" size={18} className={styles.iconDanger} />;
-  return <Clock aria-hidden="true" size={18} className={styles.iconWarning} />;
-}
+const HISTORY_COLUMNS: LiteColumn<ImportHistoryItem>[] = [
+  {
+    id: "when",
+    label: "Quando",
+    secondary: true,
+    nowrap: true,
+    render: (item) => (
+      <span className={styles.stackCell}>
+        <span className={styles.tabular}>{formatLiteDate(item.createdAt, dateTime)}</span>
+        {item.userName ? <span className={page.cellSub}>{item.userName}</span> : null}
+      </span>
+    ),
+  },
+  {
+    id: "file",
+    label: "Arquivo",
+    primary: true,
+    render: (item) => (
+      <span className={styles.stackCell}>
+        <span className={`${page.cellTitle} ${styles.truncate}`} title={item.fileName}>{item.fileName}</span>
+        {item.status !== "completed" ? <span><span className={page.badge} data-tone={statusTone(item.status)}>{statusLabel(item.status)}</span></span> : null}
+      </span>
+    ),
+  },
+  { id: "total", label: "Total", numeric: true, render: (item) => count.format(item.totalRows) },
+  { id: "created", label: "Entraram", numeric: true, render: (item) => count.format(item.importedCount) },
+  { id: "duplicates", label: "Duplicados", numeric: true, render: (item) => count.format(item.duplicateCount) },
+  { id: "invalid", label: "Com problema", numeric: true, render: (item) => count.format(item.invalidCount) },
+];
 
 export function MarketingImportLite({ branches, history, lastImport, canChooseBranch, userBranchId }: {
   branches: Branch[];
@@ -71,6 +98,27 @@ export function MarketingImportLite({ branches, history, lastImport, canChooseBr
   const inputRef = useRef<HTMLInputElement>(null);
   const fire = useFeedback();
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
+  const [resultTarget, setResultTarget] = useState<ImportResultTarget | null>(null);
+  const [lastFileName, setLastFileName] = useState("");
+  const [templateBusy, setTemplateBusy] = useState<MarketingImportType | null>(null);
+
+  async function downloadTemplate(type: MarketingImportType) {
+    if (templateBusy) return;
+    setTemplateBusy(type);
+    try {
+      await downloadMarketingImportTemplate(type);
+    } catch {
+      fire("error");
+      setError({ message: "Não deu para gerar a planilha modelo agora. Tente de novo.", retryable: false });
+    } finally {
+      setTemplateBusy(null);
+    }
+  }
+
+  function openResult(target: ImportResultTarget) {
+    setPanelOpen(false);
+    setResultTarget(target);
+  }
 
   async function handleSubmit() {
     if (busy) return;
@@ -112,6 +160,7 @@ export function MarketingImportLite({ branches, history, lastImport, canChooseBr
     const r = response as ImportResult;
     setResult({ importId: r.importId, imported: r.imported, duplicates: r.duplicates, invalid: r.invalid, durationMs: r.durationMs, errors: r.errors });
     fire("confirm");
+    setLastFileName(file.name);
     setFile(null);
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -158,7 +207,7 @@ export function MarketingImportLite({ branches, history, lastImport, canChooseBr
         <section className={page.card} aria-labelledby="import-history-title">
           <div className={page.cardHead}>
             <h2 id="import-history-title" className={page.cardTitle}>Histórico de importações</h2>
-            <p className={page.cardDescription}>Últimas 50 importações realizadas.</p>
+            <p className={page.cardDescription}>Últimas 50 importações. Abra uma linha para ver o resultado linha a linha.</p>
           </div>
           {history.length === 0 ? (
             <div className={page.empty}>
@@ -167,19 +216,14 @@ export function MarketingImportLite({ branches, history, lastImport, canChooseBr
               <p className={page.emptyText}>Use “Nova importação” para enviar a primeira planilha.</p>
             </div>
           ) : (
-            <ul className={styles.history}>
-              {history.map((item) => (
-                <li key={item.id} className={styles.historyRow}>
-                  <StatusIcon status={item.status} />
-                  <span className={styles.historyText}>
-                    <span className={`${page.cellTitle} ${styles.truncate}`} title={item.fileName}>{item.fileName}</span>
-                    <span className={page.cellSub}>{formatLiteDate(item.createdAt, dateTime)}{item.userName ? ` · ${item.userName}` : ""}</span>
-                    <span className={page.cellSub}>{count.format(item.importedCount)} importados · {count.format(item.duplicateCount)} dup. · {count.format(item.invalidCount)} invál.</span>
-                  </span>
-                  <span className={page.badge} data-tone={statusTone(item.status)}>{statusLabel(item.status)}</span>
-                </li>
-              ))}
-            </ul>
+            <LiteResponsiveData
+              caption="Histórico de importações"
+              columns={HISTORY_COLUMNS}
+              rows={history}
+              rowKey={(item) => item.id}
+              onRowOpen={(item) => setResultTarget({ id: item.id, fileName: item.fileName })}
+              empty={null}
+            />
           )}
         </section>
       </div>
@@ -223,8 +267,17 @@ export function MarketingImportLite({ branches, history, lastImport, canChooseBr
           )}
 
           <p className={styles.note}>
-            Colunas esperadas: <code>ID</code>, <code>Data</code>, <code>Nome</code>, <code>E-mail</code>, <code>Telefone</code>, <code>Operadora</code>, <code>Nome da campanha</code>, <code>Nome do conjunto de anúncio</code>, <code>Nome do anúncio</code>. A coluna <code>Nome do formulário</code> é opcional; quando ausente, os leads são registrados como “Formulário Direct”.
+            Colunas esperadas: <code>ID</code>, <code>Data</code>, <code>Nome</code>, <code>Email</code>, <code>Telefone</code>, <code>Operadora</code>, <code>Nome da campanha</code>, <code>Nome do conjunto de anúncio</code>, <code>Nome do anúncio</code> e <code>Tipo de Plano</code> (PF) ou <code>Tipo de CNPJ</code> (PME). A coluna <code>Nome do formulário</code> é opcional; quando ausente, os leads são registrados como “Formulário Direct”.
           </p>
+
+          <div className={styles.templateRow} role="group" aria-label="Baixar planilha modelo">
+            <button type="button" className={page.button} onClick={() => void downloadTemplate("pf")} disabled={templateBusy !== null}>
+              <Download aria-hidden="true" size={16} /> Baixar planilha modelo PF
+            </button>
+            <button type="button" className={page.button} onClick={() => void downloadTemplate("pme")} disabled={templateBusy !== null}>
+              <Download aria-hidden="true" size={16} /> Baixar planilha modelo PME
+            </button>
+          </div>
 
           <button type="button" className={`${page.primaryButton} ${styles.fullWidth}`} onClick={() => void handleSubmit()} disabled={busy || !file || (canChooseBranch && !branchId)} aria-busy={busy || undefined}>
             {busy ? (
@@ -246,19 +299,15 @@ export function MarketingImportLite({ branches, history, lastImport, canChooseBr
                 <div><dt>Inválidos</dt><dd>{count.format(result.invalid)}</dd></div>
               </dl>
               {(result.durationMs ?? 0) > 0 ? <p className={page.cellSub}>Tempo: {(result.durationMs / 1000).toFixed(1).replace(".", ",")} segundos</p> : null}
-              {result.errors.length > 0 ? (
-                <details className={styles.errors}>
-                  <summary>{result.errors.length} erro(s): ver detalhes</summary>
-                  <ul>
-                    {result.errors.slice(0, 10).map((error, index) => <li key={index}>Linha {error.row}: {error.message}</li>)}
-                    {result.errors.length > 10 ? <li>...e mais {result.errors.length - 10}</li> : null}
-                  </ul>
-                </details>
-              ) : null}
+              <button type="button" className={page.button} onClick={() => openResult({ id: result.importId, fileName: lastFileName || "Resultado da importação" })}>
+                {result.errors.length > 0 || result.duplicates > 0 ? "Ver problemas linha a linha" : "Ver resultado linha a linha"}
+              </button>
             </div>
           ) : null}
         </div>
       </LiteSidePanel>
+
+      <ImportResultPanel target={resultTarget} onClose={() => setResultTarget(null)} />
     </>
   );
 }

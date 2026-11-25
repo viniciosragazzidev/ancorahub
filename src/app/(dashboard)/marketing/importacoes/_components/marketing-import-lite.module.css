@@ -7,12 +7,6 @@
   gap: 16px;
 }
 
-@media (min-width: 1200px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
-  }
-}
-
 .headRow {
   display: flex;
   flex-wrap: wrap;
@@ -77,46 +71,26 @@
   white-space: nowrap;
 }
 
-.history {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.historyRow {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.historyRow:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.historyText {
+.stackCell {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.iconSuccess {
-  margin-top: 2px;
-  color: var(--success);
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
-.iconDanger {
-  margin-top: 2px;
-  color: var(--danger);
+.templateRow,
+.resultToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
-.iconWarning {
-  margin-top: 2px;
-  color: var(--warning);
+.resultToolbar {
+  justify-content: space-between;
 }
 
 .panel {
@@ -196,29 +170,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.errors {
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-}
-
-.errors summary {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  cursor: pointer;
-}
-
-.errors ul {
-  display: grid;
-  gap: 4px;
-  max-height: 128px;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
-  color: var(--danger);
-}
-
 /* Cartões em grid: a coluna implícita cresceria com nomes longos sem quebra (nowrap). */
 .layout > section {
   grid-template-columns: minmax(0, 1fr);
@@ -226,8 +177,7 @@
 
 .lastImport,
 .facts,
-.history,
-.historyText {
+.stackCell {
   grid-template-columns: minmax(0, 1fr);
 }
 
