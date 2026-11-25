@@ -1,6 +1,7 @@
 import type { BrokerDutyCalendarOccurrence, BrokerDutyCalendarResult } from "./duty-calendar";
 import type { BrokerActiveDuty, BrokerWorkspaceData, DutyPresenceAsk } from "./queries";
 import type { PresenceAskView } from "@/components/chat/types";
+import { isOnlineWithPhoto, presenceModality } from "./presence-modality";
 
 /**
  * Plantões em uma entrada única (plano do modo corretor, etapa 3): o cartão "Seu plantão atual" de `/plantoes`.
@@ -67,7 +68,7 @@ function modalityOf(mode: string | undefined | null): DutyHubShift["modality"] {
 }
 
 const askView = (ask: PresenceAsk): PresenceAskView => ({
-  assignmentId: ask.assignmentId, scheduleName: ask.scheduleName, branchName: ask.branchName, mode: ask.mode,
+  assignmentId: ask.assignmentId, scheduleName: ask.scheduleName, branchName: ask.branchName, mode: ask.mode, ...(ask.modality ? { modality: ask.modality } : {}),
   startsAt: ask.startsAt.toISOString(), endsAt: ask.endsAt.toISOString(), status: ask.status, photoId: ask.photoId,
   ...(ask.startInterval ? { startInterval: true } : {}),
 });
@@ -80,7 +81,7 @@ function askSituation(ask: PresenceAsk): Pick<DutyHubShift, "situation" | "hint"
   }
   return {
     situation: { label: "Confirme sua presença", tone: "warning" },
-    hint: ask.mode === "presencial" ? "Quando chegar à unidade, tire uma foto do local para começar a receber leads." : "Confirme sua presença para começar a receber leads.",
+    hint: isOnlineWithPhoto(ask) ? "Tire uma foto para confirmar sua presença e começar a receber leads." : ask.mode === "presencial" ? "Quando chegar à unidade, tire uma foto do local para começar a receber leads." : "Confirme sua presença para começar a receber leads.",
   };
 }
 
@@ -148,7 +149,7 @@ export function buildDutyHubCurrent(input: {
         dateLabel: dutyDateLabel(dutyDate, todayKey),
         timeLabel: `${timeOf(ask.startsAt)} às ${timeOf(ask.endsAt)}`,
         place: ask.branchName,
-        modality: modalityOf(ask.mode),
+        modality: modalityOf(presenceModality(ask)),
         ...askSituation(ask),
         href: askHref(ask),
         ask: askView(ask),

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   if (mode?.status === "pending" && windowState === "not_open") return NextResponse.json({ success: false, error: `A confirmação abre ${SELF_CONFIRM_OPENS_MINUTES} minutos antes do plantão.` }, { status: 409 });
   // "Exigir foto na confirmação" (25/11): a escolha do plantão vale aqui também, não só na tela.
   const photoRequired = mode && !isExtra ? await loadSchedulePhotoRequirement(mode.tenantId, mode.scheduleId) : null;
-  if (mode && !isExtra && effectiveAttendanceMode(mode.assignmentAttendanceMode, mode.attendanceMode, photoRequired) === "presencial") return NextResponse.json({ success: false, error: "Este plantão é presencial: confirme pelo app, tirando uma foto do local." }, { status: 409 });
+  if (mode && !isExtra && effectiveAttendanceMode(mode.assignmentAttendanceMode, mode.attendanceMode, photoRequired) === "presencial") return NextResponse.json({ success: false, error: "Este plantão pede foto na confirmação: confirme pelo app, tirando uma foto do local." }, { status: 409 });
   // A partir de 06/11/2026: sem o WhatsApp conectado, não confirma; a página leva o corretor ao app para conectar.
   if (mode?.status === "pending") {
     const whatsapp = await checkBrokerWhatsAppForPresence({ tenantId: mode.tenantId, brokerId: mode.brokerId, now });

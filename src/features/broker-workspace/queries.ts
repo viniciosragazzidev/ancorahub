@@ -36,7 +36,10 @@ export type DutyPresenceAsk = {
   scheduleId: string;
   scheduleName: string;
   branchName: string | null;
+  /** Como confirma: "presencial" = com foto e liberação; "online" = um toque (segue "Exigir foto na confirmação"). */
   mode: "online" | "presencial";
+  /** A modalidade do plantão para mostrar ("Plantão presencial"), que não muda com a foto (25/11). */
+  modality?: "online" | "presencial";
   startsAt: Date;
   endsAt: Date;
   /** awaiting_release: presencial photo sent, waiting for the director/manager to validate and release. */

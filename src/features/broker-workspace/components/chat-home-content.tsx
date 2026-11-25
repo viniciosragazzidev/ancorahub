@@ -16,6 +16,7 @@ import { isBrokerQuickSaleEnabled } from "@/features/broker-workspace/quick-sale
 import { BrokerFinanceSummaryCard } from "@/features/erp/components/broker-finance-summary-card";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getLiveHomeAnnouncement } from "@/features/home-announcement/service";
+import { isOnlineWithPhoto } from "@/features/broker-workspace/presence-modality";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const time = (date: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
@@ -49,7 +50,7 @@ function presenceNext(data: BrokerWorkspaceData): HomeSummary["next"] {
   if (presence?.status !== "pending") return null;
   return {
     label: presence.mode === "presencial" ? "Tirar a foto do plantão" : "Confirmar presença",
-    detail: presence.mode === "presencial" ? `O ${presence.scheduleName} é presencial: esteja na unidade, tire a foto do local e o diretor libera você.` : `Confirme o ${presence.scheduleName} para começar a receber leads.`,
+    detail: isOnlineWithPhoto(presence) ? `Tire uma foto para confirmar o ${presence.scheduleName}; o diretor libera você.` : presence.mode === "presencial" ? `O ${presence.scheduleName} é presencial: esteja na unidade, tire a foto do local e o diretor libera você.` : `Confirme o ${presence.scheduleName} para começar a receber leads.`,
     href: "/plantoes/agora",
     urgent: true,
   };

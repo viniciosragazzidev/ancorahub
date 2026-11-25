@@ -13,6 +13,7 @@ import type {
 import type { BrokerWorkspacePriority } from "@/features/broker-workspace/priority";
 import { DECLINE_REASONS } from "@/features/broker-workspace/components/light-lead-detail/types";
 import { isQuotePausedFor } from "../quote-availability";
+import { isOnlineWithPhoto } from "@/features/broker-workspace/presence-modality";
 
 const TIME_ZONE = "America/Sao_Paulo";
 
@@ -531,7 +532,9 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
       if (presence.status === "awaiting_release") {
         blocks.push(assistantMessage(`duty-presence-wait-${presence.assignmentId}`, `Sua foto do plantão ${presence.scheduleName} chegou para o diretor. Assim que ele validar e liberar, os leads começam a chegar. Até lá você fica pausado.`));
       } else {
-        blocks.push(assistantMessage(`duty-presence-hint-${presence.assignmentId}`, presence.mode === "presencial"
+        blocks.push(assistantMessage(`duty-presence-hint-${presence.assignmentId}`, isOnlineWithPhoto(presence)
+          ? `O ${presence.scheduleName} pede foto na confirmação: tire uma foto aqui embaixo. O diretor valida a foto e libera você para receber leads.`
+          : presence.mode === "presencial"
           ? `O ${presence.scheduleName} é presencial: quando chegar à unidade, tire uma foto do local. O diretor valida a foto e libera você para receber leads.`
           : `Confirme sua presença no ${presence.scheduleName} para começar a receber leads.`));
       }
@@ -548,7 +551,9 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
   }
   if (ask?.status === "pending") {
     const blocks: ChatBlock[] = active ? [dutyFacts(active)] : [];
-    blocks.push(assistantMessage(`duty-presence-hint-${ask.assignmentId}`, ask.mode === "presencial"
+    blocks.push(assistantMessage(`duty-presence-hint-${ask.assignmentId}`, isOnlineWithPhoto(ask)
+      ? "Seu plantão pede foto na confirmação: tire uma foto aqui embaixo. O diretor valida a foto e libera você para receber leads."
+      : ask.mode === "presencial"
       ? "Seu plantão é presencial: você precisa estar na unidade, presencialmente, durante todo o plantão. Quando chegar, tire uma foto do local aqui embaixo. O diretor valida a foto e libera você para receber leads."
       : "Confirme sua presença para começar a receber leads."));
     blocks.push({ type: "presence", id: `duty-presence-${ask.assignmentId}`, ask });

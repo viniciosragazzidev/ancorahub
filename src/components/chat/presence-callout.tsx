@@ -22,6 +22,7 @@ const loadPresenceGate = () => import("@/features/lead-distribution/duty-presenc
 const loadWhatsAppConnection = () => import("@/app/(dashboard)/settings/whatsapp-actions").then((module) => module.getWhatsAppConnection());
 import styles from "./chat.module.css";
 import type { PresenceAskView } from "./types";
+import { presenceModality } from "@/features/broker-workspace/presence-modality";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const hhmm = (iso: string) => new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
@@ -102,6 +103,8 @@ export function PresenceCallout({ ask, variant = "home", doneAction, pendingActi
   }, [guideKey]);
   const [checking, setChecking] = useState(false);
   const presencial = ask.mode === "presencial";
+  // A modalidade mostrada não muda com "Exigir foto na confirmação" (25/11); `presencial` acima é o passo com foto.
+  const modality = presenceModality(ask);
   const [started] = useState(() => new Date(ask.startsAt).getTime() <= Date.now());
 
   // Waiting for the director: check every 30 s; once released, the card turns into "confirmada".
@@ -146,7 +149,7 @@ export function PresenceCallout({ ask, variant = "home", doneAction, pendingActi
       if (viaGuide) setWhatsapp((current) => (current ? { ...current, stage: result.awaitingRelease ? "waiting" : "done", confirmedAt: at } : current));
       // Presença confirmada (15/11/2026): a tela de conquista do capitão comemora; sem anfitrião, só a confirmação.
       const celebrated = !result.awaitingRelease && announceAchievement({
-        kind: "duty", key: `duty:${ask.assignmentId}:${ask.startsAt}`, scheduleName: ask.scheduleName, until: hhmm(ask.endsAt), mode: ask.mode, startInterval: ask.startInterval,
+        kind: "duty", key: `duty:${ask.assignmentId}:${ask.startsAt}`, scheduleName: ask.scheduleName, until: hhmm(ask.endsAt), mode: modality, startInterval: ask.startInterval,
       });
       if (!celebrated) fireFeedback("confirm");
       // Pelo roteiro, a tela atualiza quando o corretor sai dele ("Ir para o Plantão").
@@ -254,11 +257,11 @@ export function PresenceCallout({ ask, variant = "home", doneAction, pendingActi
           <AssistantAvatar shape="onigiri" hue={28} size={44} state={sending || waiting ? "working" : done ? "idle" : "waiting"} />
         </span>
         <span className={styles.presenceText}>
-          <span className={styles.presencePill} data-mode={ask.mode}>
-            {presencial ? (
+          <span className={styles.presencePill} data-mode={modality}>
+            {modality === "presencial" ? (
               <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 14s4.5-4.2 4.5-7.5a4.5 4.5 0 1 0-9 0C3.5 9.8 8 14 8 14Z" fill="none" stroke="currentColor" strokeWidth="1.6" /><circle cx="8" cy="6.5" r="1.6" fill="currentColor" /></svg>
             ) : <span className={styles.presenceLive} aria-hidden="true" />}
-            {presencial ? "Plantão presencial" : "Plantão online"} · {started ? `até ${hhmm(ask.endsAt)}` : `começa ${hhmm(ask.startsAt)}`}
+            {modality === "presencial" ? "Plantão presencial" : "Plantão online"} · {started ? `até ${hhmm(ask.endsAt)}` : `começa ${hhmm(ask.startsAt)}`}
           </span>
           <span className={styles.presenceSchedule}>{ask.scheduleName}{ask.branchName ? ` · ${ask.branchName}` : ""}</span>
           <span className={styles.presenceTitle}>{done ? "Presença confirmada" : waiting ? "Foto enviada" : "Confirme sua presença"}</span>
@@ -345,7 +348,7 @@ export function PresenceCallout({ ask, variant = "home", doneAction, pendingActi
           open={whatsapp.open}
           variant="presence"
           triggerLabel="Conectar WhatsApp"
-          duty={{ key: guideKey, scheduleName: ask.scheduleName, branchName: ask.branchName, mode: ask.mode, until: hhmm(ask.endsAt) }}
+          duty={{ key: guideKey, scheduleName: ask.scheduleName, branchName: ask.branchName, mode: ask.mode, modality, until: hhmm(ask.endsAt) }}
           presence={{
             stage: whatsapp.stage,
             error: whatsapp.error,

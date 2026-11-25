@@ -111,7 +111,10 @@ export type PresenceAskView = {
   assignmentId: string;
   scheduleName: string;
   branchName: string | null;
+  /** Como confirma: "presencial" = com foto. */
   mode: "online" | "presencial";
+  /** Modalidade mostrada, que não muda com a foto (25/11). Ausente: igual a `mode`. */
+  modality?: "online" | "presencial";
   startsAt: string;
   endsAt: string;
   status: "pending" | "awaiting_release" | "confirmed";

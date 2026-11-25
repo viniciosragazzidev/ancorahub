@@ -161,7 +161,8 @@ export function buildDutySummary(input: {
         if (!window || window.startsAt < row.validFrom || (row.validUntil && window.startsAt >= row.validUntil)) return [];
         // From here on `attendanceMode` is the mode this broker works the occurrence in.
         // "Exigir foto na confirmação" (25/11): com foto, a confirmação é a do presencial; sem, a do online.
-        return [{ row: { ...row, attendanceMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode, photo.get(row.scheduleId)) }, ...window }];
+        // `attendanceMode` decide a confirmação; `venueMode` é a modalidade que a tela mostra (não muda com a foto).
+        return [{ row: { ...row, attendanceMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode, photo.get(row.scheduleId)), venueMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode) }, ...window }];
       }));
   });
 
@@ -200,6 +201,7 @@ export function buildDutySummary(input: {
           scheduleName: occurrence.row.scheduleName,
           branchName: occurrence.row.branchName,
           mode,
+          modality: occurrence.row.venueMode,
           startsAt: occurrence.startsAt,
           endsAt: occurrence.endsAt,
           status: occurrence.row.confirmationStatus === "confirmed" && (mode === "online" || Boolean(occurrence.row.confirmedBy))
@@ -224,7 +226,7 @@ export function buildDutySummary(input: {
       endsAt: occurrence.endsAt,
       paused: Boolean(occurrence.row.pausedAt),
       presenceStatus: presenceStatusOf(occurrence),
-      attendanceMode: occurrence.row.attendanceMode,
+      attendanceMode: occurrence.row.venueMode,
     });
     const active = activeOccurrence ? toActive(activeOccurrence) : null;
     const next = nextOccurrence ? {

@@ -526,16 +526,18 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     presenceEnabled,
     roster: roster.map(({ phone, userActive, membershipStatus, startsAt, endsAt, assignmentAttendanceMode, ...entry }) => {
       // The mode this broker works the occurrence in: online inside a presencial plantão when the director said so (20/10).
-      const attendanceMode = effectiveAttendanceMode(assignmentAttendanceMode, schedule.attendanceMode, photoBySchedule.get(schedule.id));
+      const attendanceMode = effectiveAttendanceMode(assignmentAttendanceMode, schedule.attendanceMode);
+      // A confirmação (com ou sem foto) segue "Exigir foto na confirmação"; a modalidade mostrada não muda (25/11).
+      const confirmMode = effectiveAttendanceMode(assignmentAttendanceMode, schedule.attendanceMode, photoBySchedule.get(schedule.id));
       // Which shift this broker works (morning, afternoon, whole day) on a split plantão.
       const shift = assignmentShift(schedule, { startsAt, endsAt });
       const occurrence = occurrenceByAssignment.get(entry.id);
       const presence = occurrence ? presenceByAssignment.get(presenceOccurrenceKey(entry.id, occurrence)) : null;
       // Same prerequisites the distribution engine applies before offering a lead.
-      const blockedReason = presence?.status === "absent" ? "Falta registrada neste plantão" : !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : attendanceMode === "presencial" && (!presence || presence.status !== "confirmed" || !presence.confirmedBy) ? "Aguardando presença na unidade" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
+      const blockedReason = presence?.status === "absent" ? "Falta registrada neste plantão" : !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : confirmMode === "presencial" && (!presence || presence.status !== "confirmed" || !presence.confirmedBy) ? "Aguardando presença na unidade" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
       const absent = presence?.status === "absent";
       // Presencial starts paused (2026-10-12): paused until the photo of the place (or the manager) releases the broker.
-      const onSitePending = attendanceMode === "presencial" && Boolean(occurrence) && (!presence || presence.status !== "confirmed" || !presence.confirmedBy);
+      const onSitePending = confirmMode === "presencial" && Boolean(occurrence) && (!presence || presence.status !== "confirmed" || !presence.confirmedBy);
       // The manager can release from 30 minutes before the start (same window as the broker's own confirmation).
       const onSiteReleaseOpen = onSitePending && Boolean(occurrence && occurrence.startsAt <= new Date(now.getTime() + 30 * 60_000));
       const liveStatus = combineLiveStatusAcrossQueues((statusQueues.length ? statusQueues : [null]).map((queue) => classifyBrokerLiveOfferStatus({
@@ -568,7 +570,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       absent,
       onSitePending,
       onSiteReleaseOpen,
-      presenceStatus: absent ? "absent" as const : !occurrence || (!presenceEnabled && attendanceMode !== "presencial") ? "not_requested" as const : presence?.status === "confirmed" && !onSitePending ? "confirmed" as const : "pending" as const,
+      presenceStatus: absent ? "absent" as const : !occurrence || (!presenceEnabled && confirmMode !== "presencial") ? "not_requested" as const : presence?.status === "confirmed" && !onSitePending ? "confirmed" as const : "pending" as const,
       confirmedAt: presence?.confirmedAt ?? null,
       /** When the presencial photo was sent: the arrival for the rotation and the wait for approval (30/10). */
       photoTakenAt: presence?.hasPhoto ? presence.photoTakenAt ?? null : null,
