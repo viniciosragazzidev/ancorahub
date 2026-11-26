@@ -12,6 +12,8 @@ import { scheduleLeadConversationAnalysis } from "@/features/conversation-intell
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { lockLeadCreationByPhone } from "@/features/leads/phone-dedup-lock";
 import { openWaPhoneCandidateFilter, openWaSamePhone } from "@/features/openwa/phone-candidates";
+import { internalContactCode } from "@/features/internal-contacts/decision";
+import { checkInternalContact } from "@/features/internal-contacts/queries";
 
 type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; type?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string; type?: string } };
 
@@ -75,7 +77,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ tena
   ]);
   // Only candidates sharing the last 8 digits come back (egress 16/11); the match rule is unchanged.
   const samePhone = (value: string) => openWaSamePhone(value, phone);
-  const isInternal = [...brokers, ...numbers, ...channels].some((b) => b.phone && samePhone(b.phone));
+  const ownOrTeam = [...brokers, ...numbers, ...channels].some((b) => b.phone && samePhone(b.phone));
+  // Contato interno ("Números internos" do diretor e equipe ativa): fica no histórico, sem lead, sem IA e sem distribuição.
+  const internalContact = ownOrTeam ? null : await checkInternalContact(tenantId, phone);
+  if (internalContact?.internal) console.info("[OpenWA] contato interno fora de lead", { tenantId, reason: internalContactCode(internalContact) });
+  const isInternal = ownOrTeam || Boolean(internalContact?.internal);
   const matchingLeads = isInternal ? [] : leads.filter((item) => samePhone(item.phone));
   const isOutgoing = event.direction === "outgoing" || event.fromMe === true;
   let lead: { id: string; phone: string; status: (typeof schema.leads.$inferSelect)["status"] } | null = matchingLeads.find((item) => ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(item.status)) ?? matchingLeads[0] ?? null;

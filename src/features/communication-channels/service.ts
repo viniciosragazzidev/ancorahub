@@ -23,6 +23,8 @@ import { readCtwaAdReferral } from "./meta-ctwa-referral";
 import { channelLeadIntakeKey, parseChannelLeadIntake, resolveChannelLeadIntakeRoute } from "./channel-lead-intake";
 import { BROKER_ACQUISITION_QUEUE_NAME, ensureBrokerAcquisitionQueue, isBrokerPartnershipMessage } from "./broker-acquisition";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { internalContactCode } from "@/features/internal-contacts/decision";
+import { checkInternalContact } from "@/features/internal-contacts/queries";
 import { COEXISTENCE_WEBHOOK_FIELDS } from "./meta-coexistence-events";
 import type { MetaWebhookPayload, MetaWebhookStatus } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
@@ -298,6 +300,32 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           console.info("[whatsapp/broker-channel] inbound.received", { tenantId: channel.tenantId, brokerProfileId: brokerProfile.id, messageKind });
           void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
           await setWebhookEventResult(eventId, "processed");
+          processed += 1;
+          continue;
+        }
+
+        // Contato interno (equipe ativa ou "Números internos" do diretor): a mensagem fica no histórico, sem lead,
+        // sem IA e sem distribuição. O motivo fica no evento do webhook.
+        const internalContact = await checkInternalContact(channel.tenantId, phone);
+        if (internalContact.internal) {
+          await db.insert(schema.whatsappMessages).values({
+            id: randomUUID(),
+            tenantId: channel.tenantId,
+            leadId: null,
+            clientId: null,
+            communicationChannelId: channel.id,
+            provider: META_CLOUD_PROVIDER,
+            providerStatus: "received",
+            messageId: message.id,
+            phone,
+            direction: "incoming",
+            body: text || `[${messageKind}]`,
+            ...(mediaColumns ? { mediaKind: mediaColumns.kind, mediaMimeType: mediaColumns.mimeType, mediaFilename: mediaColumns.filename, mediaSizeBytes: mediaColumns.sizeBytes, mediaStorageKey: mediaColumns.storageKey, mediaProviderId: inboundMediaId } : {}),
+            sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
+          }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+          console.info("[whatsapp/internal-contact] inbound.kept_out", { tenantId: channel.tenantId, reason: internalContact.reason, messageKind });
+          void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
+          await setWebhookEventResult(eventId, "processed", internalContactCode(internalContact));
           processed += 1;
           continue;
         }

@@ -12,7 +12,11 @@ import { normalizeTenantChannelRouting, type TenantChannelRouting } from "@/feat
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { teamNoticeByKey, type NoticeChannel } from "@/features/team-notices/catalog";
 import { MAX_NOTICE_FREE_MESSAGES } from "@/features/team-notices/variants";
-import { MAX_CLOSING_DIRECTOR_RECIPIENTS, noticeRecipientsKey, normalizeRecipientPhone } from "@/features/leads/closing-director-alert-core";
+import { listNoticeDeliveries, sendNoticeTest, type NoticeTestResult } from "@/features/team-notices/deliveries-server";
+import type { NoticeDeliveryView } from "@/features/team-notices/deliveries";
+import { noticeTestable } from "@/features/team-notices/deliveries";
+import { findLeadPhones, findOwnAccountPhone, getOwnAccountPhones } from "@/features/internal-contacts/account-phones";
+import { formatRecipientPhone, MAX_CLOSING_DIRECTOR_RECIPIENTS, noticeRecipientsKey, normalizeRecipientPhone } from "@/features/leads/closing-director-alert-core";
 import {
   disconnectTenantChannel,
   readTenantChannelState,
@@ -87,7 +91,7 @@ export async function saveTenantChannelRoutingAction(input: TenantChannelRouting
 export type TeamNoticeInput = { key: string; enabled: boolean; channel: NoticeChannel; freeMessageIds: string[]; recipientPhones?: string[] };
 
 /** Team notices (DEC-125): on/off, channel (Meta only or company WhatsApp) and the company-number text of each notice. */
-export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<Result<object>> {
+export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<Result<{ warnings: string[] }>> {
   try {
     const context = await getRequiredTenantContext();
     if (context.role !== "director") return { success: false, error: "Apenas o Diretor pode alterar os avisos da equipe." };
@@ -111,6 +115,12 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
       const phones = [...new Set(typed.map((phone) => normalizeRecipientPhone(phone)!))];
       if (phones.length > MAX_CLOSING_DIRECTOR_RECIPIENTS) return { success: false, error: `No máximo ${MAX_CLOSING_DIRECTOR_RECIPIENTS} números por aviso.` };
       phoneLists.push({ key: item.key, phones });
+    }
+    // Número da própria conta (oficial da Meta ou WhatsApp da empresa) mandaria o aviso para a própria caixa: recusado.
+    const typedPhones = phoneLists.flatMap((list) => list.phones);
+    if (typedPhones.length) {
+      const own = findOwnAccountPhone(typedPhones, await getOwnAccountPhones(context.tenantId));
+      if (own) return { success: false, error: `${formatRecipientPhone(own)} é um número da própria conta. Use o celular de quem deve receber.` };
     }
     const messageIds = [...new Set(rows.flatMap((item) => item.freeMessageIds))];
     if (messageIds.length) {
@@ -145,8 +155,39 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
     });
     if (phoneLists.length) invalidateSystemSettingsCache();
     revalidatePath("/integrations/whatsapp");
-    return { success: true };
+    // Número de lead não é recusado (pode ser de propósito), mas o diretor fica sabendo.
+    const leads = typedPhones.length ? await findLeadPhones(context.tenantId, [...new Set(typedPhones)]).catch(() => []) : [];
+    return { success: true, warnings: leads.map((lead) => `${formatRecipientPhone(lead.phone)} é do lead ${lead.leadName}. Ele vai receber os avisos da direção.`) };
   } catch (error) {
     return failure(error, "Não foi possível salvar os avisos da equipe.");
+  }
+}
+
+/** "Últimos envios" de um aviso: só o diretor, só da empresa. */
+export async function listTeamNoticeDeliveriesAction(key: string): Promise<Result<{ rows: NoticeDeliveryView[] }>> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") return { success: false, error: "Apenas o Diretor vê os envios dos avisos." };
+    const notice = teamNoticeByKey(key);
+    if (!notice) return { success: false, error: "Aviso não encontrado." };
+    return { success: true, rows: await listNoticeDeliveries(context.tenantId, notice) };
+  } catch (error) {
+    return failure(error, "Não deu para carregar os envios agora.");
+  }
+}
+
+/** "Enviar teste": pelo canal escolhido, para os números do aviso, no máximo 3 por hora por aviso. */
+export async function sendTeamNoticeTestAction(key: string): Promise<Result<{ results: NoticeTestResult[]; remaining: number }>> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") return { success: false, error: "Apenas o Diretor envia teste dos avisos." };
+    const notice = teamNoticeByKey(key);
+    if (!notice || !noticeTestable(notice)) return { success: false, error: "Este aviso não tem envio de teste." };
+    const outcome = await sendNoticeTest({ tenantId: context.tenantId, userId: context.userId, notice });
+    if (!outcome.ok) return { success: false, error: outcome.error };
+    revalidatePath("/integrations/whatsapp");
+    return { success: true, results: outcome.results, remaining: outcome.remaining };
+  } catch (error) {
+    return failure(error, "Não deu para enviar o teste agora.");
   }
 }

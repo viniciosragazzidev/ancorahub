@@ -14,9 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSection, SheetSectionHeader, SheetSectionLabel, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
+import { LiteMenu } from "@/components/lite/controls";
 import type { NoticeChannel } from "@/features/team-notices/catalog";
 import { MAX_NOTICE_FREE_MESSAGES } from "@/features/team-notices/variants";
 import { saveTeamNoticesAction, type TeamNoticeInput } from "../actions";
+import { NoticeDeliveriesPanel } from "./notice-deliveries-panel";
 
 export type TeamNoticeRow = {
   key: string;
@@ -27,6 +29,8 @@ export type TeamNoticeRow = {
   /** Free text typed in the chat: only the channel is chosen. */
   chat: boolean;
   immediate: boolean;
+  /** Tem "Enviar teste" (fora: chat e os sempre ligados, que levam link secreto ou vêm da escala). */
+  testable?: boolean;
   enabled: boolean;
   channel: NoticeChannel;
   /** Library messages that rotate on the company number; empty uses the built-in versions. */
@@ -65,6 +69,9 @@ export function TeamNoticesCard({
   const [isPending, startTransition] = useTransition();
   const dirty = JSON.stringify(rows) !== JSON.stringify(saved);
   const [textsKey, setTextsKey] = useState<string | null>(null);
+  const [deliveriesKey, setDeliveriesKey] = useState<string | null>(null);
+  const [saveWarnings, setSaveWarnings] = useState<string[]>([]);
+  const deliveriesRow = saved.find((row) => row.key === deliveriesKey) ?? null;
   const textsRow = rows.find((row) => row.key === textsKey) ?? null;
   const activeCount = rows.filter((row) => row.enabled && !row.chat).length;
   const usesCompanyNumber = rows.some((row) => row.enabled && !row.metaOnly && row.channel === "company_number");
@@ -83,6 +90,7 @@ export function TeamNoticesCard({
         return;
       }
       setSaved(rows);
+      setSaveWarnings(result.warnings ?? []);
       toast.success("Avisos da equipe salvos.");
     });
   }
@@ -103,6 +111,11 @@ export function TeamNoticesCard({
         <p className="mx-4 mt-4 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
           O WhatsApp da empresa não está conectado: enquanto isso, o que estiver marcado para ele sai pela Meta oficial.
         </p>
+      ) : null}
+      {saveWarnings.length ? (
+        <div role="status" className="mx-4 mt-4 grid gap-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
+          {saveWarnings.map((warning) => <p key={warning}>{warning}</p>)}
+        </div>
       ) : null}
       <ul className="divide-y divide-border/60">
         {rows.map((row) => (
@@ -138,6 +151,15 @@ export function TeamNoticesCard({
                     ) : null}
                   </label>
                 ) : null}
+              </div>
+              <div className="ml-auto shrink-0">
+                <LiteMenu
+                  label={`Mais ações de ${row.label}`}
+                  items={[
+                    { id: "envios", label: "Últimos envios", onSelect: () => setDeliveriesKey(row.key) },
+                    ...(row.testable ? [{ id: "teste", label: "Enviar teste", onSelect: () => setDeliveriesKey(row.key) }] : []),
+                  ]}
+                />
               </div>
             </div>
             {row.metaOnly ? (
@@ -176,6 +198,10 @@ export function TeamNoticesCard({
         Novo lead e informações do lead saem na hora. Os demais avisos saem de segunda a sexta, das 8h às 18h, com intervalo entre mensagens, e cada pessoa recebe no máximo 2 lembretes por dia. Pelo WhatsApp da empresa, cada envio sorteia uma versão do texto; os textos podem vir de{" "}
         <Link href="/atendimento/mensagens" className="font-medium text-foreground underline-offset-4 hover:underline">Atendimento → Mensagens</Link>.
       </p>
+      <NoticeDeliveriesPanel
+        target={deliveriesRow ? { key: deliveriesRow.key, label: deliveriesRow.label, testable: Boolean(deliveriesRow.testable), enabled: deliveriesRow.enabled, recipientPhones: deliveriesRow.recipientPhones } : null}
+        onClose={() => setDeliveriesKey(null)}
+      />
       <NoticeTextsSheet
         row={textsRow}
         freeMessages={freeMessages}

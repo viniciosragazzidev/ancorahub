@@ -67,6 +67,9 @@ import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { getTwoFactorPolicy } from "@/features/security/two-factor-policy-server";
 import { listLgpdRequests } from "@/features/leads/lgpd/lgpd-requests-store";
 import { LgpdRequestsLite } from "./_components/lite/lgpd-requests-lite";
+import { InternalNumbersLite } from "./_components/lite/internal-numbers-lite";
+import { getInternalDirectory, getInternalNumbers } from "@/features/internal-contacts/queries";
+import { formatInternalNumberLines } from "@/features/internal-contacts/decision";
 
 export default async function SettingsPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
   // /configuracoes/comissoes redireciona para cá com ?tab=comissoes (next.config.ts): mostra as regras de comissão (20/11).
@@ -278,7 +281,14 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const lgpdSection: SettingsLiteSection | null = lgpd
       ? { id: "lgpd", title: "LGPD", description: "Pedidos do titular e prazo de 15 dias", node: <LgpdRequestsLite ready={lgpd.ready} initialRows={lgpd.rows} /> }
       : null;
-    const extraSections = [proposalsSection, tagsSection, resourcesSection, lgpdSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
+    // Números internos (26/11): fornecedores, operadoras e família fora de lead e da IA, só o diretor; a action confere o papel.
+    const internal = context.role === "director"
+      ? await Promise.all([getInternalNumbers(context.tenantId), getInternalDirectory(context.tenantId)]).catch(() => null)
+      : null;
+    const internalSection: SettingsLiteSection | null = internal
+      ? { id: "numeros-internos", title: "Números internos", description: "Quem escreve no WhatsApp e não é lead", node: <InternalNumbersLite initialText={formatInternalNumberLines(internal[0])} teamCount={internal[1].team.size} /> }
+      : null;
+    const extraSections = [proposalsSection, tagsSection, internalSection, resourcesSection, lgpdSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
     const sections = [...tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section)), ...extraSections];
     return (
       <>
