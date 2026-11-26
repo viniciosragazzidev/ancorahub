@@ -10,7 +10,7 @@ import Link from "next/link";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import page from "@/components/lite/page/lite-page.module.css";
 import styles from "@/components/lite/page/lite-sections.module.css";
-import { resourceStateLabel, type ResourceEntry, type ResourceGroup } from "@/features/system-settings/resource-catalog";
+import { resourceStateLabel, resourceSupportHint, type ResourceEntry, type ResourceGroup } from "@/features/system-settings/resource-catalog";
 
 function columnsFor(group: ResourceGroup): LiteColumn<ResourceEntry>[] {
   const adjustable = group.items.some((item) => item.adjustHref);
@@ -33,7 +33,15 @@ function columnsFor(group: ResourceGroup): LiteColumn<ResourceEntry>[] {
       label: "Situação",
       nowrap: true,
       phonePriority: "high",
-      render: (item) => <span className={page.badge} data-tone={item.enabled ? "success" : undefined}>{resourceStateLabel(item.enabled)}</span>,
+      render: (item) => {
+        const hint = resourceSupportHint(item);
+        return (
+          <span>
+            <span className={page.badge} data-tone={item.enabled ? "success" : undefined}>{resourceStateLabel(item.enabled)}</span>
+            {hint ? <span className={page.cellSub}>{hint}</span> : null}
+          </span>
+        );
+      },
     },
     ...(adjustable ? [{
       id: "actions",

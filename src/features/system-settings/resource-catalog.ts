@@ -169,3 +169,8 @@ export function groupResources(entries: readonly ResourceEntry[], options: { can
 export function resourceStateLabel(enabled: boolean) {
   return enabled ? "Ligado" : "Desligado";
 }
+
+/** Recurso que só a plataforma liga e está desligado: o diretor pede ao suporte (26/11). */
+export function resourceSupportHint(entry: Pick<ResourceEntry, "enabled" | "decidedBy">) {
+  return !entry.enabled && entry.decidedBy === "Plataforma" ? "Fale com o suporte para ligar" : null;
+}

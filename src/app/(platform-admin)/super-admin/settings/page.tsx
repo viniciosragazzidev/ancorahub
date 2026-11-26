@@ -71,12 +71,14 @@ import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getAiBudgetState } from "@/features/ai-gateway/anthropic-budget";
+import { getAiAdminPanelData } from "@/features/ai-gateway/admin-panel-data";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
+import { AiAdminPanel } from "./ai-admin-panel";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { BROKER_NEWS_RESOURCES } from "@/features/system-settings/resource-catalog";
 import { ErpPlatformPanel } from "@/features/erp/components/platform-panel";
@@ -188,9 +190,10 @@ export default async function SuperAdminSettingsPage() {
     "ai_google_api_key",
     "ai_openrouter_api_key",
   ]);
-  const [notificationCapabilities, aiBudget] = await Promise.all([
+  const [notificationCapabilities, aiBudget, aiAdminPanel] = await Promise.all([
     getNotificationCapabilityStates(),
     getAiBudgetState(new Date(), { fresh: true }).catch(() => null),
+    getAiAdminPanelData().catch(() => null),
   ]);
   const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
   // The Central and the journey need the 0188 tables (scripts/apply-0188-engagement-relationship.mjs).
@@ -1854,6 +1857,8 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
+
+            {aiAdminPanel ? <section data-settings-tab="intelligence"><AiAdminPanel data={aiAdminPanel} /></section> : null}
 
             <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
               <CardHeader>

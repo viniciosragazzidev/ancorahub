@@ -9,6 +9,7 @@ import {
   groupResources,
   resourceSettingKeys,
   resourceStateLabel,
+  resourceSupportHint,
   tenantFlagKey,
   TENANT_FLAG_RESOURCES,
 } from "./resource-catalog";
@@ -87,6 +88,12 @@ describe("groupResources", () => {
   it("situação sempre em texto", () => {
     expect(resourceStateLabel(true)).toBe("Ligado");
     expect(resourceStateLabel(false)).toBe("Desligado");
+  });
+
+  it("pede ao suporte só no recurso da plataforma desligado", () => {
+    expect(resourceSupportHint({ enabled: false, decidedBy: "Plataforma" })).toBe("Fale com o suporte para ligar");
+    expect(resourceSupportHint({ enabled: true, decidedBy: "Plataforma" })).toBeNull();
+    expect(resourceSupportHint({ enabled: false, decidedBy: "Diretor" })).toBeNull();
   });
 });
 
