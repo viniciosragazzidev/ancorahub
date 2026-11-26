@@ -119,7 +119,7 @@ function AnonymizeDialog({ onCancel, onAnonymize, onDone }: {
       <div role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className={controls.dialog}>
         <h2 id={titleId} className={controls.dialogTitle}>Anonimizar este titular?</h2>
         <div id={descriptionId} className={controls.dialogDescription}>
-          Nome vira &quot;Titular anonimizado&quot;. Telefone, e-mail, CPF, nascimento, anotações e mensagens são apagados do lead e do cliente. Venda, comissão e números do relatório continuam. Não dá para desfazer.
+          Nome vira &quot;Titular anonimizado&quot;. Telefone, e-mail, CPF, nascimento, anotações, mensagens, conversas da IA, cotações, propostas e documentos enviados perdem o dado pessoal. Valores, número da apólice, comissão e números do relatório continuam. Não dá para desfazer.
         </div>
         <div className={styles.fields}>
           <label className={form.field}>

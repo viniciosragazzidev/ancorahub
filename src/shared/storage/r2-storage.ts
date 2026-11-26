@@ -12,11 +12,13 @@ export class R2StorageConfigurationError extends Error {
 }
 
 export class R2StorageRequestError extends Error {
-  constructor(operation: "upload" | "download", status: number) {
+  constructor(operation: "upload" | "download" | "delete", status: number) {
     super(
       operation === "upload"
         ? "Não foi possível gravar o arquivo no armazenamento."
-        : "Não foi possível ler o arquivo no armazenamento.",
+        : operation === "delete"
+          ? "Não foi possível apagar o arquivo no armazenamento."
+          : "Não foi possível ler o arquivo no armazenamento.",
     );
     this.name = "R2StorageRequestError";
     this.cause = { status };
@@ -67,7 +69,7 @@ export function createR2SignedHeaders({
   contentType,
   now = new Date(),
 }: {
-  method: "GET" | "PUT";
+  method: "GET" | "PUT" | "DELETE";
   accountId: string;
   accessKeyId: string;
   secretAccessKey: string;
@@ -142,4 +144,11 @@ export async function downloadR2Object(storageKey: string) {
   const response = await fetch(request.url, { headers: request.headers, cache: "no-store" });
   if (!response.ok) throw new R2StorageRequestError("download", response.status);
   return response.blob();
+}
+
+/** Apaga um objeto do bucket. Objeto que já não existe (404) conta como apagado. */
+export async function deleteR2Object(storageKey: string) {
+  const request = createR2SignedHeaders({ method: "DELETE", ...getR2Configuration(), storageKey });
+  const response = await fetch(request.url, { method: "DELETE", headers: request.headers, cache: "no-store" });
+  if (!response.ok && response.status !== 404) throw new R2StorageRequestError("delete", response.status);
 }

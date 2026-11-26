@@ -1212,7 +1212,7 @@
                         "when":  1794800300000,
                         "tag":  "0236_supervisor_lead_lists",
                         "breakpoints":  true
-                    },
+                    },
                     {
                         "idx":  173,
                         "version":  "7",
@@ -1225,6 +1225,13 @@
                         "version":  "7",
                         "when":  1795000000000,
                         "tag":  "0239_duty_presence_photo",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  175,
+                        "version":  "7",
+                        "when":  1795100000000,
+                        "tag":  "0240_lgpd_requests",
                         "breakpoints":  true
                     }
                 ]

@@ -65,6 +65,8 @@ import { getTenantResourceGroups } from "@/features/system-settings/resources";
 import { listLeadTagsWithUsage } from "@/features/lead-tags/service";
 import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { getTwoFactorPolicy } from "@/features/security/two-factor-policy-server";
+import { listLgpdRequests } from "@/features/leads/lgpd/lgpd-requests-store";
+import { LgpdRequestsLite } from "./_components/lite/lgpd-requests-lite";
 
 export default async function SettingsPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
   // /configuracoes/comissoes redireciona para cá com ?tab=comissoes (next.config.ts): mostra as regras de comissão (20/11).
@@ -271,7 +273,12 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const tagsSection: SettingsLiteSection | null = tagList
       ? { id: "etiquetas", title: "Etiquetas", description: "Nome, cor e uso das etiquetas dos leads", node: <TagsLite initialTags={tagList} /> }
       : null;
-    const extraSections = [proposalsSection, tagsSection, resourcesSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
+    // LGPD (26/11): pedidos do titular com prazo de 15 dias, só o diretor; as actions conferem o papel de novo.
+    const lgpd = context.role === "director" ? await listLgpdRequests(context.tenantId).catch(() => ({ ready: false, rows: [] })) : null;
+    const lgpdSection: SettingsLiteSection | null = lgpd
+      ? { id: "lgpd", title: "LGPD", description: "Pedidos do titular e prazo de 15 dias", node: <LgpdRequestsLite ready={lgpd.ready} initialRows={lgpd.rows} /> }
+      : null;
+    const extraSections = [proposalsSection, tagsSection, resourcesSection, lgpdSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
     const sections = [...tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section)), ...extraSections];
     return (
       <>

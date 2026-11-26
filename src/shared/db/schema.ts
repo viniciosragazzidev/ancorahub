@@ -6028,3 +6028,31 @@ export const leadRecoveryTouches = pgTable(
     index("lead_recovery_touches_lead_idx").on(table.leadId, table.createdAt),
   ],
 );
+
+/**
+ * Pedidos do titular (LGPD, 26/11/2026; migration 0240). Um por pedido de exportar ou anonimizar, com o prazo de
+ * 15 dias corridos. Exportar e anonimizar na ficha do lead concluem o pedido aberto ou gravam um já concluído;
+ * "Registrar pedido" em /settings guarda o que chegou por e-mail ou telefone e ainda não foi atendido.
+ * O motivo é o que o diretor escreve; nenhum dado pessoal do titular é copiado para cá.
+ */
+export const lgpdRequests = pgTable(
+  "lgpd_requests",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["export", "anonymize"] }).notNull(),
+    reason: text("reason"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    completedBy: text("completed_by").references(() => user.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("lgpd_requests_tenant_due_idx").on(table.tenantId, table.completedAt, table.dueAt),
+    index("lgpd_requests_tenant_lead_idx").on(table.tenantId, table.leadId, table.kind),
+  ],
+);
