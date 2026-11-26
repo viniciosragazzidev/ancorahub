@@ -60,6 +60,8 @@ type LeadDetailsDrawerProps = {
   onReassignOptimistic: (brokerId: string) => void;
   onReassignRollback: () => void;
   onLeadPatch: (patch: Partial<LeadWorkspaceItem>) => void;
+  /** Bloco no topo da gaveta (ex.: ações do lead parado na visão Esfriando). */
+  topSlot?: React.ReactNode;
 };
 
 function DetailRow({ label, value }: { label: string; value: string | React.ReactNode }) {
@@ -88,6 +90,7 @@ export function LeadDetailsDrawer({
   onReassignOptimistic,
   onReassignRollback,
   onLeadPatch,
+  topSlot,
 }: LeadDetailsDrawerProps) {
   const shouldMask = contextJobTitle === "marketing" && lead.branchId !== contextBranchId;
   const canCall = !(contextRole === "broker" && lead.status === "distributed");
@@ -130,6 +133,7 @@ export function LeadDetailsDrawer({
       footer={<Button className="w-full justify-center gap-2 font-medium" render={<Link href={`/leads/${lead.id}`} />}>Abrir atendimento completo<ArrowUpRight className="size-4" /></Button>}
     >
       <div className="space-y-5">
+        {topSlot}
         {managementRole ? (
           <>
             {!lead.corretorId && lead.distributionStatus === "returned_to_queue" ? <div className="rounded-lg border border-warning/20 bg-warning/5 px-4 py-3"><p className="text-xs font-semibold text-warning">Lead aguardando reatribuição</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">O corretor responsável foi excluído. O lead voltou para a fila e precisa ser reatribuído manualmente.</p></div> : null}

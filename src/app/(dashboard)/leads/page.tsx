@@ -951,6 +951,8 @@ async function LeadsPageContent({
               })))}
               queues={activeQueues}
               contextRole={leadManagementActionsEnabled ? context.role : "broker"}
+              contextUserId={context.userId}
+              tags={leadTagList}
               postSaleEnabled={postSaleEnabled}
               showUnassignedFilter={canViewUnassigned}
               initialView={initialView}

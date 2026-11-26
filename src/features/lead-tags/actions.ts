@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
-import type { LeadTag } from "./rules";
-import { createLeadTag, deleteLeadTag, mergeLeadTags, setLeadTags, updateLeadTag, type LeadTagMergeResult } from "./service";
+import type { BulkLeadTagMode, LeadTag } from "./rules";
+import { bulkApplyLeadTag, createLeadTag, deleteLeadTag, mergeLeadTags, setLeadTags, updateLeadTag, type BulkLeadTagResult, type LeadTagMergeResult } from "./service";
 
 type Result<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -38,6 +38,15 @@ export async function deleteLeadTagAction(tagId: string): Promise<Result<null>> 
 
 export async function setLeadTagsAction(input: { leadId: string; tagIds: string[] }): Promise<Result<LeadTag[]>> {
   return run(async () => setLeadTags(await getRequiredTenantContext(), input));
+}
+
+/** "Etiquetar" em lote em /leads: aplica ou remove uma etiqueta da empresa nos leads selecionados. */
+export async function bulkSetLeadTagAction(input: { leadIds: string[]; tagId: string; mode: BulkLeadTagMode }): Promise<Result<BulkLeadTagResult>> {
+  return run(async () => bulkApplyLeadTag(await getRequiredTenantContext(), {
+    leadIds: Array.isArray(input?.leadIds) ? input.leadIds : [],
+    tagId: String(input?.tagId ?? ""),
+    mode: input?.mode,
+  }));
 }
 
 /** Joins one tag into another (same company): assignments move without duplicates and the source is deleted. */

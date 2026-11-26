@@ -8,7 +8,17 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { pickDistinctHue, QUEUE_HUE_MAX, QUEUE_HUE_MIN } from "@/features/lead-distribution/queue-color";
 
-import { canManageLeadTags, canTagLead, normalizeLeadTagName, planLeadTagMerge, type LeadTag, type LeadTagWithUsage } from "./rules";
+import {
+  canManageLeadTags,
+  canTagLead,
+  LEAD_TAG_BULK_MAX,
+  normalizeLeadTagName,
+  planBulkLeadTag,
+  planLeadTagMerge,
+  type BulkLeadTagMode,
+  type LeadTag,
+  type LeadTagWithUsage,
+} from "./rules";
 
 export async function listLeadTags(tenantId: string): Promise<LeadTag[]> {
   return getDatabase()
@@ -142,6 +152,47 @@ export async function deleteLeadTag(context: TenantContext, tagId: string) {
     .returning({ id: schema.leadTags.id });
   if (!removed) throw new Error("Tag não encontrada.");
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_tag", entidadeId: tagId, acao: "lead_tag.deleted" });
+}
+
+export type BulkLeadTagResult = { tag: LeadTag; mode: BulkLeadTagMode; changed: number; unchanged: number; skipped: number; changedLeadIds: string[] };
+
+/**
+ * "Etiquetar" em lote (/leads): aplica ou tira uma etiqueta da empresa nos leads selecionados. Só leads da empresa
+ * do usuário e no escopo dele mudam (`planBulkLeadTag`); nunca duplica o par lead+etiqueta.
+ */
+export async function bulkApplyLeadTag(context: TenantContext, input: { leadIds: readonly string[]; tagId: string; mode: BulkLeadTagMode }): Promise<BulkLeadTagResult> {
+  const leadIds = [...new Set(input.leadIds.filter((id) => typeof id === "string" && id))];
+  if (!leadIds.length) throw new Error("Selecione ao menos um lead.");
+  if (leadIds.length > LEAD_TAG_BULK_MAX) throw new Error(`Selecione até ${LEAD_TAG_BULK_MAX} leads por vez.`);
+  if (input.mode !== "add" && input.mode !== "remove") throw new Error("Escolha aplicar ou remover.");
+  const tenantId = context.tenantId;
+  const db = getDatabase();
+  const [tag] = await db.select({ id: schema.leadTags.id, name: schema.leadTags.name, colorHue: schema.leadTags.colorHue })
+    .from(schema.leadTags)
+    .where(and(eq(schema.leadTags.tenantId, tenantId), eq(schema.leadTags.id, input.tagId)));
+  if (!tag) throw new Error("Etiqueta não encontrada.");
+  const leads = await db.select({ id: schema.leads.id, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.tenantId, tenantId), inArray(schema.leads.id, leadIds)));
+  const tagged = await db.select({ leadId: schema.leadTagAssignments.leadId })
+    .from(schema.leadTagAssignments)
+    .where(and(eq(schema.leadTagAssignments.tenantId, tenantId), eq(schema.leadTagAssignments.tagId, tag.id), inArray(schema.leadTagAssignments.leadId, leadIds)));
+  const plan = planBulkLeadTag({ context, requestedIds: leadIds, leads, taggedLeadIds: tagged.map((row) => row.leadId), mode: input.mode });
+  if (!plan.change.length && plan.skipped === leadIds.length) throw new AuthorizationError("Você não pode alterar as etiquetas destes leads.");
+  if (plan.change.length) {
+    await db.transaction(async (tx) => {
+      if (input.mode === "add") {
+        await tx.insert(schema.leadTagAssignments)
+          .values(plan.change.map((leadId) => ({ tenantId, leadId, tagId: tag.id, createdBy: context.userId })))
+          .onConflictDoNothing();
+      } else {
+        await tx.delete(schema.leadTagAssignments)
+          .where(and(eq(schema.leadTagAssignments.tenantId, tenantId), eq(schema.leadTagAssignments.tagId, tag.id), inArray(schema.leadTagAssignments.leadId, plan.change)));
+      }
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_tag", entidadeId: tag.id, acao: input.mode === "add" ? `lead_tag.bulk_added:${plan.change.length}` : `lead_tag.bulk_removed:${plan.change.length}` });
+    });
+  }
+  return { tag, mode: input.mode, changed: plan.change.length, unchanged: plan.unchanged.length, skipped: plan.skipped, changedLeadIds: plan.change };
 }
 
 /** The lead ends up with exactly `tagIds` (tags of the tenant only). */

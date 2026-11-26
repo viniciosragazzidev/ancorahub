@@ -61,3 +61,49 @@ export function describeLeadTagDelete(input: { name: string; leadCount: number }
   if (input.leadCount === 0) return `"${input.name}" não está em nenhum lead.`;
   return `"${input.name}" sai de ${leadsLabel(input.leadCount)}. Não dá para desfazer.`;
 }
+
+/** Teto do lote: a seleção da lista vai até a página inteira, com folga. */
+export const LEAD_TAG_BULK_MAX = 500;
+
+export type BulkLeadTagMode = "add" | "remove";
+
+export type BulkLeadTagPlan = {
+  /** Leads que mudam: ganham (add) ou perdem (remove) a etiqueta. */
+  change: string[];
+  /** No escopo, mas já estavam como pedido (já tinham ou já não tinham). */
+  unchanged: string[];
+  /** Fora do escopo de quem pede ou de outra empresa: ficam de fora. */
+  skipped: number;
+};
+
+/**
+ * Etiquetar em lote: só os leads que quem pede pode etiquetar (`canTagLead`) mudam. `leads` são os leads já lidos
+ * da empresa do usuário; o que não voltou de lá (outra empresa ou inexistente) conta como fora do escopo.
+ */
+export function planBulkLeadTag(input: {
+  context: { role: string; userId: string; branchId: string | null };
+  requestedIds: readonly string[];
+  leads: ReadonlyArray<{ id: string; corretorId: string | null; branchId: string | null }>;
+  taggedLeadIds: readonly string[];
+  mode: BulkLeadTagMode;
+}): BulkLeadTagPlan {
+  const requested = new Set(input.requestedIds);
+  const tagged = new Set(input.taggedLeadIds);
+  const allowed = input.leads.filter((lead) => requested.has(lead.id) && canTagLead(input.context, lead)).map((lead) => lead.id);
+  const change = allowed.filter((id) => (input.mode === "add" ? !tagged.has(id) : tagged.has(id)));
+  const changing = new Set(change);
+  return { change, unchanged: allowed.filter((id) => !changing.has(id)), skipped: requested.size - allowed.length };
+}
+
+/** Texto do resultado do lote: o que mudou, o que já estava assim e o que ficou de fora. */
+export function describeBulkLeadTag(input: { tagName: string; mode: BulkLeadTagMode; changed: number; unchanged: number; skipped: number }) {
+  const parts: string[] = [];
+  if (input.mode === "add") {
+    parts.push(input.changed ? `"${input.tagName}" aplicada em ${leadsLabel(input.changed)}.` : `Nenhum lead novo com "${input.tagName}".`);
+    if (input.unchanged) parts.push(`${leadsLabel(input.unchanged)} já ${input.unchanged === 1 ? "tinha" : "tinham"}.`);
+  } else {
+    parts.push(input.changed ? `"${input.tagName}" removida de ${leadsLabel(input.changed)}.` : `Nenhum lead tinha "${input.tagName}".`);
+  }
+  if (input.skipped) parts.push(`${leadsLabel(input.skipped)} fora do seu escopo ${input.skipped === 1 ? "ficou" : "ficaram"} de fora.`);
+  return parts.join(" ");
+}

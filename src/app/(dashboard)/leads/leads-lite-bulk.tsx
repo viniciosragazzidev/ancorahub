@@ -18,6 +18,8 @@ import { useFeedback } from "@/lib/feedback/use-feedback";
 import { bulkChangeLeadStatusAction, bulkRevertToQualificationAction } from "./status-actions";
 import { buildPostSaleAudienceHref } from "@/features/post-sale-audit/bulk-navigation";
 import { useExportSelectedLeads } from "./use-export-selected-leads";
+import type { BulkLeadTagMode, LeadTag } from "@/features/lead-tags/rules";
+import { LeadsLiteBulkTagPanel } from "./leads-lite-bulk-tag";
 
 export type LeadsLiteBulkConfig = {
   role?: string;
@@ -28,6 +30,9 @@ export type LeadsLiteBulkConfig = {
   onReassignCommitted?: (input: { leadIds: string[]; brokerId: string }) => void;
   onBranchCommitted?: (input: { leadIds: string[]; branchId: string }) => void;
   onRevertCommitted?: (input: { leadIds: string[] }) => void;
+  /** Etiquetas da empresa: com alguma, a barra ganha "Etiquetar" (aplica ou remove uma etiqueta nos selecionados). */
+  tags?: LeadTag[];
+  onTagCommitted?: (input: { leadIds: string[]; tag: LeadTag; mode: BulkLeadTagMode }) => void;
 };
 
 type OpenDialog = null | "status" | BulkMode;
@@ -35,6 +40,7 @@ type OpenDialog = null | "status" | BulkMode;
 export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: string[]; onClear: () => void; config: LeadsLiteBulkConfig }) {
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [confirmRevert, setConfirmRevert] = useState(false);
+  const [tagging, setTagging] = useState(false);
   const [reverting, startRevert] = useTransition();
   const { role, brokers, branches } = config;
   const canManage = role === "director" || role === "manager";
@@ -51,6 +57,8 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
     actions.push({ id: "revert", label: "Devolver para qualificação", shortLabel: "Devolver", tone: "danger", onRun: () => { if (!reverting) setConfirmRevert(true); } });
     if (config.postSaleEnabled) actions.push({ id: "post-sale", label: "Enviar pós-venda", shortLabel: "Pós-venda", disabled: !postSaleHref, onRun: () => { if (postSaleHref) window.location.assign(postSaleHref); } });
   }
+  // "Etiquetar" para todos: o servidor só muda os leads que cada um pode etiquetar, sempre da própria empresa.
+  if (config.tags?.length) actions.push({ id: "tag", label: "Etiquetar", shortLabel: "Etiqueta", onRun: () => setTagging(true) });
   // "Exportar CSV" para todos: o servidor só devolve os leads que o usuário pode ver.
   actions.push({
     id: "export",
@@ -96,6 +104,15 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
   return (
     <>
       <LiteBulkBar count={count} actions={actions} onClear={onClear} />
+      {config.tags?.length ? (
+        <LeadsLiteBulkTagPanel
+          open={tagging}
+          onOpenChange={setTagging}
+          leadIds={selectedIds}
+          tags={config.tags}
+          onCommitted={config.onTagCommitted}
+        />
+      ) : null}
       {canManage ? (
         <>
           <BulkStatusDialog

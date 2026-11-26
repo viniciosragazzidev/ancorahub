@@ -4,10 +4,14 @@
  * Visão "Esfriando" de /leads (?view=esfriando, 25/11/2026), o Radar do DeskComm na corretora: leads abertos parados,
  * do mais esquecido para o menos. Nível com texto (Crítico, Em risco) e "Em voo" rebaixado quando há retorno marcado.
  * Clique na linha abre a gaveta do lead. A regra está em `features/leads/cooling-radar.ts`.
+ * Diretor, gestor e supervisor têm o ⋯ da linha com Assumir, Cobrar corretor e Redistribuir (26/11/2026); o corretor
+ * não vê a coluna. Quem vê o quê vem de `coolingActionsFor`.
  */
 import { useMemo } from "react";
 
+import { LiteMenu } from "@/components/lite/controls";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
+import { COOLING_ACTION_LABELS, canRunCoolingActions, coolingActionsFor, type CoolingActionId } from "@/features/leads/cooling-lead-actions-rules";
 import {
   COOLING_LEVEL_LABELS,
   classifyCooling,
@@ -25,7 +29,14 @@ type Row = { lead: LeadWorkspaceItem; info: CoolingInfo };
 
 const levelTone = (info: CoolingInfo) => (info.level === "critical" ? "danger" : info.level === "at_risk" ? "warning" : "neutral");
 
-export function LeadsLiteCooling({ leads, onOpen, now }: { leads: LeadWorkspaceItem[]; onOpen: (lead: LeadWorkspaceItem) => void; now?: Date }) {
+export function LeadsLiteCooling({ leads, onOpen, now, actor, onAction }: {
+  leads: LeadWorkspaceItem[];
+  onOpen: (lead: LeadWorkspaceItem) => void;
+  now?: Date;
+  /** Quem está vendo: com diretor, gestor ou supervisor a linha ganha o ⋯ com as ações. */
+  actor?: { role: string; userId: string };
+  onAction?: (lead: LeadWorkspaceItem, action: CoolingActionId, idleMs: number) => void;
+}) {
   const rows = useMemo<Row[]>(() => {
     const at = now ?? new Date();
     return sortCoolingRows(leads, (lead) => classifyCooling(lead, at)).map(({ row, info }) => ({ lead: row, info }));
@@ -46,6 +57,18 @@ export function LeadsLiteCooling({ leads, onOpen, now }: { leads: LeadWorkspaceI
       ),
     },
   ];
+  if (actor && onAction && canRunCoolingActions(actor.role)) {
+    columns.push({
+      id: "actions",
+      label: "Ações",
+      render: ({ lead, info }) => (
+        <LiteMenu
+          label={`Ações do lead ${lead.nome}`}
+          items={coolingActionsFor(actor, lead).map((action) => ({ id: action, label: COOLING_ACTION_LABELS[action], onSelect: () => onAction(lead, action, info.idleMs) }))}
+        />
+      ),
+    });
+  }
 
   return (
     <div className={`arc-venancor ${styles.root}`} data-skin="diretor">

@@ -45,6 +45,10 @@ import type { LeadsFiltersProps } from "./_components/use-lead-filters";
 import { LeadsListSwitch, QualifyingLeadsListSwitch } from "./leads-lite-list";
 import { LeadsLiteKanban } from "./leads-lite-kanban";
 import { LeadsLiteCooling } from "./leads-lite-cooling";
+import { CoolingActionPanel, CoolingDrawerActions, type CoolingActionCommit } from "./leads-lite-cooling-actions";
+import { classifyCooling } from "@/features/leads/cooling-radar";
+import { coolingActionsFor, NUDGE_TASK_DUE_MS, type CoolingActionId } from "@/features/leads/cooling-lead-actions-rules";
+import type { BulkLeadTagMode, LeadTag } from "@/features/lead-tags/rules";
 import { stageActorFor } from "./lead-card-stage";
 import litePageStyles from "./leads-lite-page.module.css";
 import { computeSlaInfo, type SlaInfo } from "./lead-sla";
@@ -241,6 +245,8 @@ export function LeadsWorkspace({
   liteFilters,
   classicFilters,
   coolingLeads,
+  contextUserId,
+  tags = [],
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -285,6 +291,10 @@ export function LeadsWorkspace({
   classicFilters?: React.ReactNode;
   /** Visão "Esfriando" (?view=esfriando): carregada no servidor só quando a visão está aberta. */
   coolingLeads?: LeadWorkspaceItem[] | null;
+  /** Quem está vendo: decide as ações do ⋯ na visão Esfriando (Assumir some quando o lead já é seu). */
+  contextUserId?: string;
+  /** Etiquetas da empresa, para o "Etiquetar" da barra de lote. */
+  tags?: LeadTag[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -447,6 +457,48 @@ export function LeadsWorkspace({
     setSelectedLead((current) => current && changedIds.has(current.id) ? patch(current) : current);
     multiSelect.clear();
   }, [multiSelect.clear]);
+
+  // "Etiquetar" em lote: as etiquetas mudam na hora nas linhas, e a seleção continua para outra etiqueta.
+  const handleBulkTagCommitted = useCallback(({ leadIds: changedLeadIds, tag, mode }: { leadIds: string[]; tag: LeadTag; mode: BulkLeadTagMode }) => {
+    const changedIds = new Set(changedLeadIds);
+    const patch = (lead: LeadWorkspaceItem): LeadWorkspaceItem => {
+      const current = lead.tags ?? [];
+      const next = mode === "add"
+        ? (current.some((item) => item.id === tag.id) ? current : [...current, tag].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")))
+        : current.filter((item) => item.id !== tag.id);
+      return { ...lead, tags: next };
+    };
+    setWorkspaceLeads((current) => current.map((lead) => changedIds.has(lead.id) ? patch(lead) : lead));
+    setSelectedLead((current) => current && changedIds.has(current.id) ? patch(current) : current);
+  }, []);
+
+  // Esfriando: o que já mudou aqui some ou muda na lista antes do servidor atualizar a página.
+  const [coolingTarget, setCoolingTarget] = useState<{ lead: LeadWorkspaceItem; action: CoolingActionId; idleMs: number | null } | null>(null);
+  const [coolingChanges, setCoolingChanges] = useState<{ removed: string[]; nudged: Record<string, string> }>({ removed: [], nudged: {} });
+  const coolingList = useMemo(() => coolingLeads
+    ? coolingLeads
+      .filter((lead) => !coolingChanges.removed.includes(lead.id))
+      .map((lead) => coolingChanges.nudged[lead.id] ? { ...lead, nextOpenTaskDueAt: coolingChanges.nudged[lead.id] } : lead)
+    : null, [coolingLeads, coolingChanges]);
+  const coolingActor = contextUserId ? { role: contextRole, userId: contextUserId } : undefined;
+  const handleCoolingCommitted = useCallback((commit: CoolingActionCommit) => {
+    if (commit.action === "nudge") {
+      const due = new Date(Date.now() + NUDGE_TASK_DUE_MS).toISOString();
+      setCoolingChanges((current) => ({ ...current, nudged: { ...current.nudged, [commit.leadId]: due } }));
+    } else {
+      // Assumir e Redistribuir recomeçam o atendimento: o lead sai do radar.
+      setCoolingChanges((current) => ({ ...current, removed: [...current.removed, commit.leadId] }));
+      const patch = (lead: LeadWorkspaceItem): LeadWorkspaceItem => ({
+        ...lead,
+        corretorId: commit.corretorId ?? lead.corretorId,
+        corretorNome: commit.action === "assume" ? "Você" : commit.corretorNome ?? lead.corretorNome,
+        assignedAt: new Date().toISOString(),
+      });
+      setWorkspaceLeads((current) => current.map((lead) => lead.id === commit.leadId ? patch(lead) : lead));
+      setSelectedLead((current) => current && current.id === commit.leadId ? patch(current) : current);
+    }
+    router.refresh();
+  }, [router]);
 
   const handleBulkStatusCommitted = useCallback(({ leadIds: changedLeadIds, newStatus }: { leadIds: string[]; newStatus: string }) => {
     const stageEnteredAt = new Date().toISOString();
@@ -772,6 +824,8 @@ export function LeadsWorkspace({
                   postSaleEnabled,
                   brokers,
                   branches,
+                  tags,
+                  onTagCommitted: handleBulkTagCommitted,
                   onStatusCommitted: handleBulkStatusCommitted,
                   onReassignCommitted: handleBulkReassignCommitted,
                   onBranchCommitted: handleBulkBranchCommitted,
@@ -801,6 +855,8 @@ export function LeadsWorkspace({
                 postSaleEnabled,
                 brokers,
                 branches,
+                tags,
+                onTagCommitted: handleBulkTagCommitted,
                 onStatusCommitted: handleBulkStatusCommitted,
                 onReassignCommitted: handleBulkReassignCommitted,
                 onBranchCommitted: handleBulkBranchCommitted,
@@ -885,8 +941,16 @@ export function LeadsWorkspace({
 
         {/* ─── ESFRIANDO (radar de leads parados) ─── */}
         <TabsContent value="esfriando" className={directorLite ? litePageStyles.region : "mt-4"}>
-          {coolingLeads ? (
-            <LeadsLiteCooling leads={coolingLeads} onOpen={setSelectedLead} />
+          {coolingList ? (
+            <>
+              <LeadsLiteCooling
+                leads={coolingList}
+                onOpen={setSelectedLead}
+                actor={coolingActor}
+                onAction={(lead, action, idleMs) => setCoolingTarget({ lead, action, idleMs })}
+              />
+              <CoolingActionPanel target={coolingTarget} onClose={() => setCoolingTarget(null)} onCommitted={handleCoolingCommitted} />
+            </>
           ) : (
             <p className="text-sm text-muted-foreground" role="status">Carregando leads parados…</p>
           )}
@@ -1046,6 +1110,15 @@ export function LeadsWorkspace({
         onReassignOptimistic={handleDrawerReassignOptimistic}
         onReassignRollback={handleDrawerReassignRollback}
         onLeadPatch={(patch) => applyLeadPatch([selectedLead.id], (lead) => ({ ...lead, ...patch }))}
+        topSlot={activeTab === "esfriando" && coolingActor && coolingLeads?.some((lead) => lead.id === selectedLead.id) ? (
+          <CoolingDrawerActions
+            key={selectedLead.id}
+            lead={selectedLead}
+            actions={coolingActionsFor(coolingActor, selectedLead)}
+            idleMs={classifyCooling(selectedLead)?.idleMs ?? null}
+            onCommitted={handleCoolingCommitted}
+          />
+        ) : null}
       /> : null}
     </div>
     </BrokerProfileViewerProvider>
