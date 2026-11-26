@@ -47,9 +47,15 @@ export type PostSaleAnswersWithIntents = PostSaleAnswers & {
   /** Quantas vezes seguidas a mesma pergunta já foi repetida (24/11: no máximo uma). */
   questionRepeats?: number;
   handoff?: PostSaleHandoffState;
+  /** Cliente disse que não teve contato e a pesquisa já ofereceu um corretor para chamar (26/11). */
+  noContactOffer?: "asked";
 };
 
-export type PolicyKind = "script" | "hold_question" | "wrong_person" | "health_urgency" | "resume" | "closed_elsewhere" | "gave_up" | "handoff" | "no_follow_up" | "declined" | "repeat_guard";
+/** Etapa em que a pesquisa espera a resposta da oferta de retorno, igual à pergunta de ajuda da R1. */
+export const NO_CONTACT_OFFER_STEP = 3;
+export const NO_CONTACT_OFFER_QUESTION = "Quer que um corretor te chame para continuar seu atendimento?";
+
+export type PolicyKind = "script" | "hold_question" | "wrong_person" | "health_urgency" | "resume" | "closed_elsewhere" | "gave_up" | "handoff" | "no_follow_up" | "declined" | "repeat_guard" | "no_contact_offer" | "no_contact_close";
 
 export type PolicyTurn = Omit<PostSaleTurn, "answers"> & {
   answers: PostSaleAnswersWithIntents;
@@ -85,6 +91,8 @@ function plain(text: string) {
 }
 
 const CLEAR_OPT_OUT = /\b(nao quero mais(?! (o |um |uma )?(plano|contratar|fazer|fechar|convenio))|nao quero (responder|receber|pesquisa|mensage\w*|mais nada)|(para|pare|parem|parar) de (me )?(mandar|enviar|perguntar|chamar|mandando|enviando|perguntando)|nao me (mande|mandem|envie|enviem|chame|chamem|pergunte|perguntem) mais|(sempre|toda hora|de novo) a mesma pergunta|mesma pergunta)\b/;
+/** "Não", "não precisa", "já resolvi": recusa da oferta de retorno, qualquer que seja a leitura da pergunta. */
+const OFFER_DECLINED = /^(nao|n|nao obrigad[oa]|nao precisa( mais| nao)?|agora nao|nao quero|ja resolvi|ja resolveu|ja esta resolvido|ja fechei)( obrigad[oa])?$/;
 const REPEAT_COMPLAINT = /\b(mesma pergunta|sempre a mesma|repetid\w*|de novo a mesma)\b/;
 
 /**
@@ -143,8 +151,29 @@ function texts(names: PolicyNames) {
       `Poxa, ${names.lead}, sinto muito que o atendimento não andou. Já estou passando você para outro corretor, que vai te chamar em seguida.`,
     ]),
     handoffNoContact: v("handoff_no_contact", [
-      `Combinado, ${names.lead}! Vou passar seu atendimento para outro corretor, que vai te chamar em seguida.`,
-      `Certo, ${names.lead}! Já estou passando você para outro corretor, que vai te chamar em seguida.`,
+      `Combinado, ${names.lead}, e desculpe pela falta de contato. Vou passar seu atendimento para outro corretor, que vai te chamar em seguida.`,
+      `Certo, ${names.lead}, e desculpe pela demora. Já estou passando você para outro corretor, que vai te chamar em seguida.`,
+    ]),
+    // Sem contato (26/11): desculpas, a coordenação já avisada (o alerta sai neste turno) e a oferta de retorno.
+    noContactOffer: v("no_contact_offer", [
+      `Poxa, ${names.lead}, me desculpe pela falta de contato. Já avisei a coordenação. ${NO_CONTACT_OFFER_QUESTION}`,
+      `${names.lead}, peço desculpas por ninguém ter falado com você. Já avisei a coordenação. ${NO_CONTACT_OFFER_QUESTION}`,
+    ]),
+    noContactResume: v("no_contact_resume", [
+      `Combinado, ${names.lead}, e desculpe de novo pela falta de contato. Já pedi para a equipe te chamar por aqui.`,
+      `Certo, ${names.lead}! Já pedi para a equipe te chamar por aqui. Obrigada pela paciência.`,
+    ]),
+    noContactNoHelp: v("no_contact_no_help", [
+      `Tudo bem, ${names.lead}. Desculpe mais uma vez pela falta de contato. Se mudar de ideia, é só responder aqui que eu aviso a equipe.`,
+      `Entendi, ${names.lead}, e desculpe de novo. Se precisar, é só responder aqui que eu aviso a equipe.`,
+    ]),
+    noContactClosedElsewhere: v("no_contact_closed_elsewhere", [
+      `Entendi, ${names.lead}, e me desculpe pela falta de contato. Já avisei a coordenação para isso não se repetir. Se precisar de algo, é só chamar por aqui.`,
+      `Poxa, ${names.lead}, desculpe por ninguém ter falado com você. Já avisei a coordenação. Qualquer coisa, estamos por aqui.`,
+    ]),
+    unclearContact: v("unclear_contact", [
+      `Obrigada, ${names.lead}. Para não te fazer repetir, vou pedir para alguém da equipe falar com você por aqui.`,
+      `Obrigada, ${names.lead}! Vou pedir para alguém da equipe te chamar por aqui para entender melhor.`,
     ]),
     noFollowUp: v("no_follow_up", [
       `Entendi, ${names.lead}, e sinto muito pela falta de retorno. Já avisei a equipe para retomar seu atendimento por aqui.`,
@@ -198,14 +227,17 @@ export function decidePostSaleTurn(input: {
   const now = (intent: (typeof intents)[number]) => intents.includes(intent);
   const intentState = mergeIntentState(readIntentState(prior), reading, input.text);
   const clearOptOut = isClearPostSaleOptOut(input.text);
+  // "Não quero" à oferta de um corretor recusa a oferta, não pede para parar as mensagens (26/11).
+  const declinesOffer = prior.noContactOffer === "asked" && step === NO_CONTACT_OFFER_STEP && !clearOptOut && OFFER_DECLINED.test(plain(input.text));
   const base = barePermission
     ? { ...(input.answer.optOut !== undefined ? { optOut: input.answer.optOut } : {}), comment: input.answer.comment }
-    : clearOptOut ? { ...input.answer, optOut: true } : input.answer;
+    : clearOptOut ? { ...input.answer, optOut: true } : declinesOffer ? { ...input.answer, optOut: false, wantsHelp: false } : input.answer;
   // Contato com o corretor (24/11): R1, R2 e a pesquisa manual leem as cinco respostas possíveis.
   const contactRule = rule === null || rule === "R1" || rule === "R2";
   // Um "sim" solto só vale como "falou com o corretor" quando a pergunta é essa (abertura ou etapa 1 da R1/manual).
   const contactStep = (rule === null || rule === "R1") && step <= 1;
-  const read = contactRule && !barePermission ? resolveContactStatus(base.contactStatus, input.text) : null;
+  // "Ninguém me ligou" vale em qualquer regra e etapa (26/11): na R4 vinha como motivo da perda e a pesquisa encerrava.
+  const read = !barePermission ? resolveContactStatus(base.contactStatus, input.text) : null;
   const contactStatus = read === "talked_ok" && !contactStep ? null : read;
   const withContact: PostSaleAnswers = { ...base, ...(contactStatus ? { contactStatus } : {}) };
   if (contactStatus === "stalled" || (contactStatus === "talked_ok" && typeof withContact.contacted !== "boolean")) withContact.contacted = true;
@@ -224,10 +256,12 @@ export function decidePostSaleTurn(input: {
     status: "completed", step, text, answers: withState(merged, undefined, { questionRepeats: 0, ...state }), outcome, policy, ...extra,
   });
   const script = () => rule ? autoRuleNextTurn(rule, step, prior, answer, names) : postSaleNextTurn(step, prior, answer, names);
-  // Falta de contato ou de continuidade: passa para outro corretor quando pode; senão, avisa a equipe.
-  const noFollowUp = (status: ContactStatus): PolicyTurn => names.canHandoff
+  // Já cliente (R3, R5) ou já perdido (R4, em que o motivo é a própria resposta): o roteiro segue.
+  const openLead = rule !== "R3" && rule !== "R4" && rule !== "R5";
+  // Falta de contato ou de continuidade: passa para outro corretor quando pode (só lead aberto); senão, avisa a equipe.
+  const noFollowUp = (status: ContactStatus): PolicyTurn => names.canHandoff && openLead
     ? close("handoff", status === "no_contact" ? t.handoffNoContact : t.handoffStalled, "no_contact", { handoff: true }, { handoff: { status: "pending", contactStatus: status, reason: handoffReason(status, names.broker) } })
-    : close("no_follow_up", status === "no_contact" ? t.resume : t.noFollowUp, "no_contact");
+    : close("no_follow_up", status === "no_contact" ? t.noContactResume : t.noFollowUp, "no_contact", {}, { contactStatus: status });
 
   // 1. Opt-out: o roteiro já trata (inclusive "agora não" na abertura, que é recusa e não opt-out).
   if (answer.optOut) {
@@ -239,9 +273,43 @@ export function decidePostSaleTurn(input: {
   if (now("wrong_person")) return close("wrong_person", t.wrongPerson, "other", { wrongNumber: true });
   if (now("health_urgency")) return close("health_urgency", t.urgency, "other");
   const complaintPrefix = now("complaint") ? `${t.complaintShort} ` : "";
-  // Já cliente (R3, R5) ou já perdido (R4, em que o motivo é a própria resposta): o roteiro segue.
-  const openLead = rule !== "R3" && rule !== "R4" && rule !== "R5";
   const decided = now("closed") || now("closed_elsewhere") || now("gave_up");
+  const resumeNow = RESUME_INTENTS.some((intent) => intents.includes(intent));
+  const offerAsked = prior.noContactOffer === "asked";
+
+  // Sem contato (26/11). Antes: "Nem me ligaram" virava pergunta repetida e, na segunda resposta, um
+  // "Deixei registrado" sem alerta; na R4 "Ninguém me ligou" era só o motivo da perda; "desisti, ninguém
+  // me procurou" e "fechei com outra" encerravam com "Que bom que você já resolveu". Agora pede desculpas,
+  // gera o alerta da coordenação (outcome no_contact já neste turno) e oferece um corretor para chamar.
+  // A conversa fica aberta esperando a resposta da oferta.
+  const noContactNow = contactStatus === "no_contact" || ((rule === null || rule === "R1") && step === 1 && answer.contacted === false);
+  const lackNow = noContactNow || (contactStatus === "stalled" && (decided || rule === "R4"));
+  if (lackNow && !offerAsked) {
+    const status: ContactStatus = noContactNow ? "no_contact" : "stalled";
+    if (now("closed_elsewhere")) return close("no_contact_close", t.noContactClosedElsewhere, "no_contact", {}, { contactStatus: status });
+    if (answer.wantsHelp === true || resumeNow) return noFollowUp(status);
+    return {
+      status: "answering",
+      step: NO_CONTACT_OFFER_STEP,
+      text: t.noContactOffer,
+      question: NO_CONTACT_OFFER_QUESTION,
+      outcome: "no_contact",
+      policy: "no_contact_offer",
+      answers: withState(merged, NO_CONTACT_OFFER_QUESTION, { questionRepeats: 0, noContactOffer: "asked", contactStatus: status }),
+    };
+  }
+  // Resposta à oferta de retorno: sim (ou pedido de horário) chama; não encerra com desculpas; o resto, na
+  // dúvida, a equipe chama (quem reclamou de falta de contato nunca fica sem retorno).
+  if (offerAsked && step === NO_CONTACT_OFFER_STEP) {
+    const status: ContactStatus = prior.contactStatus === "stalled" ? "stalled" : "no_contact";
+    if (answer.wantsHelp === true || resumeNow) {
+      const turn = noFollowUp(status);
+      const schedule = !turn.handoff && intentState.scheduleText && now("scheduling") ? t.schedule(intentState.scheduleText) : "";
+      return { ...turn, text: `${turn.text}${schedule}` };
+    }
+    if (answer.wantsHelp === false || decided || OFFER_DECLINED.test(plain(input.text))) return close("no_contact_close", t.noContactNoHelp, "no_contact", {}, { contactStatus: status });
+    return close("no_follow_up", t.noContactResume, "no_contact", {}, { contactStatus: status, wantsHelp: true });
+  }
   // 2. Teve contato, mas o corretor parou (Toinha e Carmen, 24/11): nunca repete a pergunta.
   if (openLead && contactStatus === "stalled" && !decided) return noFollowUp("stalled");
   // 3. Não teve contato (ou não recebeu cotação) e ainda quer ajuda: resposta à pergunta de ajuda, ou pedido de retomar.
@@ -265,6 +333,8 @@ export function decidePostSaleTurn(input: {
     }
     const repeats = (prior.questionRepeats ?? 0) + 1;
     if (repeats <= 1) return { ...turn, answers: { ...turn.answers, questionRepeats: repeats } };
+    // Na pergunta do contato, duas respostas vagas pedem uma pessoa, não um "deixei registrado" sem alerta (26/11).
+    if (contactStep) return close("repeat_guard", t.unclearContact, "waiting", {}, { wantsHelp: true });
     return close("repeat_guard", t.unclearClose, "other");
   };
 

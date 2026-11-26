@@ -43,6 +43,8 @@ const POLICY_LABELS: Record<PolicyKind, string> = {
   no_follow_up: "Sem continuidade, equipe avisada",
   declined: "Não quis responder",
   repeat_guard: "Encerrou sem repetir a pergunta",
+  no_contact_offer: "Sem contato: desculpas e oferta de retorno",
+  no_contact_close: "Sem contato: encerrou com desculpas",
 };
 
 function simulate(replies: string[], scenario: (typeof SCENARIOS)[Scenario], canHandoff: boolean) {

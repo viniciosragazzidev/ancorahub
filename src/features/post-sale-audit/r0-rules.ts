@@ -176,7 +176,7 @@ export function classifyR0AnswerByKeywords(text: string): R0Answer {
   const optOut = R0_OPT_OUT.test(value);
   if (R0_CLOSED.test(value)) return { category: "closed_or_gave_up", closedKind: "closed_elsewhere", request: null, reason: text.trim().slice(0, 300) || null, optOut };
   if (R0_GAVE_UP.test(value)) return { category: "closed_or_gave_up", closedKind: "gave_up", request: null, reason: text.trim().slice(0, 300) || null, optOut };
-  if (SIMPLE_NO.test(value) || R0_NOT_ATTENDED.test(value) || detectContactStatus(text) === "stalled") return { category: "not_attended", closedKind: null, request: null, reason: null, optOut };
+  if (SIMPLE_NO.test(value) || R0_NOT_ATTENDED.test(value) || detectContactStatus(text) === "stalled" || detectContactStatus(text) === "no_contact") return { category: "not_attended", closedKind: null, request: null, reason: null, optOut };
   if (SIMPLE_YES.test(value) || R0_WANTS_MORE.test(value)) return { category: "wants_more", closedKind: null, request: text.trim().slice(0, 160) || null, reason: null, optOut };
   return { category: "other_subject", closedKind: null, request: text.trim().slice(0, 160) || null, reason: null, optOut };
 }

@@ -23,6 +23,8 @@ export type AutoRuleTurn = {
 /** Pergunta de cada etapa, dita ao interpretador (e às palavras-chave) para entender respostas curtas. */
 export function autoRuleQuestionFocus(rule: AutoRuleKey, step: number, previous: PostSaleAnswers): string {
   if (step === 0) return "permissão para fazer duas perguntas";
+  // Oferta de retorno depois de "ninguém me ligou" (26/11), em qualquer regra.
+  if ((previous as { noContactOffer?: string }).noContactOffer === "asked" && step === 3) return "se ainda quer ajuda com o plano: quer que um corretor te chame";
   switch (rule) {
     case "R1":
       return step === 1 ? "se o corretor conseguiu falar" : step === 2 ? "se o atendimento foi rápido" : "se ainda quer ajuda com o plano";

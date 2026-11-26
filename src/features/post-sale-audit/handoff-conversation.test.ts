@@ -110,12 +110,14 @@ describe("caso Carmen (Viviani, 24/11)", () => {
 });
 
 describe("nunca repete a mesma pergunta mais de uma vez", () => {
-  it("resposta vaga: um esclarecimento com as opções e, na segunda vaga, encerra com educação", () => {
+  it("resposta vaga: um esclarecimento com as opções e, na segunda vaga, pede uma pessoa da equipe (26/11)", () => {
     const turns = talk(["Pode perguntar", "Hmm", "Não sei dizer"], { lead: "Ana", broker: "Alan" });
     expect(turns[1]).toMatchObject({ status: "answering", step: 1 });
     expect(turns[1].text).toMatch(/Alan (chegou a te atender e seguiu com você, ou parou de responder|falou com você e continuou o atendimento, ou ficou sem retorno)\?/);
     expect(turns[1].answers.questionRepeats).toBe(1);
-    expect(turns[2]).toMatchObject({ status: "completed", policy: "repeat_guard", outcome: "other" });
+    expect(turns[2]).toMatchObject({ status: "completed", policy: "repeat_guard", outcome: "waiting" });
+    expect(turns[2].text).toMatch(/alguém da equipe/);
+    expect(alertsOf(turns[2])).toEqual(["wants_help"]);
     expectTone(turns[2].text);
   });
 
@@ -195,9 +197,12 @@ describe("outros caminhos da R1", () => {
     expect(turns[1]).toMatchObject({ status: "completed", policy: "declined", outcome: "other" });
   });
 
-  it("sumiu, mas já desisti: é desistência, não troca de corretor", () => {
-    const turns = talk(["Pode", "Ela sumiu, mas desisti do plano"], { lead: "Ana", broker: "Alan", canHandoff: true });
-    expect(turns[1]).toMatchObject({ status: "completed", policy: "gave_up" });
+  it("sumiu, mas já desisti: pede desculpas e oferece retorno, sem trocar de corretor sozinho (26/11)", () => {
+    const turns = talk(["Pode", "Ela sumiu, mas desisti do plano", "Não precisa"], { lead: "Ana", broker: "Alan", canHandoff: true });
+    expect(turns[1]).toMatchObject({ status: "answering", policy: "no_contact_offer", outcome: "no_contact" });
+    expect(turns[1].handoff).toBeUndefined();
+    expect(turns[2]).toMatchObject({ status: "completed", policy: "no_contact_close" });
+    expect(turns[2].handoff).toBeUndefined();
   });
 
   it("R2: recebeu a cotação mas o corretor sumiu também passa", () => {

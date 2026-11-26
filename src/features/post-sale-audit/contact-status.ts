@@ -52,9 +52,36 @@ const STALLED = new RegExp([
   "nao (esta|ta) (me )?(respondendo|retornando|atendendo)",
   "me deixou no vacuo",
   "vacuo",
+  // Já falou e espera a cotação: é falta de continuidade, não falta de contato.
+  "(aguardando|esperando) (a |o |pela |pelo )?(cotacao|proposta|valores|simulacao)",
 ].map((pattern) => `(?:${pattern})`).join("|"));
 
-const NO_CONTACT = /\b(nao (falei|conversei|consegui falar)|nao (me )?(ligou|chamou|procurou|atendeu|respondeu|contatou)|nao (entrou|entraram) em contato|nao tive (nenhum )?contato|nao recebi (nenhuma )?(mensagem|ligacao|contato)|ninguem (me )?(ligou|chamou|procurou|respondeu|atendeu|entrou em contato|falou comigo)|nunca (me )?(ligou|chamou|respondeu|falou comigo)|ainda nao falei|nao falou comigo)\b/;
+/**
+ * Nunca falou com o corretor (26/11): além do "ninguém me ligou", o jeito curto que o cliente escreve
+ * ("nem me ligaram", "não fui atendida", "estou aguardando até hoje", "até agora nada"). Sem isso, a
+ * pesquisa repetia a pergunta e, na segunda resposta vaga, encerrava sem avisar ninguém.
+ */
+const NO_CONTACT = new RegExp(`\\b(?:${[
+  "nao (falei|conversei|consegui falar)",
+  "nao (me )?(ligou|ligaram|chamou|chamaram|procurou|procuraram|atendeu|atenderam|respondeu|responderam|contatou|contataram|retornou|retornaram)",
+  "nao (entrou|entraram) em contato",
+  "nao (tive|tivemos|houve|teve) (nenhum )?contato",
+  "nao recebi (nenhuma |nenhum )?(mensagem|ligacao|contato|retorno|nada)",
+  "ninguem (me )?(ligou|chamou|procurou|respondeu|atendeu|retornou|entrou em contato|falou comigo|deu retorno)",
+  "ninguem falou",
+  "nunca (me )?(ligou|ligaram|chamou|chamaram|respondeu|responderam|falou comigo|falaram comigo)",
+  "nunca (fui|fomos) atendid\\w*",
+  "nunca (falei|conversei|falamos)",
+  "nem (me )?(ligou|ligaram|chamou|chamaram|procurou|procuraram|respondeu|responderam|retornou|retornaram|mandou|mandaram|atendeu|atenderam)",
+  "nem (falou|falaram) comigo",
+  "nao (fui|fomos) atendid\\w*",
+  "ainda nao falei",
+  "nao (falou|falaram) comigo",
+  "(nenhum|sem) contato",
+  "(estou|to|ainda|sigo|continuo|fiquei|fico) (aguardando|esperando)",
+  "(aguardando|esperando) (o |um |algum )?(contato|retorno|ligacao|corretor)",
+  "ate (hoje|agora) (nada|ninguem|nao)",
+].join("|")})\\b`);
 
 const TALKED_OK = /^(sim|s|falei|falei sim|sim falei|consegui|consegui sim|sim consegui|conversei|conversamos|ja|ja falei|falamos|falou sim|claro|com certeza)$|\b(me atendeu (muito )?bem|foi (muito )?(bem|otimo|otima|excelente)|esta me atendendo|estamos (conversando|em contato|falando)|ja (me )?(mandou|enviou|passou) (a )?(cotacao|proposta)|atendimento (otimo|excelente|muito bom)|falei com (ele|ela) sim|tudo certo com (ele|ela))\b/;
 
