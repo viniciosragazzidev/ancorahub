@@ -2,7 +2,6 @@ import Link from "next/link";
 import { BrokerProfileLink } from "@/components/broker-profile-link";
 import type { ReactNode } from "react";
 
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Button } from "@/components/ui/button";
 import { LightLeadDetail } from "@/features/broker-workspace/components/light-lead-detail";
 import { stageLabel } from "@/features/broker-workspace/components/light-lead-detail/format";
@@ -17,25 +16,9 @@ import { isSupervisorTeamBrokerObservation, readSupervisorObservation, readSuper
 
 
 import { TeamLeadConversation } from "./team-lead-conversation";
+import { SupervisorLeadTimeline as LeadTimeline } from "./supervisor-lead-timeline";
 
-const timelineLabels: Record<string, string> = {
-  status_change: "Mudança de etapa",
-  note: "Nota",
-  service_started: "Atendimento iniciado",
-  system_alert: "Aviso do sistema",
-  quote_generated: "Cotação gerada",
-  document_upload: "Documento enviado",
-  document_review: "Documento revisado",
-  distributed: "Lead distribuído",
-  accepted: "Lead aceito",
-  declined: "Lead recusado",
-};
-
-function timelineLabel(tipo: string) {
-  return timelineLabels[tipo] ?? "Atualização";
-}
-
-type TimelineItem = { id: string; tipo: string; conteudo: string | null; metadata?: unknown; userId?: string | null; userName: string | null; actorRole?: string | null; actorIsInSupervisorTeam?: boolean; createdAt: Date | string };
+export type TimelineItem = { id: string; tipo: string; conteudo: string | null; metadata?: unknown; userId?: string | null; userName: string | null; actorRole?: string | null; actorIsInSupervisorTeam?: boolean; createdAt: Date | string };
 type TaskItem = { id: string; title: string; dueAt: Date | null; completedAt: Date | null; priority: string };
 type DocumentItem = { id: string; filename: string; status: string; requirementName: string | null };
 
@@ -61,18 +44,6 @@ function LeadTasksAndDocuments({ tasks, documents }: { tasks: TaskItem[]; docume
   </div>;
 }
 
-function LeadTimeline({ items }: { items: TimelineItem[] }) {
-  const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Sao_Paulo" });
-  return <section className="flex flex-col gap-3" aria-labelledby="lead-timeline-title">
-    <h2 id="lead-timeline-title" className="text-base font-semibold text-(--foreground)">Linha do tempo</h2>
-    {items.length ? <ol className="grid gap-4">{items.map((item) => <li key={item.id} className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-(--foreground)">{timelineLabel(item.tipo)}</span>
-      {item.conteudo ? <p className="break-words text-sm text-(--text-secondary)">{item.conteudo}</p> : null}
-      <time className="text-xs text-(--text-muted)" dateTime={new Date(item.createdAt).toISOString()}>{item.userName ? `${item.userName} · ` : ""}{dateFormat.format(new Date(item.createdAt))}</time>
-    </li>)}</ol> : <EmptyState title="Ainda não há atualizações neste lead" description="As próximas atividades aparecem aqui." />}
-  </section>;
-}
-
 function BrokerObservations({ items }: { items: TimelineItem[] }) {
   const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Sao_Paulo" });
   const observations = items.flatMap((item) => {
@@ -90,7 +61,7 @@ function BrokerObservations({ items }: { items: TimelineItem[] }) {
   </section>;
 }
 
-export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocuments, conversation, brokerWhatsAppConnected, timeline, now, managerBrokers, tasks, documents, saleAction, postSaleCard, saleDetailsCard }: {
+export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocuments, conversation, brokerWhatsAppConnected, timeline, now, viewerId, managerBrokers, tasks, documents, saleAction, postSaleCard, saleDetailsCard }: {
   lead: { id: string; name: string; status: string; ownerId: string | null; ownerName: string | null; ownerImage: string | null; productName: string | null; assignedAt: Date | null; branchName: string | null };
   lightLead: LightLeadDetailData;
   requirements: LiteRequirement[];
@@ -99,6 +70,8 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
   brokerWhatsAppConnected: boolean;
   timeline: TimelineItem[];
   now: string;
+  /** Quem está vendo: guarda o filtro da linha do tempo por usuário. */
+  viewerId?: string | null;
   managerBrokers?: TransferBroker[];
   tasks?: TaskItem[];
   documents?: DocumentItem[];
@@ -171,7 +144,7 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
             {postSaleCard}
             {tasks && documents ? <LeadTasksAndDocuments tasks={tasks} documents={documents} /> : null}
             <BrokerObservations items={timeline} />
-            <LeadTimeline items={timeline} />
+            <LeadTimeline items={timeline} viewerId={viewerId} />
           </div>
         }
         conversation={<TeamLeadConversation conversation={conversation} brokerWhatsAppConnected={brokerWhatsAppConnected} fill />}

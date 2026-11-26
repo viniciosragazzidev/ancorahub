@@ -333,6 +333,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
       brokerWhatsAppConnected={supplements.brokerWhatsAppConnected}
       timeline={timeline ?? []}
       now={new Date().toISOString()}
+      viewerId={context.userId}
     />;
   }
   const commercialValuesEnabled = (await getSystemSetting(FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key)) !== "false";
@@ -859,7 +860,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
               beneficiaries: <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />,
               chat: hasPermission(context.role, "acessar_conversas") ? <LeadChat leadId={lead.id} phone={canSeePersonalData ? lead.telefone : null} /> : null,
               documents: <LeadDocumentsSection leadId={lead.id} requirements={requirements} documents={leadDocs} checklist={checklist} beneficiaries={beneficiaries.map((beneficiary) => ({ id: beneficiary.id, name: beneficiary.name, isHolder: beneficiary.isHolder }))} />,
-              timeline: <LeadTimeline leadId={lead.id} interactions={interactions} />,
+              timeline: <LeadTimeline leadId={lead.id} interactions={interactions} viewerId={context.userId} />,
               tasks: <LeadTasks assignees={brokers} leadId={lead.id} tasks={tasks.map((task) => ({ ...task, dueAt: task.dueAt?.toISOString() ?? null, completedAt: task.completedAt?.toISOString() ?? null }))} />,
             }}
           />
@@ -1254,7 +1255,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
               <TabsContent value="history" className="mt-4">
                 <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card" data-onboarding="lead-timeline">
                   <CardContent className="pt-6">
-                    <LeadTimeline leadId={lead.id} interactions={interactions} />
+                    <LeadTimeline leadId={lead.id} interactions={interactions} viewerId={context.userId} />
                   </CardContent>
                 </Card>
               </TabsContent>
