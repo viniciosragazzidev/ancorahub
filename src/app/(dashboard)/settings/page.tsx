@@ -59,6 +59,11 @@ import { IntegrationsLite } from "./_components/lite/integrations-lite";
 import { SecurityLite } from "./_components/lite/security-lite";
 import { ExtensionLite } from "./_components/lite/extension-lite";
 import { isExtensionPilotUser } from "@/features/browser-extension/pilot";
+import { ResourcesLite } from "./_components/lite/resources-lite";
+import { TagsLite } from "./_components/lite/tags-lite";
+import { getTenantResourceGroups } from "@/features/system-settings/resources";
+import { listLeadTagsWithUsage } from "@/features/lead-tags/service";
+import { canManageLeadTags } from "@/features/lead-tags/rules";
 
 export default async function SettingsPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
   // /configuracoes/comissoes redireciona para cá com ?tab=comissoes (next.config.ts): mostra as regras de comissão (20/11).
@@ -135,6 +140,11 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     ]);
     const branch = unitScope ? membership[0] : undefined;
     const countOf = (role: "broker" | "supervisor") => Number(unitCounts.find((row) => row.role === role)?.value ?? 0);
+    // Recursos (25/11): o gestor vê a situação da empresa e da própria unidade, só leitura. Etiquetas: quem já gerencia hoje.
+    const [resourceGroups, managerTags] = await Promise.all([
+      getTenantResourceGroups(context).catch(() => []),
+      canManageLeadTags(context.role) ? listLeadTagsWithUsage(context.tenantId).catch(() => null) : Promise.resolve(null),
+    ]);
     return (
       <>
         <LightSettings
@@ -150,6 +160,8 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
             },
             { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection connected={whatsappConnection?.status === "ready"} status={whatsappConnection?.status ?? "disconnected"} /> },
             { id: "notificacoes", title: "Notificações", description: "Avisos no celular e no navegador", node: <div className="rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)"><PushNotificationManager variant="compact" /></div> },
+            { id: "recursos", title: "Recursos", description: "O que está ligado para a corretora", node: <ResourcesLite groups={resourceGroups} /> },
+            ...(managerTags ? [{ id: "etiquetas" as const, title: "Etiquetas", description: "Nome, cor e uso das etiquetas dos leads", node: <TagsLite initialTags={managerTags} /> }] : []),
             { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
             ...(extensionPilot ? [{ id: "extensao" as const, title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension }] : []),
             { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, animação, som e vibração", node: <AccessibilityPreferences /> },
@@ -245,7 +257,19 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const proposalsSection: SettingsLiteSection | null = context.role === "director"
       ? { id: "propostas", title: "Propostas", description: "Validade e condições padrão das propostas", node: <ProposalsDefaultsLite defaults={await getProposalDefaults(context.tenantId)} /> }
       : null;
-    const extraSections = [proposalsSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
+    // Recursos (25/11): diretor e gestor, só leitura; "Ajustar" só no que o diretor decide. Etiquetas: quem já gerencia hoje.
+    const showResources = context.role === "director" || context.role === "manager";
+    const [resourceGroups, tagList] = await Promise.all([
+      showResources ? getTenantResourceGroups(context).catch(() => []) : Promise.resolve([]),
+      canManageLeadTags(context.role) ? listLeadTagsWithUsage(context.tenantId).catch(() => null) : Promise.resolve(null),
+    ]);
+    const resourcesSection: SettingsLiteSection | null = showResources
+      ? { id: "recursos", title: "Recursos", description: "O que está ligado para a corretora e quem decide", node: <ResourcesLite groups={resourceGroups} /> }
+      : null;
+    const tagsSection: SettingsLiteSection | null = tagList
+      ? { id: "etiquetas", title: "Etiquetas", description: "Nome, cor e uso das etiquetas dos leads", node: <TagsLite initialTags={tagList} /> }
+      : null;
+    const extraSections = [proposalsSection, tagsSection, resourcesSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
     const sections = [...tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section)), ...extraSections];
     return (
       <>

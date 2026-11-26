@@ -1,14 +1,14 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { pickDistinctHue, QUEUE_HUE_MAX, QUEUE_HUE_MIN } from "@/features/lead-distribution/queue-color";
 
-import { canManageLeadTags, canTagLead, normalizeLeadTagName, type LeadTag } from "./rules";
+import { canManageLeadTags, canTagLead, normalizeLeadTagName, planLeadTagMerge, type LeadTag, type LeadTagWithUsage } from "./rules";
 
 export async function listLeadTags(tenantId: string): Promise<LeadTag[]> {
   return getDatabase()
@@ -16,6 +16,60 @@ export async function listLeadTags(tenantId: string): Promise<LeadTag[]> {
     .from(schema.leadTags)
     .where(eq(schema.leadTags.tenantId, tenantId))
     .orderBy(asc(schema.leadTags.name));
+}
+
+/** The tag list with how many leads use each one (settings table). */
+export async function listLeadTagsWithUsage(tenantId: string): Promise<LeadTagWithUsage[]> {
+  const db = getDatabase();
+  const [tags, usage] = await Promise.all([
+    listLeadTags(tenantId),
+    db.select({ tagId: schema.leadTagAssignments.tagId, value: count() })
+      .from(schema.leadTagAssignments)
+      .where(eq(schema.leadTagAssignments.tenantId, tenantId))
+      .groupBy(schema.leadTagAssignments.tagId),
+  ]);
+  const byTag = new Map(usage.map((row) => [row.tagId, Number(row.value)]));
+  return tags.map((tag) => ({ ...tag, leadCount: byTag.get(tag.id) ?? 0 }));
+}
+
+export type LeadTagMergeResult = { target: LeadTag; moved: number; alreadyTagged: number; leaving: number };
+
+/**
+ * Merges `sourceId` into `targetId`, both of the caller's company, in one transaction: assignments of leads
+ * that only had the source move to the target, the ones that already had both are dropped (never a duplicate
+ * lead+tag pair), and the source tag is deleted.
+ */
+export async function mergeLeadTags(context: TenantContext, input: { sourceId: string; targetId: string }): Promise<LeadTagMergeResult> {
+  assertManager(context);
+  if (!input.sourceId || !input.targetId || input.sourceId === input.targetId) throw new Error("Escolha outra etiqueta para juntar.");
+  const tenantId = context.tenantId;
+  return getDatabase().transaction(async (tx) => {
+    const tags = await tx.select({ id: schema.leadTags.id, name: schema.leadTags.name, colorHue: schema.leadTags.colorHue })
+      .from(schema.leadTags)
+      .where(and(eq(schema.leadTags.tenantId, tenantId), inArray(schema.leadTags.id, [input.sourceId, input.targetId])));
+    const source = tags.find((tag) => tag.id === input.sourceId);
+    const target = tags.find((tag) => tag.id === input.targetId);
+    if (!source || !target) throw new Error("Etiqueta não encontrada.");
+    const assignments = await tx.select({ leadId: schema.leadTagAssignments.leadId, tagId: schema.leadTagAssignments.tagId })
+      .from(schema.leadTagAssignments)
+      .where(and(eq(schema.leadTagAssignments.tenantId, tenantId), inArray(schema.leadTagAssignments.tagId, [source.id, target.id])));
+    const plan = planLeadTagMerge({
+      sourceLeadIds: assignments.filter((row) => row.tagId === source.id).map((row) => row.leadId),
+      targetLeadIds: assignments.filter((row) => row.tagId === target.id).map((row) => row.leadId),
+    });
+    if (plan.move.length) {
+      await tx.update(schema.leadTagAssignments).set({ tagId: target.id })
+        .where(and(eq(schema.leadTagAssignments.tenantId, tenantId), eq(schema.leadTagAssignments.tagId, source.id), inArray(schema.leadTagAssignments.leadId, plan.move)));
+    }
+    await tx.delete(schema.leadTagAssignments)
+      .where(and(eq(schema.leadTagAssignments.tenantId, tenantId), eq(schema.leadTagAssignments.tagId, source.id)));
+    const [removed] = await tx.delete(schema.leadTags)
+      .where(and(eq(schema.leadTags.id, source.id), eq(schema.leadTags.tenantId, tenantId)))
+      .returning({ id: schema.leadTags.id });
+    if (!removed) throw new Error("Etiqueta não encontrada.");
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_tag", entidadeId: target.id, acao: "lead_tag.merged" });
+    return { target, moved: plan.move.length, alreadyTagged: plan.alreadyTagged.length, leaving: plan.leaving };
+  });
 }
 
 /** Each lead's tags, for lists (conversations, leads table). */
