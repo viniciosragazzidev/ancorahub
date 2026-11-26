@@ -93,6 +93,7 @@ function plain(text: string) {
 const CLEAR_OPT_OUT = /\b(nao quero mais(?! (o |um |uma )?(plano|contratar|fazer|fechar|convenio))|nao quero (responder|receber|pesquisa|mensage\w*|mais nada)|(para|pare|parem|parar) de (me )?(mandar|enviar|perguntar|chamar|mandando|enviando|perguntando)|nao me (mande|mandem|envie|enviem|chame|chamem|pergunte|perguntem) mais|(sempre|toda hora|de novo) a mesma pergunta|mesma pergunta)\b/;
 /** "Não", "não precisa", "já resolvi": recusa da oferta de retorno, qualquer que seja a leitura da pergunta. */
 const OFFER_DECLINED = /^(nao|n|nao obrigad[oa]|nao precisa( mais| nao)?|agora nao|nao quero|ja resolvi|ja resolveu|ja esta resolvido|ja fechei)( obrigad[oa])?$/;
+const OFFER_ACCEPTED = /^(sim|s|quero|quero sim|sim quero|pode|pode sim|pode ser|claro|com certeza|por favor|gostaria|ok|okay|bora|aceito|quero ver|sim pode)( por favor| obrigad[oa])?$/;
 const REPEAT_COMPLAINT = /\b(mesma pergunta|sempre a mesma|repetid\w*|de novo a mesma)\b/;
 
 /**
@@ -227,11 +228,16 @@ export function decidePostSaleTurn(input: {
   const now = (intent: (typeof intents)[number]) => intents.includes(intent);
   const intentState = mergeIntentState(readIntentState(prior), reading, input.text);
   const clearOptOut = isClearPostSaleOptOut(input.text);
-  // "Não quero" à oferta de um corretor recusa a oferta, não pede para parar as mensagens (26/11).
-  const declinesOffer = prior.noContactOffer === "asked" && step === NO_CONTACT_OFFER_STEP && !clearOptOut && OFFER_DECLINED.test(plain(input.text));
+  // Resposta a uma oferta de corretor ("Quer que um corretor te chame / te mostre...?"): "não quero" recusa a
+  // oferta, não pede para parar as mensagens; "quero sim" aceita (26/11).
+  const atOffer = step === NO_CONTACT_OFFER_STEP && (prior.noContactOffer === "asked" || /^Quer que /.test(prior.lastQuestion ?? "")) && !clearOptOut;
+  const declinesOffer = atOffer && OFFER_DECLINED.test(plain(input.text));
+  const acceptsOffer = atOffer && !declinesOffer && OFFER_ACCEPTED.test(plain(input.text));
   const base = barePermission
     ? { ...(input.answer.optOut !== undefined ? { optOut: input.answer.optOut } : {}), comment: input.answer.comment }
-    : clearOptOut ? { ...input.answer, optOut: true } : declinesOffer ? { ...input.answer, optOut: false, wantsHelp: false } : input.answer;
+    : clearOptOut ? { ...input.answer, optOut: true }
+      : declinesOffer ? { ...input.answer, optOut: false, wantsHelp: false }
+        : acceptsOffer ? { ...input.answer, optOut: false, wantsHelp: true } : input.answer;
   // Contato com o corretor (24/11): R1, R2 e a pesquisa manual leem as cinco respostas possíveis.
   const contactRule = rule === null || rule === "R1" || rule === "R2";
   // Um "sim" solto só vale como "falou com o corretor" quando a pergunta é essa (abertura ou etapa 1 da R1/manual).

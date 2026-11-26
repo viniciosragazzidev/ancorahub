@@ -323,7 +323,7 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   const turnAnswers = turn.handoff && turn.answers.handoff
     ? { ...turn.answers, handoff: { ...turn.answers.handoff, requestedAt: new Date().toISOString() } }
     : turn.answers;
-  const answers = autoRule === "R4" && turn.status === "completed"
+  const answers = autoRule === "R4" && turn.status === "completed" && turnAnswers.closed !== "yes"
     ? await withLossReasonCheck(currentSurvey, turnAnswers as PostSaleAnswers)
     : turnAnswers as PostSaleAnswers;
   const previousAlertReasons = postSaleAlertReasons(currentSurvey);

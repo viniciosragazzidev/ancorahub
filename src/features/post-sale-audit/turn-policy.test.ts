@@ -137,10 +137,11 @@ describe("política da conversa inteligente", () => {
     expect(alertsOf(turn)).toEqual(["broker_complaint"]);
   });
 
-  it("R4: desistir é a própria resposta do motivo; o roteiro conclui com o motivo", () => {
+  it("R4: desistir com o motivo já dito guarda o motivo e, sendo valor, oferece outras opções (26/11)", () => {
     const turn = turnOf({ text: "Desisti, ficou caro", step: 1, rule: "R4" });
-    expect(turn).toMatchObject({ status: "completed", outcome: "other", policy: "script" });
-    expect(turn.answers.reason).toBe("Desisti, ficou caro");
+    expect(turn).toMatchObject({ status: "answering", step: 3, policy: "script" });
+    expect(turn.answers).toMatchObject({ reason: "Desisti, ficou caro", closed: "no" });
+    expect(turn.text).toMatch(/Quer que um corretor/);
   });
 
   it("pergunta fora do roteiro: acolhe em uma frase e repete a pergunta pendente", () => {

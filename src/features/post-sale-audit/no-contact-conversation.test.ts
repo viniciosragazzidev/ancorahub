@@ -145,6 +145,16 @@ describe("R1: nunca encerra no escuro quando o cliente diz que ninguém falou co
   });
 });
 
+describe("caso real Leila (R2, 26/11)", () => {
+  it("'Ainda não' recebeu a cotação e 'Sim' quer ajuda: alerta de falta de continuidade e de pedido de ajuda", () => {
+    const turns = talk(["Pode perguntar", "Ainda não", "Sim"], { rule: "R2" });
+    expect(turns[1].text).toMatch(/ainda quer ajuda/);
+    expect(turns[2]).toMatchObject({ status: "completed", policy: "no_follow_up", outcome: "no_contact" });
+    // Antes o alerta dizia "não conseguiu falar com o corretor"; ela falou, só não recebeu a cotação.
+    expect(alertsOf(turns[2])).toEqual(["no_follow_up", "wants_help"]);
+  });
+});
+
 describe("outras regras", () => {
   it("R2: 'nem falaram comigo' na pergunta da cotação não vira 'Que bom! E a decisão?'", () => {
     const turns = talk(["Pode", "Nem falaram comigo"], { rule: "R2" });

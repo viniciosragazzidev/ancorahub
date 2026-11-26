@@ -62,10 +62,12 @@ describe("roteiros da régua", () => {
     expect(talk("R3", ["Pode perguntar", "ruim, nota 2", "não"]).at(-1)).toMatchObject({ outcome: "bad_service" });
   });
 
-  it("R4: guarda o motivo dito pelo cliente", () => {
-    const turns = talk("R4", ["Pode perguntar", "Achei caro e a carência era longa"]);
+  it("R4: guarda o motivo dito pelo cliente e, com motivo de valor, oferece outras opções (26/11)", () => {
+    const turns = talk("R4", ["Pode perguntar", "Achei caro e a carência era longa", "não"]);
+    expect(turns[0].text).toMatch(/fech\w+ o plano, ainda está decidindo ou resolveu não seguir\?/);
+    expect(turns[1]).toMatchObject({ status: "answering", step: 3 });
+    expect(turns[1].answers.reason).toBe("Achei caro e a carência era longa");
     expect(turns.at(-1)).toMatchObject({ status: "completed", outcome: "other" });
-    expect(turns.at(-1)!.answers.reason).toBe("Achei caro e a carência era longa");
   });
 
   it("R5: tudo certo e indicaria", () => {

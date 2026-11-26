@@ -1,4 +1,5 @@
 import { declinesPostSaleIntroduction, detectPostSaleKeywords, mergePostSaleAnswers, type PostSaleAnswers } from "./conversation-rules";
+import { classifyLossReasonText } from "./loss-reason-check";
 import type { AutoRuleKey } from "./auto-rules";
 import { pickVariant } from "./reply-variants";
 
@@ -33,7 +34,10 @@ export function autoRuleQuestionFocus(rule: AutoRuleKey, step: number, previous:
     case "R3":
       return step === 1 ? "como foi a contratação, nota de 1 a 5" : "se ficou alguma dúvida sobre o plano";
     case "R4":
-      return "motivo: o que mais pesou na decisão";
+      // Primeiro a decisão, depois o motivo (26/11, caso Carina): a pergunta do motivo não pressupõe que desistiu.
+      return step === 1 ? "se fechou o plano, ainda está decidindo ou resolveu não seguir, e o motivo se disser"
+        : step === 2 ? "motivo: o que mais pesou na decisão"
+          : "se ainda quer ajuda com o plano: quer que um corretor mostre outras opções";
     case "R5":
       return step === 1 ? "se está tudo certo com o plano" : previous.sentiment === "negative" ? "se quer ajuda da equipe" : "se indicaria para um amigo";
   }
@@ -82,9 +86,36 @@ export function autoRuleStepAnswered(rule: AutoRuleKey, step: number, a: PostSal
     case "R1": return step === 1 ? typeof a.contacted === "boolean" : step === 2 ? a.speed === "fast" || a.speed === "slow" : step === 3 ? typeof a.wantsHelp === "boolean" : false;
     case "R2": return step === 1 ? typeof a.receivedQuote === "boolean" || decided : step === 2 ? decided : step === 3 ? typeof a.wantsHelp === "boolean" : false;
     case "R3": return step === 1 ? opinion : step === 2 ? typeof a.wantsHelp === "boolean" : false;
-    case "R4": return step === 1 ? Boolean(a.reason?.trim()) || Boolean(a.lossCategory) : false;
+    case "R4": return step === 1 ? decided || hasLossReason(a) : step === 2 ? hasLossReason(a) : step === 3 ? typeof a.wantsHelp === "boolean" : false;
     case "R5": return step === 1 ? a.sentiment === "positive" || a.sentiment === "negative" || a.wantsHelp === true : step === 2 ? (a.sentiment === "negative" ? typeof a.wantsHelp === "boolean" : typeof a.recommends === "boolean") : false;
   }
+}
+
+/** Ainda não decidiu: não é perda, é cliente em aberto. */
+const STILL_DECIDING = /\b(ainda (nao )?(resolvi|decidi|fechei|contratei|sei|defini|escolhi)|nao (resolvi|decidi|defini|escolhi) ainda|ainda (estou|to|tou) (vendo|pensando|decidindo|avaliando|pesquisando|comparando)|(estou|to) (vendo|pensando|decidindo|avaliando|pesquisando|comparando)|ainda vendo|ainda pensando|em aberto)\b/;
+
+const DECISION_WORDS = new Set(["nao", "n", "sim", "s", "fechei", "fechamos", "fechou", "contratei", "desisti", "desistimos", "ainda", "estou", "to", "ta", "decidindo", "pensando", "avaliando", "resolvi", "seguir", "segui", "o", "a", "plano", "ja", "mas", "e", "eu", "obrigada", "obrigado", "nada", "por", "enquanto", "agora", "fiz", "quis", "quero", "mais", "nem"]);
+
+function plainWords(text: string | null | undefined) {
+  return (text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z ]+/g, " ").split(/\s+/).filter(Boolean);
+}
+
+/** O cliente disse um motivo, e não só "não fechei" ou "desisti"? */
+export function hasLossReason(a: PostSaleAnswers) {
+  if (a.lossCategory && a.lossCategory !== "other") return true;
+  return plainWords(a.reason).some((word) => !DECISION_WORDS.has(word));
+}
+
+type LossOffer = "copart" | "price" | "coverage";
+
+/** Motivo que um corretor resolve com outra opção de plano (a pesquisa nunca fala de preço). */
+export function lossReasonOffer(a: PostSaleAnswers): LossOffer | null {
+  const text = plainWords(a.reason ?? a.comment).join(" ");
+  if (/coparticip|copart|participativ/.test(text)) return "copart";
+  const category = a.lossCategory ?? classifyLossReasonText(a.reason ?? a.comment ?? null);
+  if (category === "price") return "price";
+  if (category === "coverage") return "coverage";
+  return null;
 }
 
 function ruleTurn(rule: AutoRuleKey, step: number, merged: PostSaleAnswers, answer: PostSaleAnswers, names: Names): AutoRuleTurn {
@@ -137,9 +168,41 @@ function ruleTurn(rule: AutoRuleKey, step: number, merged: PostSaleAnswers, answ
       };
     }
     case "R4": {
-      if (step === 0) return ask(1, v("reason", [`Obrigada, ${names.lead}! Se puder contar, o que mais pesou na sua decisão?`, `Combinado, ${names.lead}! O que mais pesou na sua decisão?`]), "O que mais pesou na sua decisão?");
-      const reason = merged.reason ?? (answer.comment ? answer.comment.slice(0, 300) : null);
-      return { status: "completed", step, text: v("lost_end", [`Obrigada por me contar, ${names.lead}. Se mudar de ideia, é só chamar por aqui.`, `Obrigada pela sinceridade, ${names.lead}. Quando precisar, é só chamar por aqui.`]), answers: { ...merged, reason, closed: merged.closed && merged.closed !== "unknown" ? merged.closed : "no" }, outcome: "other" };
+      // 26/11 (caso Carina): perguntava "o que mais pesou na sua decisão?" sem saber se fechou, se ainda
+      // estava decidindo ou se o atendimento nem terminou, e encerrava mesmo quando o motivo tinha solução
+      // ("todo plano tem coparticipação"). Agora: decisão, motivo e, quando o motivo tem solução, a oferta.
+      const lostEnd = () => v("lost_end", [`Obrigada por me contar, ${names.lead}. Se mudar de ideia, é só chamar por aqui.`, `Obrigada pela sinceridade, ${names.lead}. Quando precisar, é só chamar por aqui.`]);
+      const lost = (answers: PostSaleAnswers): PostSaleAnswers => ({ ...answers, closed: answers.closed && answers.closed !== "unknown" ? answers.closed : "no" });
+      const afterReason = (answers: PostSaleAnswers): AutoRuleTurn => {
+        const offer = lossReasonOffer(answers);
+        if (!offer) return { status: "completed", step, text: lostEnd(), answers: lost(answers), outcome: "other" };
+        const text = offer === "copart"
+          ? v("offer_copart", [`Entendi, ${names.lead}, obrigada por contar. Existem planos sem coparticipação. Quer que um corretor te mostre essas opções?`, `Obrigada por contar, ${names.lead}. Temos opções de plano sem coparticipação. Quer que um corretor te mostre?`])
+          : offer === "price"
+            ? v("offer_price", [`Entendi, ${names.lead}, obrigada por contar. Às vezes outro plano cabe melhor no orçamento. Quer que um corretor te mostre outras opções?`, `Obrigada por contar, ${names.lead}. Quer que um corretor veja opções que caibam melhor no seu orçamento?`])
+            : v("offer_coverage", [`Entendi, ${names.lead}, obrigada por contar. Quer que um corretor te mostre planos com a rede ou a cobertura que você precisa?`, `Obrigada por contar, ${names.lead}. Quer que um corretor veja planos com a rede ou a cobertura de que você precisa?`]);
+        return { status: "answering", step: 3, text, answers: lost(answers), question: "Quer que um corretor te mostre outras opções?" };
+      };
+      if (step === 0) return ask(1, v("decision", [`Obrigada, ${names.lead}! Primeiro: você chegou a fechar o plano, ainda está decidindo ou resolveu não seguir?`, `Combinado, ${names.lead}! Me conta: você fechou o plano, ainda está decidindo ou resolveu não seguir?`]), "Você chegou a fechar o plano, ainda está decidindo ou resolveu não seguir?");
+      if (step === 1) {
+        if (merged.closed === "yes") return { status: "completed", step, text: v("lost_closed", [`Que bom, ${names.lead}! Obrigada por contar. Se precisar de algo com o plano, é só chamar por aqui.`, `Que ótimo, ${names.lead}! Obrigada pelo retorno. Qualquer coisa, estamos por aqui.`]), answers: merged, outcome: "closed" };
+        // "Ainda não resolvi" (Alcino, 26/11): o corretor marcou perdido, mas o cliente segue decidindo.
+        const said = plainWords(answer.comment).join(" ");
+        if (STILL_DECIDING.test(said)) {
+          // Só vale como motivo o que sobra além do "ainda estou vendo" ("ainda estou vendo, achei caro").
+          const rest = plainWords(said.replace(STILL_DECIDING, " ")).some((word) => !DECISION_WORDS.has(word));
+          merged = { ...merged, closed: "deciding", reason: rest || (merged.lossCategory && merged.lossCategory !== "other") ? merged.reason : null };
+        }
+        if (hasLossReason(merged)) return afterReason(merged);
+        if (merged.closed === "deciding") return { status: "answering", step: 3, text: v("offer_deciding", [`Entendi, ${names.lead}. Quer que um corretor te chame para tirar dúvidas e ajudar na decisão?`, `Combinado, ${names.lead}. Quer que um corretor te ajude a comparar as opções?`]), answers: merged, question: "Quer que um corretor te ajude na decisão?" };
+        // Respondeu outra coisa que não "fechei", "não" ou "estou decidindo": vale como o motivo.
+        const raw = answer.comment?.trim() ?? "";
+        if (merged.closed !== "no" && plainWords(raw).some((word) => !DECISION_WORDS.has(word))) return afterReason({ ...merged, reason: raw.slice(0, 300) });
+        return ask(2, v("reason", [`Entendi, ${names.lead}. Se puder contar, o que mais pesou na decisão?`, `Obrigada, ${names.lead}. Se quiser contar, o que mais pesou na sua decisão?`]), "O que mais pesou na sua decisão?");
+      }
+      if (step === 2) return afterReason({ ...merged, reason: hasLossReason(merged) ? merged.reason : answer.comment?.slice(0, 300) ?? merged.reason ?? null });
+      if (merged.wantsHelp === true) return { status: "completed", step, text: v("offer_yes", [`Combinado, ${names.lead}! Já pedi para um corretor te chamar por aqui com essas opções.`, `Certo, ${names.lead}! Um corretor vai te chamar por aqui com as opções.`]), answers: { ...merged, wantsHelp: true }, outcome: "waiting" };
+      return { status: "completed", step, text: lostEnd(), answers: lost(merged), outcome: "other" };
     }
     case "R5": {
       if (step === 0) return ask(1, v("all_good", [`Obrigada, ${names.lead}! Está tudo certo com o plano até aqui?`, `Combinado, ${names.lead}! E aí, tudo certo com o plano até aqui?`]), "Está tudo certo com o plano até aqui?");
