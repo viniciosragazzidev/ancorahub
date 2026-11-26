@@ -202,33 +202,7 @@ function shouldSignalDirectorsNow(tenantId: string, now = Date.now()) {
 async function sendRealtimeSignal(target: RealtimeSyncTarget, signal: RealtimeSyncSignal | DomainInvalidationSignal) {
   const topic = getRealtimeSyncTopic(target);
   if (!topic) return false;
-  // 25/11: o canal próprio (pg_notify + SSE) é o principal. O Supabase Realtime segue em paralelo
-  // só enquanto existir, para as abas abertas antes do deploy; some com a migração do banco.
-  const [own, legacy] = await Promise.allSettled([
-    publishRealtimeTopic(topic, signal),
-    sendSupabaseBroadcast(topic, signal),
-  ]);
-  return (own.status === "fulfilled" && own.value) || (legacy.status === "fulfilled" && legacy.value);
-}
-
-async function sendSupabaseBroadcast(topic: string, signal: RealtimeSyncSignal | DomainInvalidationSignal) {
-  const url = requiredEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !serviceRoleKey) return false;
-
-  const response = await fetch(
-    `${url}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/${REALTIME_SYNC_EVENT}`,
-    {
-      method: "POST",
-      headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(signal),
-      cache: "no-store",
-    },
-  );
-
-  return response.ok;
+  // Canal próprio (pg_notify + SSE em /api/realtime/stream). A cópia para o Supabase Realtime saiu em 26/11/2026:
+  // nenhuma tela escuta mais o Supabase desde a virada do banco (25/11).
+  return publishRealtimeTopic(topic, signal);
 }
