@@ -9,6 +9,7 @@ import { getSystemSettings } from "@/features/system-settings/queries";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { evaluatePostSaleEligibility, isPostSaleOptedOut, pickPostSaleSourceMessage, POST_SALE_EXCLUSION_LABELS, POST_SALE_SURVEY_COOLDOWN_DAYS, type PostSaleExclusionReason, type PostSaleAudience, pickPostSaleCompanyWaha, isPostSaleWahaNumberAllowed, choosePostSaleSource, type PostSaleDefaultSourceState } from "./rules";
 import { isApprovedPostSaleMetaTemplate } from "./template-contract";
+import { getTeamCompanyNumberId } from "@/features/team-notices/service";
 
 // "meta" is how the AI stores the messages it sent on the official number (09/11: 21 leads whose only
 // history was the AI on the 6404-1142 were wrongly "sem número de origem").
@@ -165,7 +166,7 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
   const cooldownDate = new Date(now.getTime() - (options.cooldownDays ?? POST_SALE_SURVEY_COOLDOWN_DAYS) * 86_400_000);
   const humanCutoff = new Date(now.getTime() - 24 * 3_600_000);
 
-  const [messages, conversations, recentSurveys, optOuts, humanMessages, metaChannels, wahaNumbers] = await Promise.all([
+  const [messages, conversations, recentSurveys, optOuts, humanMessages, metaChannels, allWahaNumbers, teamNumberId] = await Promise.all([
     db.select({
       id: schema.whatsappMessages.id,
       leadId: schema.whatsappMessages.leadId,
@@ -219,6 +220,7 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
       .from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), inArray(schema.communicationChannels.provider, CHANNEL_META_PROVIDERS))),
     db.select({ id: schema.wahaNumbers.id, tenantId: schema.wahaNumbers.tenantId, branchId: schema.wahaNumbers.branchId, scope: schema.wahaNumbers.scope, status: schema.wahaNumbers.status, pausedUntil: schema.wahaNumbers.pausedUntil })
       .from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.tenantId, context.tenantId), inArray(schema.wahaNumbers.scope, ["tenant", "branch"]))),
+    getTeamCompanyNumberId(context.tenantId),
   ]);
 
   const channelSettings = await getSystemSettings(metaChannels.map((channel) => channelLeadIntakeKey(channel.id))).catch(() => []);
@@ -246,6 +248,8 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     )) : [];
   const approvedWabas = new Set(templates.filter(isApprovedPostSaleMetaTemplate).map((template) => template.wabaId));
   const byChannelId = new Map(metaChannels.map((channel) => [channel.id, channel]));
+  // The team's company number is reserved (26/11/2026): never a source or fallback of the survey.
+  const wahaNumbers = allWahaNumbers.filter((number) => number.id !== teamNumberId);
   const byWahaId = new Map(wahaNumbers.map((number) => [number.id, number]));
   const messagesByLead = new Map<string, typeof messages>();
   for (const message of messages) {

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 
 import { getMessageEventByPurpose } from "@/features/communication-channels/message-event-catalog";
-import { getTenantChannelRouting, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
+import { findConnectedTenantChannelId, getTenantChannelRouting, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { renderTenantChannelMessage } from "@/features/waha-cadence/tenant-channel-routing-rules";
 import { getDatabase, schema } from "@/shared/db";
 import { effectiveNoticeSetting, TEAM_NOTICES, teamNoticeByKey, type TeamNotice, type TeamNoticeSetting } from "./catalog";
@@ -32,6 +32,16 @@ export async function getTeamNoticeSettings(tenantId: string): Promise<Map<strin
 
 export async function getTeamNoticeSetting(tenantId: string, notice: TeamNotice) {
   return (await getTeamNoticeSettings(tenantId)).get(notice.key) ?? effectiveNoticeSetting(notice, null);
+}
+
+/**
+ * The company WhatsApp reserved for the team (26/11/2026): every message to a team member leaves
+ * through it, and the post-sale survey never uses it. The connected company number, else the newest.
+ */
+export async function getTeamCompanyNumberId(tenantId: string): Promise<string | null> {
+  const connected = await findConnectedTenantChannelId(tenantId).catch(() => null);
+  if (connected) return connected;
+  return (await getCompanyNumberState(tenantId).catch(() => null))?.id ?? null;
 }
 
 /** The tenant's company WAHA number (the newest), connected or not. */

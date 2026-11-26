@@ -35,6 +35,7 @@ import { builtInNoticeVariants, INVITE_LINK_PLACEHOLDER, localHour, withInviteLi
 import {
   evaluateNoticeRow,
   getCompanyNumberState,
+  getTeamCompanyNumberId,
   getTeamNoticeSetting,
   recordCompanyNumberFailure,
   recordCompanyNumberSuccess,
@@ -615,11 +616,10 @@ export function isTeamMemberOnlyCompanyNumber(input: { recipientType: string; pu
   return input.recipientType === "user" && input.purpose !== "postSaleSurvey";
 }
 
-async function companyNumberForTeam(tenantId: string): Promise<string | null> {
-  const connected = await findConnectedTenantChannelId(tenantId).catch(() => null);
-  if (connected) return connected;
-  return (await getCompanyNumberState(tenantId).catch(() => null))?.id ?? null;
-}
+const companyNumberForTeam = getTeamCompanyNumberId;
+
+/** The team's company number is reserved: the post-sale survey never leaves through it (26/11/2026). */
+const POST_SALE_TEAM_NUMBER_MESSAGE = "O WhatsApp da empresa é reservado para a equipe; a pesquisa não sai por ele.";
 
 async function enqueueTeamMemberCompanyMessage(input: {
   tenantId: string;
@@ -889,6 +889,9 @@ export async function enqueuePostSaleSurveyWahaMessage(input: {
   if (!number || !isPostSaleWahaNumberAllowed(number, lead.branchId) || (number.pausedUntil && number.pausedUntil > new Date())) {
     throw Object.assign(new Error("O número de origem está indisponível."), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
   }
+  if (number.id === await getTeamCompanyNumberId(input.tenantId)) {
+    throw Object.assign(new Error(POST_SALE_TEAM_NUMBER_MESSAGE), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
+  }
 
   const id = randomUUID();
   const now = new Date();
@@ -959,6 +962,9 @@ export async function enqueuePostSaleTestWahaMessage(input: {
     .limit(1);
   if (!number || (number.pausedUntil && number.pausedUntil > new Date())) {
     throw Object.assign(new Error("O número de origem está indisponível."), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
+  }
+  if (number.id === await getTeamCompanyNumberId(input.tenantId)) {
+    throw Object.assign(new Error(POST_SALE_TEAM_NUMBER_MESSAGE), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
   }
   const id = randomUUID();
   const now = new Date();
@@ -1422,6 +1428,15 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           providerErrorMessage: failure.message,
           updatedAt: new Date(),
         }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+        return;
+      }
+      // Queued before the team number was reserved (26/11/2026): it does not leave through it.
+      if (row.purpose === "postSaleSurvey" && viaTenantChannel && row.wahaNumberId === await getTeamCompanyNumberId(row.tenantId)) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "skipped", failedAt: new Date(), providerErrorCode: "POST_SALE_TEAM_NUMBER_RESERVED",
+          providerErrorMessage: POST_SALE_TEAM_NUMBER_MESSAGE, updatedAt: new Date(),
+        }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
+        await syncPostSaleSurveyOutbound(row, { status: "skipped", reason: POST_SALE_TEAM_NUMBER_MESSAGE });
         return;
       }
       if (row.purpose === "postSaleSurvey" && !viaTenantChannel && row.deliveryRoute !== "meta_only") {

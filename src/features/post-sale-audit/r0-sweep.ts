@@ -15,6 +15,7 @@ import { isPostSaleBusinessHours, postSaleBusinessMillisecondsBetween, r0Waiting
 import { ensurePostSaleSurveyAlerts } from "./alert-service";
 import { decideR0Trigger, parseR0Settings, postSaleR0SettingKey, R0_DEFAULTS, R0_ELIGIBLE_STATUSES, R0_RULE_KEY, r0EscalationState, readR0State, renderR0Opening, type R0SkipReason } from "./r0-rules";
 import { firstName, isPostSaleWahaNumberAllowed } from "./rules";
+import { getTeamCompanyNumberId } from "@/features/team-notices/service";
 
 export type PostSaleR0SweepResult = {
   tenants: number;
@@ -333,6 +334,8 @@ async function resolveTriggerSource(tenantId: string, leadBranchId: string | nul
     const [number] = await db.select({ id: schema.wahaNumbers.id, scope: schema.wahaNumbers.scope, branchId: schema.wahaNumbers.branchId, status: schema.wahaNumbers.status })
       .from(schema.wahaNumbers)
       .where(and(eq(schema.wahaNumbers.id, message.wahaNumberId), eq(schema.wahaNumbers.tenantId, tenantId))).limit(1);
+    // The team's company number is reserved (26/11/2026): the survey never leaves through it.
+    if (number && number.id === await getTeamCompanyNumberId(tenantId)) return null;
     if (number && ["active", "ready"].includes(number.status) && isPostSaleWahaNumberAllowed(number, leadBranchId)) return { type: "waha", ref: number.id };
   }
   return null;
