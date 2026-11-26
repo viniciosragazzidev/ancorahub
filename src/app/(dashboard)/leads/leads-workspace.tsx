@@ -44,6 +44,7 @@ import { LeadsFilters } from "./_components/leads-filters";
 import type { LeadsFiltersProps } from "./_components/use-lead-filters";
 import { LeadsListSwitch, QualifyingLeadsListSwitch } from "./leads-lite-list";
 import { LeadsLiteKanban } from "./leads-lite-kanban";
+import type { LeadsLiteForecastData } from "./leads-lite-forecast";
 import { LeadsLiteCooling } from "./leads-lite-cooling";
 import { CoolingActionPanel, CoolingDrawerActions, type CoolingActionCommit } from "./leads-lite-cooling-actions";
 import { classifyCooling } from "@/features/leads/cooling-radar";
@@ -247,7 +248,10 @@ export function LeadsWorkspace({
   coolingLeads,
   contextUserId,
   tags = [],
+  forecast = null,
 }: {
+  /** Previsão do mês no topo do kanban Lite (já no escopo de quem vê). */
+  forecast?: LeadsLiteForecastData | null;
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
   queues?: Array<{ id: string; name: string; branchId: string | null }>;
@@ -867,6 +871,7 @@ export function LeadsWorkspace({
               slaStagnantDays={slaStagnantDays}
               stageActor={(lead) => stageActorFor(contextRole, lead, { branchId: contextBranchId })}
               onStageCommitted={handleBulkStatusCommitted}
+              forecast={forecast}
             />
           ) : (
           <>

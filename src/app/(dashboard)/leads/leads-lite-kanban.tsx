@@ -26,6 +26,7 @@ import { computeSlaInfo, type SlaInfo } from "./lead-sla";
 import { LeadsLiteBulk, type LeadsLiteBulkConfig } from "./leads-lite-bulk";
 import styles from "./leads-lite-kanban.module.css";
 import { liteStageLabel } from "./lite-stage-labels";
+import { LeadsLiteForecast, type LeadsLiteForecastData } from "./leads-lite-forecast";
 
 export type LeadsLiteKanbanProps = {
   statuses: string[];
@@ -47,13 +48,15 @@ export type LeadsLiteKanbanProps = {
   stageActor?: (lead: LeadWorkspaceItem) => StageActor;
   /** Etapa confirmada pelo servidor: o workspace atualiza o cartão na hora. */
   onStageCommitted?: (input: { leadIds: string[]; newStatus: string }) => void;
+  /** Previsão do mês no topo do funil, já no escopo de quem vê. Sem ela, a linha não aparece. */
+  forecast?: LeadsLiteForecastData | null;
 };
 
 const noActor = () => "none" as const;
 
 export function LeadsLiteKanban({
   statuses, groupedLeads, onMoveColumn, onOpen, onQuote, commercialValuesEnabled = false, isSelected, onToggle, selectedIds, onClearSelection, bulk,
-  slaFirstContactMinutes = 15, slaStagnantDays = 3, stageActor = noActor, onStageCommitted,
+  slaFirstContactMinutes = 15, slaStagnantDays = 3, stageActor = noActor, onStageCommitted, forecast = null,
 }: LeadsLiteKanbanProps) {
   const columns = useMemo(
     () => statuses.map((status) => ({ id: status, title: liteStageLabel(status), items: groupedLeads[status] ?? [] })),
@@ -95,6 +98,7 @@ export function LeadsLiteKanban({
       <div aria-live="polite" className={styles.notice}>
         <ActionNoticeLine notice={notice.notice} />
       </div>
+      {forecast ? <LeadsLiteForecast forecast={forecast} /> : null}
       <LiteKanban
         label="Funil de leads em Kanban"
         columns={columns}

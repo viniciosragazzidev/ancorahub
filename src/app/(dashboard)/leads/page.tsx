@@ -58,6 +58,8 @@ import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-e
 import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { buildLeadScopeWhere, buildUnassignedLeadWhere } from "@/features/leads/lead-authorization";
+import { getMonthlyForecast } from "@/features/leads/monthly-forecast-query";
+import { forecastScopeLabel } from "@/features/leads/monthly-forecast";
 import { OVERDUE_TASK_VALUE, leadLastContactAtSql, listCoolingLeads, overdueTaskLeadFilter } from "@/features/leads/cooling-radar-query";
 import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
 import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
@@ -819,6 +821,16 @@ async function LeadsPageContent({
   const coolingRows = initialView === "esfriando"
     ? await withPerfSpan("leads.cooling", () => listCoolingLeads(context, { requestedBranchId: filters.branch, extra: commonWhere }))
     : null;
+  // Previsão do mês (26/11): só no kanban Lite com valores comerciais; no escopo de quem vê e na filial escolhida.
+  // Se a consulta falhar, a linha só não aparece.
+  const forecast = directorLitePage && leadCommercialValuesEnabled
+    ? await withPerfSpan("leads.forecast", () => getMonthlyForecast(context, filters.branch ?? null))
+      .then((data) => ({ ...data, scopeLabel: forecastScopeLabel(context.role), canConfigure: context.role === "director" }))
+      .catch((error) => {
+        console.error("[lead-forecast] failed", { error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+        return null;
+      })
+    : null;
   const hasWorkspace = Boolean(leads.length || qualifyingLeads.length || unassignedRows.length || initialView === "esfriando");
   // Props simples (serializáveis): no Lite o LeadsWorkspace (client) monta o LeadsFilters com as abas no fim da barra.
   const leadsFiltersProps = {
@@ -961,6 +973,7 @@ async function LeadsPageContent({
               slaFirstContactMinutes={slaFirstContactMinutes}
               slaStagnantDays={slaStagnantDays}
               commercialValuesEnabled={leadCommercialValuesEnabled}
+              forecast={forecast}
               quotePlans={plans.map((plan) => ({ id: plan.id, name: plan.name }))}
               brokers={brokers}
               branches={branches.filter((branch) => (context.role === "director" || branch.id === context.branchId) && branch.status === "active" && branch.acceptingLeads && !branch.isDistributionHub)}
