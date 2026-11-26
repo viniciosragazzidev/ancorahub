@@ -50,7 +50,10 @@ const leads: LightLeadItem[] = [
   { ...base, id: "l1", name: "Fabio Perdeu", status: "lost", isLost: true },
 ];
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  window.localStorage.clear();
+});
 afterEach(() => cleanup());
 
 describe("LightLeadsList", () => {
@@ -64,13 +67,24 @@ describe("LightLeadsList", () => {
     expect(items.map((item) => item.kind)).toEqual(["acceptance", "response", "return"]);
   });
 
-  it("opens on Novos with the new lead as a large card with the accept action", () => {
+  it("opens on Todos with every lead, and the new lead keeps the accept action", () => {
     render(<LightLeadsList leads={leads} />);
 
+    expect(screen.getByRole("button", { name: /^Todos/ }).getAttribute("aria-pressed")).toBe("true");
     const group = screen.getByRole("region", { name: /Sem data/ });
     expect(within(group).getByText("Ana Novo")).toBeTruthy();
     expect(within(group).getByRole("button", { name: /^Aceitar/ })).toBeTruthy();
-    expect(screen.queryByText("Carla Tranquila")).toBeNull();
+    expect(screen.getByText("Carla Tranquila")).toBeTruthy();
+  });
+
+  it("switches to the table with name, phone, entry and stage badge", () => {
+    render(<LightLeadsList leads={leads} />);
+    fireEvent.click(screen.getByRole("button", { name: "Tabela" }));
+
+    const table = screen.getByRole("table");
+    for (const header of ["Nome", "Telefone", "Entrada", "Etapa"]) expect(within(table).getByRole("columnheader", { name: header })).toBeTruthy();
+    expect(within(table).getByText("Ana Novo")).toBeTruthy();
+    expect(within(table).getByRole("button", { name: /^Aceitar/ })).toBeTruthy();
   });
 
   it("never pulls the leads that need the broker above the order of arrival", () => {
@@ -101,7 +115,7 @@ describe("LightLeadsList", () => {
 
   it("shows the empty state of the tab when there is nothing to list", () => {
     render(<LightLeadsList leads={[]} />);
-    expect(screen.getByRole("heading", { name: "Nenhum atendimento em andamento" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Nenhum lead ainda" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /^Retornos/ }));
     expect(screen.getByRole("heading", { name: "Nenhum retorno pendente" })).toBeTruthy();
   });

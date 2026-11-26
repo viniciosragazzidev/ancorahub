@@ -40,3 +40,7 @@
   .nowAction { transition: none; }
   .nowAction:active { transform: none; }
 }
+
+/* Lista ou tabela (26/11/2026): a troca fica no topo, alinhada à direita. */
+.viewSwitch { display: flex; justify-content: flex-end; }
+.tableNumber { font-variant-numeric: tabular-nums; white-space: nowrap; }

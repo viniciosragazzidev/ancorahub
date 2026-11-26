@@ -12,6 +12,9 @@ import { motionTokens } from "@/components/arc/motion-tokens";
 import { useArrivedKeys } from "@/components/lite/motion/arrivals";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import { LiteDataTable, type LiteColumn } from "@/components/lite/data/data";
+import { formatLeadPhone } from "@/features/leads/format-lead-phone";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 import { BrokerWalletTabs } from "@/features/broker-workspace/components/broker-wallet-tabs";
 import { AcceptLeadButton } from "@/features/broker-workspace/components/accept-lead-button";
@@ -50,7 +53,7 @@ export type LightLeadItem = {
   isTeamList?: boolean;
 };
 
-type FilterTab = "new" | "active" | "returns" | "risk" | "team" | "closed";
+type FilterTab = "all" | "new" | "active" | "returns" | "risk" | "team" | "closed";
 
 const ACTIVE_STATUSES = ["in_contact", "contacted", "quote_sent", "negotiation", "documentation_pending"];
 
@@ -68,6 +71,8 @@ const needsYouNow = (lead: LightLeadItem) =>
 // 16/11: os leads da lista da supervisão ficam numa aba só deles, fora das etapas dos leads do corretor.
 const own = (test: (lead: LightLeadItem) => boolean) => (lead: LightLeadItem) => !lead.isTeamList && test(lead);
 const TAB_FILTERS: Record<FilterTab, (lead: LightLeadItem) => boolean> = {
+  // "Todos" (26/11/2026): a carteira inteira do corretor, inclusive fechados e os da supervisão.
+  all: () => true,
   new: own(isNewLead),
   active: own(isActiveLead),
   returns: own(isReturnLead),
@@ -76,9 +81,10 @@ const TAB_FILTERS: Record<FilterTab, (lead: LightLeadItem) => boolean> = {
   closed: (lead) => isWonLead(lead) || isLostLead(lead),
 };
 
-const QUERY_FILTERS: Record<string, FilterTab> = { equipe: "team", team: "team", awaiting: "new", new: "new", active: "active", returns: "returns", risk: "risk", closed: "closed", finished: "closed", lost: "closed" };
+const QUERY_FILTERS: Record<string, FilterTab> = { all: "all", todos: "all", equipe: "team", team: "team", awaiting: "new", new: "new", active: "active", returns: "returns", risk: "risk", closed: "closed", finished: "closed", lost: "closed" };
 
 const EMPTY_COPY: Record<FilterTab, { title: string; description: string }> = {
+  all: { title: "Nenhum lead ainda", description: "Fique disponível no plantão para receber os próximos leads." },
   new: { title: "Nenhum lead novo", description: "Fique disponível no plantão para receber os próximos leads." },
   active: { title: "Nenhum atendimento em andamento", description: "Aceite um lead novo para começar um atendimento." },
   returns: { title: "Nenhum retorno pendente", description: "Leads sem atualização há mais de 3 dias aparecem aqui." },
@@ -271,7 +277,7 @@ function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number
     <PeopleRow
       index={index}
       dataTour={dataTour}
-      href={lead.isAwaitingResponse ? `/conversas/broker?leadId=${lead.id}` : `/leads/${lead.id}`}
+      href={leadHref(lead)}
       name={lead.name}
       chip={<Badge tone={state.tone} size="sm">{state.chip}</Badge>}
       preview={withDuty(state.context === state.chip ? lead.summary || lead.city || "Toque para abrir o atendimento" : state.context, lead)}
@@ -284,6 +290,53 @@ function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number
     />
   );
 }
+
+/** Lista (como sempre foi) ou tabela; a escolha fica neste aparelho. */
+type ListView = "list" | "table";
+const VIEW_STORAGE_KEY = "ancorahub:broker-leads-view";
+
+function readStoredView(): ListView {
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === "table" ? "table" : "list";
+  } catch {
+    return "list";
+  }
+}
+
+function leadHref(lead: LightLeadItem) {
+  return lead.isAwaitingResponse ? `/conversas/broker?leadId=${lead.id}` : `/leads/${lead.id}`;
+}
+
+const TABLE_COLUMNS: LiteColumn<LightLeadItem>[] = [
+  { id: "name", label: "Nome", primary: true, nowrap: true, render: (lead) => lead.name },
+  { id: "phone", label: "Telefone", nowrap: true, render: (lead) => (lead.phone ? <span className={styles.tableNumber}>{formatLeadPhone(lead.phone)}</span> : "Sem telefone") },
+  {
+    id: "arrival",
+    label: "Entrada",
+    nowrap: true,
+    render: (lead) => {
+      const handedAt = distributedAt(lead);
+      return handedAt ? <time className={styles.tableNumber} dateTime={handedAt.toISOString()} suppressHydrationWarning>{arrivalLabel(lead) ?? ""}</time> : "Sem data";
+    },
+  },
+  {
+    id: "stage",
+    label: "Etapa",
+    render: (lead) => {
+      const state = describeLead(lead);
+      return <Badge tone={state.tone} size="sm">{state.chip}</Badge>;
+    },
+  },
+  { id: "product", label: "Produto", nowrap: true, render: (lead) => lead.productName || "–" },
+  { id: "lives", label: "Vidas", numeric: true, render: (lead) => (lead.livesCount ? lead.livesCount : "–") },
+  { id: "city", label: "Cidade", nowrap: true, render: (lead) => lead.city || "–" },
+  { id: "duty", label: "Plantão", nowrap: true, render: (lead) => lead.dutyName || "–" },
+  {
+    id: "actions",
+    label: "Ação",
+    render: (lead) => (isNewLead(lead) ? <AcceptLeadButton leadId={lead.id} className={acceptButton}>Aceitar e chamar no WhatsApp</AcceptLeadButton> : null),
+  },
+];
 
 export function LightLeadsList({
   leads,
@@ -300,12 +353,25 @@ export function LightLeadsList({
   const router = useRouter();
   const searchParams = useSearchParams();
   const requested = QUERY_FILTERS[searchParams.get("filter") ?? ""];
-  const [filter, setFilter] = useState<FilterTab>(() => requested ?? initialFilter ?? (leads.some(isNewLead) ? "new" : "active"));
+  // Abre em "Todos" (26/11/2026); ?filter= e o atalho do Início continuam abrindo a aba pedida.
+  const [filter, setFilter] = useState<FilterTab>(() => requested ?? initialFilter ?? "all");
+  const [view, setView] = useState<ListView>("list");
+  useEffect(() => setView(readStoredView()), []);
+  const changeView = (next: string) => {
+    const value: ListView = next === "table" ? "table" : "list";
+    setView(value);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, value);
+    } catch {
+      // Sem armazenamento (aba anônima): a escolha vale só nesta visita.
+    }
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const nowItems = useMemo(() => buildLeadNowItems(leads), [leads]);
 
   const counts = useMemo(
     () => ({
+      all: leads.filter(TAB_FILTERS.all).length,
       new: leads.filter(TAB_FILTERS.new).length,
       active: leads.filter(TAB_FILTERS.active).length,
       returns: leads.filter(TAB_FILTERS.returns).length,
@@ -335,10 +401,10 @@ export function LightLeadsList({
   const dayGroups = useMemo(() => groupByArrivalDay(visible, (lead) => lead.arrivedAt, new Date(), (lead) => lead.name), [visible]);
 
   // "Em risco" only takes room in the bar while there is something at risk (or the broker came from the Inicio card).
-  const tabs = (["new", "active", "returns", "risk", "team", "closed"] as const).filter((value) => (value !== "risk" && value !== "team") || counts[value] > 0 || filter === value);
+  const tabs = (["all", "new", "active", "returns", "risk", "team", "closed"] as const).filter((value) => (value !== "risk" && value !== "team") || counts[value] > 0 || filter === value);
   const options = tabs.map((value) => ({
     id: value,
-    label: { new: "Novos", active: "Atendendo", returns: "Retornos", risk: "Em risco", team: "Da supervisão", closed: "Fechados" }[value],
+    label: { all: "Todos", new: "Novos", active: "Atendendo", returns: "Retornos", risk: "Em risco", team: "Da supervisão", closed: "Fechados" }[value],
     count: counts[value],
   }));
 
@@ -348,7 +414,15 @@ export function LightLeadsList({
 
       <PeoplePage>
         {walletTabs ? <BrokerWalletTabs value="atendimento" /> : null}
-        {filter !== "closed" && !searching ? <NowBlock items={nowItems} /> : null}
+        <div className={styles.viewSwitch}>
+          <SegmentedControl
+            label="Ver leads em"
+            options={[{ value: "list", label: "Lista" }, { value: "table", label: "Tabela" }]}
+            value={view}
+            onValueChange={changeView}
+          />
+        </div>
+        {filter !== "closed" && !searching && view === "list" ? <NowBlock items={nowItems} /> : null}
         <PeopleFilters
           label="Etapas da fila"
           options={options}
@@ -378,6 +452,15 @@ export function LightLeadsList({
                 <Button variant="secondary" onClick={() => router.push("/minha-fila?filter=new")}>Ver leads novos</Button>
               ) : undefined
             }
+          />
+        ) : view === "table" ? (
+          <LiteDataTable
+            caption="Seus leads"
+            columns={TABLE_COLUMNS}
+            rows={visible}
+            rowKey={(lead) => lead.id}
+            onRowOpen={(lead) => router.push(leadHref(lead))}
+            empty={null}
           />
         ) : (
           <>
