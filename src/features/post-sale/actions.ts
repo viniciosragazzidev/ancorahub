@@ -274,6 +274,10 @@ const conversationSaleInput = z.object({
   source: z.enum(["conversa", "contrato"]),
   /** Lido do contrato: titular primeiro, depois os dependentes. */
   people: z.array(conversationPersonInput).max(30).optional(),
+  /** Titular confirmado na conversa (26/11/2026): nome, nascimento e CPF valem mesmo com titular já cadastrado. */
+  holderConfirmed: z.boolean().optional(),
+  /** CNPJ da empresa titular, só dígitos. Vai para os dados do lead. */
+  holderCnpj: z.string().regex(/^\d{14}$/).nullable().optional(),
   policyNumber: z.string().trim().max(60).nullable().optional(),
   paymentMethod: z.enum(schema.paymentMethodValues).nullable().optional(),
   contractTermMonths: z.number().int().min(1).max(120).nullable().optional(),
@@ -314,7 +318,7 @@ export async function registerConversationSaleAction(rawInput: ConversationSaleI
       approvedValue: input.approvedValue,
       confirmationDocumentId: null,
       ...(input.carrierId ? { carrierId: input.carrierId } : {}),
-    }, { planId: input.planId, leadPlanId: input.leadPlanId ?? input.planId, ages: input.ages, notes, people, contract: input.contract ?? null });
+    }, { planId: input.planId, leadPlanId: input.leadPlanId ?? input.planId, ages: input.ages, notes, people, contract: input.contract ?? null, holderConfirmed: input.holderConfirmed ?? false, holderCnpj: input.holderCnpj ?? null });
   } catch (error) {
     if (error instanceof SaleAlreadyRegisteredError) return { error: error.message };
     console.error("[register-sale-conversation] failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
@@ -339,8 +343,10 @@ function sameName(a: string, b: string) {
 async function applyConversationSaleToLead(tx: SaleTx, input: {
   tenantId: string; userId: string; leadId: string; leadName: string; planId: string | null; approvedValue: number; ages: number[];
   people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null; coverageStartDate: string; now: Date;
+  holderConfirmed?: boolean; holderCnpj?: string | null;
 }): Promise<string | null> {
   await tx.update(schema.leads).set({
+    ...(input.holderCnpj ? { formData: sql`coalesce(${schema.leads.formData}, '{}'::jsonb) || ${JSON.stringify({ cnpj: input.holderCnpj })}::jsonb` } : {}),
     ...(input.planId ? { planId: input.planId } : {}),
     livesCount: input.ages.length,
     monthlyValue: input.approvedValue.toFixed(2),
@@ -358,8 +364,10 @@ async function applyConversationSaleToLead(tx: SaleTx, input: {
     const changes = {
       ...(read?.name ? { name: read.name } : {}),
       ...(holder.age == null && holderAge != null ? { age: holderAge } : {}),
-      ...(holder.birthDate == null && read?.birthDate ? { birthDate: read.birthDate } : {}),
-      ...(holder.cpf == null && read?.cpf ? { cpf: read.cpf } : {}),
+      // Confirmado pelo corretor na conversa: o que ele informou vale sobre o que estava cadastrado.
+      ...((holder.birthDate == null || input.holderConfirmed) && read?.birthDate ? { birthDate: read.birthDate } : {}),
+      ...((holder.cpf == null || input.holderConfirmed) && read?.cpf ? { cpf: read.cpf } : {}),
+      ...(input.holderConfirmed && holderAge != null ? { age: holderAge } : {}),
     };
     if (Object.keys(changes).length) {
       await tx.update(schema.leadBeneficiaries).set({ ...changes, updatedAt: input.now }).where(and(eq(schema.leadBeneficiaries.id, holder.id), eq(schema.leadBeneficiaries.tenantId, input.tenantId)));
@@ -430,7 +438,7 @@ type SaleCoreInput = Omit<z.output<typeof registerSaleInput>, "policyNumber" | "
  * Venda registrada pela conversa (19/11): sem documentos nesta fase. O que o corretor respondeu (ou o que a IA leu
  * do contrato) vai para o lead: plano, vidas e valor; a idade do titular vai para o titular, criado se faltar.
  */
-type ConversationSale = { planId: string | null; leadPlanId: string | null; ages: number[]; notes: string; people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null };
+type ConversationSale = { planId: string | null; leadPlanId: string | null; ages: number[]; notes: string; people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null; holderConfirmed?: boolean; holderCnpj?: string | null };
 
 async function registerSale(input: SaleCoreInput, conversation: ConversationSale | null = null): Promise<RegisterSaleResult> {
   const { context, db, lead } = await assertLeadScope(input.leadId);
@@ -520,7 +528,7 @@ async function registerSale(input: SaleCoreInput, conversation: ConversationSale
       const evidenceIssue = saleEvidenceIssue(lockedEvidence);
       if (evidenceIssue) throw new SaleDocumentValidationError(saleEvidenceIssueMessage(evidenceIssue) ?? "Revise os documentos obrigatórios antes de registrar a venda.");
     } else {
-      conversationDocumentId = await applyConversationSaleToLead(tx, { tenantId: context.tenantId, userId: context.userId, leadId: lead.id, leadName: lead.nome, planId: conversation.leadPlanId ?? resolvedPlanId, approvedValue: input.approvedValue, ages: conversation.ages, people: conversation.people, contract: conversation.contract, coverageStartDate: input.coverageStartDate, now });
+      conversationDocumentId = await applyConversationSaleToLead(tx, { tenantId: context.tenantId, userId: context.userId, leadId: lead.id, leadName: lead.nome, planId: conversation.leadPlanId ?? resolvedPlanId, approvedValue: input.approvedValue, ages: conversation.ages, people: conversation.people, contract: conversation.contract, coverageStartDate: input.coverageStartDate, now, holderConfirmed: conversation.holderConfirmed, holderCnpj: conversation.holderCnpj });
     }
     // Já convertido pela IA: a etapa não muda de novo e o desfecho já foi avisado na conversão.
     soldFrom = lockedAiSale ? null : { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };

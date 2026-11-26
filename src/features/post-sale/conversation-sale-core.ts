@@ -1,4 +1,5 @@
 import type { ChatBlock, ChatChoice, ChatProgress } from "@/components/chat/types";
+import { isValidCnpj } from "@/features/companies/cnpj";
 
 /**
  * Registrar venda em conversa (19/11): no lugar dos formulários, o assistente pergunta uma coisa por vez (tipo de
@@ -45,7 +46,16 @@ export type SaleContractFile = { filename: string; fileUrl: string; storageKey?:
 /** Campos que podem vir do contrato (marcados "Do contrato" no resumo). */
 export type SaleField = "planType" | "people" | "carrier" | "plan" | "value" | "start" | "policy" | "payment" | "term";
 
+/**
+ * Titular confirmado no começo do registro (26/11/2026): nome, CPF (ou CNPJ da empresa) e nascimento.
+ * `document` vazio: ainda não perguntado; `birthDate` null: não se aplica (CNPJ).
+ */
+export type SaleHolder = { name?: string; document?: { kind: "cpf" | "cnpj"; digits: string }; birthDate?: string | null };
+
 export type SaleAnswers = {
+  holder?: SaleHolder;
+  /** O corretor tocou em "Outra pessoa": o próximo texto é o nome do titular. */
+  holderTyping?: boolean;
   planType?: SalePlanType;
   ages?: number[];
   /** null: a operadora não está no catálogo (a venda segue sem vínculo de plano). */
@@ -65,11 +75,14 @@ export type SaleAnswers = {
   sourced?: SaleField[];
 };
 
-export type SaleAwaiting = "planType" | "ages" | "carrier" | "plan" | "value" | "start" | "done";
+export type SaleAwaiting = "holderName" | "holderDoc" | "holderBirth" | "planType" | "ages" | "carrier" | "plan" | "value" | "start" | "done";
 
-export const SALE_STEPS = 6;
+export const SALE_STEPS = 7;
 
 export function saleAwaiting(answers: SaleAnswers, catalog: SaleCatalog): SaleAwaiting {
+  if (!answers.holder?.name) return "holderName";
+  if (!answers.holder.document) return "holderDoc";
+  if (answers.holder.birthDate === undefined) return "holderBirth";
   if (!answers.planType) return "planType";
   if (!answers.ages?.length) return "ages";
   if (answers.carrierId === undefined) return "carrier";
@@ -84,8 +97,33 @@ export function saleAwaiting(answers: SaleAnswers, catalog: SaleCatalog): SaleAw
   return "done";
 }
 
+/** Idade do titular pela data de nascimento confirmada (null sem data). */
+export function holderAge(answers: SaleAnswers, today: Date): number | null {
+  return answers.holder?.birthDate ? ageOn(answers.holder.birthDate, today) : null;
+}
+
+/** No plano individual, a idade do titular confirmado já é a única vida: não pergunta de novo. */
+export function withHolderAge(answers: SaleAnswers, today: Date): SaleAnswers {
+  const age = holderAge(answers, today);
+  if (age == null || answers.planType !== "individual" || answers.ages?.length) return answers;
+  return { ...answers, ages: [age] };
+}
+
+/** A pessoa do titular para o registro (nome, nascimento e CPF confirmados), ou null. */
+export function holderPerson(answers: SaleAnswers, today: Date): SalePerson | null {
+  const holder = answers.holder;
+  if (!holder?.name) return null;
+  return {
+    name: holder.name,
+    age: answers.ages?.[0] ?? holderAge(answers, today),
+    birthDate: holder.birthDate ?? null,
+    cpf: holder.document?.kind === "cpf" ? holder.document.digits : null,
+    relationship: "titular",
+  };
+}
+
 export function saleProgress(answers: SaleAnswers): ChatProgress {
-  const done = [answers.planType, answers.ages?.length ? answers.ages : undefined, answers.carrierId, answers.planId, answers.monthlyValue, answers.coverageStartDate]
+  const done = [answers.holder?.birthDate !== undefined ? true : undefined, answers.planType, answers.ages?.length ? answers.ages : undefined, answers.carrierId, answers.planId, answers.monthlyValue, answers.coverageStartDate]
     .filter((value) => value !== undefined).length;
   return { title: "Registrando a venda", done, total: SALE_STEPS };
 }
@@ -99,6 +137,48 @@ export function parseSaleAges(text: string, planType: SalePlanType | undefined):
   if (planType === "individual" && ages.length > 1) return { error: "Individual é uma vida só. Se tem dependentes, toque em Corrigir e escolha Familiar." };
   if ((planType === "pme" || planType === "empresarial") && ages.length < 2) return { error: "Plano de empresa precisa de pelo menos 2 vidas. Manda as idades de todos." };
   return { ages };
+}
+
+/** CPF com os dois dígitos verificadores certos (só dígitos). */
+export function isValidSaleCpf(digits: string) {
+  if (!/^\d{11}$/.test(digits) || /^(\d)\1{10}$/.test(digits)) return false;
+  const check = (length: number) => {
+    let sum = 0;
+    for (let index = 0; index < length; index += 1) sum += Number(digits[index]) * (length + 1 - index);
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+  return check(9) === Number(digits[9]) && check(10) === Number(digits[10]);
+}
+
+/** CPF (11 dígitos) ou CNPJ (14), com ou sem pontuação. */
+export function parseSaleDocument(text: string): { document: { kind: "cpf" | "cnpj"; digits: string } } | { error: string } {
+  const digits = text.replace(/\D/g, "");
+  if (digits.length === 11) return isValidSaleCpf(digits) ? { document: { kind: "cpf", digits } } : { error: "Esse CPF não confere. Confira os números e mande de novo." };
+  if (digits.length === 14) return isValidCnpj(digits) ? { document: { kind: "cnpj", digits } } : { error: "Esse CNPJ não confere. Confira os números e mande de novo." };
+  return { error: "Mande o CPF (11 números) ou o CNPJ da empresa (14 números)." };
+}
+
+/** Nascimento "15/03/1985" → "1985-03-15", no passado e com no máximo 120 anos. */
+export function parseSaleBirthDate(text: string, today: Date): { date: string } | { error: string } {
+  const match = /(\d{1,2})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{2,4})/.exec(text);
+  if (!match) return { error: "Escreva a data de nascimento assim: 15/03/1985." };
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  let year = Number(match[3]);
+  if (match[3].length === 2) year += year > today.getFullYear() % 100 ? 1900 : 2000;
+  const date = new Date(year, month - 1, day);
+  if (date.getMonth() !== month - 1 || date.getDate() !== day) return { error: "Essa data não existe. Confere e manda de novo?" };
+  const key = dateKey(date);
+  if (date > today || ageOn(key, today) == null) return { error: "Essa data de nascimento não parece certa. Confere e manda de novo?" };
+  return { date: key };
+}
+
+export function formatSaleDocument(document: { kind: "cpf" | "cnpj"; digits: string }) {
+  const d = document.digits;
+  return document.kind === "cpf"
+    ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+    : `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
 /** "1.250,90", "R$ 1250", "1250.9" → 1250.9. */
@@ -183,9 +263,26 @@ export function startOptions(today: Date) {
 }
 
 /** A pergunta do que falta (ou o resumo para confirmar quando está tudo respondido). */
-export function nextSaleBlocks(answers: SaleAnswers, catalog: SaleCatalog, context: { turn: number; today: Date; leadValue: number | null }): ChatBlock[] {
+export function nextSaleBlocks(answers: SaleAnswers, catalog: SaleCatalog, context: { turn: number; today: Date; leadValue: number | null; leadName?: string }): ChatBlock[] {
   const { turn, today } = context;
   switch (saleAwaiting(answers, catalog)) {
+    case "holderName":
+      if (answers.holderTyping || !context.leadName) {
+        return [{ type: "assistant", id: `a-holder-name-${turn}`, text: "Qual o nome completo do titular? Escreva aqui embaixo." }];
+      }
+      return [{
+        type: "question",
+        id: `q-holder-${turn}`,
+        prompt: `Primeiro, o titular. É ${context.leadName}?`,
+        choices: [
+          { id: "holder-lead", label: `Sim, é ${context.leadName}`, action: local("holder", "lead") },
+          { id: "holder-other", label: "Outra pessoa", action: local("holder", "other") },
+        ],
+      }];
+    case "holderDoc":
+      return [{ type: "assistant", id: `a-holder-doc-${turn}`, text: `Qual o CPF de ${answers.holder?.name ?? "titular"}? Se for empresa, mande o CNPJ.` }];
+    case "holderBirth":
+      return [{ type: "assistant", id: `a-holder-birth-${turn}`, text: `E a data de nascimento de ${answers.holder?.name ?? "titular"}? Ex.: 15/03/1985` }];
     case "planType":
       return [{
         type: "question",
@@ -199,7 +296,9 @@ export function nextSaleBlocks(answers: SaleAnswers, catalog: SaleCatalog, conte
         id: `a-ages-${turn}`,
         text: answers.planType === "individual"
           ? "Qual a idade do titular? Escreva aqui embaixo."
-          : "Quais as idades? O titular primeiro, depois os dependentes, separando por vírgula. Ex.: 35, 32, 8",
+          : holderAge(answers, today) != null
+            ? `O titular tem ${holderAge(answers, today)} anos. Quais as idades dos dependentes? Separe por vírgula. Ex.: 32, 8`
+            : "Quais as idades? O titular primeiro, depois os dependentes, separando por vírgula. Ex.: 35, 32, 8",
       }];
     case "carrier": {
       const carriers = carriersFor(catalog, answers.planType);
@@ -288,11 +387,18 @@ export function saleReviewData(answers: SaleAnswers, catalog: SaleCatalog): Sale
     // Sem prazo no contrato vale o padrão de 12 meses: não é algo que o corretor informou.
     { label: "Prazo", value: answers.contractTermMonths ? `${answers.contractTermMonths} meses` : "12 meses (padrão)", sourced: sourced.has("term") || !answers.contractTermMonths },
   ];
+  const holderRows = answers.holder?.name
+    ? [
+      { label: "Titular", value: answers.holder.name, sourced: false },
+      ...(answers.holder.document ? [{ label: answers.holder.document.kind === "cpf" ? "CPF" : "CNPJ", value: formatSaleDocument(answers.holder.document), sourced: false }] : []),
+      ...(answers.holder.birthDate ? [{ label: "Nascimento", value: dateLabel(answers.holder.birthDate), sourced: false }] : []),
+    ]
+    : [];
   return {
     fromContract: Boolean(answers.fromContract),
     contractName: answers.contract?.filename ?? null,
     sections: [
-      { title: "Pessoas", rows: peopleRows },
+      { title: "Pessoas", rows: [...holderRows, ...peopleRows.filter((row) => !(holderRows.length && row.label === "Titular"))] },
       {
         title: "Plano",
         rows: [
@@ -328,6 +434,7 @@ export function fixBlocks(turn: number): ChatBlock[] {
     id: `q-fix-${turn}`,
     prompt: "O que você quer corrigir?",
     choices: [
+      { id: "fix-holder", label: "Titular", action: local("reset", "holder") },
       { id: "fix-type", label: "Tipo e vidas", action: local("reset", "type") },
       { id: "fix-carrier", label: "Operadora e plano", action: local("reset", "carrier") },
       { id: "fix-value", label: "Valor", action: local("reset", "value") },
@@ -340,6 +447,7 @@ export function fixBlocks(turn: number): ChatBlock[] {
 export function resetSaleAnswers(answers: SaleAnswers, part: string): SaleAnswers {
   const next = { ...answers };
   const drop = (...fields: SaleField[]) => { next.sourced = (next.sourced ?? []).filter((field) => !fields.includes(field)); };
+  if (part === "holder") { delete next.holder; delete next.holderTyping; }
   if (part === "type") { delete next.planType; delete next.ages; delete next.people; drop("planType", "people"); }
   if (part === "carrier") { delete next.carrierId; delete next.planId; drop("carrier", "plan"); }
   if (part === "value") { delete next.monthlyValue; drop("value"); }
@@ -348,9 +456,13 @@ export function resetSaleAnswers(answers: SaleAnswers, part: string): SaleAnswer
 }
 
 /** Uma resposta tocada. null quando não vale para a pergunta em aberto. */
-export function applySaleChoice(answers: SaleAnswers, value: string, catalog: SaleCatalog): SaleAnswers | null {
+export function applySaleChoice(answers: SaleAnswers, value: string, catalog: SaleCatalog, leadNameForHolder?: string): SaleAnswers | null {
   const [field, raw] = splitSaleChoice(value);
   const awaiting = saleAwaiting(answers, catalog);
+  if (field === "holder" && awaiting === "holderName") {
+    if (raw === "other") return { ...answers, holderTyping: true };
+    return leadNameForHolder ? { ...answers, holder: { ...answers.holder, name: leadNameForHolder }, holderTyping: false } : null;
+  }
   if (field === "planType" && awaiting === "planType" && raw in PLAN_TYPE_LABEL) {
     const planType = raw as SalePlanType;
     // Trocou para individual com várias idades: as idades são perguntadas de novo.
@@ -468,6 +580,17 @@ export function mergeContractReading(answers: SaleAnswers, reading: SaleContract
   if (reading.paymentMethod && reading.paymentMethod in PAYMENT_LABEL) { next.paymentMethod = reading.paymentMethod; sourced.add("payment"); }
   if (reading.contractTermMonths && reading.contractTermMonths >= 1 && reading.contractTermMonths <= 120) { next.contractTermMonths = reading.contractTermMonths; sourced.add("term"); }
   next.sourced = [...sourced];
+  // O que o contrato traz do titular entra como resposta; o que faltar ainda é perguntado.
+  const readHolder = next.people?.[0];
+  if (readHolder?.relationship === "titular") {
+    const cpf = readHolder.cpf && isValidSaleCpf(readHolder.cpf) ? readHolder.cpf : null;
+    next.holder = {
+      ...next.holder,
+      ...(readHolder.name && !next.holder?.name ? { name: readHolder.name } : {}),
+      ...(cpf && !next.holder?.document ? { document: { kind: "cpf" as const, digits: cpf } } : {}),
+      ...(readHolder.birthDate && next.holder?.birthDate === undefined ? { birthDate: readHolder.birthDate } : {}),
+    };
+  }
 
   const holder = next.people?.find((person) => person.relationship === "titular");
   const dependents = next.people?.filter((person) => person.relationship !== "titular") ?? [];
@@ -489,8 +612,24 @@ export function mergeContractReading(answers: SaleAnswers, reading: SaleContract
 /** Escreveu em vez de tocar: tenta casar o texto com a pergunta em aberto. */
 export function applySaleText(answers: SaleAnswers, text: string, catalog: SaleCatalog, today: Date): { answers: SaleAnswers } | { error: string } {
   const awaiting = saleAwaiting(answers, catalog);
+  if (awaiting === "holderName") {
+    const name = text.replace(/\s+/g, " ").trim();
+    if (name.length < 3 || /\d/.test(name)) return { error: "Escreva o nome completo do titular, sem números." };
+    return { answers: { ...answers, holder: { ...answers.holder, name: name.slice(0, 160) }, holderTyping: false } };
+  }
+  if (awaiting === "holderDoc") {
+    const parsed = parseSaleDocument(text);
+    if ("error" in parsed) return parsed;
+    // Empresa (CNPJ): não há data de nascimento para pedir.
+    return { answers: { ...answers, holder: { ...answers.holder, document: parsed.document, ...(parsed.document.kind === "cnpj" ? { birthDate: null } : {}) } } };
+  }
+  if (awaiting === "holderBirth") {
+    const parsed = parseSaleBirthDate(text, today);
+    return "error" in parsed ? parsed : { answers: { ...answers, holder: { ...answers.holder, birthDate: parsed.date } } };
+  }
   if (awaiting === "ages") {
-    const parsed = parseSaleAges(text, answers.planType);
+    const known = holderAge(answers, today);
+    const parsed = parseSaleAges(known != null && answers.planType && answers.planType !== "individual" ? `${known}, ${text}` : text, answers.planType);
     return "error" in parsed ? parsed : { answers: { ...answers, ages: parsed.ages, people: undefined } };
   }
   if (awaiting === "value") {

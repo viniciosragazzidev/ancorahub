@@ -57,7 +57,9 @@ describe("o que foi dito vira dados", () => {
     expect(answers).toMatchObject({ planType: "familiar", ages: [35, 32, 8], carrierId: "amil", planId: "amil-s380", monthlyValue: 1290, fromContract: false, sourced: [] });
     expect(found.slice(0, 4)).toEqual(["tipo Familiar", "3 vidas", "Amil", "plano Amil S380"]);
     expect(found[4]?.replace(/\s/g, " ")).toBe("valor R$ 1.290,00");
-    expect(saleAwaiting(answers, catalog)).toBe("start");
+    // 26/11/2026: o titular é confirmado antes de tudo; depois dele, só falta a vigência.
+    expect(saleAwaiting(answers, catalog)).toBe("holderName");
+    expect(saleAwaiting({ ...answers, holder: { name: "Carlos Silva", document: { kind: "cpf", digits: "52998224725" }, birthDate: "1990-01-01" } }, catalog)).toBe("start");
   });
 
   it("a cotação abre com as idades, o tipo e a cidade ditos", () => {

@@ -38,6 +38,8 @@ import {
   type SalePaymentMethod,
   type SalePerson,
   type SaleReviewData,
+  holderPerson,
+  withHolderAge,
 } from "../conversation-sale-core";
 import styles from "./sale-chat.module.css";
 
@@ -62,6 +64,10 @@ export type SaleChatServices = {
     coverageStartDate: string;
     source: "conversa" | "contrato";
     people?: SalePerson[];
+    /** Titular confirmado na conversa (26/11/2026): nome, nascimento e CPF substituem os do lead. */
+    holderConfirmed?: boolean;
+    /** CNPJ da empresa titular (14 dígitos), quando o titular é empresa. */
+    holderCnpj?: string | null;
     policyNumber?: string | null;
     paymentMethod?: SalePaymentMethod | null;
     contractTermMonths?: number | null;
@@ -109,7 +115,7 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
   const [registered, setRegistered] = useState(false);
   const [contractPhase, setContractPhase] = useState<ContractPhase | null>(null);
   const [celebration, setCelebration] = useState<{ key: string; stats: SaleCelebrationStat[] } | null>(null);
-  const context = useMemo(() => ({ today, leadValue: lead.monthlyValue }), [today, lead.monthlyValue]);
+  const context = useMemo(() => ({ today, leadValue: lead.monthlyValue, leadName: holderNameFromLead(lead.name) }), [today, lead.monthlyValue, lead.name]);
   const firstName = lead.name.split(" ")[0] ?? lead.name;
 
   // A prévia da foto vive só enquanto a tela está aberta.
@@ -121,7 +127,7 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
       ? [
         { type: "client", id: "c-lead", name: lead.name, initials: lead.initials, chips: [{ label: lead.stageLabel, tone: "info" }] },
         { type: "assistant", id: "a-intro", text: `Vamos registrar a venda de ${firstName}! Já anotei o que você me disse: ${spoken.found.join(", ")}.` },
-        ...nextSaleBlocks(spoken.answers, catalog, { today, leadValue: lead.monthlyValue, turn: 0 }),
+        ...nextSaleBlocks(spoken.answers, catalog, { today, leadValue: lead.monthlyValue, leadName: holderNameFromLead(lead.name), turn: 0 }),
       ]
       : [
         { type: "client", id: "c-lead", name: lead.name, initials: lead.initials, chips: [{ label: lead.stageLabel, tone: "info" }] },
@@ -133,9 +139,11 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
   }), [firstName, lead.initials, lead.name, lead.stageLabel]);
 
   const commit = useCallback((next: SaleAnswers) => {
-    answersRef.current = next;
-    setAnswers(next);
-  }, []);
+    // Plano individual com o titular confirmado: a idade dele já é a vida, sem perguntar de novo.
+    const settled = withHolderAge(next, today);
+    answersRef.current = settled;
+    setAnswers(settled);
+  }, [today]);
 
   const next = useCallback((current: SaleAnswers) => nextSaleBlocks(current, catalog, { ...context, turn: ++round.current }), [catalog, context]);
 
@@ -153,7 +161,9 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
         approvedValue: current.monthlyValue,
         coverageStartDate: current.coverageStartDate,
         source: current.fromContract ? "contrato" : "conversa",
-        people: current.people?.length === current.ages.length ? current.people : undefined,
+        people: salePeople(current, today),
+        holderConfirmed: Boolean(current.holder?.name),
+        holderCnpj: current.holder?.document?.kind === "cnpj" ? current.holder.document.digits : null,
         policyNumber: current.policyNumber ?? null,
         paymentMethod: current.paymentMethod ?? null,
         contractTermMonths: current.contractTermMonths ?? null,
@@ -235,11 +245,11 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
         setAwaitingDate(true);
         return [{ type: "assistant", id: `a-date-${++round.current}`, text: "Qual a data do início da vigência? Ex.: 10/12/2026" }];
     }
-    const applied = applySaleChoice(current, value, catalog);
+    const applied = applySaleChoice(current, value, catalog, holderNameFromLead(lead.name));
     if (!applied) return [];
     commit(applied);
     return next(applied);
-  }, [catalog, commit, next, onRestart, readContract, register, registered]);
+  }, [catalog, commit, lead.name, next, onRestart, readContract, register, registered]);
 
   const onFreeText = useCallback(async (text: string): Promise<ChatBlock[]> => {
     const turn = ++round.current;
@@ -302,10 +312,16 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
   const waiting = saleAwaiting(answers, catalog);
   const flowDone = waiting === "done" || registered;
   const placeholder = awaitingDate ? "Ex.: 10/12/2026"
+    : waiting === "holderName" ? "Nome completo do titular"
+    : waiting === "holderDoc" ? "CPF ou CNPJ"
+    : waiting === "holderBirth" ? "Ex.: 15/03/1985"
     : waiting === "ages" ? (answers.planType === "individual" ? "Ex.: 35" : "Ex.: 35, 32, 8")
       : waiting === "value" ? "Ex.: 1.250,90"
         : flowDone ? "Escolha uma opção acima" : undefined;
   const composerInput = awaitingDate ? { label: "Data do início da vigência" }
+    : waiting === "holderName" ? { label: "Nome completo do titular" }
+    : waiting === "holderDoc" ? { inputMode: "numeric" as const, label: "CPF ou CNPJ do titular" }
+    : waiting === "holderBirth" ? { label: "Data de nascimento do titular" }
     : waiting === "ages" ? { inputMode: "numeric" as const, label: "Idades, o titular primeiro, separadas por vírgula" }
       : waiting === "value" ? { inputMode: "numeric" as const, label: "Valor mensal da venda" } : undefined;
   const started = Object.keys(answers).length > 0;
@@ -419,7 +435,7 @@ function ContractUpload({ blockId, onFile, onAsk }: { blockId: string; onFile: (
             </Button>
             {asked ? null : (
               <button type="button" className={styles.askLink} disabled={disabled} onClick={() => { setAsked(true); onAsk(); }}>
-                Sem o contrato? Responder 6 perguntas
+                Sem o contrato? Responder as perguntas
               </button>
             )}
           </motion.div>
@@ -510,4 +526,24 @@ function ReviewCard({ data }: { data: SaleReviewData }) {
       ) : null}
     </motion.section>
   );
+}
+
+/** O nome do lead serve de sugestão de titular, menos quando é o nome provisório ("Lead sem nome"). */
+function holderNameFromLead(name: string) {
+  const trimmed = name.trim();
+  return trimmed.length >= 3 && !/^lead sem nome|^sem nome/i.test(trimmed) ? trimmed : undefined;
+}
+
+/**
+ * As pessoas do registro: o titular confirmado na conversa vem primeiro (nome, nascimento e CPF); os dependentes,
+ * pelo contrato quando ele bate com as idades, ou só com a idade.
+ */
+function salePeople(answers: SaleAnswers, today: Date): SalePerson[] | undefined {
+  const ages = answers.ages ?? [];
+  if (!ages.length) return undefined;
+  const fromContract = answers.people?.length === ages.length ? answers.people : null;
+  const holder = holderPerson(answers, today);
+  if (!holder) return fromContract ?? undefined;
+  const dependents = ages.slice(1).map((age, index) => fromContract?.[index + 1] ?? { name: null, age, birthDate: null, cpf: null, relationship: "outro" as const });
+  return [{ ...holder, age: ages[0] ?? holder.age }, ...dependents];
 }
