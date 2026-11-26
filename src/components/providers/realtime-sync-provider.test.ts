@@ -22,6 +22,11 @@ describe("shouldScheduleShellRefresh", () => {
     )).toBe(true);
   });
 
+  it("refreshes the open screen when the team changes (name, role or status)", () => {
+    expect(shouldScheduleShellRefresh({ kind: "domain.invalidated", domain: "team" }, "/equipe")).toBe(true);
+    expect(shouldScheduleShellRefresh({ kind: "domain.invalidated", domain: "team" }, "/leads")).toBe(true);
+  });
+
   it("refreshes only routes that display conversation data", () => {
     const conversationEvent = { kind: "domain.invalidated", domain: "conversations" } as const;
 

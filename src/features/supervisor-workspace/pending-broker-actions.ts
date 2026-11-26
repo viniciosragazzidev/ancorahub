@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { publishTeamInvalidation } from "@/features/notifications/realtime-sync";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { assertBrokerRegistrationAvailable, brokerRegistrationInput } from "@/features/team/broker-registration";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -88,5 +89,6 @@ export async function updatePendingSupervisedBrokerAction(rawInput: unknown): Pr
     return { ok: false, message: error instanceof Error && error.message.startsWith("Já existe") ? error.message : "Não consegui salvar agora. Tente de novo em instantes." };
   }
   revalidatePath("/equipe/minha");
+  void publishTeamInvalidation({ tenantId: context.tenantId, actorId: context.userId }).catch(() => undefined);
   return { ok: true, message: "Cadastro atualizado." };
 }

@@ -133,6 +133,25 @@ export async function publishConversationInvalidation(input: {
   );
 }
 
+/**
+ * Team changes (name, contact, role, status, new or removed member) refresh the screens
+ * of whoever made the change (on any device), of the people changed and of the directors.
+ */
+export async function publishTeamInvalidation(input: {
+  tenantId: string;
+  actorId: string;
+  affectedUserIds?: Array<string | null | undefined>;
+}): Promise<void> {
+  if (!(await isRealtimeSyncEnabled())) return;
+  const userIds = new Set<string>([input.actorId]);
+  for (const userId of input.affectedUserIds ?? []) if (userId) userIds.add(userId);
+  for (const userId of await activeDirectorIds(input.tenantId)) userIds.add(userId);
+  await publishDomainInvalidation(
+    [...userIds].map((userId) => ({ tenantId: input.tenantId, userId })),
+    "team",
+  );
+}
+
 const DIRECTOR_SIGNAL_WINDOW_MS = 10_000;
 const DIRECTORS_CACHE_MS = 60_000;
 const lastDirectorSignal = new Map<string, number>();

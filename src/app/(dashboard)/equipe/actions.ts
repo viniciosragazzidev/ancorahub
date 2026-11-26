@@ -26,6 +26,7 @@ import { parseCsv } from "@/shared/utils/csv";
 import { ensureDefaultQueue } from "@/features/lead-distribution/service";
 import { findPostSaleExemptionQueueName, postSaleTransferAuditAction } from "@/features/lead-distribution/post-sale-transfer";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
+import { publishTeamInvalidation } from "@/features/notifications/realtime-sync";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { canRevokeTeamInvitation } from "@/features/team/invitation-scope";
 import { canManageLiteBroker } from "@/features/team/lite-team-scope";
@@ -131,9 +132,11 @@ export async function createTeamUserAction(
   formData: FormData,
 ): Promise<TeamActionState> {
   try {
-    await requireCargoCapability(await getRequiredTenantContext(), "convidar_corretor");
+    const createContext = await getRequiredTenantContext();
+    await requireCargoCapability(createContext, "convidar_corretor");
     const res = await createTeamUser(Object.fromEntries(formData));
     invalidateTenantContextCache(); // role/unit/status changes apply at once
+    void publishTeamInvalidation({ tenantId: createContext.tenantId, actorId: createContext.userId, affectedUserIds: [] }).catch(() => undefined);
     return { success: true, token: res.token, invitationId: res.invitationId, whatsappStatus: res.whatsappStatus };
   } catch (e) {
     const message =
@@ -326,6 +329,7 @@ export async function updateTeamMemberAction(
       });
 
       invalidateTenantContextCache(); // role/unit/status changes apply at once
+      void publishTeamInvalidation({ tenantId: context.tenantId, actorId: context.userId, affectedUserIds: [] }).catch(() => undefined);
       return { success: true };
     }
 
@@ -477,6 +481,7 @@ export async function updateTeamMemberAction(
     });
 
     invalidateTenantContextCache(); // role/unit/status changes apply at once
+    void publishTeamInvalidation({ tenantId: context.tenantId, actorId: context.userId, affectedUserIds: [member.userId] }).catch(() => undefined);
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao atualizar o membro.";
@@ -566,7 +571,7 @@ export async function bulkToggleTeamMemberStatusAction(
       updatedCount++;
     }
 
-
+    void publishTeamInvalidation({ tenantId: context.tenantId, actorId: context.userId, affectedUserIds: [] }).catch(() => undefined);
     return {
       success: true,
       message: `${updatedCount} membro${updatedCount === 1 ? "" : "s"} ${nextActive ? "ativado" : "desativado"}${updatedCount === 1 ? "" : "s"} com sucesso.`,
@@ -642,6 +647,7 @@ export async function toggleTeamMemberStatusAction(
     });
 
     invalidateTenantContextCache(); // role/unit/status changes apply at once
+    void publishTeamInvalidation({ tenantId: context.tenantId, actorId: context.userId, affectedUserIds: [member.userId] }).catch(() => undefined);
     return { success: true, status: nextActive ? "active" : "disabled" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao atualizar o status.";
@@ -699,6 +705,7 @@ export async function updateLiteBrokerContactAction(input: unknown): Promise<Tea
       }).where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.userId, target.userId)));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_profile", entidadeId: target.userId, acao: "team.broker_contact_updated" });
     });
+    void publishTeamInvalidation({ tenantId: context.tenantId, actorId: context.userId, affectedUserIds: [target.userId] }).catch(() => undefined);
     return { success: true, message: "Dados do corretor atualizados." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar os dados." };
@@ -846,6 +853,7 @@ export async function deleteTeamMemberAction(
     }
 
     invalidateTenantContextCache(); // role/unit/status changes apply at once
+    void publishTeamInvalidation({ tenantId: context.tenantId, actorId: context.userId, affectedUserIds: [] }).catch(() => undefined);
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao excluir o membro.";
@@ -1333,6 +1341,7 @@ export async function importBrokersAction(
       reportMessage += ` Erros encontrados:\n${errors.join("\n")}`;
     }
     invalidateTenantContextCache(); // role/unit/status changes apply at once
+    void publishTeamInvalidation({ tenantId: context.tenantId, actorId: context.userId, affectedUserIds: [] }).catch(() => undefined);
     return { success: true, report: reportMessage };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao importar.";
