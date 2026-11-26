@@ -223,12 +223,15 @@ export function teamNoticeByKey(key: string) {
 /** `freeMessageIds`: library messages that rotate on the company number; empty uses the built-in versions. */
 export type TeamNoticeSetting = { enabled: boolean; channel: NoticeChannel; freeMessageIds: string[] };
 
-/** Stored setting, or the default: on/off from the catalog, Meta only. */
+/**
+ * Stored setting, or the default on/off from the catalog. The channel is always the company WhatsApp
+ * (26/11/2026): every message to the team leaves only through it, never Meta, whatever was stored
+ * before (see enqueueTeamMemberCompanyMessage in outbound-service).
+ */
 export function effectiveNoticeSetting(notice: TeamNotice, stored: Partial<TeamNoticeSetting> | null | undefined): TeamNoticeSetting {
-  if (notice.metaOnly) return { enabled: true, channel: "meta", freeMessageIds: [] };
   return {
-    enabled: notice.alwaysOn ? true : stored?.enabled ?? notice.defaultEnabled,
-    channel: stored?.channel ?? notice.defaultChannel ?? "meta",
+    enabled: notice.metaOnly || notice.alwaysOn ? true : stored?.enabled ?? notice.defaultEnabled,
+    channel: "company_number",
     freeMessageIds: notice.chat ? [] : [...new Set(stored?.freeMessageIds ?? [])],
   };
 }

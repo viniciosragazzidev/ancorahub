@@ -1,9 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, getInvitationDeliveryFailureUpdate, parseMetaOutboundStaleAfterHours, resolveNoticeTextVariants, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
+import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, getInvitationDeliveryFailureUpdate, parseMetaOutboundStaleAfterHours, resolveNoticeTextVariants, resolveTemplateTextBody, isTeamMemberOnlyCompanyNumber, selectInternalBrokerDeliveryRoute, teamCompanyRetryAt, whatsappOutboundStatusValues } from "./outbound-service";
 
 vi.mock("server-only", () => ({}));
 
 describe("outboundService", () => {
+  it("sends every message to a team member only through the company number (26/11/2026)", () => {
+    expect(isTeamMemberOnlyCompanyNumber({ recipientType: "user", purpose: "dutyPresenceConfirmation" })).toBe(true);
+    expect(isTeamMemberOnlyCompanyNumber({ recipientType: "user", purpose: "directText" })).toBe(true);
+    expect(isTeamMemberOnlyCompanyNumber({ recipientType: "user", purpose: "postSaleSurvey" })).toBe(false);
+    expect(isTeamMemberOnlyCompanyNumber({ recipientType: "lead", purpose: "leadQualification" })).toBe(false);
+  });
+
+  it("waits up to 2 h for a company number that is down and retries a refused send 3 times", () => {
+    const now = new Date("2026-11-26T12:00:00Z");
+    expect(teamCompanyRetryAt({ attempts: 9, createdAt: new Date("2026-11-26T11:00:00Z") }, true, now)).toEqual(new Date("2026-11-26T12:02:00Z"));
+    expect(teamCompanyRetryAt({ attempts: 1, createdAt: new Date("2026-11-26T09:59:00Z") }, true, now)).toBeNull();
+    expect(teamCompanyRetryAt({ attempts: 0, createdAt: now }, false, now)).toEqual(new Date("2026-11-26T12:01:00Z"));
+    expect(teamCompanyRetryAt({ attempts: 2, createdAt: now }, false, now)).toEqual(new Date("2026-11-26T12:04:00Z"));
+    expect(teamCompanyRetryAt({ attempts: 3, createdAt: now }, false, now)).toBeNull();
+  });
+
   it("defines supported whatsapp outbound statuses", () => {
     expect(whatsappOutboundStatusValues).toContain("pending");
     expect(whatsappOutboundStatusValues).toContain("queued");

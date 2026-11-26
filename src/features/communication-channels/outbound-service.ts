@@ -416,6 +416,12 @@ export async function enqueueMetaTemplateMessage(input: {
       leadId: input.recipientType === "lead" ? input.recipientId : null,
     }) ?? requestedDestinationPhone;
   const variables = variablesSchema.parse(input.variables ?? []);
+  if (isTeamMemberOnlyCompanyNumber(input)) {
+    return enqueueTeamMemberCompanyMessage({
+      tenantId: input.tenantId, recipientId: input.recipientId, destinationPhone, purpose: input.purpose, variables,
+      requestedBy: input.requestedBy, idempotencyKey: input.idempotencyKey, scheduledAt: input.scheduledAt,
+    });
+  }
   // Resolved up front: a template only exists inside the selected number's WABA.
   const channel = assertMetaChannelAvailable(await resolveMetaChannel({
     tenantId: input.tenantId,
@@ -598,6 +604,86 @@ export async function enqueueAndProcessMetaEventMessage(
   return message;
 }
 
+/**
+ * Every message to a team member leaves only through the company WhatsApp (WAHA), never through Meta
+ * (26/11/2026, decisão do diretor: o 130472 da Meta deixou corretores sem a confirmação do plantão).
+ * The connected company number is preferred; a disconnected one still takes the row, which waits for
+ * it to come back (see the WAHA retry in processMetaOutboundBatch). Without any company number the
+ * row is recorded as failed, never moved to Meta.
+ */
+export function isTeamMemberOnlyCompanyNumber(input: { recipientType: string; purpose?: string | null }) {
+  return input.recipientType === "user" && input.purpose !== "postSaleSurvey";
+}
+
+async function companyNumberForTeam(tenantId: string): Promise<string | null> {
+  const connected = await findConnectedTenantChannelId(tenantId).catch(() => null);
+  if (connected) return connected;
+  return (await getCompanyNumberState(tenantId).catch(() => null))?.id ?? null;
+}
+
+async function enqueueTeamMemberCompanyMessage(input: {
+  tenantId: string;
+  recipientId?: string;
+  destinationPhone: string;
+  purpose: string;
+  variables: string[];
+  /** Free text already written by the caller; otherwise the notice text is rendered from the variables. */
+  body?: string;
+  requestedBy?: string | null;
+  idempotencyKey: string;
+  scheduledAt?: Date;
+}) {
+  const db = getDatabase();
+  const [existing] = await db.select({ id: schema.whatsappOutboundMessages.id, status: schema.whatsappOutboundMessages.status }).from(schema.whatsappOutboundMessages)
+    .where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
+  if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
+  const teamNotice = teamNoticeForPurpose(input.purpose);
+  const setting = teamNotice ? await getTeamNoticeSetting(input.tenantId, teamNotice) : null;
+  const id = randomUUID();
+  const now = new Date();
+  const base = {
+    id, tenantId: input.tenantId, channelId: null, deliveryRoute: "waha_direct" as const,
+    recipientType: "user" as const, recipientId: input.recipientId ?? null, destinationPhone: input.destinationPhone,
+    purpose: input.purpose, messageType: "text" as const, templateName: "__text__", templateLanguage: "pt_BR",
+    variables: input.variables, noticeKey: teamNotice?.key ?? null, idempotencyKey: input.idempotencyKey,
+    scheduledAt: input.scheduledAt ?? null, queuedAt: now, requestedBy: input.requestedBy ?? null, createdAt: now, updatedAt: now,
+  };
+  const insertRow = async (values: Partial<typeof schema.whatsappOutboundMessages.$inferInsert>, status: WhatsAppOutboundStatus) => {
+    const [inserted] = await db.insert(schema.whatsappOutboundMessages).values({ ...base, wahaNumberId: null, ...values, status })
+      .onConflictDoNothing().returning({ id: schema.whatsappOutboundMessages.id });
+    if (!inserted) {
+      const [raced] = await db.select({ id: schema.whatsappOutboundMessages.id, status: schema.whatsappOutboundMessages.status }).from(schema.whatsappOutboundMessages)
+        .where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
+      return { id: raced?.id ?? id, status: (raced?.status ?? status) as WhatsAppOutboundStatus, duplicate: true };
+    }
+    if (input.requestedBy) {
+      await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.requestedBy, entidade: "whatsapp_outbound_message", entidadeId: id, acao: "whatsapp_message_queued" });
+    }
+    return { id, status, duplicate: false };
+  };
+  // Turned off by the director: not sent (kept as skipped), as before.
+  if (teamNotice && setting && !setting.enabled) {
+    return insertRow({ templateName: "__skipped__", holdReason: "disabled" }, "skipped");
+  }
+  const rendered = input.body
+    ? { text: input.body, variant: null as string | null }
+    : teamNotice && setting
+      ? await renderTeamNoticeText({
+        tenantId: input.tenantId, notice: teamNotice, setting, variables: input.variables,
+        builtIn: resolveNoticeTextVariants(input.purpose, input.variables), seed: input.idempotencyKey, recipientId: input.recipientId ?? null, purpose: input.purpose,
+      })
+      : { text: resolveTemplateTextBody(input.purpose, input.variables), variant: null };
+  const wahaNumberId = await companyNumberForTeam(input.tenantId);
+  if (!wahaNumberId || !rendered?.text) {
+    return insertRow({
+      renderedBody: rendered?.text ?? null, providerErrorCode: wahaNumberId ? "COMPANY_TEXT_EMPTY" : "COMPANY_NUMBER_UNAVAILABLE",
+      providerErrorMessage: wahaNumberId ? "O aviso ficou sem texto para o WhatsApp da empresa." : "Nenhum WhatsApp da empresa cadastrado; mensagens para a equipe não usam a Meta.",
+      failedAt: now,
+    }, "failed");
+  }
+  return insertRow({ wahaNumberId, renderedBody: rendered.text, textVariant: rendered.variant ?? null }, input.scheduledAt && input.scheduledAt > now ? "pending" : "queued");
+}
+
 /** The company WAHA number when it can send now (connected and not paused by the breaker). */
 async function usableCompanyNumber(tenantId: string): Promise<{ id: string | null; pausedUntil: Date | null }> {
   const id = await findConnectedTenantChannelId(tenantId);
@@ -709,6 +795,13 @@ export async function enqueueMetaTextMessage(input: {
     return { id, status: (errorCode ? "failed" : "queued") as WhatsAppOutboundStatus, duplicate: false };
   }
 
+  if (isTeamMemberOnlyCompanyNumber({ recipientType: input.recipientType, purpose: input.purpose ?? "directText" })) {
+    if (!destinationPhone) phoneSchema.parse(input.destinationPhone);
+    return enqueueTeamMemberCompanyMessage({
+      tenantId: input.tenantId, recipientId: input.recipientId, destinationPhone, purpose: input.purpose ?? "directText", variables: [body],
+      body, requestedBy: input.requestedBy, idempotencyKey: input.idempotencyKey, scheduledAt: input.scheduledAt,
+    });
+  }
   const delivery = resolveInternalBrokerDeliveryRoute({
     tenantId: input.tenantId,
     recipientType: input.recipientType,
@@ -1155,6 +1248,26 @@ async function markPresenceNotified(row: OutboundRow) {
   ));
 }
 
+/** The presence link could not leave through the company number at all: the plantão screen shows it as failed. */
+async function markPresenceFailed(row: OutboundRow) {
+  if (row.purpose !== "dutyPresenceConfirmation" || !Array.isArray(row.variables) || typeof row.variables[2] !== "string") return;
+  await getDatabase().update(schema.dutyPresenceConfirmations).set({ notificationStatus: "error", notificationErrorCode: "OUTBOX_DELIVERY_FAILED", updatedAt: new Date() }).where(and(
+    eq(schema.dutyPresenceConfirmations.id, row.variables[2]),
+    eq(schema.dutyPresenceConfirmations.tenantId, row.tenantId),
+  ));
+}
+
+/**
+ * When a team member's message tries the company number again. Number down or paused: every 2 min
+ * for up to 2 h (it usually comes back). WAHA refused the send: 1, 2 and 4 min, then it fails.
+ */
+export function teamCompanyRetryAt(row: { attempts: number; createdAt: Date }, numberUnavailable: boolean, now: Date): Date | null {
+  if (numberUnavailable) {
+    return now.getTime() - row.createdAt.getTime() < 2 * 60 * 60_000 ? new Date(now.getTime() + 2 * 60_000) : null;
+  }
+  return row.attempts < 3 ? new Date(now.getTime() + Math.pow(2, row.attempts) * 60_000) : null;
+}
+
 /** A first-access invite sent by the company number counts as delivered, as on the Meta path. */
 async function markInvitationSent(row: OutboundRow) {
   if (row.purpose !== "brokerInvitation" || !row.recipientId) return;
@@ -1480,6 +1593,25 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
               updatedAt: new Date(),
             }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
             await syncPostSaleSurveyOutbound(row, { status: unavailable ? "skipped" : "failed", reason });
+            return;
+          }
+          // A team member only receives through the company number (26/11/2026): wait for it, never Meta.
+          if (isTeamMemberOnlyCompanyNumber(row)) {
+            const retryAt = teamCompanyRetryAt(row, Boolean(companyUnavailable), new Date());
+            await db.update(schema.whatsappOutboundMessages).set({
+              status: retryAt ? "pending" : "failed",
+              nextAttemptAt: retryAt,
+              failedAt: retryAt ? null : new Date(),
+              holdReason: retryAt && companyUnavailable ? "company_number_unavailable" : null,
+              providerErrorCode: companyUnavailable ? "COMPANY_NUMBER_UNAVAILABLE" : "COMPANY_NUMBER_SEND_FAILED",
+              providerErrorMessage: companyUnavailable ?? companyChatSendFailedMessage(wahaError instanceof Error ? wahaError.message : null),
+              updatedAt: new Date(),
+            }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+            if (retryAt) retried += 1;
+            else {
+              failed += 1;
+              await markPresenceFailed(row);
+            }
             return;
           }
           if (!row.noticeKey && row.recipientType === "user" && !(await brokerMetaWindowOpen(row.tenantId, row.destinationPhone))) {
