@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getDatabase, schema } from "@/shared/db";
@@ -16,6 +16,8 @@ export async function ensurePostSaleSurveyAlerts(survey: {
   rating: number | null;
   answers: unknown;
   alertsHandledAt: Date | null;
+  /** Corretor avaliado: ele e o supervisor dele também recebem o alerta (26/11). */
+  brokerId?: string | null;
   /** Last client message: repeatable alerts (health, resume) notify again for each new message. */
   lastInboundMessageId?: string | null;
 }) {
@@ -32,6 +34,17 @@ export async function ensurePostSaleSurveyAlerts(survey: {
     .limit(1);
   if (!lead) return;
   const effectiveBranchId = lead.branchId ?? lead.queueBranchId;
+  // 26/11 (Vinicios): além da direção e do gerente da filial, o corretor avaliado e o supervisor dele
+  // recebem o alerta no CRM, para retomar o cliente sem depender da gestão repassar.
+  const team: string[] = [];
+  if (survey.brokerId) {
+    const [broker] = await db.select({ supervisorId: schema.tenantMemberships.supervisorId })
+      .from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.tenantId, survey.tenantId), eq(schema.tenantMemberships.userId, survey.brokerId), eq(schema.tenantMemberships.status, "active")))
+      .limit(1);
+    if (broker) team.push(survey.brokerId);
+    if (broker?.supervisorId) team.push(broker.supervisorId);
+  }
   const recipients = await db.selectDistinct({ userId: schema.tenantMemberships.userId })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
@@ -43,6 +56,7 @@ export async function ensurePostSaleSurveyAlerts(survey: {
       or(
         eq(schema.tenantMemberships.role, "director"),
         effectiveBranchId ? and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, effectiveBranchId)) : undefined,
+        team.length ? inArray(schema.tenantMemberships.userId, team) : undefined,
       ),
     ));
   if (!recipients.length) return;
