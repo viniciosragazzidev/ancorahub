@@ -65,6 +65,7 @@ const ROUTES: readonly RouteRule[] = [
   { test: exact("/qualificacao"), route: { title: "Qualificação", parentHref: null } },
   { test: exact("/integrations/whatsapp"), route: { title: "WhatsApp", parentHref: null } },
   { test: exact("/marketing/campanhas"), route: { title: "Campanhas", parentHref: null } },
+  { test: exact("/marketing/links"), route: { title: "Links rastreáveis", parentHref: null } },
   { test: exact("/notificacoes"), route: { title: "Notificações", parentHref: null } },
   { test: exact("/settings"), route: { title: "Configurações", parentHref: null } },
   { test: exact("/relatorios"), route: { title: "Relatórios", parentHref: null } },

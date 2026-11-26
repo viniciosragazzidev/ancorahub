@@ -4386,6 +4386,38 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   updatedAt,
 });
 
+/**
+ * Links rastreáveis do Marketing (migration 0245): /l/<code> conta o clique e manda para o WhatsApp da empresa ou o
+ * formulário público. O lead que entra por ali leva `trackingLinkId` em leads.source_metadata.
+ */
+export const trackingLinks = pgTable("tracking_links", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  destination: text("destination").$type<"whatsapp" | "form">().notNull(),
+  whatsappPhone: text("whatsapp_phone"),
+  whatsappMessage: text("whatsapp_message"),
+  utmSource: text("utm_source").notNull(),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  status: text("status").$type<"active" | "paused">().notNull().default("active"),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt,
+  updatedAt,
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("tracking_links_code_unique").on(table.code),
+  index("tracking_links_tenant_idx").on(table.tenantId, table.createdAt),
+]);
+
+/** Cliques por link e dia (fuso de São Paulo), somados com ON CONFLICT. */
+export const trackingLinkClicks = pgTable("tracking_link_clicks", {
+  linkId: text("link_id").notNull().references(() => trackingLinks.id, { onDelete: "cascade" }),
+  day: date("day").notNull(),
+  clicks: integer("clicks").notNull().default(0),
+}, (table) => [primaryKey({ columns: [table.linkId, table.day] })]);
+
 export const pushSubscriptionRelations = relations(pushSubscriptions, ({ one }) => ({
   user: one(user, {
     fields: [pushSubscriptions.userId],

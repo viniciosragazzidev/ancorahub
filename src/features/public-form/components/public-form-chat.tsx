@@ -24,6 +24,8 @@ import {
   type PublicFormResult,
   type PublicFormSubmission,
 } from "../form-flow";
+import { readFormOrigin, type FormOrigin } from "@/features/tracking-links/core";
+
 import styles from "./public-form-chat.module.css";
 
 /** O que a conversa pede ao servidor; o laboratório (/dev/laboratorio) troca por respostas simuladas. */
@@ -31,12 +33,19 @@ export type PublicFormServices = { submit: (submission: PublicFormSubmission) =>
 
 const identity = { name: "Âncora Saúde", shape: "logo" as const, hue: null };
 
+function originFromLocation(): { origin?: FormOrigin } {
+  if (typeof window === "undefined") return {};
+  const origin = readFormOrigin(window.location.search);
+  return origin ? { origin } : {};
+}
+
 async function postSubmission(submission: PublicFormSubmission): Promise<PublicFormResult> {
   try {
     const response = await fetch("/api/public/formulario", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(submission),
+      // A origem (link rastreável e UTMs) sai da URL na hora do envio, sem entrar na chave de idempotência.
+      body: JSON.stringify({ ...submission, ...originFromLocation() }),
     });
     const payload = await response.json().catch(() => null) as { ok?: boolean; error?: string; retryable?: boolean } | null;
     if (response.ok && payload?.ok) return { ok: true };

@@ -311,6 +311,8 @@ export type PublicFormSubmission = {
   website: string;
   /** A mesma em toda tentativa desta conversa: reenviar nunca cria dois leads. */
   idempotencyKey: string;
+  /** Link rastreável (?lk=) e UTMs da URL, quando a pessoa chegou por um. */
+  origin?: { link?: string; utm_source?: string; utm_medium?: string; utm_campaign?: string; utm_content?: string; utm_term?: string };
 };
 
 export type PublicFormResult = { ok: true } | { ok: false; error: string; retryable: boolean };

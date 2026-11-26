@@ -18,6 +18,15 @@ export const publicFormSubmissionSchema = z.object({
   phone: z.string().max(40),
   website: z.string().max(500).optional().default(""),
   idempotencyKey: z.string().regex(/^[a-zA-Z0-9_-]{8,64}$/),
+  // De onde a pessoa veio (link rastreável ?lk= e UTMs da URL). Opcional; o servidor confere o link na empresa.
+  origin: z.object({
+    link: z.string().max(20).optional(),
+    utm_source: z.string().max(120).optional(),
+    utm_medium: z.string().max(120).optional(),
+    utm_campaign: z.string().max(120).optional(),
+    utm_content: z.string().max(120).optional(),
+    utm_term: z.string().max(120).optional(),
+  }).strict().optional(),
 }).strict();
 
 export type ParsedSubmission = { ok: true; data: PublicFormSubmission } | { ok: false; error: string };

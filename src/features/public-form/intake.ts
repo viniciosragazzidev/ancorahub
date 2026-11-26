@@ -6,6 +6,8 @@ import { resolvePmeQueueFor } from "@/features/lead-distribution/pme-queue-routi
 import { isPmeQueueName } from "@/features/lead-distribution/pme-queue-matching";
 import { authenticateLeadWebhook, WebhookAuthError } from "@/features/leads/webhooks/services/authenticate-lead-webhook";
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
+import { attributionMetadata, readUtm } from "@/features/tracking-links/core";
+import { findLinkForAttribution } from "@/features/tracking-links/service";
 import { getDatabase, schema } from "@/shared/db";
 
 import { PUBLIC_FORM_CHANNEL_ID as PUBLIC_FORM_CHANNEL } from "./channel";
@@ -64,6 +66,11 @@ export async function receivePublicForm(
   const company = submission.kind === "cnpj";
   const route = await resolveIntakeQueue(credential.tenantId, config.queue, company);
   const externalId = `formulario-${submission.idempotencyKey}`;
+  // Link rastreável (Marketing > Links): só um link desta empresa atribui; as UTMs da URL vão junto.
+  const origin = submission.origin ?? {};
+  const link = await findLinkForAttribution(credential.tenantId, origin.link);
+  const utm = readUtm(new URLSearchParams(Object.entries(origin).filter((entry): entry is [string, string] => entry[0] !== "link" && typeof entry[1] === "string")));
+  const attribution = attributionMetadata(link, utm);
 
   const result = await createLeadFromWebhookSync({
     tenantId: credential.tenantId,
@@ -88,6 +95,7 @@ export async function receivePublicForm(
       metadata: {
         entry: PUBLIC_FORM_CHANNEL,
         formAnswers: lead.formAnswers,
+        ...attribution,
         ...(route.routedTo ? { companyRoutedToQueue: route.routedTo } : {}),
       },
     },

@@ -28,6 +28,8 @@ import { brazilNinthDigitVariant, contactNumberShape, phoneSubscriberSuffix, sam
 import { storeWahaMessageMedia, wahaFilePath } from "./message-media";
 import { isContentlessMessage } from "@/features/conversations/media-kinds";
 import { captureWahaGroupMessage, findActiveWahaGroupSource } from "@/features/waha-group-capture/service";
+import { attributionMetadata, extractLinkRef } from "@/features/tracking-links/core";
+import { findLinkForAttribution } from "@/features/tracking-links/service";
 
 type SessionSource =
   | { kind: "number"; number: typeof schema.wahaNumbers.$inferSelect }
@@ -391,6 +393,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     tenantId,
     normalizedPhone,
     isOutgoing,
+    isOutgoing ? null : event.message?.body ?? null,
   );
   metrics.leadResolveMs = Date.now() - leadResolveStart;
 
@@ -645,6 +648,8 @@ async function resolveContact(
   tenantId: string,
   normalizedPhone: string,
   isOutgoing: boolean,
+  /** Texto da mensagem do cliente: traz "(código abc1234)" quando ele veio por um link rastreável. */
+  inboundText: string | null = null,
 ): Promise<{ leadId: string | null; clientId: string | null; runId: string | null; formerOwnerLead: boolean }> {
   let formerOwnerLead = false;
   let leadId: string | null = null;
@@ -762,6 +767,9 @@ async function resolveContact(
     })
   ) {
     const newLeadId = randomUUID();
+    // Link rastreável (Marketing > Links): a mensagem pronta leva o código; o lead novo fica com essa origem.
+    const trackingLink = await findLinkForAttribution(tenantId, extractLinkRef(inboundText));
+    const trackingMetadata = trackingLink ? attributionMetadata(trackingLink) : null;
     const resolution = await db.transaction(async (tx) => {
       const phoneKey = await lockLeadCreationByPhone(tx, tenantId, normalizedPhone);
       const candidateLeads = await tx.select({ id: schema.leads.id, telefone: schema.leads.telefone, corretorId: schema.leads.corretorId })
@@ -789,6 +797,7 @@ async function resolveContact(
         origem: "webhook",
         status: "new",
         serviceStartedAt: new Date(),
+        ...(trackingMetadata ? { sourceMetadata: trackingMetadata, sourceCampaign: trackingMetadata.utm_campaign ?? null } : {}),
       });
       return { leadId: newLeadId, clientId: null, created: true };
     });

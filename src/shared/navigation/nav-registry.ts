@@ -200,6 +200,7 @@ export const NAV_AREAS: readonly NavArea[] = [
     tabs: [
       { id: "campanhas", label: "Campanhas", description: "Campanhas da Meta e os leads que trouxeram", href: "/marketing/campanhas", permission: "acessar_campanhas_meta", paths: ["/marketing"] },
       { id: "importacoes", label: "Importações", description: "Importar listas de leads", href: "/marketing/importacoes", permission: "importar_leads_meta" },
+      { id: "links", label: "Links rastreáveis", description: "Links curtos que contam cliques e marcam a origem do lead", href: "/marketing/links", permission: "acessar_campanhas_meta" },
     ],
   },
   {
