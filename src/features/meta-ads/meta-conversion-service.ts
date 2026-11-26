@@ -24,6 +24,13 @@ import {
   type MetaConversionEvent,
   type MetaConversionStage,
 } from "./meta-conversion-events";
+import {
+  checkMetaConversionRetry,
+  describeMetaConversionRefusal,
+  metaConversionStageLabel,
+  type MetaRefusalReason,
+  type MetaRefusalRetryCheck,
+} from "./meta-conversion-refusals";
 
 /**
  * Conversions API for CRM (Conversion Leads). Lead stage changes are written
@@ -526,6 +533,116 @@ export async function getMetaConversionsPanel(tenantId: string): Promise<MetaCon
     console.warn("[meta-conversions] panel unavailable", { message: errorText(error).slice(0, 160) });
     return empty;
   }
+}
+
+export type MetaConversionRefusal = {
+  id: string;
+  leadId: string;
+  leadName: string;
+  stage: string;
+  stageLabel: string;
+  reason: MetaRefusalReason;
+  at: Date;
+  retry: MetaRefusalRetryCheck;
+};
+
+const REFUSAL_LIST_LIMIT = 200;
+
+/** Etapas recusadas da empresa, mais recentes primeiro, com motivo em pt-BR e se ainda dá para reenviar. */
+export async function listMetaConversionRefusals(input: { tenantId: string; now?: Date }): Promise<MetaConversionRefusal[]> {
+  const db = getDatabase();
+  const now = input.now ?? new Date();
+  const [[settings], rows] = await Promise.all([
+    db.select({ enabled: schema.metaConversionSettings.enabled })
+      .from(schema.metaConversionSettings)
+      .where(eq(schema.metaConversionSettings.tenantId, input.tenantId))
+      .limit(1),
+    db.select({
+      id: schema.metaConversionEvents.id,
+      leadId: schema.metaConversionEvents.leadId,
+      leadName: schema.leads.nome,
+      stage: schema.metaConversionEvents.stage,
+      status: schema.metaConversionEvents.status,
+      eventTime: schema.metaConversionEvents.eventTime,
+      lastError: schema.metaConversionEvents.lastError,
+      updatedAt: schema.metaConversionEvents.updatedAt,
+    })
+      .from(schema.metaConversionEvents)
+      .innerJoin(schema.leads, and(eq(schema.leads.id, schema.metaConversionEvents.leadId), eq(schema.leads.tenantId, input.tenantId)))
+      .where(and(eq(schema.metaConversionEvents.tenantId, input.tenantId), eq(schema.metaConversionEvents.status, "failed")))
+      .orderBy(desc(schema.metaConversionEvents.updatedAt))
+      .limit(REFUSAL_LIST_LIMIT),
+  ]);
+  const enabled = settings?.enabled === true;
+  return rows.map((row) => ({
+    id: row.id,
+    leadId: row.leadId,
+    leadName: row.leadName,
+    stage: row.stage,
+    stageLabel: metaConversionStageLabel(row.stage),
+    reason: describeMetaConversionRefusal(row.lastError),
+    at: row.updatedAt,
+    retry: checkMetaConversionRetry({ status: row.status, eventTime: row.eventTime, lastError: row.lastError, enabled, now }),
+  }));
+}
+
+export type MetaConversionRetryResult = { requeued: number; refused: Array<{ id: string; cause: string }> };
+
+/**
+ * Devolve recusas para a fila (pending, tentativas zeradas, já vencidas) para o job meta-conversions enviar.
+ * Nunca chama a Meta. `ids: "all"` pega todas as recusas da empresa; cada linha passa pela mesma regra de reenvio.
+ */
+export async function retryMetaConversionRefusals(input: { tenantId: string; userId: string; ids: string[] | "all"; now?: Date }): Promise<MetaConversionRetryResult> {
+  const db = getDatabase();
+  const now = input.now ?? new Date();
+  if (input.ids !== "all" && !input.ids.length) return { requeued: 0, refused: [] };
+  const [[settings], rows] = await Promise.all([
+    db.select({ enabled: schema.metaConversionSettings.enabled })
+      .from(schema.metaConversionSettings)
+      .where(eq(schema.metaConversionSettings.tenantId, input.tenantId))
+      .limit(1),
+    db.select({
+      id: schema.metaConversionEvents.id,
+      status: schema.metaConversionEvents.status,
+      eventTime: schema.metaConversionEvents.eventTime,
+      lastError: schema.metaConversionEvents.lastError,
+    })
+      .from(schema.metaConversionEvents)
+      .where(and(
+        eq(schema.metaConversionEvents.tenantId, input.tenantId),
+        input.ids === "all" ? eq(schema.metaConversionEvents.status, "failed") : inArray(schema.metaConversionEvents.id, input.ids),
+      )),
+  ]);
+  const enabled = settings?.enabled === true;
+  const found = new Set(rows.map((row) => row.id));
+  const refused: MetaConversionRetryResult["refused"] = input.ids === "all"
+    ? []
+    : input.ids.filter((id) => !found.has(id)).map((id) => ({ id, cause: "Etapa não encontrada nesta empresa." }));
+  const eligible: string[] = [];
+  for (const row of rows) {
+    const check = checkMetaConversionRetry({ status: row.status, eventTime: row.eventTime, lastError: row.lastError, enabled, now });
+    if (check.retryable) eligible.push(row.id);
+    else refused.push({ id: row.id, cause: check.cause });
+  }
+  let requeued = 0;
+  for (const ids of chunk(eligible, ID_CHUNK)) {
+    const updated = await db.update(schema.metaConversionEvents)
+      .set({ status: "pending", attempts: 0, nextAttemptAt: now, updatedAt: now })
+      .where(and(
+        eq(schema.metaConversionEvents.tenantId, input.tenantId),
+        eq(schema.metaConversionEvents.status, "failed"),
+        inArray(schema.metaConversionEvents.id, ids),
+      ))
+      .returning({ id: schema.metaConversionEvents.id });
+    requeued += updated.length;
+  }
+  if (requeued) {
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(), userId: input.userId, entidade: "meta_conversion_events", entidadeId: input.tenantId,
+      acao: "meta_conversions.retried", createdAt: now,
+    });
+  }
+  return { requeued, refused };
 }
 
 /** Saves the tenant's switch, dataset and test code; turning it on runs the 7-day backfill. */

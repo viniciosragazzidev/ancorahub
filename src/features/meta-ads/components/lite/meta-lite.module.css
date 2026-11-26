@@ -255,3 +255,30 @@
 .campaignCell.campaignCell {
   white-space: normal;
 }
+
+/* Contador "Recusados" que abre a gaveta das recusas: mesmo cartão do stat, alvo inteiro clicável. */
+.statButton {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.statButton:hover {
+  background: var(--surface-muted);
+}
+
+.statButton:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}
+
+.refusalsPanel {
+  display: grid;
+  gap: 16px;
+}
+
+.refusalsToolbar {
+  display: flex;
+  justify-content: flex-end;
+}

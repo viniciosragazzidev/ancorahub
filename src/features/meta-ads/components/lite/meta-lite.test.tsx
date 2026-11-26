@@ -11,7 +11,12 @@ vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 vi.mock("../../actions", () => ({ setMetaGlobalCaptureModeAction: mocks.setMode, triggerManualMetaSync: mocks.sync, disconnectMetaConnection: mocks.disconnect, confirmMetaConnection: vi.fn(), getMetaMarketingAttemptAssets: vi.fn(), recordMetaMarketingOnboardingStep: vi.fn() }));
 vi.mock("@/features/lead-distribution/actions", () => ({ saveMetaCampaignQueueRouteAction: mocks.saveRoute }));
 vi.mock("../../broker-brief-actions", () => ({ saveCampaignBrokerOfferAction: vi.fn() }));
-vi.mock("../../meta-conversion-actions", () => ({ saveMetaConversionSettingsAction: mocks.saveConversions }));
+const refusals = vi.hoisted(() => ({ list: vi.fn(), retry: vi.fn() }));
+vi.mock("../../meta-conversion-actions", () => ({
+  saveMetaConversionSettingsAction: mocks.saveConversions,
+  listMetaConversionRefusalsAction: refusals.list,
+  retryMetaConversionRefusalsAction: refusals.retry,
+}));
 
 import { CampaignsDashboardView } from "../campaigns-dashboard-view";
 import { CampaignDetailView } from "../campaign-detail-view";
@@ -120,5 +125,47 @@ describe("integração Meta no visual Lite", () => {
     fireEvent.change(screen.getByLabelText("Código de teste (opcional)"), { target: { value: "TEST1" } });
     await act(async () => { fireEvent.click(save); });
     expect(mocks.saveConversions).toHaveBeenCalledWith({ enabled: true, datasetId: "556677889900", testEventCode: "TEST1" });
+  });
+
+  it("conversões: Recusados abre a lista e Tentar de novo confirma só depois do servidor", async () => {
+    const row = (id: string, retryable: boolean) => ({
+      id, leadId: `lead-${id}`, leadName: `Maria ${id}`, stage: "qualified", stageLabel: "Qualificado",
+      reason: { kind: "user_data", label: "Dados do lead insuficientes", hint: "Confira telefone e e-mail do lead e tente de novo." },
+      at: new Date("2026-11-24T10:00:00.000Z"),
+      retry: retryable ? { retryable: true } : { retryable: false, cause: "Passou da janela de 7 dias da Meta." },
+    });
+    refusals.list.mockResolvedValue({ success: true, refusals: [row("a", true), row("b", false)] });
+    refusals.retry.mockResolvedValue({ success: true, requeued: 1, refused: [] });
+    render(<MetaConversionsLite panel={META_CONVERSIONS_FIXTURE} datasets={[{ id: "556677889900", name: "Conversões CRM Âncora" }]} />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Recusados/ })); });
+    const dialog = screen.getByRole("dialog", { name: "Etapas recusadas pela Meta" });
+    expect(within(dialog).getAllByRole("link", { name: "Maria a" })[0]).toHaveAttribute("href", "/leads/lead-a");
+    expect(within(dialog).getAllByText("Dados do lead insuficientes").length).toBeGreaterThan(0);
+
+    await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Tentar todos de novo" })); });
+    expect(screen.getByRole("alertdialog", { name: "Tentar de novo 1 etapa?" })).toBeInTheDocument();
+    expect(refusals.retry).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Tentar de novo" })); });
+    expect(refusals.retry).toHaveBeenCalledWith({ all: true });
+    expect(screen.getByText(/1 etapa voltou para a fila de envio/)).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("confirm", expect.anything());
+  });
+
+  it("conversões: Tentar de novo fora da janela mostra a causa", async () => {
+    refusals.list.mockResolvedValue({ success: true, refusals: [{
+      id: "x", leadId: "lead-x", leadName: "João", stage: "sale", stageLabel: "Venda",
+      reason: { kind: "meta", label: "Erro da Meta", hint: "Falha do lado da Meta." }, at: new Date("2026-11-10T10:00:00.000Z"),
+      retry: { retryable: false, cause: "Passou da janela de 7 dias da Meta." },
+    }] });
+    refusals.retry.mockResolvedValue({ success: false, error: "Passou da janela de 7 dias da Meta. Esta etapa não pode mais ser enviada." });
+    render(<MetaConversionsLite panel={META_CONVERSIONS_FIXTURE} datasets={[]} />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Recusados/ })); });
+    const dialog = screen.getByRole("dialog", { name: "Etapas recusadas pela Meta" });
+    expect(within(dialog).queryByRole("button", { name: "Tentar todos de novo" })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getAllByRole("button", { name: "Ações da etapa Venda de João" })[0]!);
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Tentar de novo" })); });
+    expect(refusals.retry).toHaveBeenCalledWith({ id: "x" });
+    expect(screen.getByRole("alert")).toHaveTextContent("Passou da janela de 7 dias");
+    expect(fire).toHaveBeenCalledWith("error");
   });
 });

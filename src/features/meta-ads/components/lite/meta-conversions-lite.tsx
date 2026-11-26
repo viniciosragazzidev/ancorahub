@@ -15,6 +15,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { toast } from "@/components/ui/sonner";
 import { saveMetaConversionSettingsAction } from "../../meta-conversion-actions";
 import type { MetaConversionsPanel } from "../../meta-conversion-service";
+import { MetaConversionRefusalsLite } from "./meta-conversion-refusals-lite";
 import styles from "./meta-lite.module.css";
 import integration from "./meta-integration-lite.module.css";
 
@@ -26,6 +27,7 @@ export function MetaConversionsLite({ panel, datasets }: { panel: MetaConversion
   const [datasetId, setDatasetId] = useState(panel.datasetId ?? (datasets.length === 1 ? datasets[0]!.id : ""));
   const [testEventCode, setTestEventCode] = useState(panel.testEventCode ?? "");
   const [saving, startSaving] = useTransition();
+  const [refusalsOpen, setRefusalsOpen] = useState(false);
   const dirty = enabled !== panel.enabled || datasetId !== (panel.datasetId ?? "") || testEventCode.trim() !== (panel.testEventCode ?? "");
 
   const save = () => {
@@ -101,8 +103,17 @@ export function MetaConversionsLite({ panel, datasets }: { panel: MetaConversion
           <div className={integration.counts}>
             <div className={page.stat}><span className={page.statLabel}>Pendentes</span><span className={page.statValue}>{count.format(panel.counts.pending)}</span></div>
             <div className={page.stat}><span className={page.statLabel}>Enviados</span><span className={page.statValue}>{count.format(panel.counts.sent)}</span></div>
-            <div className={page.stat}><span className={page.statLabel}>Recusados</span><span className={page.statValue}>{count.format(panel.counts.failed)}</span></div>
+            {panel.counts.failed > 0 ? (
+              <button type="button" className={`${page.stat} ${styles.statButton}`} aria-haspopup="dialog" onClick={() => setRefusalsOpen(true)}>
+                <span className={page.statLabel}>Recusados</span>
+                <span className={page.statValue}>{count.format(panel.counts.failed)}</span>
+                <span className={page.statHint}>Ver e resolver</span>
+              </button>
+            ) : (
+              <div className={page.stat}><span className={page.statLabel}>Recusados</span><span className={page.statValue}>{count.format(panel.counts.failed)}</span></div>
+            )}
           </div>
+          <MetaConversionRefusalsLite open={refusalsOpen} onOpenChange={setRefusalsOpen} />
 
           {panel.lastError ? (
             <div className={integration.warning}>
