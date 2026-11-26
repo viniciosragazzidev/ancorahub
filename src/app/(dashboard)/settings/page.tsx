@@ -69,6 +69,9 @@ import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { getTwoFactorPolicy } from "@/features/security/two-factor-policy-server";
 import { listLgpdRequests } from "@/features/leads/lgpd/lgpd-requests-store";
 import { LgpdRequestsLite } from "./_components/lite/lgpd-requests-lite";
+import { DpoLite, MediaRetentionLite } from "./_components/lite/privacy-lite";
+import { getDpo } from "@/features/leads/lgpd/dpo-server";
+import { getMediaRetentionPolicy } from "@/features/leads/lgpd/media-retention-store";
 import { InternalNumbersLite } from "./_components/lite/internal-numbers-lite";
 import { getInternalDirectory, getInternalNumbers } from "@/features/internal-contacts/queries";
 import { formatInternalNumberLines } from "@/features/internal-contacts/decision";
@@ -283,9 +286,27 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
       ? { id: "etiquetas", title: "Etiquetas", description: "Nome, cor e uso das etiquetas dos leads", node: <TagsLite initialTags={tagList} /> }
       : null;
     // LGPD (26/11): pedidos do titular com prazo de 15 dias, só o diretor; as actions conferem o papel de novo.
-    const lgpd = context.role === "director" ? await listLgpdRequests(context.tenantId).catch(() => ({ ready: false, rows: [] })) : null;
-    const lgpdSection: SettingsLiteSection | null = lgpd
-      ? { id: "lgpd", title: "LGPD", description: "Pedidos do titular e prazo de 15 dias", node: <LgpdRequestsLite ready={lgpd.ready} initialRows={lgpd.rows} /> }
+    // Privacidade (26/11): encarregado de dados e retenção de mídia ficam junto dos pedidos, em system_settings.
+    const [lgpd, dpo, mediaRetention] = context.role === "director"
+      ? await Promise.all([
+        listLgpdRequests(context.tenantId).catch(() => ({ ready: false, rows: [] })),
+        getDpo(context.tenantId),
+        getMediaRetentionPolicy(context.tenantId),
+      ])
+      : [null, null, null];
+    const lgpdSection: SettingsLiteSection | null = lgpd && mediaRetention
+      ? {
+        id: "lgpd",
+        title: "Privacidade",
+        description: "Encarregado de dados, retenção de mídia e pedidos do titular",
+        node: (
+          <>
+            <DpoLite initial={dpo} />
+            <MediaRetentionLite initial={mediaRetention.option} />
+            <LgpdRequestsLite ready={lgpd.ready} initialRows={lgpd.rows} />
+          </>
+        ),
+      }
       : null;
     // Números internos (26/11): fornecedores, operadoras e família fora de lead e da IA, só o diretor; a action confere o papel.
     const internal = context.role === "director"

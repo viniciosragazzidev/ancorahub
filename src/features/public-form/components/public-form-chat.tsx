@@ -61,12 +61,13 @@ async function postSubmission(submission: PublicFormSubmission): Promise<PublicF
  * fim. O "enviado" só aparece depois que o servidor confirma; a falha mantém as respostas e oferece
  * "Tentar de novo" com a mesma chave (nunca cria dois leads).
  */
-export function PublicFormChat({ services }: { services?: PublicFormServices }) {
+/** `fill`: ocupa a altura do pai em vez da tela toda (a página põe o rodapé do encarregado embaixo). */
+export function PublicFormChat({ services, fill = false }: { services?: PublicFormServices; fill?: boolean }) {
   const [run, setRun] = useState(0);
-  return <PublicFormConversation key={run} services={services} onRestart={() => setRun((value) => value + 1)} />;
+  return <PublicFormConversation key={run} services={services} fill={fill} onRestart={() => setRun((value) => value + 1)} />;
 }
 
-function PublicFormConversation({ services, onRestart }: { services?: PublicFormServices; onRestart: () => void }) {
+function PublicFormConversation({ services, fill, onRestart }: { services?: PublicFormServices; fill: boolean; onRestart: () => void }) {
   const lab = useDevLab();
   const submit = services?.submit ?? lab?.publicForm?.submit ?? postSubmission;
   const fire = useFeedback();
@@ -170,6 +171,7 @@ function PublicFormConversation({ services, onRestart }: { services?: PublicForm
         identity={identity}
         backHref="/formulario"
         backButton={false}
+        fill={fill}
         mentions={false}
         script={script}
         onLocalChoice={onLocalChoice}

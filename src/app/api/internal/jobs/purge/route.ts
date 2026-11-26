@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { runMediaRetention } from "@/features/leads/lgpd/media-retention-store";
 import { processPendingPurgeJobs } from "@/features/platform-admin/purge-job";
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { withJobHeartbeat } from "@/features/live-status/heartbeat";
@@ -16,7 +17,9 @@ async function handle(request: NextRequest) {
   }
 
   const result = await processPendingPurgeJobs();
-  return NextResponse.json({ success: true, result });
+  // Retenção de mídia (LGPD, 26/11): na mesma tarefa, só com o expurgo parado e no máximo a cada 6 h.
+  const mediaRetention = result.processed ? null : await runMediaRetention().catch(() => ({ ran: false as const, reason: "error" as const }));
+  return NextResponse.json({ success: true, result, mediaRetention });
 }
 
 async function handleGET(request: NextRequest) {

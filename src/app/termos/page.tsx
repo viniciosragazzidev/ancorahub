@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AncoraLogo } from "@/components/ancora-logo";
+import { DpoFooter } from "@/features/leads/lgpd/dpo-footer";
+import { getPublicDpo } from "@/features/leads/lgpd/dpo-server";
 import "@/components/arc/venancor-scope.css";
 
 import styles from "./termos.module.css";
@@ -23,8 +25,12 @@ const sections = [
   { id: "atualizacoes", title: "9. Atualizações e contato", content: "Esta página pode ser atualizada para refletir evolução do produto, requisitos legais ou ajustes operacionais. Para dúvidas sobre dados de clientes, o titular deve procurar primeiro a corretora responsável pelo atendimento. O canal oficial de privacidade e a identificação jurídica da contratada serão informados no instrumento contratual e na política definitiva aplicável." },
 ];
 
+// O rodapé do encarregado lê a configuração da empresa a cada visita (26/11).
+export const dynamic = "force-dynamic";
+
 /** Termos no visual Lite para todo mundo (Onda 8): o mesmo texto, as mesmas âncoras e os mesmos links. */
-export default function TermsPage() {
+export default async function TermsPage() {
+  const dpo = await getPublicDpo();
   return (
     <main className={`arc-venancor ${styles.page}`}>
       <header className={styles.header}>
@@ -55,6 +61,7 @@ export default function TermsPage() {
         </section>
 
         <footer className={styles.footer}><p>Ao continuar usando a plataforma, o usuário declara que leu estas diretrizes e atua em nome ou com autorização da corretora responsável.</p><Link className={styles.link} style={{ paddingInline: 0 }} href="/login">Voltar para o login</Link></footer>
+        <DpoFooter dpo={dpo} />
       </div>
     </main>
   );
