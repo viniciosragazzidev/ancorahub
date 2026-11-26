@@ -4387,7 +4387,7 @@ export const userNotificationPreferences = pgTable("user_notification_preference
 });
 
 /**
- * Links rastreáveis do Marketing (migration 0245): /l/<code> conta o clique e manda para o WhatsApp da empresa ou o
+ * Links rastreáveis do Marketing (migration 0245): /r/<code> conta o clique e manda para o WhatsApp da empresa ou o
  * formulário público. O lead que entra por ali leva `trackingLinkId` em leads.source_metadata.
  */
 export const trackingLinks = pgTable("tracking_links", {

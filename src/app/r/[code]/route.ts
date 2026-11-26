@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const BOT = /bot|crawler|spider|preview|facebookexternalhit|whatsapp|slurp|curl|wget/i;
 
 /**
- * Link rastreável público (/l/<codigo>), sem login: soma um clique no dia e redireciona para o WhatsApp da empresa ou
+ * Link rastreável público (/r/<codigo>), sem login: soma um clique no dia e redireciona para o WhatsApp da empresa ou
  * para o formulário, preservando as UTMs. Não expõe nada da empresa: código desconhecido, pausado ou excluído vai para
  * o formulário público, sem origem, igual para todos. Robôs de prévia (o próprio WhatsApp ao colar o link) não contam como clique.
  * A contagem nunca segura o redirecionamento: se o banco falhar, a pessoa segue mesmo assim.

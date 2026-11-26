@@ -37,7 +37,7 @@ const DEFAULT_MESSAGE = "Olá! Quero conhecer os planos de saúde.";
 const count = (value: number) => value.toLocaleString("pt-BR");
 
 export function shortLinkUrl(baseUrl: string, code: string) {
-  return `${baseUrl.replace(/\/+$/, "")}/l/${code}`;
+  return `${baseUrl.replace(/\/+$/, "")}/r/${code}`;
 }
 
 function formatPhone(digits: string) {

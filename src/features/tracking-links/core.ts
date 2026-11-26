@@ -1,6 +1,6 @@
 /**
  * Links rastreáveis (Marketing > Links, 26/11/2026): regras puras, sem banco.
- * - O código curto de /l/<code> sai de um alfabeto sem letras ambíguas (sem 0/o, 1/l/i).
+ * - O código curto de /r/<code> sai de um alfabeto sem letras ambíguas (sem 0/o, 1/l/i).
  * - O redirecionamento preserva as UTMs que chegaram na URL; as do link só preenchem o que faltar.
  * - No WhatsApp, a mensagem pronta leva "(código abc1234)": é assim que a conversa que chega volta para o link.
  * - No formulário, o código vai como ?lk=<code> e o envio do formulário devolve a origem ao servidor.
@@ -91,7 +91,7 @@ export function mergeUtm(link: Pick<RedirectLink, "utmSource" | "utmMedium" | "u
 export const PUBLIC_FORM_PATH = "/formulario";
 
 /**
- * Para onde /l/<code> manda. Formulário: o próprio site, com ?lk e as UTMs. WhatsApp: wa.me com a mensagem pronta
+ * Para onde /r/<code> manda. Formulário: o próprio site, com ?lk e as UTMs. WhatsApp: wa.me com a mensagem pronta
  * (o WhatsApp não carrega UTM; a origem volta pelo código na mensagem). Sem número válido, cai no formulário.
  */
 export function buildRedirectTarget(link: RedirectLink, incoming: URLSearchParams, origin: string): string {

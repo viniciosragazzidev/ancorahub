@@ -26,7 +26,7 @@ vi.mock("@/shared/db", () => ({
   getDatabase: () => ({ select: () => ({ from: () => ({ where: () => ({ orderBy: async () => [] }) }) }) }),
 }));
 
-import { GET } from "@/app/l/[code]/route";
+import { GET } from "@/app/r/[code]/route";
 import { receivePublicForm } from "@/features/public-form/intake";
 import { parsePublicFormSubmission } from "@/features/public-form/submission-schema";
 
@@ -106,7 +106,7 @@ describe("redirecionamento", () => {
   });
 });
 
-describe("rota pública /l/<codigo>", () => {
+describe("rota pública /r/<codigo>", () => {
   beforeEach(() => {
     state.recordClick.mockResolvedValue(undefined);
     delete process.env.NEXT_PUBLIC_APP_URL;
@@ -114,7 +114,7 @@ describe("rota pública /l/<codigo>", () => {
   afterEach(() => vi.clearAllMocks());
 
   const call = (code: string, query = "", ua = "Mozilla/5.0 (iPhone)") =>
-    GET(new NextRequest(`https://crm.ancorasaude.cloud/l/${code}${query}`, { headers: { "User-Agent": ua } }), { params: Promise.resolve({ code }) });
+    GET(new NextRequest(`https://crm.ancorasaude.cloud/r/${code}${query}`, { headers: { "User-Agent": ua } }), { params: Promise.resolve({ code }) });
 
   it("conta o clique e redireciona", async () => {
     state.findActive.mockResolvedValue({ id: "link-1", ...formLink });

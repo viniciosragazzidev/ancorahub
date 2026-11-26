@@ -25,7 +25,7 @@ function rowsOf<T>(result: unknown): T[] {
   return (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as T[];
 }
 
-/** A migration 0245 está aplicada? Sem as tabelas, a tela mostra "ainda não ligado" e /l/ vai para o formulário público. */
+/** A migration 0245 está aplicada? Sem as tabelas, a tela mostra "ainda não ligado" e /r/ vai para o formulário público. */
 export async function trackingLinksReady(now = Date.now()): Promise<boolean> {
   if (readyCache?.value && now - readyCache.at < READY_TTL_MS) return true;
   if (readyCache && !readyCache.value && now - readyCache.at < READY_TTL_MS) return false;
@@ -172,7 +172,7 @@ export async function setTrackingLinkStatus(tenantId: string, linkId: string, st
   if (!updated.length) throw new TrackingLinkError("Esse link não existe mais.");
 }
 
-/** Excluir tira o link da lista e desliga /l/<code>; os leads que vieram por ele continuam com a origem. */
+/** Excluir tira o link da lista e desliga /r/<code>; os leads que vieram por ele continuam com a origem. */
 export async function deleteTrackingLink(tenantId: string, linkId: string) {
   if (!(await trackingLinksReady())) throw new TrackingLinkError(NOT_READY);
   const now = new Date();
