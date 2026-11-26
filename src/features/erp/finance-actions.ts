@@ -4,9 +4,10 @@ import { z } from "zod";
 import { erpAction, erpValidationMessage } from "./action-result";
 import { ErpError, parseMoneyCents, type ErpActionResult } from "./contracts";
 import {
-  getFinancialEntry, prepareFinancialEntry, prepareSettlement, prepareSettlementReversal, reviewFinancialEntry, reviewSettlement,
+  getFinancialEntry, prepareSettlement, prepareSettlementReversal, reviewFinancialEntry, reviewSettlement,
   searchFinanceBeneficiaries, searchFinanceSales,
 } from "./finance";
+import { prepareFinancialEntryWithRecurrence, startRecurringExpense, stopRecurringExpense } from "./recurring-expenses";
 import { prepareOffset, prepareOffsetReversal, reviewOffset } from "./offsets";
 import { prepareClosing, reviewClosing } from "./closing";
 
@@ -34,8 +35,15 @@ export async function searchFinanceSalesAction(query: string) {
 export async function searchFinanceBeneficiariesAction(query: string) {
   return erpRead(() => searchFinanceBeneficiaries(query));
 }
+export async function startRecurringExpenseAction(id: string): Promise<ErpActionResult> {
+  return erpAction(async () => { await startRecurringExpense(id); refresh(id); return { id, message: "Pronto. Esta despesa vai se repetir todo mês." }; });
+}
+export async function stopRecurringExpenseAction(id: string): Promise<ErpActionResult> {
+  return erpAction(async () => { const result = await stopRecurringExpense(id); refresh(id); return { id, message: result.stopped ? "Pronto. Esta despesa não se repete mais. Os meses já gerados continuam na lista." : "Esta despesa já não se repetia." }; });
+}
 export async function prepareFinancialEntryAction(_previous: ErpActionResult, form: FormData): Promise<ErpActionResult> {
-  return erpAction(async () => { const id = await prepareFinancialEntry({ requestId: form.get("requestId"), reference: form.get("reference"), kind: form.get("kind"), saleId: form.get("saleId") || null, branchId: form.get("branchId") || null, beneficiaryId: form.get("beneficiaryId") || null, amountCents: parseMoneyCents(String(form.get("amount") ?? "")), dueOn: form.get("dueOn"), competence: form.get("competence"), description: form.get("description"), evidenceDocumentId: null }); refresh(id); return { id, message: "Lançamento preparado. Envie a evidência e solicite aprovação independente." }; });
+  const repeatMonthly = form.get("kind") === "expense" && form.get("repeatMonthly") === "on";
+  return erpAction(async () => { const id = await prepareFinancialEntryWithRecurrence({ requestId: form.get("requestId"), reference: form.get("reference"), kind: form.get("kind"), saleId: form.get("saleId") || null, branchId: form.get("branchId") || null, beneficiaryId: form.get("beneficiaryId") || null, amountCents: parseMoneyCents(String(form.get("amount") ?? "")), dueOn: form.get("dueOn"), competence: form.get("competence"), description: form.get("description"), evidenceDocumentId: null }, repeatMonthly); refresh(id); return { id, message: repeatMonthly ? "Despesa preparada e marcada para repetir todo mês. Envie a evidência e solicite aprovação independente." : "Lançamento preparado. Envie a evidência e solicite aprovação independente." }; });
 }
 export async function reviewFinancialEntryAction(_previous: ErpActionResult, form: FormData): Promise<ErpActionResult> {
   return erpAction(async () => { const id = await reviewFinancialEntry({ id: form.get("id"), expectedVersion: Number(form.get("version")), decision: form.get("decision"), reason: form.get("reason") }); refresh(id); return { id, message: "Revisão registrada." }; });

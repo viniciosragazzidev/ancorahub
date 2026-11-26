@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AppSelect } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { recurringRowAction } from "../recurring-expenses-core";
 import { Field, FieldError, FieldLabel, FieldSuccess } from "@/components/ui/field";
 import { FINANCIAL_KINDS, FINANCIAL_LABELS, formatCents, type ErpActionResult, type FinancialKind } from "../contracts";
 import {
   loadFinancialEntryAction, prepareFinancialEntryAction, prepareSettlementAction, reverseSettlementAction, reviewFinancialEntryAction,
-  reviewSettlementAction, searchFinanceBeneficiariesAction, searchFinanceSalesAction,
+  reviewSettlementAction, searchFinanceBeneficiariesAction, searchFinanceSalesAction, startRecurringExpenseAction, stopRecurringExpenseAction,
 } from "../finance-actions";
 import { submitErpFile } from "../client-file-request";
 import { ENTRY_STATUS_LABELS, MOVEMENT_STATUS_LABELS } from "../shared";
@@ -101,6 +103,10 @@ export function NewEntryForm({ branches, defaultKind, onCreated }: {
     <Field><FieldLabel htmlFor="finance-period">Competência</FieldLabel><ErpMonthField id="finance-period" name="competence" /></Field>
     {kind === "client_premium" ? <ErpNote>Pagamento do cliente à operadora. Este fato não movimenta o caixa da Âncora.</ErpNote> : null}
     {kind === "broker_commission" ? <ErpNote>A comissão pertence ao corretor da venda.</ErpNote> : null}
+    {kind === "expense" ? <label className="flex min-h-11 items-center gap-3 text-sm">
+      <Checkbox name="repeatMonthly" disabled={pending} />
+      <span>Repetir todo mês<span className="block text-xs text-muted-foreground">Aluguel, internet, leads comprados, salários fixos. O mês novo aparece quando o mês vira.</span></span>
+    </label> : null}
     <FinanceFeedback result={result} />
     <div><Button type="submit" loading={pending}>Preparar e enviar evidência</Button></div>
   </form>;
@@ -299,7 +305,9 @@ export function EntryPanelBody({ detail, onChanged }: { detail: EntryDetail; onC
 type Entries = Awaited<ReturnType<typeof getFinancialEntries>>;
 type EntryRow = Entries["rows"][number];
 const ENTRY_COLUMNS: ErpColumn<EntryRow>[] = [
-  { id: "description", label: "Lançamento", primary: true, render: (row) => <ErpCell title={row.description} sub={`${FINANCIAL_LABELS[row.kind]} · Ref. ${row.reference}`} /> },
+  { id: "description", label: "Lançamento", primary: true, render: (row) => <ErpCell
+    title={row.recurring ? <>{row.description} <ErpStatus>Todo mês</ErpStatus></> : row.description}
+    sub={`${FINANCIAL_LABELS[row.kind]} · Ref. ${row.reference}`} /> },
   { id: "beneficiary", label: "Beneficiário", nowrap: true, render: (row) => row.beneficiaryName ?? "Sem beneficiário" },
   { id: "competence", label: "Competência", nowrap: true, render: (row) => formatCompetence(row.competence) },
   { id: "amount", label: "Valor", numeric: true, render: (row) => formatCents(row.amountCents) },
@@ -363,14 +371,38 @@ export function FinanceLedger({ data, branches, title, description, emptyTitle =
   }
   const row = data.rows.find((item) => item.id === openId);
   const canCreate = data.canPrepare && !!branches;
+  const [repeatPending, startRepeat] = useTransition();
+  const [repeatResult, setRepeatResult] = useState<{ result: ErpActionResult; retry: () => void } | null>(null);
+  // Sucesso só depois da resposta do servidor; na falha, a causa e "Tentar de novo".
+  function toggleRepeat(item: EntryRow, action: "start" | "stop") {
+    const run = () => startRepeat(async () => {
+      const result = await (action === "stop" ? stopRecurringExpenseAction(item.id) : startRecurringExpenseAction(item.id));
+      setRepeatResult({ result, retry: run });
+      if (result.ok) router.refresh();
+    });
+    run();
+  }
+  function repeatMenu(item: EntryRow): ErpMenuItem[] {
+    const action = recurringRowAction(item);
+    if (!action) return [];
+    return [{ id: action, label: action === "stop" ? "Parar de repetir" : "Repetir todo mês", disabled: repeatPending, onSelect: () => toggleRepeat(item, action) }];
+  }
+  // Só diretor e financeiro (quem prepara lançamentos da corretora) veem o ⋯ de repetição.
+  const columns = !data.agency ? BROKER_ENTRY_COLUMNS : data.canPrepare
+    ? [...ENTRY_COLUMNS, { id: "menu", label: "", render: (item: EntryRow) => <ErpRowMenu label={`Ações de ${item.description}`} entityName={item.description} items={repeatMenu(item)} /> }]
+    : ENTRY_COLUMNS;
   return <>
+    {repeatResult?.result.message ? <div role="status" className="flex flex-wrap items-center gap-2">
+      <FinanceFeedback result={repeatResult.result} />
+      {!repeatResult.result.ok ? <Button type="button" variant="outline" loading={repeatPending} onClick={repeatResult.retry}>Tentar de novo</Button> : null}
+    </div> : null}
     <ErpList<EntryRow>
       title={title}
       description={description}
       count={data.total}
       countLabel={["lançamento", "lançamentos"]}
       // O corretor só vê os próprios lançamentos já aprovados: beneficiário e estado repetiriam o óbvio; vale a situação do pagamento.
-      columns={data.agency ? ENTRY_COLUMNS : BROKER_ENTRY_COLUMNS}
+      columns={columns}
       rows={data.rows}
       rowKey={(item) => item.id}
       onRowOpen={(item) => openEntry(item.id)}

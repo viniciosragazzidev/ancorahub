@@ -5786,6 +5786,31 @@ export const erpFinancialEntries = pgTable("erp_financial_entries", {
   check("erp_financial_entries_independent_approval", sql`${table.approvedBy} IS NULL OR ${table.approvedBy} <> ${table.createdBy}`),
 ]);
 
+/**
+ * Despesa que se repete todo mês (migração 0242). A despesa-origem fica imutável depois de aprovada, por isso a regra
+ * mora fora dela. Cada mês gerado entra em `erp_recurring_expense_runs`, único por regra e competência.
+ */
+export const erpRecurringExpenses = pgTable("erp_recurring_expenses", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  originEntryId: text("origin_entry_id").notNull().references(() => erpFinancialEntries.id),
+  status: text("status").notNull().default("active"), startsCompetence: text("starts_competence").notNull(),
+  createdBy: text("created_by").notNull().references(() => user.id), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  stoppedBy: text("stopped_by").references(() => user.id), stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("erp_recurring_expenses_tenant_origin_unique").on(table.tenantId, table.originEntryId),
+  index("erp_recurring_expenses_tenant_status_idx").on(table.tenantId, table.status),
+  check("erp_recurring_expenses_status_check", sql`${table.status} IN ('active', 'stopped')`),
+]);
+export const erpRecurringExpenseRuns = pgTable("erp_recurring_expense_runs", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  recurringId: text("recurring_id").notNull().references(() => erpRecurringExpenses.id),
+  competence: text("competence").notNull(), entryId: text("entry_id").notNull().references(() => erpFinancialEntries.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("erp_recurring_expense_runs_rule_competence_unique").on(table.tenantId, table.recurringId, table.competence),
+  uniqueIndex("erp_recurring_expense_runs_entry_unique").on(table.tenantId, table.entryId),
+]);
+
 export const erpSettlements = pgTable("erp_settlements", {
   id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
   entryId: text("entry_id").notNull(), requestId: text("request_id").notNull(),

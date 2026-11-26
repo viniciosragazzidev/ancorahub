@@ -12,6 +12,7 @@ import { getEntryOffsets } from "./offset-balances";
 import { syncLegacyInstallment } from "./legacy-sync";
 import { confirmedSettledSql, openBalanceSql } from "./balances";
 import { PAGE_SIZE, pageSchema, periodSchema, uuidSchema } from "./shared";
+import { recurringEntryIds } from "./recurring-flags";
 
 export async function activePayoutFor(db: ErpDatabase, tenantId: string, entryId: string) {
   const [row] = await db.select({ id: schema.erpPayouts.id }).from(schema.erpPayoutItems).innerJoin(schema.erpPayouts, and(eq(schema.erpPayouts.tenantId, tenantId), eq(schema.erpPayouts.id, schema.erpPayoutItems.payoutId)))
@@ -240,6 +241,8 @@ export async function getFinancialEntries(raw: unknown) {
       approved: sql<number>`coalesce(sum(CASE WHEN ${entries.status} = 'approved' THEN ${entries.amountCents} ELSE 0 END), 0)::bigint`.mapWith(Number),
     }).from(entries).leftJoin(schema.user, eq(schema.user.id, entries.beneficiaryId)).where(scoped),
   ]);
+  // O selo "Todo mês" só existe nos livros da corretora; sem a migração 0242 nenhuma linha se repete.
+  const recurring = agency ? await recurringEntryIds(db, tenantId, rows.filter(({ entry }) => entry.kind === "expense").map(({ entry }) => entry.id)) : new Set<string>();
   await auditErp(db, {
     tenantId: auth.context.tenantId, actorId: auditActor(auth.context), action: "erp.finance.viewed", entityType: "erp_access",
     entityId: "financial_entries", metadata: { count: rows.length, page: filters.page },
@@ -251,7 +254,7 @@ export async function getFinancialEntries(raw: unknown) {
     rows: rows.map(({ entry, beneficiaryName, settledCents: settled }) => ({
       id: entry.id, kind: z.enum(FINANCIAL_KINDS).parse(entry.kind), reference: entry.reference, description: entry.description, beneficiaryName,
       amountCents: entry.amountCents, dueOn: entry.dueOn, competence: entry.competence, status: entry.status, version: entry.version,
-      settledCents: checkedCents(settled),
+      settledCents: checkedCents(settled), recurring: recurring.has(entry.id),
     })),
   };
 }

@@ -57,9 +57,9 @@ const entries = {
   summary: { toReview: 1, receivableCents: 10000, payableCents: 0, settledCents: 5000, approvedCents: 15000 },
   rows: [
     { id: "e1", kind: "agency_receivable" as const, reference: "REC-1", description: "Recebível sintético", amountCents: 15000, dueOn: "2026-11-30",
-      competence: "2026-11", status: "approved", version: 2, settledCents: 5000, beneficiaryName: null },
+      competence: "2026-11", status: "approved", version: 2, settledCents: 5000, beneficiaryName: null, recurring: false },
     { id: "e2", kind: "agency_receivable" as const, reference: "REC-2", description: "Outro recebível", amountCents: 9000, dueOn: "2026-12-10",
-      competence: "2026-12", status: "submitted", version: 1, settledCents: 0, beneficiaryName: "Ana Souza" },
+      competence: "2026-12", status: "submitted", version: 1, settledCents: 0, beneficiaryName: "Ana Souza", recurring: false },
   ],
 };
 const offsets = {
