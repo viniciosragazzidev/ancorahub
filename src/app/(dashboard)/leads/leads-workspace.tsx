@@ -315,7 +315,8 @@ export function LeadsWorkspace({
     ? readMetaLeadDisplayDetails(selectedLead.sourceChannel, selectedLead.sourceMetadata)
     : null;
   const drawerOptimisticSnapshots = useRef(new Map<string, LeadWorkspaceItem>());
-  const [activeTab, setActiveTab] = useState<string>(() => initialView ?? (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
+  // Sem ?view=, abre sempre em "Todos os leads" (26/11/2026); antes abria em Qualificação IA quando havia lead qualificando.
+  const [activeTab, setActiveTab] = useState<string>(() => initialView ?? "list");
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isDistributingAll, startDistribution] = useTransition();
