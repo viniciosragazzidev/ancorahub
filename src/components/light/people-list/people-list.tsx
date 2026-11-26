@@ -20,10 +20,10 @@ export const peopleHue = (text: string) => [...text].reduce((total, char) => tot
 
 const enterStyle = (index: number) => ({ "--i": Math.min(index, 12) }) as CSSProperties;
 
-export function PeoplePage({ title, hideTitle = false, subtitle, action, children, className }: { title?: ReactNode; /** Título só para leitor de tela (a barra do app já mostra). */ hideTitle?: boolean; subtitle?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
+export function PeoplePage({ title, hideTitle = false, subtitle, action, children, className, wide = false }: { /** Modo corretor no desktop: 400px mais largo (26/11/2026). */ wide?: boolean; title?: ReactNode; /** Título só para leitor de tela (a barra do app já mostra). */ hideTitle?: boolean; subtitle?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <div className={`arc-venancor ${styles.page}${className ? ` ${className}` : ""}`}>
-      <div className={styles.inner}>
+      <div className={styles.inner} data-wide={wide ? "true" : undefined}>
         {title || subtitle || action ? (
           <header className={`${styles.header} ${styles.enter}`}>
             <div>

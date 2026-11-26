@@ -282,7 +282,7 @@ export function BrokerMyWallet({
   );
 
   return (
-    <PeoplePage
+    <PeoplePage wide
       title="Minha carteira"
       hideTitle
       subtitle={summary}

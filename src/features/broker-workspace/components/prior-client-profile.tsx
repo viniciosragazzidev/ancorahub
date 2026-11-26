@@ -133,7 +133,7 @@ export function PriorClientProfile({
   }
 
   return (
-    <PeoplePage title={client.name} hideTitle className={`${walletStyles.page} ${styles.page}`}>
+    <PeoplePage wide title={client.name} hideTitle className={`${walletStyles.page} ${styles.page}`}>
       <div className={styles.profileHeader}>
         <span className={styles.profileAvatar} style={{ "--hue": peopleHue(client.name) } as CSSProperties} aria-hidden="true">{peopleInitials(client.name)}</span>
         <div className={styles.profileMain}>

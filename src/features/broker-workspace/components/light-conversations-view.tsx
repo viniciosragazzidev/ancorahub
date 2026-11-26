@@ -139,7 +139,7 @@ export function LightConversationsView({
   );
 
   return (
-    <PeoplePage title="Dicas de Atendimento" hideTitle subtitle={subtitle}>
+    <PeoplePage wide title="Dicas de Atendimento" hideTitle subtitle={subtitle}>
       {selected ? (
         <SelectedInsight key={selected.id} item={selected} />
       ) : insights.length > 0 ? (

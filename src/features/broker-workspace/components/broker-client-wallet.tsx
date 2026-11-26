@@ -212,7 +212,7 @@ export function BrokerClientWallet({ wallet, filters, hideTitle = true }: { wall
   const pageLabel = wallet.totalPages > 0 ? `Página ${wallet.page} de ${wallet.totalPages}` : "Sem páginas";
 
   return (
-    <PeoplePage title="Clientes" hideTitle={hideTitle} subtitle={`${countLabel} · ${visibleCount}`} className={styles.page}>
+    <PeoplePage wide title="Clientes" hideTitle={hideTitle} subtitle={`${countLabel} · ${visibleCount}`} className={styles.page}>
       <ClientWalletControls key={buildQuery(effectiveFilters)} filters={effectiveFilters} counts={wallet.counts} hasRenewalData={wallet.hasRenewalData} origins={wallet.origins} />
 
       {wallet.rows.length ? (

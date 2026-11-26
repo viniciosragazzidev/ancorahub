@@ -412,7 +412,7 @@ export function LightLeadsList({
     <div className="flex min-h-full flex-col text-foreground">
       <LightAvailabilityBanner initialStatus={availabilityStatus} />
 
-      <PeoplePage>
+      <PeoplePage wide>
         {walletTabs ? <BrokerWalletTabs value="atendimento" /> : null}
         <div className={styles.viewSwitch}>
           <SegmentedControl

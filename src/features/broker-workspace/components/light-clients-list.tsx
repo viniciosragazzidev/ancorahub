@@ -97,7 +97,7 @@ export function LightClientsList({ clients, management = false }: { clients: Lig
   const countLabel = clients.length === 1 ? "1 cliente conquistado" : `${clients.length} clientes conquistados`;
 
   return (
-    <PeoplePage title="Clientes" hideTitle={!management} subtitle={countLabel}>
+    <PeoplePage wide title="Clientes" hideTitle={!management} subtitle={countLabel}>
       {management ? (
         <PeopleStats items={[
           { value: clients.length, label: "Clientes" },

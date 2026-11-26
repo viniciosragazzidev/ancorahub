@@ -9,6 +9,8 @@
 /* minmax(0, 1fr): a coluna nunca passa da largura disponível; sem isso, a faixa de abas (que não quebra) alargava a
    página inteira e o conteúdo vazava à direita, deixando a margem esquerda maior que a direita. */
 .inner { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; width: 100%; max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+/* Modo corretor no desktop (26/11/2026): +400px de largura. */
+@media (min-width: 1024px) { .inner[data-wide="true"] { max-width: 1260px; } }
 @media (min-width: 720px) { .inner { padding: 32px 24px 56px; } }
 .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .title { margin: 0; font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); color: var(--foreground); }
