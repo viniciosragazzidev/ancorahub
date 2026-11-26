@@ -8,7 +8,8 @@ import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { criarTarefaDoLead } from "./tarefa-servico";
+import { isNoReplyReminderId, NO_REPLY_TASK_TITLE, noReplyReminderDue } from "./no-reply-reminder";
+import { autorizarTarefaDoLead, criarTarefaDoLead } from "./tarefa-servico";
 
 export type LeadTaskState = { success?: boolean; error?: string };
 
@@ -113,5 +114,42 @@ async function setLeadTaskDone(taskId: string, mode: "toggle" | "done" | "cancel
     // Never a technical message to the broker; the detail stays in the server log.
     console.error("[lead-task] update failed", error);
     return { error: "Não foi possível atualizar a tarefa. Tente de novo." };
+  }
+}
+
+/**
+ * "Lembrar se não responder" (⋯ da conversa): tarefa "Retornar: cliente não respondeu" para quem pediu, com o prazo
+ * da opção recalculado aqui (o cliente manda só a opção). Aparece em /tarefas e na agenda de quem pediu.
+ */
+export async function createNoReplyReminderAction(leadId: string, option: string): Promise<LeadTaskState & { taskId?: string; dueAt?: string }> {
+  if (!z.string().min(1).safeParse(leadId).success || leadId.startsWith("unassigned-")) return { error: "Este contato ainda não é um lead." };
+  if (!isNoReplyReminderId(option)) return { error: "Prazo inválido." };
+  const dueAt = noReplyReminderDue(option);
+  if (!dueAt) return { error: "Esse horário já passou. Escolha outro prazo." };
+  try {
+    const context = await getRequiredTenantContext();
+    const { lead } = await autorizarTarefaDoLead(context, leadId);
+    const taskId = randomUUID();
+    await getDatabase().transaction(async (tx) => {
+      await tx.insert(schema.leadTasks).values({
+        id: taskId,
+        tenantId: context.tenantId,
+        leadId: lead.id,
+        assignedTo: context.userId,
+        createdBy: context.userId,
+        title: NO_REPLY_TASK_TITLE,
+        description: "Criada na central de conversas: o cliente ainda não respondeu.",
+        priority: "normal",
+        dueAt,
+      });
+      await tx.insert(schema.leadTaskAssignees).values({ id: randomUUID(), tenantId: context.tenantId, taskId, userId: context.userId });
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_task", entidadeId: taskId, acao: "criou_lembrete_sem_resposta" });
+    });
+    return { success: true, taskId, dueAt: dueAt.toISOString() };
+  } catch (error) {
+    // Scope messages (lead de outro corretor ou de outra filial) go to the user; anything else stays in the log.
+    if (error instanceof Error && /Lead não encontrado|Você só pode|não pertence/.test(error.message)) return { error: error.message };
+    console.error("[lead-task] no-reply reminder failed", error);
+    return { error: "Não foi possível criar o lembrete. Tente de novo." };
   }
 }

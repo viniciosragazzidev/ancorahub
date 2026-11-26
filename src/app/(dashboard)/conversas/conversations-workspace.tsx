@@ -9,6 +9,10 @@ import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { conversationDayGroup } from "./conversation-day-group";
+import { describeActiveConversationFilters, isUnownedConversation } from "./conversation-filters";
+import { createNoReplyReminderAction } from "@/features/leads/task-actions";
+import { formatNoReplyReminderDue, noReplyReminderOptions, type NoReplyReminderId } from "@/features/leads/no-reply-reminder";
+import { Kbd } from "@/components/ui/kbd";
 import { useIncrementalRows } from "./use-incremental-rows";
 import styles from "./conversas-lite.module.css";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
@@ -100,6 +104,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -214,7 +221,7 @@ export type ConversationItem = {
   tags?: LeadTag[];
 };
 
-type ViewFilter = "all" | "awaiting" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
+type ViewFilter = "all" | "awaiting" | "unowned" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
 
 /** Esperando resposta: a última mensagem foi do cliente (inbox de CRM, 20/11). */
 export function isAwaitingReply(conversation: Pick<ConversationItem, "latestMessage">) {
@@ -450,6 +457,7 @@ export function ConversationsWorkspace({
   const [profileOpen, setProfileOpen] = useState(true);
   const searchRef = useRef<HTMLInputElement>(null);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const reduceMotion = useReducedMotion();
 
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
@@ -470,7 +478,7 @@ export function ConversationsWorkspace({
         );
       const matchesFilter =
         filter === "all" ||
-        (filter === "awaiting" ? isAwaitingReply(conversation) : filter === "closing" ? conversation.inClosing === true : filter === "converted" ? conversation.status === "converted" : filter === "qualified"
+        (filter === "awaiting" ? isAwaitingReply(conversation) : filter === "unowned" ? isUnownedConversation(conversation) : filter === "closing" ? conversation.inClosing === true : filter === "converted" ? conversation.status === "converted" : filter === "qualified"
           ? conversation.status === "distributed" ||
             conversation.aiConversation?.status === "CLOSED" ||
             ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status)
@@ -518,6 +526,11 @@ export function ConversationsWorkspace({
         searchRef.current?.focus();
         return;
       }
+      if (event.key === "?" && !typing) {
+        event.preventDefault();
+        setShortcutsOpen(true);
+        return;
+      }
       if ((event.key === "ArrowDown" || event.key === "ArrowUp") && !typing) {
         const list = filteredRef.current;
         if (!list.length) return;
@@ -555,9 +568,12 @@ export function ConversationsWorkspace({
   }
 
   const awaitingCount = useMemo(() => conversations.filter(isAwaitingReply).length, [conversations]);
+  const unownedCount = useMemo(() => conversations.filter(isUnownedConversation).length, [conversations]);
   const statusFilters: { value: ViewFilter; label: string; count: number }[] = [
     { value: "all", label: "Todos", count: conversations.length },
     { value: "awaiting", label: "Esperando resposta", count: awaitingCount },
+    // Sem dono (Inbox do DeskComm, 25/11): sem corretor responsável. Vem do corretorId que a lista já traz.
+    { value: "unowned", label: "Sem dono", count: unownedCount },
     { value: "qualified", label: "Qualificados", count: conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length },
     { value: "closing", label: "Fechamento", count: conversations.filter((c) => c.inClosing === true).length },
     { value: "converted", label: "Convertidos", count: conversations.filter((c) => c.status === "converted").length },
@@ -678,6 +694,18 @@ export function ConversationsWorkspace({
       ? coexLabel.split(" · ")[0]
       : "Leads";
   const activeFilterCount = [filter !== "all", branchFilter !== "all", tagFilter !== "all"].filter(Boolean).length;
+  function clearListFilters() {
+    setFilter("all");
+    setBranchFilter("all");
+    setTagFilter("all");
+  }
+  // Vazio por filtro (Inbox do DeskComm, 25/11): diz o que está filtrando e limpa tudo, busca inclusive.
+  const activeFilterLabels = describeActiveConversationFilters({
+    query,
+    branchName: branchFilter === "all" ? null : branches.find((branch) => branch.id === branchFilter)?.name ?? null,
+    tagName: tagFilter === "all" ? null : allTags.find((tag) => tag.id === tagFilter)?.name ?? null,
+    situationLabel: filter === "all" ? null : statusFilters.find((option) => option.value === filter)?.label ?? null,
+  });
   // Lite (07/11): views and filters live in one floating menu next to the search (bulk qualification is
   // the icon beside it),
   // so the list starts right under it instead of below four rows of controls.
@@ -713,7 +741,7 @@ export function ConversationsWorkspace({
           {activeFilterCount ? (
             <Button
               className="justify-self-start px-0 text-xs"
-              onClick={() => { setFilter("all"); setBranchFilter("all"); setTagFilter("all"); }}
+              onClick={clearListFilters}
               size="sm"
               variant="link"
             >
@@ -780,7 +808,7 @@ export function ConversationsWorkspace({
 
           {directorSkinEnabled ? (
             <div data-conversations-part="quick-tabs" role="group" aria-label="Ver conversas" className={styles.quickTabs}>
-              {(["all", "awaiting"] as const).map((value) => {
+              {(["all", "awaiting", "unowned"] as const).map((value) => {
                 const option = statusFilters.find((item) => item.value === value)!;
                 return (
                   <button key={value} type="button" className={styles.quickTab} data-active={filter === value ? "true" : undefined} aria-pressed={filter === value} onClick={() => setFilter(value)}>
@@ -824,7 +852,13 @@ export function ConversationsWorkspace({
                 </Fragment>
               ))}
               {listRows.hasMore ? <div ref={listRows.sentinelRef} aria-hidden="true" className="h-px" /> : null}
-              {!filtered.length ? <EmptyConversationList hasQuery={Boolean(query || filter !== "all" || branchFilter !== "all" || tagFilter !== "all")} /> : null}
+              {!filtered.length && activeFilterLabels.length ? (
+                <FilteredEmptyConversationList
+                  activeFilters={activeFilterLabels}
+                  onClear={() => { clearListFilters(); setQuery(""); }}
+                />
+              ) : null}
+              {!filtered.length && !activeFilterLabels.length ? <EmptyConversationList hasQuery={false} /> : null}
             </div>
           </ScrollArea>
         </section>
@@ -937,7 +971,47 @@ export function ConversationsWorkspace({
           ) : null}
         </SheetContent>
       </Sheet>
+      {directorSkinEnabled ? <ConversationShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} /> : null}
     </section>
+  );
+}
+
+// Atalhos que a central já tem (Inbox do DeskComm, 25/11): "?" abre esta lista.
+const CONVERSATION_SHORTCUTS: { keys: string[]; label: string }[] = [
+  { keys: ["/"], label: "Buscar conversa" },
+  { keys: ["↑", "↓"], label: "Conversa anterior ou próxima" },
+  { keys: ["Enter"], label: "Enviar a mensagem" },
+  { keys: ["Shift", "Enter"], label: "Quebrar linha na mensagem" },
+  { keys: ["/"], label: "No início da mensagem, abre as respostas rápidas" },
+  { keys: ["Esc"], label: "Fechar menu ou janela" },
+  { keys: ["?"], label: "Mostrar estes atalhos" },
+];
+
+function ConversationShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogPopup data-conversations-part="shortcuts-dialog">
+        <DialogPanel>
+          <DialogHeader>
+            <DialogTitle className="font-medium">Atalhos</DialogTitle>
+            <DialogDescription>Funcionam fora do campo de texto, exceto os da mensagem.</DialogDescription>
+          </DialogHeader>
+          <ul className="grid gap-1">
+            {CONVERSATION_SHORTCUTS.map((shortcut) => (
+              <li key={shortcut.label} className="flex min-h-11 items-center justify-between gap-3 border-b border-border py-2 text-sm last:border-b-0">
+                <span className="text-foreground">{shortcut.label}</span>
+                <span className="flex shrink-0 items-center gap-1">
+                  {shortcut.keys.map((key) => <Kbd key={key}>{key}</Kbd>)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogPanel>
+      </DialogPopup>
+    </Dialog>
   );
 }
 
@@ -1111,6 +1185,36 @@ function ConversationHeader({
   const canExportThisConversation = (role === "director" || role === "manager" || role === "supervisor") && !client.id.startsWith("unassigned-");
   const [isExporting, setIsExporting] = useState(false);
 
+  // Lembrar se não responder (Inbox do DeskComm, 25/11): tarefa do lead para quem pediu; vai para /tarefas e agenda.
+  const canRemindNoReply = !client.id.startsWith("unassigned-");
+  const [isReminding, setIsReminding] = useState(false);
+
+  async function handleNoReplyReminder(option: NoReplyReminderId) {
+    setIsReminding(true);
+    const toastId = toast.loading("Criando o lembrete...");
+    try {
+      const result = await createNoReplyReminderAction(client.id, option);
+      if (!result.success || !result.dueAt) {
+        toast.error(result.error ?? "Não foi possível criar o lembrete.", {
+          id: toastId,
+          action: { label: "Tentar de novo", onClick: () => void handleNoReplyReminder(option) },
+        });
+        return;
+      }
+      toast.success(`Lembrete criado para ${formatNoReplyReminderDue(new Date(result.dueAt))}. Está em Tarefas.`, {
+        id: toastId,
+        action: { label: "Ver tarefas", onClick: () => router.push("/tarefas") },
+      });
+    } catch {
+      toast.error("Não foi possível criar o lembrete. A conversa continua como estava.", {
+        id: toastId,
+        action: { label: "Tentar de novo", onClick: () => void handleNoReplyReminder(option) },
+      });
+    } finally {
+      setIsReminding(false);
+    }
+  }
+
   async function handleExportConversation() {
     setIsExporting(true);
     const toastId = toast.loading("Gerando o PDF da conversa...");
@@ -1283,6 +1387,35 @@ function ConversationHeader({
                     <span>Ligar para cliente</span>
                   </DropdownMenuItem>
                 </>
+              ) : null}
+
+              {canRemindNoReply ? (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger
+                    data-conversations-part="no-reply-reminder"
+                    disabled={isReminding}
+                    className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+                  >
+                    <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <span className="flex flex-col gap-0.5">
+                      <span>Lembrar se não responder</span>
+                      <span className="text-[10px] text-muted-foreground">Cria uma tarefa para você</span>
+                    </span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-56 p-1.5">
+                    {noReplyReminderOptions().map((option) => (
+                      <DropdownMenuItem
+                        key={option.id}
+                        onClick={() => void handleNoReplyReminder(option.id)}
+                        disabled={isReminding}
+                        className="flex flex-col items-start gap-0.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+                      >
+                        <span>{option.label}</span>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">{option.hint}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
               ) : null}
 
               {canExportThisConversation ? (
@@ -2208,6 +2341,20 @@ function EmptyConversationList({ hasQuery }: { hasQuery: boolean }) {
       description={hasQuery ? "Ajuste a busca ou os filtros para encontrar outro atendimento." : "Os atendimentos disponíveis no seu escopo aparecerão aqui."}
       className="px-5 py-12"
     />
+  );
+}
+
+function FilteredEmptyConversationList({ activeFilters, onClear }: { activeFilters: string[]; onClear: () => void }) {
+  return (
+    <div role="status" data-conversations-part="filtered-empty" className="flex flex-col items-center gap-3 px-5 py-12 text-center">
+      <p className="text-sm font-medium text-foreground">Nenhuma conversa com esses filtros</p>
+      <ul aria-label="Filtros ativos" className="flex flex-wrap justify-center gap-1.5">
+        {activeFilters.map((label) => (
+          <li key={label} className="max-w-full truncate rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{label}</li>
+        ))}
+      </ul>
+      <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={onClear}>Limpar filtros</Button>
+    </div>
   );
 }
 
