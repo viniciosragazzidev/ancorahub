@@ -5,6 +5,8 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
+import { getUserNotificationPreferences } from "@/features/notifications/preferences";
+import { shouldDeliverNotification } from "@/features/notifications/preferences-core";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { getDatabase, schema } from "@/shared/db";
 import {
@@ -93,8 +95,9 @@ export async function runClientReturnedAlerts(now = new Date()): Promise<ClientR
         const leadName = row.leadName?.trim() || "Seu cliente";
         const since = assignedDayLabel(row.assignedAt);
         const key = `client-returned:${row.leadId}`;
+        const wantsWhatsApp = shouldDeliverNotification(await getUserNotificationPreferences(row.brokerId), "lead_client_returned", "whatsapp");
         await Promise.allSettled([
-          broker?.phone
+          broker?.phone && wantsWhatsApp
             ? enqueueMetaTemplateMessage({
               tenantId: row.tenantId,
               recipientType: "user",

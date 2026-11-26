@@ -3,6 +3,8 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { getUserNotificationPreferences } from "@/features/notifications/preferences";
+import { shouldDeliverNotification } from "@/features/notifications/preferences-core";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { getDatabase, schema } from "@/shared/db";
 import {
@@ -41,7 +43,9 @@ async function deliverBrokerClosingStageNotice(input: {
       .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, input.tenantId)))
       .where(eq(schema.user.id, brokerId))
       .limit(1);
-    const phone = broker?.phone?.trim();
+    // Minha conta > Notificações: sem WhatsApp interno para este tipo, só o app e o push.
+    const wantsWhatsApp = shouldDeliverNotification(await getUserNotificationPreferences(brokerId), input.capability ?? "lead_closing_stage", "whatsapp");
+    const phone = wantsWhatsApp ? broker?.phone?.trim() : undefined;
     const inApp = input.inApp ?? closingStageInAppNotice(input.leadName);
     const settled = await Promise.allSettled([
       phone

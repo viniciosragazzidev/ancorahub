@@ -1240,6 +1240,13 @@
                         "when":  1795200000000,
                         "tag":  "0241_ai_qualification_config_versions",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  178,
+                        "version":  "7",
+                        "when":  1795400000000,
+                        "tag":  "0243_user_notification_preferences",
+                        "breakpoints":  true
                     }
                 ]
 }

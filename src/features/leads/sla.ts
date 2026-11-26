@@ -231,6 +231,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
                 : `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos. Inicie o contato agora para evitar que ele seja redistribuído!`,
               url: `/leads/${lead.id}`,
               tag: `corretop-warning-${lead.id}`,
+              capability: "lead_sla",
             }).catch(console.error);
           }
         }

@@ -9,6 +9,8 @@ import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features
 import { getDatabase, schema } from "@/shared/db";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { isNotificationCapabilityEnabled } from "./queries";
+import { getUserNotificationPreferences } from "./preferences";
+import { applyPushPrivacy, shouldDeliverNotification } from "./preferences-core";
 import { publishRealtimeSync } from "./realtime-sync";
 import type { NotificationCapabilityId } from "./catalog";
 import { ensureVapidConfigured } from "./vapid";
@@ -36,7 +38,7 @@ export function clearPushTrackerForTest() {
  */
 export async function sendNotificationToUser(
   userId: string,
-  payload: { title: string; body: string; url?: string; tag?: string }
+  payload: { title: string; body: string; url?: string; tag?: string; capability?: NotificationCapabilityId }
 ) {
   const db = getDatabase();
   const [membership] = await db
@@ -49,6 +51,11 @@ export async function sendNotificationToUser(
     console.log(`[push-notification] User ${userId} is offline. Skipping push.`);
     return;
   }
+
+  // Minha conta > Notificações: o tipo desligado no push não sai; com a privacidade ligada, sai sem dado do lead.
+  const preferences = await getUserNotificationPreferences(userId);
+  if (!shouldDeliverNotification(preferences, payload.capability, "push")) return;
+  const visible = applyPushPrivacy({ title: payload.title, body: payload.body }, preferences, payload.capability);
 
   const now = Date.now();
   const history = userPushTracker.get(userId);
@@ -75,8 +82,8 @@ export async function sendNotificationToUser(
 
   if (!subscriptions.length) return;
 
-  let finalTitle = payload.title;
-  let finalBody = payload.body;
+  let finalTitle = visible.title;
+  let finalBody = visible.body;
   let finalTag = payload.tag ?? "corretop-notification";
   let renotify = false;
   let requireInteraction = false;
@@ -166,6 +173,7 @@ export async function publishNotification(input: {
       body: input.pushBody ?? input.message,
       url: input.url,
       tag: input.tag,
+      capability: input.capability,
     }),
     publishRealtimeSync(
       { tenantId: input.tenantId, userId: input.recipientUserId },
@@ -213,6 +221,9 @@ export async function publishInAppNotification(input: {
   return Boolean(notificationId);
 }
 
+/** O corretor desligou o WhatsApp do lead novo: não é erro, só não envia. */
+class SkipBrokerWhatsApp extends Error {}
+
 export async function notifyNewLead(
   leadId: string,
   tenantId: string,
@@ -235,6 +246,9 @@ export async function notifyNewLead(
 
   if (corretorId && !pushError && !options?.skipBrokerWhatsApp) {
     try {
+      // Minha conta > Notificações: o corretor pode desligar o WhatsApp interno do lead novo.
+      const brokerPreferences = await getUserNotificationPreferences(corretorId);
+      if (!shouldDeliverNotification(brokerPreferences, "lead_assignment", "whatsapp")) throw new SkipBrokerWhatsApp();
       const brokerDelivery = await enqueueAndProcessBrokerLeadNotification({
         tenantId,
         leadId,
@@ -251,8 +265,10 @@ export async function notifyNewLead(
         });
       }
     } catch (err) {
-      whatsappError = err instanceof Error ? err.message : "Erro desconhecido";
-      console.error("[notifyNewLead] WhatsApp broker notification error:", err);
+      if (!(err instanceof SkipBrokerWhatsApp)) {
+        whatsappError = err instanceof Error ? err.message : "Erro desconhecido";
+        console.error("[notifyNewLead] WhatsApp broker notification error:", err);
+      }
     }
   }
 

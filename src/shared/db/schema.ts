@@ -4378,6 +4378,14 @@ export const pushSubscriptions = pgTable(
   ]
 );
 
+/** Preferências de notificação por usuário (migration 0243). Sem linha, vale o padrão: tudo ligado. */
+export const userNotificationPreferences = pgTable("user_notification_preferences", {
+  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  channels: jsonb("channels").notNull().default(sql`'{}'::jsonb`),
+  pushPrivacy: boolean("push_privacy").notNull().default(false),
+  updatedAt,
+});
+
 export const pushSubscriptionRelations = relations(pushSubscriptions, ({ one }) => ({
   user: one(user, {
     fields: [pushSubscriptions.userId],
