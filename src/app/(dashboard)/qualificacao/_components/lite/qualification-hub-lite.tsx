@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import page from "@/components/lite/page/lite-page.module.css";
-import { LiteActionButton } from "@/components/lite/controls";
+import { LiteActionButton, LiteMenu } from "@/components/lite/controls";
 import {
   deleteFollowUpRuleAction,
   saveFollowUpRuleAction,
@@ -26,6 +26,7 @@ import { BulkQualificationDialog } from "@/features/ai-qualification/components/
 
 import type { QualificationHubProps } from "../qualification-hub-types";
 import { parseInputForFields, type SimMemory } from "../simulator-memory";
+import { ConfigHistoryPanelLite } from "./config-history-panel-lite";
 import { DiagnosticTabLite } from "./diagnostic-tab-lite";
 import { FollowUpTabLite, type FollowUpDraft } from "./followup-tab-lite";
 import { OverviewTabLite, type OverviewFields } from "./overview-tab-lite";
@@ -50,7 +51,7 @@ function fieldsFrom(settings: QualificationHubProps["settings"]): OverviewFields
   };
 }
 
-export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRules: initialRules, toolPermissions: initialTools, stats, alerts: initialAlerts }: QualificationHubProps) {
+export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRules: initialRules, toolPermissions: initialTools, stats, alerts: initialAlerts, canSeeConfigHistory = false }: QualificationHubProps) {
   const router = useRouter();
   const fire = useFeedback();
   const searchParams = useSearchParams();
@@ -70,6 +71,7 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
     { sender: "bot", text: `Olá! Tudo bem? Sou a ${settings?.assistantName || "Ana"} da Âncora Corretora. Que ótimo falar com você! Para te passar as melhores opções de planos, como posso te chamar?` },
   ]);
   const [simInput, setSimInput] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [simLoading, setSimLoading] = useState(false);
 
   useEffect(() => {
@@ -227,6 +229,7 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
         <div className={styles.actions}>
           <span className={page.badge} data-tone={fields.enabled ? "success" : undefined}>{fields.enabled ? "IA operando" : "IA pausada"}</span>
           <BulkQualificationDialog trigger={<button type="button" className={page.button}>Qualificar em massa</button>} />
+          {activeTab === "overview" && canSeeConfigHistory ? <LiteMenu label="Mais ações do prompt" items={[{ id: "history", label: "Histórico", onSelect: () => setHistoryOpen(true) }]} /> : null}
           <LiteActionButton key={saveRevision} className={page.toolbarEnd} busyLabel="Salvando…" doneLabel="Alterações salvas" keeps="O que você escreveu continua aqui." errorFallback="As alterações não foram salvas." onAction={save}>Salvar alterações</LiteActionButton>
         </div>
         <div id="qualification-panel" className={page.stack}>
@@ -237,6 +240,19 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
           {activeTab === "simulator" ? <SimulatorTabLite activeAlerts={activeAlerts} messages={simMessages} input={simInput} onInput={setSimInput} onSend={sendSim} loading={simLoading} memory={simMemory} /> : null}
         </div>
       </main>
+      {canSeeConfigHistory ? (
+        <ConfigHistoryPanelLite
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          onRestored={(restored) => {
+            // Os campos da tela passam a mostrar a versão restaurada (o servidor já confirmou).
+            setFields((current) => ({ ...fieldsFrom(restored), enabled: current.enabled }));
+            if (restored.handoffMessage) setHandoffMessage(restored.handoffMessage);
+            setSaveRevision((value) => value + 1);
+            router.refresh();
+          }}
+        />
+      ) : null}
     </>
   );
 }

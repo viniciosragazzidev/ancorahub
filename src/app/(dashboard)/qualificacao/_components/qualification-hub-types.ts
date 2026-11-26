@@ -94,4 +94,6 @@ export type QualificationHubProps = {
     distributionPolicy: unknown;
   };
   canManageMessages: boolean;
+  /** Só o diretor vê o "Histórico" do prompt (versões e restaurar). */
+  canSeeConfigHistory?: boolean;
 };

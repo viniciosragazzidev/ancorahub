@@ -104,6 +104,12 @@ function leadRowQuery(tenantId: string, leadId: string) {
     `);
 }
 
+/** Linha crua e etapa de um lead (recuperação na gaveta precisa do turbo e da marca de recuperação crus). */
+export async function getLeadJourneySource(tenantId: string, leadId: string, now = new Date()) {
+  const source = rowsOf<QualificationLeadSource>(await leadRowQuery(tenantId, leadId))[0];
+  return source ? { source, row: buildQualificationRow(source, now) } : null;
+}
+
 /** Etapa de um lead (ficha e conversas), sem a linha do tempo. */
 export async function getLeadJourneyRow(tenantId: string, leadId: string) {
   const source = rowsOf<QualificationLeadSource>(await leadRowQuery(tenantId, leadId))[0];

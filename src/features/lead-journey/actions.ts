@@ -105,3 +105,50 @@ export async function markBadMomentAction(input: { leadId: string; days?: number
     return { ok: false, error: "Não consegui marcar agora. O lead continua como estava." };
   }
 }
+
+type RecoveryAction = "pause" | "resume" | "skip" | "finish";
+type RecoveryPositionView = import("@/features/lead-recovery/position").RecoveryPositionDetail;
+
+/** "Onde está agora" (gaveta de /qualificacao/leads): passo atual, próximo toque e o que dá para fazer. */
+export async function getRecoveryPositionAction(input: { leadId: string }): Promise<JourneyActionResult<{ position: RecoveryPositionView | null }>> {
+  try {
+    const context = await requireQualificationAccess();
+    const { leadId } = leadInput.parse(input);
+    const { getRecoveryPosition, leadInRecoveryScope } = await import("@/features/lead-recovery/position");
+    if (!(await leadInRecoveryScope(context, leadId))) return { ok: false, error: "Este lead não está no seu escopo." };
+    return { ok: true, data: { position: await getRecoveryPosition(context.tenantId, leadId) } };
+  } catch (error) {
+    console.error("[lead-journey] recovery_position", error instanceof Error ? error.message : error);
+    return { ok: false, error: "Não consegui ver a recuperação agora." };
+  }
+}
+
+/**
+ * Pausar, retomar, pular passo e encerrar a recuperação de um lead. Respeita o escopo (diretor: empresa; gestor:
+ * unidade; supervisor: equipe ou sem corretor), grava a auditoria e devolve a posição nova. Nada aqui manda mensagem.
+ */
+export async function changeRecoveryAction(input: { leadId: string; action: RecoveryAction }): Promise<JourneyActionResult<{ position: RecoveryPositionView | null; skipped?: string }>> {
+  try {
+    const context = await requireQualificationAccess();
+    const { leadId } = leadInput.parse(input);
+    const action = z.enum(["pause", "resume", "skip", "finish"]).parse(input.action);
+    const recovery = await import("@/features/lead-recovery/position");
+    if (!(await recovery.leadInRecoveryScope(context, leadId))) return { ok: false, error: "Este lead não está no seu escopo." };
+    const now = new Date();
+    let skipped: string | undefined;
+    try {
+      if (action === "pause") await recovery.pauseRecovery(context.tenantId, leadId, context.userId, now);
+      if (action === "resume") await recovery.resumeRecovery(context.tenantId, leadId, context.userId, now);
+      if (action === "skip") skipped = await recovery.skipRecoveryStep(context.tenantId, leadId, context.userId, now);
+      if (action === "finish") await recovery.finishRecovery(context.tenantId, leadId, context.userId, now);
+    } catch (error) {
+      if (error instanceof recovery.RecoveryActionError) return { ok: false, error: error.message };
+      throw error;
+    }
+    revalidatePath("/qualificacao/leads");
+    return { ok: true, data: { position: await recovery.getRecoveryPosition(context.tenantId, leadId), skipped } };
+  } catch (error) {
+    console.error("[lead-journey] recovery_change", error instanceof Error ? error.message : error);
+    return { ok: false, error: "Não consegui mudar a recuperação agora. O lead continua como estava." };
+  }
+}

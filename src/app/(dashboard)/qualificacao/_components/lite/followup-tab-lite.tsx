@@ -11,6 +11,7 @@ import { LiteConfirmDialog, LiteSelect } from "@/components/lite/controls";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
+import { followUpInertBadge } from "@/features/ai-qualification/followup-execution";
 
 import type { QualificationHubProps } from "../qualification-hub-types";
 import { ActionNote, BusyLabel, type ActionStatus } from "./action-status-lite";
@@ -29,7 +30,7 @@ const MODES = [
   { value: "template", label: "Template oficial (HSM)" },
   { value: "ai_generated", label: "Gerada por IA (custo R$ 0,02)" },
 ];
-const TRIGGER_LABEL = new Map(TRIGGERS.map((item) => [item.value, item.label]));
+const TRIGGER_LABEL = new Map([...TRIGGERS.map((item) => [item.value, item.label] as const), ["cold_lead_reactivation", "Reativação de lead frio"] as const]);
 const MODE_LABEL: Record<string, string> = { fixed: "Mensagem fixa", template: "Template oficial", ai_generated: "Gerada por IA" };
 
 export function FollowUpTabLite({ rules, draft, onDraft, onSubmit, onDelete, ruleStatus, rulesStatus }: {
@@ -105,10 +106,18 @@ export function FollowUpTabLite({ rules, draft, onDraft, onSubmit, onDelete, rul
             {rules.map((rule) => (
               <li key={rule.id} className={sections.item}>
                 <span className={sections.itemText}>
-                  <span className={sections.rowTitle}>{rule.name}</span>
+                  <span className={sections.rowTitle}>
+                    {rule.name}
+                    {followUpInertBadge(rule) ? <> <span className={page.badge} data-tone="warning">{followUpInertBadge(rule)}</span></> : null}
+                  </span>
                   <span className={sections.itemSub}>
                     {TRIGGER_LABEL.get(rule.trigger) ?? rule.trigger} · {MODE_LABEL[rule.messageMode] ?? rule.messageMode} · depois de {rule.delayMinutes} min · até {rule.maxAttempts} tentativas · das {rule.allowedStartTime} às {rule.allowedEndTime}
                   </span>
+                  {followUpInertBadge(rule) ? (
+                    <span className={sections.itemSub}>
+                      Esta regra ainda não envia nada. Quem traz de volta quem parou de responder é a <a className={sections.link} href="/qualificacao/recuperacao">Recuperação</a>.
+                    </span>
+                  ) : null}
                 </span>
                 <button type="button" className={page.iconButton} aria-label={`Remover ${rule.name}`} disabled={removingBusy} onClick={() => setRemoving(rule)}>
                   <Trash2 aria-hidden="true" size={18} />

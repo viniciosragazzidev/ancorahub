@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { getColdLeadReactivationRuleDefaults } from "./cold-lead-reactivation-policy";
+import { isFollowUpExecutionAllowed } from "./followup-execution";
 
 export const followUpTriggerValues = [
   "no_first_response",
@@ -48,11 +49,9 @@ export type FollowUpRuleInput = z.infer<typeof followUpRuleSchema>;
 
 /**
  * Only the explicitly approved cold-lead rule is executable. Other rules stay
- * in preparation mode until separately approved and implemented.
+ * in preparation mode until separately approved and implemented (pure rule in followup-execution.ts).
  */
-export function isFollowUpExecutionAllowed(trigger: string, enabled: boolean) {
-  return trigger === "cold_lead_reactivation" && enabled;
-}
+export { isFollowUpExecutionAllowed };
 
 export async function ensureColdLeadReactivationRule(tenantId: string) {
   const db = getDatabase();

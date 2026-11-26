@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { type SituationalPlaybookItem } from "@/shared/domain-root/situational-playbooks-root";
 import { buildSituationalPromptSection } from "@/features/ai-qualification/situational-response-engine";
+import { stripPlaybooksFromInstructions } from "@/features/ai-qualification/playbooks-format";
 
 /**
  * Phase 4 — Tenant AI Agent Configuration
@@ -111,7 +112,7 @@ export async function loadTenantAiAgentConfig(
       useEmojis: config.useEmojis ?? false,
       language: (config.language as TenantAiAgentConfig["language"]) || "pt-BR",
       businessContext: config.businessContext ?? undefined,
-      customInstructions: config.customInstructions ?? undefined,
+      customInstructions: stripPlaybooksFromInstructions(config.customInstructions) || undefined,
       businessHoursStart: config.businessHoursStart ?? undefined,
       businessHoursEnd: config.businessHoursEnd ?? undefined,
       businessDays: config.businessDays ?? undefined,

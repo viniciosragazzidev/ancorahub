@@ -7,6 +7,7 @@
 import { buildQualificationRow, type QualificationLeadSource } from "@/features/lead-journey/rows";
 import { QualificationLeadsWorkspace } from "@/features/lead-journey/components/qualification-leads-workspace";
 import type { TimelineItem } from "@/features/lead-journey/timeline";
+import { describeRecoveryPosition, type RecoveryPositionTouch } from "@/features/lead-recovery/position-core";
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
@@ -54,7 +55,26 @@ const LAB_TIMELINE: TimelineItem[] = [
 
 export function labQualificationServices(delay: number, failing: boolean) {
   const wait = () => new Promise((resolve) => setTimeout(resolve, delay));
+  // Recuperação simulada (parou no meio, 4 h atrás): pausar, pular e encerrar mudam só esta memória.
+  const startAt = minutesAgo(240);
+  let recovery: Record<string, unknown> | null = null;
+  const touches: RecoveryPositionTouch[] = [{ step: "s2", status: "sent", at: minutesAgo(60) }];
+  const position = () => describeRecoveryPosition({ now: new Date(), segment: "stopped_midway", startAt, touches, recovery, running: true });
   return {
+    recoveryPosition: async () => {
+      await wait();
+      return failing ? { ok: false as const, error: "Não consegui ver a recuperação agora." } : { ok: true as const, data: { position: position() } };
+    },
+    changeRecovery: async (_leadId: string, action: "pause" | "resume" | "skip" | "finish") => {
+      await wait();
+      if (failing) return { ok: false as const, error: "Não consegui mudar a recuperação agora." };
+      const next = position().next;
+      if (action === "pause") recovery = { state: "paused" };
+      if (action === "resume") recovery = null;
+      if (action === "skip" && next) touches.push({ step: next.step, status: "skipped", at: new Date().toISOString() });
+      if (action === "finish") recovery = { cadenceFinishedAt: new Date().toISOString(), finishedBy: "lab" };
+      return { ok: true as const, data: { position: position() } };
+    },
     timeline: async () => {
       await wait();
       return failing ? { ok: false as const, error: "Não consegui carregar a linha do tempo agora." } : { ok: true as const, data: { items: LAB_TIMELINE } };

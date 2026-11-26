@@ -21,6 +21,7 @@ import { parseOptOut, parseWrongNumber, type QuickReplyMessageKind } from "@/fea
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { incrementAiQualificationRetry } from "./retry-count";
+import { stripPlaybooksFromInstructions } from "./playbooks-format";
 
 const questions = [
   { key: "city", prompt: "Para começar, em qual cidade você pretende contratar o plano?" },
@@ -192,8 +193,9 @@ export async function processAiQualificationMessage(input: { tenantId: string; l
     if (config?.businessContext?.trim()) {
       systemPromptOverride += `\n\nCONTEXTO E BASE DE CONHECIMENTO DA EMPRESA:\n${config.businessContext.trim()}`;
     }
-    if (config?.customInstructions?.trim()) {
-      systemPromptOverride += `\n\nDIRETRIZES DE ATUAÇÃO E TOM DE VOZ:\n${config.customInstructions.trim()}`;
+    const guidelines = stripPlaybooksFromInstructions(config?.customInstructions);
+    if (guidelines) {
+      systemPromptOverride += `\n\nDIRETRIZES DE ATUAÇÃO E TOM DE VOZ:\n${guidelines}`;
     }
     const result = await aiComplete({
       systemPromptOverride,

@@ -104,6 +104,8 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
     isNotNull(schema.leads.telefone),
     sql`${schema.leads.qualificationDetails}->'turbo'->>'firstContactAt' is not null`,
     sql`${schema.leads.qualificationDetails}->'turbo'->>'stoppedAt' is null`,
+    // "Pausar recuperação" na gaveta do lead (26/11): pausado não recebe lembrete até a equipe retomar.
+    sql`coalesce(${schema.leads.qualificationDetails}->'recovery'->>'state', '') <> 'paused'`,
   // Oldest last touch first, so leads waiting for T3/T4 are never starved by new ones.
   )).orderBy(sql`(${schema.leads.qualificationDetails}->'turbo'->'touches'->-1->>'at') asc nulls first`).limit(MAX_LEADS_PER_RUN);
   result.candidates = leads.length;

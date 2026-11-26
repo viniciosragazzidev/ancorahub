@@ -119,6 +119,7 @@ export default async function QualificacaoPage({ searchParams }: { searchParams?
       alerts={alerts}
       agentTraining={agentTraining}
       canManageMessages={context.role === "director" || context.role === "manager"}
+      canSeeConfigHistory={context.role === "director"}
     />
   );
 }

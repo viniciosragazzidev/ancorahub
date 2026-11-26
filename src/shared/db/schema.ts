@@ -6056,3 +6056,30 @@ export const lgpdRequests = pgTable(
     index("lgpd_requests_tenant_lead_idx").on(table.tenantId, table.leadId, table.kind),
   ],
 );
+
+/**
+ * Histórico do "Prompt e comportamento" da IA de qualificação (migration 0241). Cada salvar grava uma linha com os
+ * campos editáveis; restaurar cria uma versão nova igual à antiga (nunca apaga). Só o diretor vê e restaura.
+ */
+export const aiQualificationConfigVersions = pgTable(
+  "ai_qualification_config_versions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    changedFields: jsonb("changed_fields").notNull().default([]),
+    restoredFromVersion: integer("restored_from_version"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+  },
+  (table) => [uniqueIndex("ai_qualification_config_versions_tenant_version_unique").on(table.tenantId, table.version)],
+);
+
+/** Playbooks situacionais da IA fora de custom_instructions (migration 0241). Sem a tabela, seguem no texto antigo. */
+export const aiQualificationPlaybooks = pgTable("ai_qualification_playbooks", {
+  tenantId: text("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+  playbooks: jsonb("playbooks").notNull(),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt,
+});

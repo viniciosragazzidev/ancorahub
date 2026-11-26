@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
-import { LiteFilterChips, LiteMenu } from "@/components/lite/controls";
+import { LiteConfirmDialog, LiteFilterChips, LiteMenu } from "@/components/lite/controls";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
@@ -20,7 +20,9 @@ import { Kbd } from "@/components/ui/kbd";
 import { formatLeadPhone } from "@/features/leads/format-lead-phone";
 import { useDevLab } from "@/lib/dev-lab";
 
-import { getLeadTimelineAction, markBadMomentAction, markDoNotContactAction, sendToCallQueueAction } from "../actions";
+import { formatNextTouch, type RecoveryPosition } from "@/features/lead-recovery/position-core";
+
+import { changeRecoveryAction, getLeadTimelineAction, getRecoveryPositionAction, markBadMomentAction, markDoNotContactAction, sendToCallQueueAction } from "../actions";
 import { formatElapsed } from "../journey";
 import { JOURNEY_TABS, rowsForTab, type QualificationLeadRow } from "../rows";
 import type { TimelineItem } from "../timeline";
@@ -32,7 +34,13 @@ export type QualificationLeadsServices = {
   doNotContact: (leadId: string) => Promise<{ ok: true; data: unknown } | { ok: false; error: string }>;
   toCallQueue: (leadId: string) => Promise<{ ok: true; data: { score: string } } | { ok: false; error: string }>;
   badMoment: (leadId: string) => Promise<{ ok: true; data: { until: string } } | { ok: false; error: string }>;
+  /** "Onde está agora": passo atual e próximo toque da recuperação. */
+  recoveryPosition: (leadId: string) => Promise<{ ok: true; data: { position: RecoveryPosition | null } } | { ok: false; error: string }>;
+  /** Pausar, retomar, pular passo e encerrar a recuperação (devolve a posição nova). */
+  changeRecovery: (leadId: string, action: RecoveryChange) => Promise<{ ok: true; data: { position: RecoveryPosition | null; skipped?: string } } | { ok: false; error: string }>;
 };
+
+export type RecoveryChange = "pause" | "resume" | "skip" | "finish";
 
 function normalize(text: string) {
   return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
@@ -53,7 +61,7 @@ export function QualificationLeadsWorkspace({ rows, filters, summary, truncated 
 }) {
   const router = useRouter();
   const lab = useDevLab();
-  const services: QualificationLeadsServices = lab?.qualificationLeads ?? { timeline: (leadId) => getLeadTimelineAction({ leadId }), doNotContact: (leadId) => markDoNotContactAction({ leadId }), toCallQueue: (leadId) => sendToCallQueueAction({ leadId }), badMoment: (leadId) => markBadMomentAction({ leadId }) };
+  const services: QualificationLeadsServices = lab?.qualificationLeads ?? { timeline: (leadId) => getLeadTimelineAction({ leadId }), doNotContact: (leadId) => markDoNotContactAction({ leadId }), toCallQueue: (leadId) => sendToCallQueueAction({ leadId }), badMoment: (leadId) => markBadMomentAction({ leadId }), recoveryPosition: (leadId) => getRecoveryPositionAction({ leadId }), changeRecovery: (leadId, action) => changeRecoveryAction({ leadId, action }) };
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
@@ -209,14 +217,14 @@ export function QualificationLeadsWorkspace({ rows, filters, summary, truncated 
         description={open ? [open.phone ? formatLeadPhone(open.phone) : null, open.queueName ?? "Sem fila", open.brokerName ? `Corretor: ${open.brokerName}` : null].filter(Boolean).join(" · ") : undefined}
       >
         {open ? (
-          <LeadTimelinePanel key={open.id} row={open} services={services} onCopyPhone={() => copyPhone(open.phone)} hasNeighbors={visible.length > 1} />
+          <LeadTimelinePanel key={open.id} row={open} services={services} onCopyPhone={() => copyPhone(open.phone)} hasNeighbors={visible.length > 1} onRecoveryChanged={() => { if (!lab) router.refresh(); }} />
         ) : null}
       </LiteSidePanel>
     </>
   );
 }
 
-function LeadTimelinePanel({ row, services, onCopyPhone, hasNeighbors }: { row: QualificationLeadRow; services: QualificationLeadsServices; onCopyPhone: () => void; hasNeighbors: boolean }) {
+function LeadTimelinePanel({ row, services, onCopyPhone, hasNeighbors, onRecoveryChanged }: { row: QualificationLeadRow; services: QualificationLeadsServices; onCopyPhone: () => void; hasNeighbors: boolean; onRecoveryChanged: () => void }) {
   const [state, setState] = useState<{ status: "loading" } | { status: "ready"; items: TimelineItem[] } | { status: "error"; error: string }>({ status: "loading" });
   const load = useCallback(() => {
     setState({ status: "loading" });
@@ -234,8 +242,9 @@ function LeadTimelinePanel({ row, services, onCopyPhone, hasNeighbors }: { row: 
         <a className={page.button} href={`/leads/${row.id}`}>Abrir ficha</a>
         {hasNeighbors ? <span className="ml-auto text-ds-caption text-ds-fog"><Kbd>J</Kbd> próximo · <Kbd>K</Kbd> anterior</span> : null}
       </div>
+      <RecoveryNow leadId={row.id} services={services} onChanged={onRecoveryChanged} />
       <div className="flex flex-col gap-ds-8">
-        <p className="text-ds-caption font-medium uppercase tracking-wide text-ds-fog">Linha do tempo da qualificação</p>
+        <h3 className="text-ds-body font-medium">Linha do tempo da qualificação</h3>
         {state.status === "loading" ? <p className="text-ds-body text-ds-fog" aria-live="polite">Carregando…</p> : null}
         {state.status === "error" ? (
           <p className="text-ds-body text-ds-rose-ink" role="alert">
@@ -245,5 +254,91 @@ function LeadTimelinePanel({ row, services, onCopyPhone, hasNeighbors }: { row: 
         {state.status === "ready" ? <QualificationTimeline items={state.items} /> : null}
       </div>
     </div>
+  );
+}
+
+const CHANGE_DONE: Record<RecoveryChange, string> = {
+  pause: "Recuperação pausada. Nenhum toque sai até retomar.",
+  resume: "Recuperação retomada. O próximo toque segue a cadência.",
+  skip: "Passo pulado. O seguinte assume.",
+  finish: "Recuperação encerrada. A IA continua respondendo se o lead escrever.",
+};
+
+const CHANGE_BUSY: Record<RecoveryChange, string> = { pause: "Pausando…", resume: "Retomando…", skip: "Pulando…", finish: "Encerrando…" };
+
+/**
+ * "Onde está agora" (engenharia reversa §7.3): passo atual da recuperação, próximo toque com data e o ⋯ com Pausar,
+ * Pular passo e Encerrar. O texto de sucesso só aparece depois do servidor; a falha diz o que continua valendo.
+ */
+function RecoveryNow({ leadId, services, onChanged }: { leadId: string; services: QualificationLeadsServices; onChanged: () => void }) {
+  const [state, setState] = useState<{ status: "loading" } | { status: "ready"; position: RecoveryPosition | null } | { status: "error"; error: string }>({ status: "loading" });
+  const [busy, setBusy] = useState<RecoveryChange | null>(null);
+  const [confirmFinish, setConfirmFinish] = useState(false);
+  const notice = useActionNotice();
+  const load = useCallback(() => {
+    setState({ status: "loading" });
+    services.recoveryPosition(leadId)
+      .then((result) => setState(result.ok ? { status: "ready", position: result.data.position } : { status: "error", error: result.error }))
+      .catch(() => setState({ status: "error", error: "Sem conexão agora." }));
+  }, [leadId, services]);
+  useEffect(() => { load(); }, [load]);
+
+  const change = async (action: RecoveryChange) => {
+    notice.tap();
+    setBusy(action);
+    const result = await services.changeRecovery(leadId, action).catch(() => ({ ok: false as const, error: "Sem conexão agora." }));
+    setBusy(null);
+    if (!result.ok) { notice.fail(result.error, { keeps: "A recuperação continua como estava.", retry: () => void change(action) }); return; }
+    setState({ status: "ready", position: result.data.position });
+    notice.succeed(CHANGE_DONE[action]);
+    onChanged();
+  };
+
+  const position = state.status === "ready" ? state.position : null;
+  const now = new Date();
+  const items = position ? [
+    ...(position.canPause ? [{ id: "pause", label: "Pausar recuperação", disabled: Boolean(busy), onSelect: () => void change("pause") }] : []),
+    ...(position.canResume ? [{ id: "resume", label: "Retomar recuperação", disabled: Boolean(busy), onSelect: () => void change("resume") }] : []),
+    ...(position.canSkip ? [{ id: "skip", label: "Pular passo", disabled: Boolean(busy), onSelect: () => void change("skip") }] : []),
+    ...(position.canFinish ? [{ id: "finish", label: "Encerrar recuperação", tone: "danger" as const, disabled: Boolean(busy), onSelect: () => setConfirmFinish(true) }] : []),
+  ] : [];
+  const titleId = `recovery-now-${leadId}`;
+
+  return (
+    <section className="flex flex-col gap-ds-8" aria-labelledby={titleId}>
+      <div className="flex items-center gap-ds-8">
+        <h3 id={titleId} className="text-ds-body font-medium">Onde está agora</h3>
+        {items.length ? <span className="ml-auto"><LiteMenu label="Ações da recuperação" items={items} /></span> : null}
+      </div>
+      {state.status === "loading" ? <p className="text-ds-body text-ds-fog" aria-live="polite">Carregando…</p> : null}
+      {state.status === "error" ? (
+        <p className="text-ds-body text-ds-rose-ink" role="alert">
+          {state.error} A etapa acima continua valendo. <button type="button" className="underline" onClick={load}>Tentar de novo</button>
+        </p>
+      ) : null}
+      {position ? (
+        <div className="flex flex-col gap-ds-4 text-ds-body">
+          <p className="flex flex-wrap items-center gap-ds-8">
+            <span className={page.badge} data-tone={position.state === "paused" || position.state === "off" ? "warning" : undefined}>{position.label}</span>
+            {busy ? <span className="text-ds-fog" role="status">{CHANGE_BUSY[busy]}</span> : null}
+          </p>
+          {position.current ? <p className="text-ds-fog">Último passo: {position.current.label}{position.current.status === "skipped" ? " (pulado)" : position.current.status === "failed" ? " (não saiu)" : ""}</p> : null}
+          {position.next ? <p>Próximo toque: {position.next.label}, {formatNextTouch(position.next.at, now)}</p> : null}
+          {position.state === "off" ? <p className="text-ds-fog">Nada sai enquanto a recuperação estiver desligada. <a className="underline" href="/qualificacao/recuperacao">Abrir Recuperação</a></p> : null}
+          {position.state === "none" ? <p className="text-ds-fog">Este lead não está em nenhuma cadência agora.</p> : null}
+        </div>
+      ) : null}
+      {state.status === "ready" && !position ? <p className="text-ds-body text-ds-fog">Este lead não está em nenhuma cadência agora.</p> : null}
+      <ActionNoticeLine notice={notice.notice} />
+      <LiteConfirmDialog
+        open={confirmFinish}
+        title="Encerrar a recuperação?"
+        description="A cadência não volta mais para este lead. A IA continua respondendo se ele escrever."
+        confirmLabel="Encerrar recuperação"
+        tone="danger"
+        onCancel={() => setConfirmFinish(false)}
+        onConfirm={() => { setConfirmFinish(false); void change("finish"); }}
+      />
+    </section>
   );
 }

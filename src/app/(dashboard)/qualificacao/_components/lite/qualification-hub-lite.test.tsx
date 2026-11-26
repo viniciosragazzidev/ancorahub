@@ -15,6 +15,21 @@ const actions = vi.hoisted(() => ({
   deleteFollowUpRuleAction: vi.fn(async () => []),
   updateToolPermissionAction: vi.fn(async () => []),
   acknowledgeAlertAction: vi.fn(async () => []),
+  fetchQualificationConfigVersionsAction: vi.fn(async () => ({
+    ok: true as const,
+    data: {
+      ready: true as const,
+      versions: [
+        { version: 3, createdAt: "2026-11-26T13:00:00.000Z", createdByName: "Rui", summary: "Mudou diretrizes", restoredFromVersion: null, current: true },
+        { version: 2, createdAt: "2026-11-25T13:00:00.000Z", createdByName: "Rui", summary: "Mudou nome de exibição", restoredFromVersion: null, current: false },
+      ],
+    },
+  })),
+  restoreQualificationConfigVersionAction: vi.fn(async () => ({ ok: true as const, data: { settings: { ...QUALIFICATION_SETTINGS, assistantName: "Carla" } } })),
+}));
+const QUALIFICATION_SETTINGS = vi.hoisted(() => ({
+  enabled: true, pauseMode: "handoff_active", assistantName: "Ana", initialMessage: "Olá!", handoffMessage: "Vou chamar.", outOfHoursMessage: "Fora.", absenceMessage: "Sem corretor.",
+  tone: "friendly", useEmojis: false, timeoutMinutes: 20, businessContext: "Rio de Janeiro", customInstructions: "", version: 3, updatedAt: null,
 }));
 vi.mock("@/features/ai-qualification/actions", () => actions);
 vi.mock("@/components/dashboard-header", () => ({ DashboardHeader: ({ title }: { title: string }) => <h1>{title}</h1> }));
@@ -125,5 +140,53 @@ describe("hub de qualificação Lite", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Informe o nome da regra de follow-up.");
     expect(actions.saveFollowUpRuleAction).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("histórico: só o diretor vê o ⋯ da aba Prompt e comportamento", () => {
+    const { unmount } = render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
+    expect(screen.queryByRole("button", { name: "Mais ações do prompt" })).not.toBeInTheDocument();
+    unmount();
+    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} canSeeConfigHistory />);
+    expect(screen.getByRole("button", { name: "Mais ações do prompt" })).toBeInTheDocument();
+  });
+
+  it("histórico: restaurar pede confirmação, cria versão nova e confirma depois do servidor", async () => {
+    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} canSeeConfigHistory />);
+    fireEvent.click(screen.getByRole("button", { name: "Mais ações do prompt" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Histórico" }));
+    });
+    expect(await screen.findByText("Mudou nome de exibição", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("Em uso")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Restaurar como nova versão" }));
+    expect(actions.restoreQualificationConfigVersionAction).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Restaurar como nova versão" }));
+    });
+    expect(actions.restoreQualificationConfigVersionAction).toHaveBeenCalledWith({ version: 2 });
+    expect(await screen.findByText("Versão 2 restaurada como versão nova.")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Nome de exibição" })).toHaveValue("Carla");
+  });
+
+  it("histórico: a falha mostra a causa e o que continua valendo", async () => {
+    actions.restoreQualificationConfigVersionAction.mockResolvedValueOnce({ ok: false, error: "Essa versão não existe mais." } as never);
+    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} canSeeConfigHistory />);
+    fireEvent.click(screen.getByRole("button", { name: "Mais ações do prompt" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Histórico" }));
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Restaurar como nova versão" }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Restaurar como nova versão" }));
+    });
+    expect(await screen.findByText(/Essa versão não existe mais/)).toBeInTheDocument();
+    expect(screen.getByText(/A versão em uso continua valendo/)).toBeInTheDocument();
+  });
+
+  it("follow-up: regra que não dispara ganha o selo e o link para Recuperação", () => {
+    search.value = "tab=followup_rules";
+    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
+    expect(screen.getAllByText("Não dispara ainda").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Recuperação" })[0]).toHaveAttribute("href", "/qualificacao/recuperacao");
   });
 });

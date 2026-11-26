@@ -65,6 +65,38 @@ export async function updateQualificationSettingsAction(input: UpdateTenantSetti
   return result;
 }
 
+/** Histórico do "Prompt e comportamento" (só o diretor). Sem a migration 0241, avisa que ainda não está disponível. */
+export async function fetchQualificationConfigVersionsAction(): Promise<{ ok: true; data: import("./config-versions-service").ConfigVersionsResult } | { ok: false; error: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") return { ok: false, error: "Só o diretor vê o histórico do prompt." };
+    const { listConfigVersions } = await import("./config-versions-service");
+    return { ok: true, data: await listConfigVersions(context.tenantId) };
+  } catch (error) {
+    console.error("[ai-qualification] list_versions", error instanceof Error ? error.message : error);
+    return { ok: false, error: "Não deu para carregar o histórico agora." };
+  }
+}
+
+/** "Restaurar como nova versão" (só o diretor): cria uma versão nova igual à escolhida. Nunca apaga nada. */
+export async function restoreQualificationConfigVersionAction(input: { version: number }): Promise<{ ok: true; data: { settings: Awaited<ReturnType<typeof getQualificationTenantSettings>> } } | { ok: false; error: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") return { ok: false, error: "Só o diretor restaura uma versão do prompt." };
+    const version = Math.trunc(Number(input?.version));
+    if (!Number.isFinite(version) || version < 1) return { ok: false, error: "Versão inválida." };
+    const { restoreConfigVersion } = await import("./config-versions-service");
+    const settings = await restoreConfigVersion(context.tenantId, context.userId, version);
+    return { ok: true, data: { settings } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[ai-qualification] restore_version", message);
+    if (message === "version_not_found") return { ok: false, error: "Essa versão não existe mais." };
+    if (message === "versions_unavailable") return { ok: false, error: "O histórico ainda não está ligado nesta empresa." };
+    return { ok: false, error: "Não deu para restaurar agora." };
+  }
+}
+
 export async function toggleQualificationEnabledAction(enabled: boolean) {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
@@ -641,7 +673,7 @@ export async function saveSituationalPlaybooksAction(playbooks: any[]) {
   const { randomUUID } = await import("node:crypto");
 
   const validated = playbooks.map((p) => SituationalPlaybookItemSchema.parse(p));
-  await saveTenantPlaybooks(context.tenantId, validated);
+  await saveTenantPlaybooks(context.tenantId, validated, context.userId);
 
   const db = getDatabase();
   await db.insert(schema.auditLogs).values({
@@ -664,7 +696,7 @@ export async function resetSituationalPlaybooksAction() {
   const { randomUUID } = await import("node:crypto");
 
   const defaults = getDefaultPlaybooks();
-  await saveTenantPlaybooks(context.tenantId, defaults);
+  await saveTenantPlaybooks(context.tenantId, defaults, context.userId);
 
   const db = getDatabase();
   await db.insert(schema.auditLogs).values({
