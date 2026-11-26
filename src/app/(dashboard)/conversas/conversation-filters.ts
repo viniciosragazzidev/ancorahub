@@ -8,6 +8,13 @@ export function isUnownedConversation(conversation: { corretorId: string | null 
   return !conversation.corretorId;
 }
 
+const fold = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** Fila "Aquisição Corretores" (24/11): corretores que pedem parceria, não clientes. Filtro próprio na gestão (26/11/2026). */
+export function isBrokerAcquisitionConversation(conversation: { queueName: string | null }) {
+  return Boolean(conversation.queueName) && fold(conversation.queueName!) === "aquisicao corretores";
+}
+
 export type ActiveConversationFilters = {
   query?: string;
   branchName?: string | null;

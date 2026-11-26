@@ -9,7 +9,7 @@ import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { conversationDayGroup } from "./conversation-day-group";
-import { describeActiveConversationFilters, isUnownedConversation } from "./conversation-filters";
+import { describeActiveConversationFilters, isUnownedConversation, isBrokerAcquisitionConversation } from "./conversation-filters";
 import { createNoReplyReminderAction } from "@/features/leads/task-actions";
 import { formatNoReplyReminderDue, noReplyReminderOptions, type NoReplyReminderId } from "@/features/leads/no-reply-reminder";
 import { Kbd } from "@/components/ui/kbd";
@@ -221,7 +221,7 @@ export type ConversationItem = {
   tags?: LeadTag[];
 };
 
-type ViewFilter = "all" | "awaiting" | "unowned" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
+type ViewFilter = "all" | "awaiting" | "unowned" | "acquisition" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
 
 /** Esperando resposta: a última mensagem foi do cliente (inbox de CRM, 20/11). */
 export function isAwaitingReply(conversation: Pick<ConversationItem, "latestMessage">) {
@@ -478,7 +478,7 @@ export function ConversationsWorkspace({
         );
       const matchesFilter =
         filter === "all" ||
-        (filter === "awaiting" ? isAwaitingReply(conversation) : filter === "unowned" ? isUnownedConversation(conversation) : filter === "closing" ? conversation.inClosing === true : filter === "converted" ? conversation.status === "converted" : filter === "qualified"
+        (filter === "awaiting" ? isAwaitingReply(conversation) : filter === "unowned" ? isUnownedConversation(conversation) : filter === "acquisition" ? isBrokerAcquisitionConversation(conversation) : filter === "closing" ? conversation.inClosing === true : filter === "converted" ? conversation.status === "converted" : filter === "qualified"
           ? conversation.status === "distributed" ||
             conversation.aiConversation?.status === "CLOSED" ||
             ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status)
@@ -569,11 +569,14 @@ export function ConversationsWorkspace({
 
   const awaitingCount = useMemo(() => conversations.filter(isAwaitingReply).length, [conversations]);
   const unownedCount = useMemo(() => conversations.filter(isUnownedConversation).length, [conversations]);
+  const acquisitionCount = useMemo(() => conversations.filter(isBrokerAcquisitionConversation).length, [conversations]);
   const statusFilters: { value: ViewFilter; label: string; count: number }[] = [
     { value: "all", label: "Todos", count: conversations.length },
     { value: "awaiting", label: "Esperando resposta", count: awaitingCount },
     // Sem dono (Inbox do DeskComm, 25/11): sem corretor responsável. Vem do corretorId que a lista já traz.
     { value: "unowned", label: "Sem dono", count: unownedCount },
+    // Fila Aquisição Corretores (26/11/2026): só para a gestão.
+    ...(role === "broker" ? [] : [{ value: "acquisition" as const, label: "Aquisição de corretores", count: acquisitionCount }]),
     { value: "qualified", label: "Qualificados", count: conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length },
     { value: "closing", label: "Fechamento", count: conversations.filter((c) => c.inClosing === true).length },
     { value: "converted", label: "Convertidos", count: conversations.filter((c) => c.status === "converted").length },
@@ -808,7 +811,7 @@ export function ConversationsWorkspace({
 
           {directorSkinEnabled ? (
             <div data-conversations-part="quick-tabs" role="group" aria-label="Ver conversas" className={styles.quickTabs}>
-              {(["all", "awaiting", "unowned"] as const).map((value) => {
+              {(role === "broker" ? (["all", "awaiting", "unowned"] as const) : (["all", "awaiting", "unowned", "acquisition"] as const)).map((value) => {
                 const option = statusFilters.find((item) => item.value === value)!;
                 return (
                   <button key={value} type="button" className={styles.quickTab} data-active={filter === value ? "true" : undefined} aria-pressed={filter === value} onClick={() => setFilter(value)}>

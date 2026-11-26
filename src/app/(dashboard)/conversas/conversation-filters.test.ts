@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { describeActiveConversationFilters, isUnownedConversation } from "./conversation-filters";
+import { describeActiveConversationFilters, isBrokerAcquisitionConversation, isUnownedConversation } from "./conversation-filters";
 
 describe("filtros ativos da central de conversas", () => {
   it("sem nada ativo, lista vazia", () => {
@@ -23,5 +23,14 @@ describe("filtros ativos da central de conversas", () => {
   it("sem dono é conversa sem corretor", () => {
     expect(isUnownedConversation({ corretorId: null })).toBe(true);
     expect(isUnownedConversation({ corretorId: "u1" })).toBe(false);
+  });
+});
+
+describe("isBrokerAcquisitionConversation", () => {
+  it("recognizes the Aquisição Corretores queue by name, with or without accents", () => {
+    expect(isBrokerAcquisitionConversation({ queueName: "Aquisição Corretores" })).toBe(true);
+    expect(isBrokerAcquisitionConversation({ queueName: "aquisicao  corretores" })).toBe(true);
+    expect(isBrokerAcquisitionConversation({ queueName: "FILA PF - RENAN" })).toBe(false);
+    expect(isBrokerAcquisitionConversation({ queueName: null })).toBe(false);
   });
 });
