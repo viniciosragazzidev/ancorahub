@@ -36,7 +36,8 @@ export function LeadActionBar({ lead, c, inline = false, compact = false }: { le
     setWhatsappOpenedAt,
   } = c;
 
-  if (!isDistributed && (leadStatus === "converted" || leadStatus === "lost")) return null;
+  // Perdido segue com WhatsApp e Etapa (26/11/2026): o cliente pode voltar a falar e o corretor reabre o lead.
+  if (!isDistributed && leadStatus === "converted") return null;
 
   return (
     <nav

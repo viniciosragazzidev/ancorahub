@@ -287,6 +287,9 @@ export async function changeLeadStatus(
   if (system) {
     // The caller checked scope; the IA never reopens a lost lead.
     if (isReopening && !system.skipTransitionCheck) throw new Error("A IA não reabre lead perdido.");
+  } else if (isReopening && context.role === "broker") {
+    // 26/11/2026: o corretor responsável reabre o próprio lead perdido quando o cliente volta a falar.
+    await assertCanChangeStatus(context, lead);
   } else if (isReopening) {
     await assertCanReopen(context);
   } else {
