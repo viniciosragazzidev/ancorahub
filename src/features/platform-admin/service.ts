@@ -150,9 +150,38 @@ export async function createTenantAccess(rawInput: unknown) {
   await writeAudit("tenant_access.created", "tenant_membership", userId, { tenantId: input.tenantId, role: input.role });
 }
 
-export async function getPlatformAuditLogs(limit = 100) {
+/** Filtro por empresa da auditoria (?tenant=): só ids de texto curtos chegam ao banco. */
+export function normalizeAuditTenantId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const id = value.trim();
+  return id && id.length <= 64 && /^[A-Za-z0-9_-]+$/.test(id) ? id : null;
+}
+
+/** Eventos da plataforma de uma empresa: o alvo é a empresa ou a empresa vem no metadata. */
+function platformLogsOfTenant(tenantId: string) {
+  return sql`(${schema.platformAuditLogs.targetId} = ${tenantId} or ${schema.platformAuditLogs.metadata}->>'tenantId' = ${tenantId})`;
+}
+
+/**
+ * Eventos operacionais de uma empresa: audit_logs não guarda a empresa, então vale quem é membro dela.
+ * Sem ler o metadata (bancos antigos não têm a coluna).
+ */
+function tenantLogsOfTenant(tenantId: string) {
+  return sql`exists (select 1 from ${schema.tenantMemberships} where ${schema.tenantMemberships.userId} = ${schema.auditLogs.userId} and ${schema.tenantMemberships.tenantId} = ${tenantId})`;
+}
+
+/** Empresas para o filtro da auditoria (busca + seleção), em ordem alfabética. */
+export async function getAuditTenantOptions() {
+  await getRequiredPlatformAdmin();
+  return getDatabase().select({ id: schema.tenants.id, name: schema.tenants.name })
+    .from(schema.tenants)
+    .orderBy(schema.tenants.name);
+}
+
+export async function getPlatformAuditLogs(limit = 100, tenantId: string | null = null) {
   await getRequiredPlatformAdmin();
   const db = getDatabase();
+  const tenant = normalizeAuditTenantId(tenantId);
   return db.select({
     id: schema.platformAuditLogs.id,
     action: schema.platformAuditLogs.action,
@@ -164,13 +193,15 @@ export async function getPlatformAuditLogs(limit = 100) {
     actorEmail: schema.user.email,
   }).from(schema.platformAuditLogs)
     .innerJoin(schema.user, eq(schema.platformAuditLogs.actorUserId, schema.user.id))
+    .where(tenant ? platformLogsOfTenant(tenant) : undefined)
     .orderBy(schema.platformAuditLogs.createdAt)
     .limit(limit);
 }
 
-export async function getTenantAuditLogs() {
+export async function getTenantAuditLogs(tenantId: string | null = null) {
   await getRequiredPlatformAdmin();
   const db = getDatabase();
+  const tenant = normalizeAuditTenantId(tenantId);
   return db.select({
     id: schema.auditLogs.id,
     userId: schema.auditLogs.userId,
@@ -182,6 +213,7 @@ export async function getTenantAuditLogs() {
     userEmail: schema.user.email,
   }).from(schema.auditLogs)
     .innerJoin(schema.user, eq(schema.auditLogs.userId, schema.user.id))
+    .where(tenant ? tenantLogsOfTenant(tenant) : undefined)
     .orderBy(schema.auditLogs.createdAt);
 }
 

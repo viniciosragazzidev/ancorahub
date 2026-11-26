@@ -42,13 +42,14 @@ function leadLabel(row: DirectionQuestionRow) {
   return row.leadName?.trim() || "Lead sem nome";
 }
 
-export function DirectionQuestionsWorkspace({ initialRows, services = defaultServices }: { initialRows: DirectionQuestionRow[]; services?: DirectionQuestionsServices }) {
+/** `canTeach`: só o diretor ensina a IA (26/11); o gestor da unidade responde e envia ao lead. */
+export function DirectionQuestionsWorkspace({ initialRows, canTeach = true, services = defaultServices }: { initialRows: DirectionQuestionRow[]; canTeach?: boolean; services?: DirectionQuestionsServices }) {
   const [rows, setRows] = useState(initialRows);
   const [tab, setTab] = useState<DirectionQuestionTab>("open");
   const [openId, setOpenId] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
   const [sendToLead, setSendToLead] = useState(true);
-  const [teach, setTeach] = useState(true);
+  const [teach, setTeach] = useState(canTeach);
   // Respondida pela gaveta: o botão fica mostrando o resultado até a gaveta fechar.
   const [answeredHere, setAnsweredHere] = useState<string | null>(null);
 
@@ -60,12 +61,12 @@ export function DirectionQuestionsWorkspace({ initialRows, services = defaultSer
     setOpenId(row.id);
     setAnswer("");
     setSendToLead(Boolean(row.leadId));
-    setTeach(true);
+    setTeach(canTeach);
     setAnsweredHere(null);
   };
 
   const submit = async (row: DirectionQuestionRow) => {
-    const result = await services.answer({ id: row.id, answer, sendToLead: sendToLead && Boolean(row.leadId), teach });
+    const result = await services.answer({ id: row.id, answer, sendToLead: sendToLead && Boolean(row.leadId), teach: canTeach && teach });
     if (!result.ok) return { ok: false as const, message: result.error };
     const updated: DirectionQuestionRow = result.row ?? {
       ...row,
@@ -73,7 +74,7 @@ export function DirectionQuestionsWorkspace({ initialRows, services = defaultSer
       answer: answer.trim(),
       answeredAt: new Date().toISOString(),
       sentToLeadAt: sendToLead ? new Date().toISOString() : null,
-      taught: teach,
+      taught: canTeach && teach,
     };
     setRows((current) => current.map((item) => (item.id === row.id ? updated : item)));
     setAnsweredHere(row.id);
@@ -191,10 +192,12 @@ export function DirectionQuestionsWorkspace({ initialRows, services = defaultSer
                     <input type="checkbox" checked={sendToLead && Boolean(open.leadId)} disabled={!open.leadId || answeredHere === open.id} onChange={(event) => setSendToLead(event.target.checked)} />
                     <span>Enviar ao lead pelo {directionChannelLabel(open.transport)}</span>
                   </label>
-                  <label className={form.check}>
-                    <input type="checkbox" checked={teach} disabled={answeredHere === open.id} onChange={(event) => setTeach(event.target.checked)} />
-                    <span>Ensinar a IA para as próximas vezes</span>
-                  </label>
+                  {canTeach ? (
+                    <label className={form.check}>
+                      <input type="checkbox" checked={teach} disabled={answeredHere === open.id} onChange={(event) => setTeach(event.target.checked)} />
+                      <span>Ensinar a IA para as próximas vezes</span>
+                    </label>
+                  ) : null}
                 </div>
                 <div className={hub.drawerActions}>
                   <LiteActionButton

@@ -179,7 +179,7 @@ describe("nav-registry", () => {
     expect(navRowTabs(area, fullDirector, "inicio").map((tab) => tab.id)).toEqual(["inicio", "leads-qualificacao", "alertas", "execucoes", "perguntas-direcao"]);
     expect(navRowTabs(area, fullDirector, "simulador").map((tab) => tab.id)).toEqual(["inicio", "leads-qualificacao", "alertas", "execucoes", "perguntas-direcao", "simulador"]);
     expect(area.tabs.filter((tab) => !tab.hub).map((tab) => tab.id)).toEqual(["inicio", "leads-qualificacao", "alertas", "execucoes", "perguntas-direcao"]);
-    // Perguntas para a direção: só o diretor responde, o supervisor não vê a aba.
+    // Perguntas para a direção: o diretor e o gestor (26/11) respondem, o supervisor não vê a aba.
     expect(resolveNavLocation("/ia/perguntas")).toMatchObject({ area: { id: "atendimento-ia" }, tab: { id: "perguntas-direcao" } });
     expect(navRowTabs(area, { ...fullDirector, roleKey: "supervisor" }, "inicio").map((tab) => tab.id)).not.toContain("perguntas-direcao");
     // Other areas have no hub tabs: their row is unchanged.

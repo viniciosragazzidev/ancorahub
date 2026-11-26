@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { DashboardHeader } from "@/components/dashboard-header";
 import page from "@/components/lite/page/lite-page.module.css";
 import { summarizeAiRuns } from "@/features/ai-qualification/ai-runs-copy";
@@ -18,6 +20,8 @@ function single(value: string | string[] | undefined) {
  */
 export default async function AiRunsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const context = await getRequiredTenantContext();
+  // Gestor (papel manager) só abre /ia/perguntas na área da IA (26/11); o layout não roda de novo entre abas.
+  if (context.role === "manager") redirect("/access-denied");
   const params = await searchParams;
   const onlyFailures = single(params.falhas) === "1";
   const requestedPage = Number.parseInt(single(params.pagina) ?? "1", 10);

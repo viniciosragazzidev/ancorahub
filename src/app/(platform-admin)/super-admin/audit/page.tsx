@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Suspense, useCallback, useRef, useState, useTransition } from "react";
 import { Activity, Calendar, UserRound } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import type { ColumnDef } from "@tanstack/react-table";
+import { AuditTenantFilter } from "@/components/platform-admin-audit-tenant-filter";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   getLeadEvidenceReportAction,
   getPlatformAuditLogsAction,
   getTenantAuditLogsAction,
+  getAuditTenantOptionsAction,
 } from "../actions";
 
 // Typings
@@ -151,11 +153,15 @@ export default function SuperAdminAuditPage() {
   const [evidenceReport, setEvidenceReport] = useState<any>(null);
   const [purgingId, setPurgingId] = useState("");
   const [pending, startTransition] = useTransition();
+  // Empresa do filtro (?tenant=): vale para as duas auditorias; trocar recarrega a aba aberta.
+  const tenantRef = useRef("");
+  const tenantSeenRef = useRef(false);
+  const reloadRef = useRef<() => void>(() => undefined);
 
   const loadPlatformLogs = async () => {
     setLoading(true);
     try {
-      const data = await getPlatformAuditLogsAction();
+      const data = await getPlatformAuditLogsAction(tenantRef.current || null);
       setPlatformLogs(data);
     } catch {
       toast.error("Erro ao carregar logs de plataforma.");
@@ -167,7 +173,7 @@ export default function SuperAdminAuditPage() {
   const loadTenantLogs = async () => {
     setLoading(true);
     try {
-      const data = await getTenantAuditLogsAction();
+      const data = await getTenantAuditLogsAction(tenantRef.current || null);
       setTenantLogs(data);
     } catch {
       toast.error("Erro ao carregar logs de operadoras.");
@@ -175,6 +181,19 @@ export default function SuperAdminAuditPage() {
       setLoading(false);
     }
   };
+
+  reloadRef.current = () => {
+    if (activeTab === "platform") void loadPlatformLogs();
+    if (activeTab === "tenant") void loadTenantLogs();
+  };
+
+  const handleTenantChange = useCallback((next: string) => {
+    // Na primeira leitura só recarrega se a URL já veio com empresa; depois, só quando a empresa muda.
+    const changed = tenantSeenRef.current ? next !== tenantRef.current : next !== "";
+    tenantSeenRef.current = true;
+    tenantRef.current = next;
+    if (changed) reloadRef.current();
+  }, []);
 
   const fetchEvidence = () => {
     if (!leadIdInput.trim()) return;
@@ -230,6 +249,12 @@ export default function SuperAdminAuditPage() {
             Governança LGPD (7.7)
           </button>
         </div>
+
+        {(activeTab === "platform" || activeTab === "tenant") && (
+          <Suspense fallback={null}>
+            <AuditTenantFilter loadTenants={getAuditTenantOptionsAction} onTenantChange={handleTenantChange} />
+          </Suspense>
+        )}
 
         {/* Tab Content */}
         {activeTab === "platform" && (

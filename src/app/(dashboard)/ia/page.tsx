@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { DashboardHeader } from "@/components/dashboard-header";
 import page from "@/components/lite/page/lite-page.module.css";
 import { buildAiHubSections, buildAiHubSummary } from "@/features/ai-qualification/ai-area-hub";
@@ -28,6 +30,8 @@ async function safely<T>(section: string, loader: () => Promise<T>): Promise<T |
  */
 export default async function AiAreaPage() {
   const context = await getRequiredTenantContext();
+  // Gestor (papel manager) só abre /ia/perguntas na área da IA (26/11); o layout não roda de novo entre abas.
+  if (context.role === "manager") redirect("/access-denied");
   const now = new Date();
   const [settings, alerts, activeQualifications, runs, user] = await Promise.all([
     safely("settings", () => getQualificationTenantSettings(context.tenantId)),

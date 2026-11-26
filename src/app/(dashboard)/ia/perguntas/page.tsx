@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import page from "@/components/lite/page/lite-page.module.css";
-import { canAnswerDirectionQuestions } from "@/features/ai-qualification/direction-questions-core";
+import { canAnswerDirectionQuestions, canTeachDirectionAnswers } from "@/features/ai-qualification/direction-questions-core";
 import { listDirectionQuestions } from "@/features/ai-qualification/direction-questions-service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
@@ -28,7 +28,7 @@ export default async function DirectionQuestionsPage() {
       />
       <main className={page.stack}>
         {list.ready ? (
-          <DirectionQuestionsWorkspace initialRows={list.rows} />
+          <DirectionQuestionsWorkspace initialRows={list.rows} canTeach={canTeachDirectionAnswers(context.role)} />
         ) : (
           <section className={page.group}>
             <p className={page.emptyText}>Falta aplicar a migration 0246 no banco. Até lá, a IA responde como antes e nenhuma pergunta é registrada.</p>

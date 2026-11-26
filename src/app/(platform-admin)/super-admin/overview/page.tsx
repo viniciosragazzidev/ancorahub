@@ -10,7 +10,10 @@ import {
 } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getTenantAlertRows } from "@/features/platform-admin/tenant-alerts";
 import { getDatabase, schema } from "@/shared/db";
+
+import { TenantAlertsCard } from "./tenant-alerts-card";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +21,7 @@ export default async function PlatformOverviewPage() {
   const db = getDatabase();
 
   // Platform-wide metrics
-  const [tenantStats, userStats, leadStats] = await Promise.all([
+  const [tenantStats, userStats, leadStats, tenantAlerts] = await Promise.all([
     db
       .select({
         total: count(),
@@ -35,6 +38,11 @@ export default async function PlatformOverviewPage() {
       })
       .from(schema.user),
     db.select({ total: count() }).from(schema.leads),
+    // Alertas por empresa (26/11): falhou, o bloco some e o resto da visão geral segue.
+    getTenantAlertRows().catch((error) => {
+      console.error("[super-admin/overview] tenant_alerts_failed", { error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+      return null;
+    }),
   ]);
 
   const tenants = tenantStats[0];
@@ -268,6 +276,8 @@ export default async function PlatformOverviewPage() {
             </CardContent>
           </Card>
         </section>
+
+        {tenantAlerts ? <TenantAlertsCard rows={tenantAlerts.rows} questionsReady={tenantAlerts.questionsReady} /> : null}
       </main>
     </>
   );

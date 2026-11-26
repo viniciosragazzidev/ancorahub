@@ -11,6 +11,8 @@ import {
   purgeUserLGPD,
   getPlatformAuditLogs,
   getTenantAuditLogs,
+  getAuditTenantOptions,
+  normalizeAuditTenantId,
 } from "@/features/platform-admin/service";
 import { startPurgeJob, processPurgeJob } from "@/features/platform-admin/purge-job";
 
@@ -765,12 +767,17 @@ export async function getLeadEvidenceReportAction(leadId: string) {
   };
 }
 
-export async function getPlatformAuditLogsAction() {
-  return getPlatformAuditLogs();
+export async function getPlatformAuditLogsAction(tenantId?: string | null) {
+  return getPlatformAuditLogs(100, normalizeAuditTenantId(tenantId));
 }
 
-export async function getTenantAuditLogsAction() {
-  return getTenantAuditLogs();
+export async function getTenantAuditLogsAction(tenantId?: string | null) {
+  return getTenantAuditLogs(normalizeAuditTenantId(tenantId));
+}
+
+/** Empresas para o filtro da auditoria. */
+export async function getAuditTenantOptionsAction() {
+  return getAuditTenantOptions();
 }
 
 // DEV TOOLS SERVER ACTIONS

@@ -26,6 +26,8 @@ export const MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/tarefas$/,
   // Ligações da unidade (26/11): a página escopa pelas pessoas da unidade da sessão.
   /^\/tarefas\/ligacoes$/,
+  // Perguntas para a direção (26/11): o gestor responde as dos leads da unidade. O resto de /ia segue fechado.
+  /^\/ia\/perguntas$/,
   /^\/notificacoes$/,
   /^\/settings$/,
   /^\/primeiro-acesso(\/.*)?$/,
@@ -43,6 +45,17 @@ function pathOnly(pathname: string) {
 export function isManagerRouteAllowed(pathname: string): boolean {
   const path = pathOnly(pathname);
   return MANAGER_ALLOWED_ROUTES.some((route) => route.test(path));
+}
+
+/** Única tela da área da IA (/ia) que o gestor de unidade abre (26/11). */
+export const MANAGER_AI_AREA_PATH = "/ia/perguntas";
+
+/**
+ * Área da IA para quem tem papel manager (gestor, marketing e financeiro, como antes): só Perguntas para a direção.
+ * Caminho vazio (sem cabeçalho) fica a cargo da página, que confere de novo.
+ */
+export function isManagerAiAreaPathAllowed(pathname: string): boolean {
+  return pathOnly(pathname) === MANAGER_AI_AREA_PATH;
 }
 
 /** Primeira tela do gestor: a equipe da unidade. */

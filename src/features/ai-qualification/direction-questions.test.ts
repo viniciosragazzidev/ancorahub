@@ -6,16 +6,29 @@ const state = vi.hoisted(() => ({
   ready: true,
   results: [] as unknown[][],
   inserts: [] as { table: unknown; values: unknown }[],
+  /** Escopo que o relatório devolve (gestor: só a unidade) e os filtros que chegaram ao banco. */
+  leadScope: undefined as unknown,
+  scopeFor: [] as unknown[],
+  wheres: [] as unknown[],
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/features/reports/metrics/metric-scope", () => ({ resolveReportDataScope: async () => ({ leadScope: undefined }) }));
+vi.mock("@/features/reports/metrics/metric-scope", () => ({
+  resolveReportDataScope: async (context: unknown) => {
+    state.scopeFor.push(context);
+    return { leadScope: state.leadScope };
+  },
+}));
 vi.mock("@/shared/db", async () => {
   const schema = await import("@/shared/db/schema");
   function chain() {
     const result = state.results.shift() ?? [];
     const builder: Record<string, unknown> = {};
-    for (const name of ["from", "orderBy", "leftJoin", "where", "limit"]) builder[name] = () => builder;
+    for (const name of ["from", "orderBy", "leftJoin", "limit"]) builder[name] = () => builder;
+    builder.where = (condition: unknown) => {
+      state.wheres.push(condition);
+      return builder;
+    };
     builder.then = (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => Promise.resolve(result).then(resolve, reject);
     return builder;
   }
@@ -31,17 +44,28 @@ vi.mock("@/shared/db", async () => {
 
 import { schema } from "@/shared/db";
 
+import { sql } from "drizzle-orm";
+
 import {
   DIRECTION_HOLD_REPLY,
   buildTaughtKnowledge,
   canAnswerDirectionQuestions,
+  canTeachDirectionAnswers,
   carrierNamedIn,
   findTaughtAnswer,
   shouldAskDirection,
   toExcerptLine,
   validateDirectionAnswer,
 } from "./direction-questions-core";
-import { answerDirectionQuestion, findTaughtDirectionAnswer, recordDirectionQuestion, type DirectionAnswerPorts, type StoredDirectionQuestion } from "./direction-questions-service";
+import {
+  answerDirectionQuestion,
+  countOpenDirectionQuestions,
+  findTaughtDirectionAnswer,
+  listDirectionQuestions,
+  recordDirectionQuestion,
+  type DirectionAnswerPorts,
+  type StoredDirectionQuestion,
+} from "./direction-questions-service";
 
 let clock = Date.UTC(2026, 10, 26, 12);
 vi.useFakeTimers({ toFake: ["Date"] });
@@ -53,6 +77,9 @@ beforeEach(() => {
   state.ready = true;
   state.results = [];
   state.inserts = [];
+  state.leadScope = undefined;
+  state.scopeFor = [];
+  state.wheres = [];
 });
 
 afterAll(() => {
@@ -61,6 +88,15 @@ afterAll(() => {
 
 const director = { userId: "dir-1", tenantId: "t1", role: "director", jobTitle: "director", branchId: null } as TenantContext;
 const supervisor = { ...director, role: "supervisor", jobTitle: "supervisor" } as TenantContext;
+const manager = { ...director, userId: "ger-1", role: "manager", jobTitle: "manager", branchId: "b-1" } as TenantContext;
+
+/** O filtro do banco carrega este pedaço (referência exata), em qualquer nível do and(...)? */
+function carries(condition: unknown, piece: unknown, seen = new Set<unknown>()): boolean {
+  if (condition === piece) return true;
+  if (!condition || typeof condition !== "object" || seen.has(condition)) return false;
+  seen.add(condition);
+  return Object.values(condition as Record<string, unknown>).some((value) => carries(value, piece, seen));
+}
 
 const recordInput = {
   tenantId: "t1", leadId: "lead-1", conversationId: "conv-1", phone: "5521999990000", transport: "waha", wahaRunId: "run-1",
@@ -190,6 +226,42 @@ describe("resposta da direção", () => {
     await expect(answerDirectionQuestion(director, { id: "q-1", answer: "Sim.", sendToLead: true, teach: false }, ports(question({ status: "answered" })).value)).rejects.toThrow("já foi respondida");
     expect(validateDirectionAnswer({ id: "q-1", answer: " ", sendToLead: true, teach: true })).toEqual({ ok: false, error: "Escreva a resposta antes de enviar." });
     expect(validateDirectionAnswer({ id: "q-1", answer: "x".repeat(1001), sendToLead: true, teach: true }).ok).toBe(false);
+  });
+});
+
+describe("gestor da unidade nas perguntas (26/11)", () => {
+  it("lista e contador usam o escopo da unidade do gestor", async () => {
+    const unitOnly = sql`leads.branch_id = 'b-1'`;
+    state.leadScope = unitOnly;
+    state.results = [[], [{ value: 2 }]];
+    await expect(listDirectionQuestions(manager)).resolves.toEqual({ ready: true, rows: [] });
+    await expect(countOpenDirectionQuestions(manager)).resolves.toBe(2);
+    expect(state.scopeFor).toEqual([manager, manager]);
+    expect(state.wheres).toHaveLength(2);
+    for (const where of state.wheres) expect(carries(where, unitOnly)).toBe(true);
+  });
+
+  it("responde e envia ao lead da unidade, sem ensinar a IA", async () => {
+    const { value, calls } = ports();
+    await answerDirectionQuestion(manager, { id: "q-1", answer: "Sim, cobre.", sendToLead: true, teach: false }, value);
+    expect(calls.sent).toEqual(["Sim, cobre."]);
+    expect(calls.taught).toEqual([]);
+    expect(calls.saved).toEqual([expect.objectContaining({ actorUserId: "ger-1", taughtDocumentId: null, sentToLeadAt: expect.any(Date) })]);
+  });
+
+  it("pedir para ensinar a IA é recusado antes de enviar: ensinar é só do diretor", async () => {
+    expect(canTeachDirectionAnswers("director")).toBe(true);
+    expect(canTeachDirectionAnswers("manager")).toBe(false);
+    const { value, calls } = ports();
+    await expect(answerDirectionQuestion(manager, { id: "q-1", answer: "Sim.", sendToLead: true, teach: true }, value)).rejects.toThrow("Só o diretor ensina a IA");
+    expect(calls.sent).toEqual([]);
+    expect(calls.saved).toEqual([]);
+  });
+
+  it("pergunta de lead de outra unidade não carrega no escopo do gestor e é recusada", async () => {
+    const { value, calls } = ports(null);
+    await expect(answerDirectionQuestion(manager, { id: "q-outra", answer: "Sim.", sendToLead: true, teach: false }, value)).rejects.toThrow("Pergunta não encontrada.");
+    expect(calls.sent).toEqual([]);
   });
 });
 

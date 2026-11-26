@@ -11,6 +11,7 @@ import { getDatabase, schema } from "@/shared/db";
 import {
   buildTaughtKnowledge,
   canAnswerDirectionQuestions,
+  canTeachDirectionAnswers,
   carrierNamedIn,
   cleanDirectionQuestion,
   directionChannelLabel,
@@ -232,6 +233,7 @@ export class DirectionAnswerError extends Error {}
  */
 export async function answerDirectionQuestion(context: TenantContext, input: DirectionAnswerInput, ports: DirectionAnswerPorts = defaultPorts) {
   if (!canAnswerDirectionQuestions(context.role, context.jobTitle)) throw new DirectionAnswerError("Só o diretor ou o gestor da unidade responde as perguntas da IA.");
+  if (input.teach && !canTeachDirectionAnswers(context.role)) throw new DirectionAnswerError("Só o diretor ensina a IA. Responda sem marcar \"Ensinar a IA\".");
   const valid = validateDirectionAnswer(input);
   if (!valid.ok) throw new DirectionAnswerError(valid.error);
   const question = await ports.load(context, input.id);

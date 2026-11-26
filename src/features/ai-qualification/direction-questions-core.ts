@@ -120,6 +120,11 @@ export function canAnswerDirectionQuestions(role: string, jobTitle?: string | nu
   return role === "manager" && !(jobTitle === "marketing" || jobTitle === "finance");
 }
 
+/** "Ensinar a IA" (base de conhecimento da empresa toda) é só do diretor; o gestor responde e envia ao lead. */
+export function canTeachDirectionAnswers(role: string) {
+  return role === "director";
+}
+
 export type DirectionAnswerInput = { id: string; answer: string; sendToLead: boolean; teach: boolean };
 
 /** Confere a resposta antes de qualquer envio. Devolve o texto limpo ou a causa em pt-BR. */

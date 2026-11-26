@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { canShowNavTab, NAV_AREAS, visibleNavAreas, type NavAccessUser } from "@/shared/navigation/nav-registry";
 import { hasPermission, PERMISSIONS, type PermissionKey } from "@/shared/auth/permissions";
 
-import { isManagerRouteAllowed, isOutsideManagerScope, MANAGER_SETTINGS_TABS } from "./manager-routes";
+import { isManagerAiAreaPathAllowed, isManagerRouteAllowed, isOutsideManagerScope, MANAGER_SETTINGS_TABS } from "./manager-routes";
 
 const ALLOWED = [
   "/dashboard",
@@ -18,6 +18,8 @@ const ALLOWED = [
   "/leads/7f1c2b9e-0000-4000-8000-000000000002",
   "/tarefas",
   "/tarefas?escopo=minhas",
+  "/ia/perguntas",
+  "/ia/perguntas?aba=abertas",
   "/notificacoes",
   "/settings",
   "/settings?tab=seguranca",
@@ -40,6 +42,8 @@ const BLOCKED = [
   "/relacionamento", "/noc", "/assinatura", "/guia", "/guia/webhook", "/relatorios", "/relatorios/drill/abc",
   "/empresas", "/integridade", "/tarefas/dashboard", "/cotacao", "/plantoes", "/plantoes/agora", "/filiais", "/roadmap",
   "/dashboard/drill/abc", "/dashboard/c/jornada", "/extensao", "/internal/design-system",
+  // Atendimento IA segue fechado; só /ia/perguntas abriu (26/11).
+  "/ia", "/ia/alertas", "/ia/execucoes", "/ia/execucoes?falhas=1", "/ia/perguntas/abc", "/ia/perguntasx",
 ];
 
 describe("rotas do gestor na versão antiga (10/11)", () => {
@@ -49,6 +53,13 @@ describe("rotas do gestor na versão antiga (10/11)", () => {
 
   it.each(BLOCKED)("bloqueia %s", (path) => {
     expect(isManagerRouteAllowed(path)).toBe(false);
+  });
+
+  it("na área da IA o gestor só abre Perguntas para a direção (26/11)", () => {
+    expect(isManagerAiAreaPathAllowed("/ia/perguntas")).toBe(true);
+    expect(isManagerAiAreaPathAllowed("/ia/perguntas/")).toBe(true);
+    expect(isManagerAiAreaPathAllowed("/ia/perguntas?x=1")).toBe(true);
+    for (const path of ["/ia", "/ia/alertas", "/ia/execucoes", "/ia/perguntas/abc"]) expect(isManagerAiAreaPathAllowed(path)).toBe(false);
   });
 
   it("Ajustes do gestor ficam só com conta e segurança", () => {
@@ -71,12 +82,13 @@ function userFor(role: "director" | "manager" | "supervisor" | "broker"): NavAcc
 }
 
 describe("menu do gestor (10/11)", () => {
-  it("mostra só Início (Painel), Tarefas (25/11) e Ligações (26/11), Equipe (Pessoas, Plantões da unidade e Pós-venda com a chave) e Configurações (Ajustes)", () => {
+  it("mostra só Início (Painel), Tarefas (25/11) e Ligações (26/11), Equipe (Pessoas, Plantões da unidade e Pós-venda com a chave), Perguntas para a direção (26/11) e Configurações (Ajustes)", () => {
     const areas = visibleNavAreas(userFor("manager"));
     expect(areas.map(({ area, tabs }) => [area.id, tabs.map((tab) => tab.id)])).toEqual([
       ["inicio", ["painel"]],
       ["leads", ["tarefas", "ligacoes"]],
       ["equipe", ["pessoas", "plantoes-unidade", "pos-venda"]],
+      ["atendimento-ia", ["perguntas-direcao"]],
       ["configuracoes", ["ajustes"]],
     ]);
   });
@@ -87,6 +99,16 @@ describe("menu do gestor (10/11)", () => {
       for (const tab of area.tabs) {
         if (canShowNavTab(tab, manager)) expect(isManagerRouteAllowed(tab.href)).toBe(true);
       }
+    }
+  });
+
+  it("a área da IA do gestor abre direto em /ia/perguntas; marketing e financeiro não veem a aba", () => {
+    const ia = visibleNavAreas(userFor("manager")).find(({ area }) => area.id === "atendimento-ia");
+    expect(ia?.href).toBe("/ia/perguntas");
+    for (const jobTitle of ["marketing", "finance"]) {
+      const user = { ...userFor("manager"), jobTitle };
+      const tabs = visibleNavAreas(user).find(({ area }) => area.id === "atendimento-ia")?.tabs ?? [];
+      expect(tabs.map((tab) => tab.id)).not.toContain("perguntas-direcao");
     }
   });
 
