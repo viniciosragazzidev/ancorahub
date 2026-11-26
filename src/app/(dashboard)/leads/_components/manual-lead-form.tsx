@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Check, WarningCircle } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
 
+import { CnpjLookupPanel } from "@/features/companies/components/cnpj-lookup-panel";
+
+import { consultarCnpjAction } from "../../empresas/actions";
 import { createManualLeadAction, type LeadCreateState } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -181,6 +184,18 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
               />
             </div>
           </div>
+          <CnpjLookupPanel
+            value={cnpj}
+            onValueChange={setCnpj}
+            hideInput
+            onLookup={consultarCnpjAction}
+            onUse={async (data) => {
+              setRazaoSocial(data.legalName);
+              return { ok: true };
+            }}
+            useDoneLabel="Razão social preenchida"
+            useHint="Preenche a razão social deste formulário."
+          />
         </div>
       )}
 

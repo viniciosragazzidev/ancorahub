@@ -1,0 +1,76 @@
+/* Consultar CNPJ (gaveta de /empresas e lead PJ): só tokens do Lite. */
+
+.root {
+  display: grid;
+  gap: 16px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.row > input {
+  flex: 1 1 200px;
+  font-variant-numeric: tabular-nums;
+}
+
+.result {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-surface) - 12px);
+  background: var(--surface);
+}
+
+.warning {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: calc(var(--radius-surface) - 12px);
+  background: var(--danger-subtle);
+  color: var(--danger);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.facts dt {
+  color: var(--text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.saved {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 767px) {
+  .row > input {
+    font-size: var(--text-base);
+  }
+}

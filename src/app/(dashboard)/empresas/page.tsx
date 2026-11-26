@@ -1,21 +1,26 @@
 import Link from "next/link";
-import { and, count, desc, eq } from "drizzle-orm";
-import { Buildings, Plus, Users } from "@/components/huge-icons";
+import { redirect } from "next/navigation";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import { Plus } from "lucide-react";
+
 import { DashboardHeader } from "@/components/dashboard-header";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { hasEffectiveCapability } from "@/features/custom-roles/service";
+import page from "@/components/lite/page/lite-page.module.css";
+import { countCompanyLeads } from "@/features/companies/company-portfolio";
 import { buildCompanyLeadCountScope, buildCompanyReadScope } from "@/features/companies/read-scope";
+import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { redirect } from "next/navigation";
-import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
-import { LightCompaniesList } from "@/features/broker-workspace/components/light-companies-list";
+
+import { CompaniesWorkspace, type CompanyLeadRow, type CompanyRow } from "./_components/companies-workspace";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Empresas (25/11, "Empresas" do DeskComm): a carteira PJ numa tabela Lite com busca e gaveta. Diretor vê a empresa
+ * toda, gestor a unidade, supervisor e corretor só as empresas com lead seu (buildCompanyReadScope). Os leads da
+ * gaveta seguem o mesmo escopo dos leads (buildCompanyLeadCountScope).
+ */
 export default async function EmpresasPage() {
   const context = await getRequiredTenantContext();
   const canAccess = await hasEffectiveCapability({
@@ -30,51 +35,65 @@ export default async function EmpresasPage() {
   if (!enabled) redirect("/leads");
 
   const db = getDatabase();
+  const companyScope = buildCompanyReadScope(context);
   const leadScope = buildCompanyLeadCountScope(context);
-  const companies = await db
-    .select({
-      id: schema.companies.id,
-      name: schema.companies.name,
-      cnpj: schema.companies.cnpj,
-      employeeCount: schema.companies.employeeCount,
-      branchName: schema.branches.name,
-      leadCount: count(schema.leads.id),
-    })
-    .from(schema.companies)
-    .leftJoin(schema.branches, and(eq(schema.companies.branchId, schema.branches.id), eq(schema.branches.tenantId, context.tenantId)))
-    .leftJoin(schema.leads, and(eq(schema.leads.companyId, schema.companies.id), eq(schema.leads.tenantId, context.tenantId), ...(leadScope ? [leadScope] : [])))
-    .where(buildCompanyReadScope(context))
-    .groupBy(schema.companies.id, schema.branches.name)
-    .orderBy(desc(schema.companies.createdAt));
-  // Gestor Lite: the unit's PJ portfolio in the Lite shell (same scoped query above).
-  if ((await getLiteAudience(context)) === "manager") return <LightCompaniesList companies={companies} />;
-  const visibleCompanies = companies;
-  const linkedLeads = visibleCompanies.reduce((total, company) => total + company.leadCount, 0);
+  const [companyRows, leadRows] = await Promise.all([
+    db
+      .select({
+        id: schema.companies.id,
+        name: schema.companies.name,
+        legalName: schema.companies.legalName,
+        cnpj: schema.companies.cnpj,
+        employeeCount: schema.companies.employeeCount,
+        branchName: schema.branches.name,
+      })
+      .from(schema.companies)
+      .leftJoin(schema.branches, and(eq(schema.companies.branchId, schema.branches.id), eq(schema.branches.tenantId, context.tenantId)))
+      .where(companyScope)
+      .orderBy(desc(schema.companies.createdAt)),
+    db
+      .select({
+        id: schema.leads.id,
+        companyId: schema.leads.companyId,
+        nome: schema.leads.nome,
+        status: schema.leads.status,
+        corretorName: schema.user.name,
+        createdAt: schema.leads.createdAt,
+      })
+      .from(schema.leads)
+      .innerJoin(schema.companies, eq(schema.leads.companyId, schema.companies.id))
+      .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), companyScope, ...(leadScope ? [leadScope] : [])))
+      .orderBy(desc(schema.leads.createdAt))
+      .limit(5000),
+  ]);
+
+  const counts = countCompanyLeads(leadRows);
+  const companies: CompanyRow[] = companyRows.map((company) => ({
+    ...company,
+    openLeads: counts.get(company.id)?.open ?? 0,
+    totalLeads: counts.get(company.id)?.total ?? 0,
+  }));
+  const leads: CompanyLeadRow[] = leadRows.map((lead) => ({
+    id: lead.id,
+    companyId: lead.companyId ?? "",
+    nome: lead.nome,
+    status: lead.status,
+    corretorName: lead.corretorName,
+    createdAt: lead.createdAt ? new Date(lead.createdAt).toISOString() : null,
+  }));
+  const linked = leads.length;
 
   return (
     <>
       <DashboardHeader
         breadcrumb="CRM comercial"
         title="Empresas"
-        summary={`${visibleCompanies.length.toLocaleString("pt-BR")} ${visibleCompanies.length === 1 ? "empresa" : "empresas"} · ${linkedLeads.toLocaleString("pt-BR")} ${linkedLeads === 1 ? "oportunidade vinculada" : "oportunidades vinculadas"}`}
-        rightSlot={<Button render={<Link href="/leads?tipo=PJ" />} size="sm"><Plus /> Novo lead PJ</Button>}
+        summary={`${companies.length.toLocaleString("pt-BR")} ${companies.length === 1 ? "empresa" : "empresas"} · ${linked.toLocaleString("pt-BR")} ${linked === 1 ? "lead PJ" : "leads PJ"}`}
+        rightSlot={<Link href="/leads?tipo=PJ" className={page.primaryButton}><Plus className="size-4" aria-hidden="true" />Novo lead PJ</Link>}
       />
-      <main className="flex min-w-0 flex-1 flex-col gap-6 p-4 lg:p-6">
-        <Card className="border-primary/15 bg-primary/[0.025] shadow-sm">
-          <CardContent className="flex items-start gap-3 p-4">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Buildings className="size-5" /></span>
-            <div><p className="font-semibold">Carteira de empresas</p><p className="mt-1 text-sm text-muted-foreground">Empresas são criadas ao cadastrar um lead PJ. Cada registro permanece isolado na sua empresa e unidade.</p></div>
-          </CardContent>
-        </Card>
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Empresas cadastradas">
-          {visibleCompanies.map((company) => (
-            <Card key={company.id} className="border-border/70 bg-card shadow-sm transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-md">
-              <CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><CardTitle className="truncate text-base">{company.name}</CardTitle><CardDescription className="mt-1">{company.branchName ?? "Sem unidade"}</CardDescription></div><Badge variant="secondary" className="shrink-0">PJ</Badge></div></CardHeader>
-              <CardContent className="space-y-3 text-sm"><div className="flex items-center justify-between gap-3 text-muted-foreground"><span>CNPJ</span><span className="font-medium text-foreground">{company.cnpj ?? "Não informado"}</span></div><div className="flex items-center justify-between gap-3 text-muted-foreground"><span className="flex items-center gap-1.5"><Users className="size-3.5" /> Pessoas</span><span className="font-medium text-foreground tabular-nums">{company.employeeCount ?? "—"}</span></div><div className="border-t border-border/60 pt-3 text-xs text-muted-foreground"><span className="font-semibold tabular-nums text-foreground">{company.leadCount}</span> oportunidade{company.leadCount === 1 ? "" : "s"} vinculada{company.leadCount === 1 ? "" : "s"}</div></CardContent>
-            </Card>
-          ))}
-          {!visibleCompanies.length && <Card className="col-span-full border-dashed bg-muted/20"><CardContent className="flex flex-col items-center gap-3 px-6 py-14 text-center"><Buildings className="size-8 text-muted-foreground" /><div><p className="font-semibold">Nenhuma empresa cadastrada</p><p className="mt-1 text-sm text-muted-foreground">Cadastre um lead PJ para iniciar a carteira comercial.</p></div><Button render={<Link href="/leads?tipo=PJ" />} variant="outline">Cadastrar lead PJ</Button></CardContent></Card>}
-        </section>
+      <main className={page.stack}>
+        <CompaniesWorkspace companies={companies} leads={leads} canEdit={context.role === "director" || context.role === "manager"} />
       </main>
     </>
   );
