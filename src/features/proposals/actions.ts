@@ -16,6 +16,7 @@ import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope"
 import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
 import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-service";
 import { getProposalDefaults } from "./defaults";
+import { notifyProposalOutcome } from "./proposal-outcome-notify";
 import { buildProposalWhatsAppMessage, canSendProposalOnWhatsApp, defaultValidUntilInput, proposalPublicPath, validUntilFromDateInput } from "./proposal-rules";
 
 async function assertFeatureEnabled() {
@@ -220,6 +221,12 @@ export async function updateProposalStatusAction(
         });
       }
     });
+
+    // Aprovada ou recusada pela operadora: avisa o corretor responsável (sino + push), sem travar a resposta.
+    if (proposal.status !== newStatus && (newStatus === "aprovada" || newStatus === "perdida")) {
+      void notifyProposalOutcome({ tenantId: context.tenantId, actorUserId: context.userId, proposal, newStatus })
+        .catch((error) => console.error("[proposal-outcome] notify failed", { error: error instanceof Error ? error.message.slice(0, 200) : "unknown" }));
+    }
 
     return { success: true };
   } catch (error) {

@@ -66,6 +66,9 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+const notifyProposalOutcome = vi.fn(async (..._args: unknown[]) => true);
+vi.mock("./proposal-outcome-notify", () => ({ notifyProposalOutcome: (...args: unknown[]) => notifyProposalOutcome(...args) }));
+
 import { convertProposalToSaleAction, updateProposalStatusAction } from "./actions";
 
 describe("Proposals feature and business rules", () => {
@@ -222,6 +225,29 @@ describe("Proposals feature and business rules", () => {
       const res = await updateProposalStatusAction("prop-5", "enviada");
       expect(res.success).toBe(true);
       expect(mockDb.update).toHaveBeenCalled();
+    });
+
+    it("avisa o corretor quando a proposta muda para aprovada ou recusada, e não quando o status se repete", async () => {
+      let current = "enviada";
+      mockDb.select.mockImplementation(() => ({ from: () => ({ where: () => ({ limit: () => [{ id: "prop-6", tenantId: "tenant-a", leadId: "lead-6", createdBy: "user-1", status: current }] }) }) }));
+      mockDb.transaction.mockImplementation(async (cb) => cb(mockDb));
+      mockDb.update.mockReturnValue({ set: () => ({ where: () => Promise.resolve() }) });
+      mockDb.insert.mockReturnValue({ values: () => Promise.resolve() });
+
+      expect((await updateProposalStatusAction("prop-6", "aprovada")).success).toBe(true);
+      expect(notifyProposalOutcome).toHaveBeenCalledTimes(1);
+      expect(notifyProposalOutcome.mock.calls[0]![0]).toMatchObject({ tenantId: "tenant-a", actorUserId: "user-1", newStatus: "aprovada", proposal: { id: "prop-6", status: "enviada" } });
+
+      current = "aprovada";
+      await updateProposalStatusAction("prop-6", "aprovada");
+      expect(notifyProposalOutcome).toHaveBeenCalledTimes(1);
+
+      await updateProposalStatusAction("prop-6", "perdida");
+      expect(notifyProposalOutcome).toHaveBeenCalledTimes(2);
+
+      current = "enviada";
+      await updateProposalStatusAction("prop-6", "negociacao");
+      expect(notifyProposalOutcome).toHaveBeenCalledTimes(2);
     });
   });
 });

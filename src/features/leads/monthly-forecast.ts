@@ -142,6 +142,11 @@ export function forecastScopeLabel(role: string): string {
   return "Seus leads abertos";
 }
 
+/** Quem vê a previsão: o rótulo do escopo e se pode ajustar as chances (só o diretor). */
+export function forecastViewer(role: string): { scopeLabel: string; canConfigure: boolean } {
+  return { scopeLabel: forecastScopeLabel(role), canConfigure: role === "director" };
+}
+
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export function formatForecastCents(cents: number) {

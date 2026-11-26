@@ -70,4 +70,11 @@ describe("SupervisorLeadsRadar", () => {
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar lead" }), { target: { value: "0000" } });
     expect(screen.getByRole("link", { name: /Maria Silva/ })).toBeTruthy();
   });
+
+  it("mostra a previsão do mês no topo do radar, antes dos filtros", () => {
+    render(<SupervisorLeadsRadar data={data} now={now} forecast={<button type="button">Previsão do mês R$ 1.000</button>} />);
+    const forecast = screen.getByRole("button", { name: /Previsão do mês/ });
+    const filters = screen.getByRole("group", { name: "Situação dos leads" });
+    expect(forecast.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

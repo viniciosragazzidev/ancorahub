@@ -141,7 +141,7 @@ function RadarRow({ item, index, isManager, slaMinutes, now, selectable = false,
  * The manager's (unit) or supervisor's (team) lead list, built from the same Arc pieces as the
  * broker's queue: the phone-book list, what needs attention first, the rest grouped by the day it arrived.
  */
-export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab, postSaleEnabled = false, action, switcher }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager"; postSaleEnabled?: boolean; /** Ação no topo da página (Importar contatos da lista interna da equipe). */ action?: ReactNode; /** Leads da equipe x Lista importada. */ switcher?: ReactNode }) {
+export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab, postSaleEnabled = false, action, switcher, forecast }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager"; postSaleEnabled?: boolean; /** Ação no topo da página (Importar contatos da lista interna da equipe). */ action?: ReactNode; /** Leads da equipe x Lista importada. */ switcher?: ReactNode; /** Previsão do mês no topo (supervisor: escopo da equipe). */ forecast?: ReactNode }) {
   const isManager = audience === "manager";
   const currentTime = useMemo(() => new Date(now), [now]);
   const [query, setQuery] = useState(search);
@@ -226,6 +226,7 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
         ? <><span className="font-medium text-(--danger)">{attentionTotal === 1 ? "1 lead precisa" : `${attentionTotal} leads precisam`} de você</span> · {data.leads.length} em aberto</>
         : `Tudo em dia · ${data.leads.length === 1 ? "1 lead em aberto" : `${data.leads.length} leads em aberto`}`}
     >
+      {forecast}
       {switcher}
       <PeopleFilters label="Situação dos leads" options={options} value={tab} onChange={setTab} search={query} onSearch={setQuery} searchPlaceholder="Buscar por nome, telefone, corretor ou produto" searchLabel="Buscar lead" />
 

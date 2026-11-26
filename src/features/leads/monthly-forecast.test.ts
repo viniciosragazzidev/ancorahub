@@ -6,6 +6,7 @@ import {
   computeMonthlyForecast,
   defaultForecastChances,
   forecastScopeLabel,
+  forecastViewer,
   formatForecastCents,
   normalizeForecastChancesInput,
   parseForecastChances,
@@ -98,5 +99,13 @@ describe("rótulo do escopo", () => {
     expect(forecastScopeLabel("manager")).toBe("Leads abertos da unidade");
     expect(forecastScopeLabel("supervisor")).toBe("Leads abertos da equipe");
     expect(forecastScopeLabel("broker")).toBe("Seus leads abertos");
+  });
+});
+
+describe("quem vê a previsão", () => {
+  it("supervisor vê a equipe sem Configurações; só o diretor ajusta", () => {
+    expect(forecastViewer("supervisor")).toEqual({ scopeLabel: "Leads abertos da equipe", canConfigure: false });
+    expect(forecastViewer("manager").canConfigure).toBe(false);
+    expect(forecastViewer("director")).toEqual({ scopeLabel: "Leads abertos da empresa", canConfigure: true });
   });
 });

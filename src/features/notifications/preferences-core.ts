@@ -33,9 +33,9 @@ export const notificationPreferenceGroups = [
   {
     id: "proposal_outcome",
     label: "Proposta e documentos",
-    description: "Documento aprovado ou recusado, fechamento, venda, lead perdido ou reaberto.",
+    description: "Proposta ou documento aprovado ou recusado, fechamento, venda, lead perdido ou reaberto.",
     channels: ["push", "whatsapp"],
-    capabilities: ["document_reviewed", "lead_closing_stage", "lead_closing_outcome", "lead_converted", "sale_registered", "lead_lost", "lead_reopened"],
+    capabilities: ["proposal_approved", "proposal_rejected", "document_reviewed", "lead_closing_stage", "lead_closing_outcome", "lead_converted", "sale_registered", "lead_lost", "lead_reopened"],
   },
   {
     id: "team_notice",
@@ -123,6 +123,8 @@ const PRIVATE_TEXT_BY_CAPABILITY: Partial<Record<NotificationCapabilityId, strin
   team_list_distributed: "Lead novo atribuído a você",
   lead_arrived: "Lead novo na fila",
   lead_reassigned: "Um lead seu foi reatribuído",
+  proposal_approved: "Uma proposta sua foi aprovada",
+  proposal_rejected: "Uma proposta sua foi recusada",
 };
 
 const PRIVATE_TEXT_BY_GROUP: Record<NotificationPreferenceGroupId, string> = {

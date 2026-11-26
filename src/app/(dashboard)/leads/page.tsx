@@ -59,7 +59,8 @@ import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { buildLeadScopeWhere, buildUnassignedLeadWhere } from "@/features/leads/lead-authorization";
 import { getMonthlyForecast } from "@/features/leads/monthly-forecast-query";
-import { forecastScopeLabel } from "@/features/leads/monthly-forecast";
+import { forecastViewer } from "@/features/leads/monthly-forecast";
+import { LeadsLiteForecast } from "./leads-lite-forecast";
 import { OVERDUE_TASK_VALUE, leadLastContactAtSql, listCoolingLeads, overdueTaskLeadFilter } from "@/features/leads/cooling-radar-query";
 import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
 import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
@@ -83,8 +84,23 @@ export default async function LeadsPage(props: Parameters<typeof LeadsPageConten
   return result;
 }
 
+/** Previsão do mês no escopo de quem vê; se a consulta falhar, a linha só não aparece. */
+async function loadLiteForecast(context: TenantContext, branchId: string | null) {
+  return withPerfSpan("leads.forecast", () => getMonthlyForecast(context, branchId))
+    .then((data) => ({ ...data, ...forecastViewer(context.role) }))
+    .catch((error) => {
+      console.error("[lead-forecast] failed", { error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+      return null;
+    });
+}
+
 async function SupervisorRadarContent({ context, search, view = "equipe", listId = null }: { context: TenantContext; search: string; view?: "equipe" | "lista"; listId?: string | null }) {
-  const [radar, importEnabled] = await Promise.all([getSupervisorLiteRadar(context), isSupervisorImportEnabled()]);
+  // Previsão do mês (26/11): a mesma linha do kanban, no escopo da equipe; sem Configurações (só o diretor ajusta).
+  const [radar, importEnabled, forecast] = await Promise.all([
+    getSupervisorLiteRadar(context),
+    isSupervisorImportEnabled(),
+    getFeatureFlag(FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES).then((value) => (value === "false" ? null : loadLiteForecast(context, null))).catch(() => null),
+  ]);
   const leads = await withRadarSignals(context.tenantId, radar.leads.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null, stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null })));
   // Lista interna da equipe (16/11/2026): importar contatos e distribuir só para a equipe do supervisor.
   const canImport = importEnabled && context.role === "supervisor";
@@ -107,7 +123,7 @@ async function SupervisorRadarContent({ context, search, view = "equipe", listId
   }
   const action = canImport ? <TeamListImport pending={pending} team={team} /> : undefined;
   const switcher = canImport ? <TeamListSwitch value="equipe" pending={pending} /> : undefined;
-  return <SupervisorLeadsRadar data={{ ...radar, leads }} now={new Date().toISOString()} search={search} action={action} switcher={switcher} />;
+  return <SupervisorLeadsRadar data={{ ...radar, leads }} now={new Date().toISOString()} search={search} action={action} switcher={switcher} forecast={forecast ? <LeadsLiteForecast forecast={forecast} /> : undefined} />;
 }
 
 function SupervisorRadarLoading() {
@@ -823,14 +839,7 @@ async function LeadsPageContent({
     : null;
   // Previsão do mês (26/11): só no kanban Lite com valores comerciais; no escopo de quem vê e na filial escolhida.
   // Se a consulta falhar, a linha só não aparece.
-  const forecast = directorLitePage && leadCommercialValuesEnabled
-    ? await withPerfSpan("leads.forecast", () => getMonthlyForecast(context, filters.branch ?? null))
-      .then((data) => ({ ...data, scopeLabel: forecastScopeLabel(context.role), canConfigure: context.role === "director" }))
-      .catch((error) => {
-        console.error("[lead-forecast] failed", { error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
-        return null;
-      })
-    : null;
+  const forecast = directorLitePage && leadCommercialValuesEnabled ? await loadLiteForecast(context, filters.branch ?? null) : null;
   const hasWorkspace = Boolean(leads.length || qualifyingLeads.length || unassignedRows.length || initialView === "esfriando");
   // Props simples (serializáveis): no Lite o LeadsWorkspace (client) monta o LeadsFilters com as abas no fim da barra.
   const leadsFiltersProps = {
