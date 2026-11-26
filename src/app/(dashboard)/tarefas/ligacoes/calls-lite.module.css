@@ -1,0 +1,73 @@
+/* /tarefas/ligacoes no Lite: só tokens do .arc-venancor (nenhuma cor, raio ou tipografia nova). */
+
+/* Resumo discreto: três números em linha, sem cartão. */
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 0;
+}
+
+.summaryItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.summaryItem dt {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.summaryItem dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.result {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.callList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.callItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.callItem:last-child {
+  border-bottom: 0;
+}
+
+.callMain {
+  display: grid;
+  min-width: 0;
+}
+
+.panel > a {
+  justify-self: start;
+}

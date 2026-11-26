@@ -10,6 +10,7 @@ import { getTaskList, TASKS_PAGE_SIZE } from "@/features/tasks/task-list-queries
 import { hasPermission } from "@/shared/auth/permissions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
+import { TasksSectionNav } from "./tasks-section-nav";
 import { TasksLite } from "./tasks-lite";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         <h1 className="lite-page-title">Tarefas</h1>
         <p className="lite-page-subtitle">Retornos, documentos e confirmações por prazo. Toque em uma tarefa para abrir o lead.</p>
       </header>
+      <TasksSectionNav current="tarefas" />
       {content}
     </main>
   );

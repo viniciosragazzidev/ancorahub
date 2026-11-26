@@ -71,11 +71,11 @@ function userFor(role: "director" | "manager" | "supervisor" | "broker"): NavAcc
 }
 
 describe("menu do gestor (10/11)", () => {
-  it("mostra só Início (Painel), Tarefas (25/11), Equipe (Pessoas, Plantões da unidade e Pós-venda com a chave) e Configurações (Ajustes)", () => {
+  it("mostra só Início (Painel), Tarefas (25/11) e Ligações (26/11), Equipe (Pessoas, Plantões da unidade e Pós-venda com a chave) e Configurações (Ajustes)", () => {
     const areas = visibleNavAreas(userFor("manager"));
     expect(areas.map(({ area, tabs }) => [area.id, tabs.map((tab) => tab.id)])).toEqual([
       ["inicio", ["painel"]],
-      ["leads", ["tarefas"]],
+      ["leads", ["tarefas", "ligacoes"]],
       ["equipe", ["pessoas", "plantoes-unidade", "pos-venda"]],
       ["configuracoes", ["ajustes"]],
     ]);

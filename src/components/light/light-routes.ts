@@ -58,6 +58,8 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/relacionamento$/,
   // Tarefas da equipe (25/11): a página escopa aos corretores do supervisor.
   /^\/tarefas$/,
+  // Ligações da equipe (26/11): a página escopa aos corretores do supervisor.
+  /^\/tarefas\/ligacoes$/,
   /^\/notificacoes$/,
   /^\/settings$/,
   /^\/primeiro-acesso(\/.*)?$/,
@@ -233,6 +235,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/call-ancora"), route: { title: "Call Âncora", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/agenda"), route: { title: "Agenda", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/tarefas"), route: { title: "Tarefas", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/tarefas/ligacoes"), route: { title: "Ligações", tab: "mais", isRoot: false, parentHref: "/tarefas" } },
   { test: exact("/desempenho"), route: { title: "Desempenho", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null, chat: true, hidesTabBar: true } },
   { test: under("/dashboard/c"), route: { title: "Conversa", tab: "inicio", isRoot: false, parentHref: "/dashboard", chat: true, hidesTabBar: true } },

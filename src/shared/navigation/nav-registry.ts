@@ -90,6 +90,8 @@ export const NAV_AREAS: readonly NavArea[] = [
       { id: "arquivados", label: "Arquivados", description: "Leads arquivados, para consultar ou reativar", href: "/leads/arquivados", permission: "acessar_leads", roles: ["director"] },
       // Tarefas por prazo (25/11, DeskComm §7.2): Minhas e Da equipe. O antigo /tarefas/dashboard fica sob esta aba.
       { id: "tarefas", label: "Tarefas", description: "Retornos e tarefas por prazo, suas e da equipe", href: "/tarefas", permission: "acessar_tarefas" },
+      // Minhas ligações (26/11, DeskComm): as ligações do Call Âncora com resultado e duração, suas e da equipe.
+      { id: "ligacoes", label: "Ligações", description: "Ligações feitas pelo Call Âncora, com resultado e duração", href: "/tarefas/ligacoes", permission: "acessar_tarefas" },
     ],
   },
   {
