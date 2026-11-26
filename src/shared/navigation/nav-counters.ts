@@ -10,6 +10,7 @@ export type NavCounts = Partial<Record<NavAreaId, number>>;
 export const NAV_COUNTER_LABELS: Partial<Record<NavAreaId, { one: string; many: string }>> = {
   leads: { one: "lead sem primeiro contato", many: "leads sem primeiro contato" },
   distribuicao: { one: "lead esperando corretor", many: "leads esperando corretor" },
+  "atendimento-ia": { one: "pergunta da IA esperando a direção", many: "perguntas da IA esperando a direção" },
 };
 
 /** Número que aparece no menu: nada no zero, "99+" acima de 99. */

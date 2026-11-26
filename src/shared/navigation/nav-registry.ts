@@ -176,6 +176,8 @@ export const NAV_AREAS: readonly NavArea[] = [
       { id: "leads-qualificacao", label: "Leads na qualificação", description: "Leads que a IA está qualificando agora", href: "/qualificacao/leads", permission: "acessar_qualificacao_ia" },
       { id: "alertas", label: "Alertas", description: "O que a IA não conseguiu resolver sozinha", href: "/ia/alertas", permission: "acessar_qualificacao_ia" },
       { id: "execucoes", label: "Execuções", description: "Cada resposta da IA e por que ela agiu assim", href: "/ia/execucoes", permission: "acessar_qualificacao_ia" },
+      // 26/11/2026: o que a IA não soube responder ao lead espera a resposta da direção aqui (contador no menu).
+      { id: "perguntas-direcao", label: "Perguntas para a direção", description: "O que a IA não soube responder ao lead, para você responder e ensinar", href: "/ia/perguntas", permission: "acessar_qualificacao_ia", roles: ["director"] },
       { id: "comportamento", label: "Prompt e comportamento", description: "O prompt e o jeito de a IA conversar", href: "/qualificacao", permission: "acessar_qualificacao_ia", inPlace: true, hub: true },
       { id: "permissoes", label: "Permissões", description: "O que a IA pode fazer sem perguntar", href: "/qualificacao?tab=agent_triggers", permission: "acessar_qualificacao_ia", inPlace: true, aliases: { tab: ["mcp_governance"] }, hub: true },
       { id: "follow-up", label: "Follow-up", description: "Quando a IA volta a chamar quem parou de responder", href: "/qualificacao?tab=followup_rules", permission: "acessar_qualificacao_ia", inPlace: true, hub: true },

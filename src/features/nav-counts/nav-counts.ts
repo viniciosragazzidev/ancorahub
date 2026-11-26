@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, count, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
+import { countOpenDirectionQuestions } from "@/features/ai-qualification/direction-questions-service";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -25,12 +26,15 @@ export async function getNavCounts(context: TenantContext): Promise<NavCounts> {
     isNull(schema.leads.archivedAt),
     scope.leadScope,
   );
-  const [[waiting], [withoutFirstContact]] = await Promise.all([
+  const [[waiting], [withoutFirstContact], directionQuestions] = await Promise.all([
     db.select({ value: count() }).from(schema.leads).where(and(alive, isNull(schema.leads.corretorId), inArray(schema.leads.distributionStatus, [...WAITING_STATES]))),
     db.select({ value: count() }).from(schema.leads).where(and(alive, isNotNull(schema.leads.corretorId), inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.serviceStartedAt))),
+    // Perguntas da IA esperando a direção (26/11/2026). Falhou ou sem a tabela: sem número, o resto segue.
+    countOpenDirectionQuestions(context).catch(() => 0),
   ]);
   return {
     leads: Number(withoutFirstContact?.value ?? 0),
     distribuicao: Number(waiting?.value ?? 0),
+    "atendimento-ia": directionQuestions,
   };
 }

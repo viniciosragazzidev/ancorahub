@@ -6116,3 +6116,37 @@ export const aiQualificationPlaybooks = pgTable("ai_qualification_playbooks", {
   updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
   updatedAt,
 });
+
+/**
+ * Perguntas para a direção (migration 0246, 26/11/2026): o que a IA de qualificação não soube responder ao lead.
+ * A IA responde "Vou confirmar isso com a equipe e já te retorno" e a pergunta espera o diretor aqui. A resposta pode
+ * ir ao lead pelo canal da conversa e virar conhecimento da IA (knowledge_documents). Sem a tabela, a IA segue como antes.
+ */
+export const aiDirectionQuestions = pgTable(
+  "ai_direction_questions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id").references(() => aiConversations.id, { onDelete: "set null" }),
+    phone: text("phone"),
+    transport: text("transport").notNull().default("meta"), // meta | waha | openwa
+    communicationChannelId: text("communication_channel_id"),
+    wahaRunId: text("waha_run_id"),
+    question: text("question").notNull(),
+    normalizedQuestion: text("normalized_question").notNull(),
+    excerpt: jsonb("excerpt").notNull().default([]),
+    status: text("status").notNull().default("open"), // open | answered
+    answer: text("answer"),
+    answeredBy: text("answered_by").references(() => user.id, { onDelete: "set null" }),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+    sentToLeadAt: timestamp("sent_to_lead_at", { withTimezone: true }),
+    taughtDocumentId: text("taught_document_id").references(() => knowledgeDocuments.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("ai_direction_questions_tenant_status_idx").on(table.tenantId, table.status, table.createdAt),
+    index("ai_direction_questions_conversation_idx").on(table.conversationId),
+  ],
+);

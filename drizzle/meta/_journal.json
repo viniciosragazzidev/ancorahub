@@ -1254,6 +1254,13 @@
                         "when":  1795400000000,
                         "tag":  "0243_user_notification_preferences",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  181,
+                        "version":  "7",
+                        "when":  1795700000000,
+                        "tag":  "0246_ai_direction_questions",
+                        "breakpoints":  true
                     }
                 ]
 }

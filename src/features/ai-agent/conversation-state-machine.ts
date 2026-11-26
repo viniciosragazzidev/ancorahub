@@ -48,6 +48,7 @@ import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualif
 import { interpretQualificationTurn, shouldVerifyExtraction, VERIFIABLE_FIELDS, verifyExtractedFacts, type InterpreterResult, type VerifiableField } from "./qualification-interpreter";
 import { applyQualificationCorrectionsToMemory, describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
 import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
+import { DIRECTION_HOLD_REPLY, shouldAskDirection } from "@/features/ai-qualification/direction-questions-core";
 import { canResumeDistributedQualification, distributedHandoffText } from "./distributed-resume";
 import { prepareQualificationAudio } from "./audio-transcription/service";
 import { AUDIO_DECLINE_TEXTS, isAudioDeclineText, type AudioDeclineReason } from "./audio-transcription/rules";
@@ -2447,7 +2448,20 @@ async function processInboundAiTurn({
       const situationText = situation.kind === "custom" ? situation.response : (await loadQuickReplyTemplates(tenantId))[situation.key]?.body;
       if (situationText) deterministicTurn = { ...deterministicTurn, reply: `${renderConversationVariables(situationText, updatedMemory, lead?.nome)}\n\n${deterministicTurn.reply}` };
     } else if (isCustomerQuestion(normalizedInboundMessage)) {
-      const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: lead?.nome ?? updatedMemory.customerFirstName?.value ?? null, conversationId: conversation.id, leadId });
+      // Perguntas para a direção (26/11/2026): o que a direção já ensinou responde primeiro; o que a IA não sabe
+      // vira pergunta em /ia/perguntas e o lead ouve que a equipe vai confirmar. Sem a tabela (0246), como antes.
+      const direction = await import("@/features/ai-qualification/direction-questions-service").catch(() => null);
+      const taught = direction ? await direction.findTaughtDirectionAnswer(tenantId, normalizedInboundMessage).catch(() => null) : null;
+      let lateral = taught;
+      if (!taught) {
+        lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: lead?.nome ?? updatedMemory.customerFirstName?.value ?? null, conversationId: conversation.id, leadId });
+        if (direction && shouldAskDirection(normalizedInboundMessage, lateral)) {
+          const asked = await direction.recordDirectionQuestion({
+            tenantId, leadId, conversationId: conversation.id, phone, transport, communicationChannelId: communicationChannelId ?? null, wahaRunId: wahaRunId ?? null, question: normalizedInboundMessage,
+          }).catch(() => false);
+          if (asked) lateral = DIRECTION_HOLD_REPLY;
+        }
+      }
       learn(null, lateral);
       if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };
     }
