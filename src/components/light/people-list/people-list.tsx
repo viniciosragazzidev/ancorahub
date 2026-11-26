@@ -57,8 +57,10 @@ export function PeopleStats({ items, label = "Resumo" }: { items: PeopleStat[]; 
 export type PeopleFilterOption<T extends string> = { id: T; label: string; count?: number };
 
 export function PeopleFilters<T extends string>({
-  options, value, onChange, label = "Filtrar", search, onSearch, searchPlaceholder = "Buscar", searchLabel, dataTourSegment, dataTourSearch,
+  options, value, onChange, label = "Filtrar", search, onSearch, searchPlaceholder = "Buscar", searchLabel, dataTourSegment, dataTourSearch, aside,
 }: {
+  /** Controle na mesma linha das abas, à direita (ex.: Lista | Tabela). */
+  aside?: ReactNode;
   options?: PeopleFilterOption<T>[];
   value?: T;
   onChange?: (value: T) => void;
@@ -75,6 +77,7 @@ export function PeopleFilters<T extends string>({
   return (
     <div className={`${styles.filters} ${styles.enter}`} style={{ "--i": 2 } as CSSProperties}>
       {options?.length ? (
+        <div className={styles.segmentRow}>
         <div className={styles.segment} data-tour={dataTourSegment}>
           <SegmentedControl
             label={label}
@@ -87,8 +90,11 @@ export function PeopleFilters<T extends string>({
             }))}
           />
         </div>
+          {aside}
+        </div>
       ) : null}
       {onSearch ? (
+        <div className={styles.search}>
         <SearchField
           className={styles.searchInput}
           label={searchLabel ?? searchPlaceholder}
@@ -99,6 +105,7 @@ export function PeopleFilters<T extends string>({
           enterKeyHint="search"
           data-tour={dataTourSearch}
         />
+        </div>
       ) : null}
     </div>
   );

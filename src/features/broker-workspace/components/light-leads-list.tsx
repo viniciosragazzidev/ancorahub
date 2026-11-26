@@ -414,14 +414,6 @@ export function LightLeadsList({
 
       <PeoplePage wide>
         {walletTabs ? <BrokerWalletTabs value="atendimento" /> : null}
-        <div className={styles.viewSwitch}>
-          <SegmentedControl
-            label="Ver leads em"
-            options={[{ value: "list", label: "Lista" }, { value: "table", label: "Tabela" }]}
-            value={view}
-            onValueChange={changeView}
-          />
-        </div>
         {filter !== "closed" && !searching && view === "list" ? <NowBlock items={nowItems} /> : null}
         <PeopleFilters
           label="Etapas da fila"
@@ -434,6 +426,14 @@ export function LightLeadsList({
           searchLabel="Buscar lead"
           dataTourSegment="micro-queue-tabs"
           dataTourSearch="micro-queue-search"
+          aside={
+            <SegmentedControl
+            label="Ver leads em"
+            options={[{ value: "list", label: "Lista" }, { value: "table", label: "Tabela" }]}
+            value={view}
+            onValueChange={changeView}
+          />
+          }
         />
 
         {visible.length === 0 ? (

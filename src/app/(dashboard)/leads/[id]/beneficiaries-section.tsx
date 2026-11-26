@@ -27,7 +27,7 @@ import embeddedStyles from "./beneficiaries-section.module.css";
 import { lerCpf } from "@/shared/input/documento";
 import { useCampoMascarado } from "@/shared/input/use-campo-mascarado";
 
-type Beneficiary = {
+export type Beneficiary = {
   id: string;
   name: string;
   birthDate: string | null;

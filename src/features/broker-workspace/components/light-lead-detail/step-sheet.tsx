@@ -25,7 +25,8 @@ const STEP_SEGMENTS = [
 const MIN_JUSTIFICATION = 15;
 
 /** Register the stage of the attendance: follow-up reminder, loss reason and the AI regression protection. */
-export function StepSheet({ c }: { c: LeadDetailController }) {
+/** canRegisterSale: a tela tem o registro de venda montado (26/11/2026: atalho para ele dentro da folha de etapa). */
+export function StepSheet({ c, canRegisterSale = false }: { c: LeadDetailController; canRegisterSale?: boolean }) {
   const {
     showUpdateSheet,
     setShowUpdateSheet,
@@ -163,6 +164,19 @@ export function StepSheet({ c }: { c: LeadDetailController }) {
           </Button>
           {/* Nível 1: a causa fica aqui, na folha que reabriu com o que o corretor escreveu (sem toast). */}
           {stepError ? <p id="step-sheet-error" role="alert" className="text-sm text-(--danger)">{stepError}</p> : null}
+          {canRegisterSale && c.leadStatus !== "lost" ? (
+            <Button
+              size="lg"
+              variant="secondary"
+              disabled={updatingStep}
+              onClick={() => {
+                setShowUpdateSheet(false);
+                c.setShowSaleConfirm(true);
+              }}
+            >
+              Registrar venda
+            </Button>
+          ) : null}
         </div>
       </div>
     </BottomSheet>

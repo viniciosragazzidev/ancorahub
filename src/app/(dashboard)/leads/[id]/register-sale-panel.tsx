@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogClose, DialogDescription, DialogPanel, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { registerSaleAction } from "@/features/post-sale/actions";
+import { BeneficiariesSection, type Beneficiary } from "./beneficiaries-section";
 import { cn } from "@/lib/utils";
 import { dataIso, formatarData, lerData } from "@/shared/input/data";
 import { useCampoMascarado } from "@/shared/input/use-campo-mascarado";
@@ -207,7 +208,10 @@ export function RegisterSalePanel({
   onOpenChange,
   onRegistered,
   celebration = false,
+  people,
 }: {
+  /** Titular e dependentes: o corretor adiciona e confirma aqui, no registro da venda (26/11/2026). */
+  people?: { contactName: string; beneficiaries: Beneficiary[] };
   leadId: string;
   documents: ConfirmationDocument[];
   carriers: CarrierOption[];
@@ -427,6 +431,16 @@ export function RegisterSalePanel({
               className="h-9 border-0 bg-transparent px-1 text-base shadow-none focus-visible:ring-0 dark:bg-transparent"
             />
           </div>
+
+          {people ? (
+            <BeneficiariesSection
+              leadId={leadId}
+              contactName={people.contactName}
+              initialBeneficiaries={people.beneficiaries}
+              onChanged={() => router.refresh()}
+              embedded
+            />
+          ) : null}
 
           {/* Grade 2x2 de escolhas */}
           <div className="grid grid-cols-2 gap-3">

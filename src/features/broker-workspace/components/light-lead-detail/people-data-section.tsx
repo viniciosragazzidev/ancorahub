@@ -1,6 +1,5 @@
 "use client";
 
-import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 import { type LightLeadDetailData } from "./types";
 import type { LeadDetailController } from "./use-lead-detail";
@@ -12,11 +11,8 @@ export function PeopleDataSection({ lead, c, showRecordDetails = true }: { lead:
         {/* ── Pessoas da Contratação + Dados Organizados ──────────────────── */}
         {!isDistributed && (
           <div className="space-y-4" data-form-density="compact">
-            <BeneficiariesSection
-              leadId={lead.id}
-              contactName={lead.nome}
-              initialBeneficiaries={lead.beneficiaries || []}
-            />
+            {/* Titular e dependentes só para leitura: adicionar e confirmar ficam no registro da venda (26/11/2026). */}
+            <PeopleReadOnly lead={lead} />
             {showRecordDetails ? <PersonRecordDetails
               kind="lead"
               hideRegistrationDate

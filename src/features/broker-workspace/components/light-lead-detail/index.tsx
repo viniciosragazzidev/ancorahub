@@ -153,10 +153,10 @@ export function LightLeadDetail({
           conversation={conversation}
         />
         <DeclineSheet lead={lead} c={c} />
-        <StepSheet c={c} />
+        <StepSheet c={c} canRegisterSale={!conversationSale && !lead.hasActiveSale} />
         {conversationSale ? null : saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} celebrationScreen /> : <>
           <SaleDocSheet lead={lead} c={c} requirements={requirements} />
-          <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration />
+          <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration people={{ contactName: lead.nome, beneficiaries: lead.beneficiaries || [] }} />
         </>}
         {c.successOverlay}
       {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={`${c.handoffUrl}:${c.handoffPhase}`} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} initialPhase={c.handoffPhase} onClose={c.closeHandoff} /> : null}
@@ -197,10 +197,10 @@ export function LightLeadDetail({
 
       <LeadActionBar lead={lead} c={c} />
       <DeclineSheet lead={lead} c={c} />
-      <StepSheet c={c} />
+      <StepSheet c={c} canRegisterSale={!conversationSale && !lead.hasActiveSale} />
       {conversationSale ? null : saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} celebrationScreen /> : <>
         <SaleDocSheet lead={lead} c={c} requirements={requirements} />
-        <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration />
+        <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration people={{ contactName: lead.nome, beneficiaries: lead.beneficiaries || [] }} />
       </>}
       {c.successOverlay}
       {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={`${c.handoffUrl}:${c.handoffPhase}`} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} initialPhase={c.handoffPhase} onClose={c.closeHandoff} /> : null}
