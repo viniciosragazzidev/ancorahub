@@ -1,0 +1,3 @@
+/* Último acesso nas listas Lite: recente em texto principal, parado ou nunca em texto secundário. */
+.fresh { color: var(--foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stale { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }

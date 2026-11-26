@@ -110,3 +110,21 @@ describe("MyTeamPage pending brokers in the members list", () => {
     expect(screen.getByRole("button", { name: "Editar" })).toBeTruthy();
   });
 });
+
+describe("MyTeamPage last access", () => {
+  const member = { imageUrl: null, email: null, phone: null, cpf: null, brokerCode: null, availability: "available", receivedToday: 0, inService: 0, late: 0 };
+  it("shows when each team member last entered, muted after 7 days or never, with full date in the title", () => {
+    render(<MyTeamPage initialData={{ ...base, renderedAt: "2026-11-25T17:00:00.000Z", members: [
+      { ...member, id: "u1", name: "Ana Recente", lastAccessAt: "2026-11-24T15:00:00.000Z" },
+      { ...member, id: "u2", name: "Bia Parada", lastAccessAt: "2026-11-01T15:00:00.000Z" },
+      { ...member, id: "u3", name: "Caio Novo", lastAccessAt: null },
+    ] }} />);
+    const recent = screen.getByText("Entrou ontem");
+    expect(recent.getAttribute("title")).toBe("Último acesso em 24/11/2026 às 12:00");
+    expect(recent.hasAttribute("data-stale")).toBe(false);
+    expect(screen.getByText("Entrou há 24 dias").hasAttribute("data-stale")).toBe(true);
+    const never = screen.getByText("Nunca entrou");
+    expect(never.hasAttribute("data-stale")).toBe(true);
+    expect(never.getAttribute("title")).toBe("Nunca entrou no sistema");
+  });
+});

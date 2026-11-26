@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
-import { and, asc, eq, inArray, max, or, sql } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
+import { getLastAccessByUser } from "@/features/team/last-access-query";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { StatCard } from "@/components/dashboard/metric-card";
@@ -238,16 +239,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const agentOff = context.role === "director" ? await listAgentOffUsers(context.tenantId).catch(() => []) : [];
   // Último acesso (25/11): sessão mais recente de cada pessoa listada, numa consulta agregada. Só os userIds já
   // filtrados pelo escopo (gestor: unidade; supervisor: equipe), então ninguém de fora entra na conta.
-  const listedUserIds = [...new Set([...brokers, ...nonBrokers].map((member) => member.userId).filter((id): id is string => Boolean(id)))];
-  const lastAccessRows = listedUserIds.length
-    ? await getDatabase()
-      .select({ userId: schema.session.userId, lastAccessAt: max(sql<Date>`greatest(${schema.session.createdAt}, ${schema.session.updatedAt})`) })
-      .from(schema.session)
-      .where(inArray(schema.session.userId, listedUserIds))
-      .groupBy(schema.session.userId)
-      .catch((error) => { console.error("[equipe] last access unavailable", error instanceof Error ? error.message : error); return []; })
-    : [];
-  const lastAccessByUser = new Map(lastAccessRows.map((row) => [row.userId, row.lastAccessAt ? new Date(row.lastAccessAt).toISOString() : null]));
+  const lastAccessByUser = (await getLastAccessByUser([...brokers, ...nonBrokers].map((member) => member.userId))) ?? new Map<string, string | null>();
   const members = [
     ...new Map<string, TeamMemberRow>(
       [...brokers, ...nonBrokers].map((member) => [member.id, member])

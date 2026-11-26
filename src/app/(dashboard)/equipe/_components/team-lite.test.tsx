@@ -121,6 +121,49 @@ describe("TeamLite", () => {
   });
 });
 
+describe("clique na linha abre a gaveta do membro", () => {
+  const rowOf = (name: string) => within(table()).getByText(name).closest("tr") as HTMLElement;
+
+  it("quem pode editar abre a edição", () => {
+    renderTeam();
+    fireEvent.click(rowOf("Ana Souza"));
+    const panel = screen.getByRole("dialog", { name: "Editar membro" });
+    expect(within(panel).getByRole("textbox", { name: "Nome" })).toHaveValue("Ana Souza");
+  });
+
+  it("quem não pode editar vê só leitura, sem campos editáveis", () => {
+    const readOnly: TeamMemberLite[] = [{ ...base, id: "m9", userId: "u9", name: "Dora Prado", email: "dora@x.com", role: "manager", jobTitle: "manager", status: "active", phone: "21988887777", canEditAuthority: false, canManage: false, lastAccessAt: "2026-11-25T14:00:00.000Z" }];
+    render(<TeamLite members={readOnly} branches={[{ id: "b1", name: "Centro" }]} customRoles={[]} stats={stats} transferRequests={[]} showTransfers={false} currentRole="manager" currentBranchId="b1" currentUserId="u1" canViewProfile={false} renderedAt="2026-11-25T17:00:00.000Z" />);
+    fireEvent.click(rowOf("Dora Prado"));
+    const panel = screen.getByRole("dialog", { name: "Dora Prado" });
+    expect(within(panel).getByText("Só leitura. Você não pode editar este acesso.")).toBeInTheDocument();
+    for (const label of ["Nome", "Papel", "Unidade", "WhatsApp", "Status", "Último acesso"]) expect(within(panel).getByText(label)).toBeInTheDocument();
+    expect(within(panel).getByText("Gestor")).toBeInTheDocument();
+    expect(within(panel).getByText("Centro")).toBeInTheDocument();
+    expect(within(panel).getByText("Ativo")).toBeInTheDocument();
+    expect(within(panel).getByText("25/11/2026 às 11:00")).toBeInTheDocument();
+    expect(within(panel).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: /Salvar/ })).not.toBeInTheDocument();
+    expect(team.updateTeamMemberAction).not.toHaveBeenCalled();
+  });
+
+  it("o menu ⋯ da linha não abre a gaveta", () => {
+    renderTeam();
+    fireEvent.click(within(table()).getByRole("button", { name: "Ações de Ana Souza" }));
+    expect(screen.queryByRole("dialog", { name: "Editar membro" })).not.toBeInTheDocument();
+  });
+});
+
+describe("rowSheetKind", () => {
+  it("segue a permissão de editar", async () => {
+    const { rowSheetKind } = await import("./team-lite");
+    expect(rowSheetKind({ canEditAuthority: true })).toBe("edit");
+    expect(rowSheetKind({ canEditAuthority: false })).toBe("view");
+  });
+});
+
 describe("equipe Lite para o gestor no modo normal", () => {
   it("sem Cargos e permissões e convite só de corretores, como a tela de hoje", async () => {
     const { TeamHeaderActionsLite } = await import("./team-lite");

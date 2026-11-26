@@ -8,6 +8,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSupervisorWorkspaceData, type TeamDuty } from "@/features/supervisor-workspace/queries";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { teamLeaderboard } from "@/features/engagement/leaderboard-queries";
+import { getLastAccessByUser } from "@/features/team/last-access-query";
+import { lastAccessOf } from "@/features/team/last-access";
 
 export type SupervisorTeamPageData = {
   branchId: string;
@@ -15,7 +17,11 @@ export type SupervisorTeamPageData = {
   team: { name: string; description: string; imageUrl: string | null } | null;
   ranking: { position: number; positionChange: number | null } | null;
   overview: { brokers: number; inService: number; late: number };
-  members: Array<{ id: string; name: string; imageUrl: string | null; email: string | null; phone: string | null; cpf: string | null; brokerCode: string | null; availability: string; receivedToday: number; inService: number; late: number }>;
+  members: Array<{ id: string; name: string; imageUrl: string | null; email: string | null; phone: string | null; cpf: string | null; brokerCode: string | null; availability: string; receivedToday: number; inService: number; late: number;
+    /** Sessão mais recente (ISO); null quando nunca entrou; ausente quando a consulta falhou. */
+    lastAccessAt?: string | null }>;
+  /** Hora do servidor (ISO): o "há 3 h" do último acesso sai igual no servidor e no navegador. */
+  renderedAt?: string;
   invites: Array<{ id: string; brokerId: string; brokerName: string; createdAt: string }>;
   pendingAccessInvites: Array<{ id: string; brokerProfileId: string; brokerName: string; email: string | null; phone: string | null; cpf: string | null; brokerCode: string | null; createdAt: string }>;
   brokers: Array<{ id: string; name: string; imageUrl: string | null; supervisorId: string | null; supervisorName: string | null; inviteId: string | null }>;
@@ -93,6 +99,8 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
       )).orderBy(asc(schema.user.name)),
     getSupervisorWorkspaceData(context),
   ]);
+  // Último acesso (26/11): só dos corretores da própria equipe, numa consulta agregada.
+  const lastAccessPromise = getLastAccessByUser(memberRows.map((member) => member.id), "equipe-supervisor");
   const rankingEnabled = await getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false") === "true";
   const leaderboard = rankingEnabled
     ? await teamLeaderboard(context.tenantId, context.branchId).catch(() => null)
@@ -104,9 +112,11 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
     .where(and(eq(schema.user.status, "active"), eq(schema.user.active, true), inArray(schema.user.id, supervisorIds))) : [];
   const supervisorNameById = new Map(supervisorRows.map((row) => [row.id, row.name]));
   const pendingInviteByBroker = new Map(inviteRows.map((row) => [row.brokerId, row.id]));
+  const lastAccess = await lastAccessPromise;
 
   return {
     onDuty: workspace.duty,
+    renderedAt: new Date().toISOString(),
     branchId: context.branchId,
     branchName: branchRows[0]?.name ?? null,
     team: teamRows[0] ?? null,
@@ -124,6 +134,7 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
         receivedToday: activity?.receivedToday ?? 0,
         inService: activity?.inService ?? 0,
         late: activity?.late ?? 0,
+        lastAccessAt: lastAccessOf(lastAccess, member.id),
       };
     }).sort((a, b) => Number(b.late > 0) - Number(a.late > 0) || b.late - a.late || a.name.localeCompare(b.name, "pt-BR")),
     invites: inviteRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),

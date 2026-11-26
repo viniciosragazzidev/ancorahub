@@ -17,6 +17,7 @@ import { resendInviteAction, revokeInviteAction, updateLiteBrokerContactAction }
 import { Input } from "@/components/ui/input";
 import { TeamInviteLiteSheet } from "@/features/team/team-invite-lite-sheet";
 import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
+import { LastAccessMeta } from "@/features/team/last-access-meta";
 
 import { addBrokerToMyTeamAction } from "./actions";
 import { cancelMyTeamInviteAction, inviteBrokerToMyTeamAction, removeBrokerFromMyTeamAction } from "./my-team-actions";
@@ -48,6 +49,8 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const reducedMotion = useReducedMotion() ?? false;
+  // Hora do servidor: o "Entrou há 3 h" sai igual no servidor e no navegador.
+  const now = data.renderedAt ? new Date(data.renderedAt) : new Date();
   const normalizeName = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
   const unitQuery = normalizeName(unitSearch.trim());
   const unitBrokers = data.brokers.filter((broker) => normalizeName(broker.name).includes(unitQuery));
@@ -148,6 +151,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           chip={<Badge tone={member.availability === "available" ? "success" : "neutral"} size="sm">{member.availability === "available" ? "Disponível" : member.availability === "paused" ? "Pausado" : "Fora do ar"}</Badge>}
           preview={[`${member.receivedToday} hoje`, `${member.inService} em atendimento`, member.late ? (member.late === 1 ? "1 atrasado" : `${member.late} atrasados`) : null].filter(Boolean).join(" · ")}
           previewTone={member.late ? "alert" : "muted"}
+          meta={<LastAccessMeta value={member.lastAccessAt} now={now} />}
           dot={member.late ? "alert" : null}
           dotLabel={member.late ? "Tem lead atrasado" : undefined}
           action={<BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este membro." closeLabel="Fechar" detents={[0.38, 0.7]}>

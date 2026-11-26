@@ -17,6 +17,7 @@ import { PeopleFilters, PeopleRow, PeopleSection } from "@/components/light/peop
 import type { ManagerLiteTeamData } from "./manager-lite-team-queries";
 import styles from "@/features/supervisor-workspace/my-team-page.module.css";
 import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
+import { LastAccessMeta } from "@/features/team/last-access-meta";
 
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "medium", timeStyle: "short" });
 
@@ -31,6 +32,8 @@ export function ManagerLiteTeam({ initialData, initialTransfers }: { initialData
   const [requests, setRequests] = useState(initialTransfers);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const reducedMotion = useReducedMotion() ?? false;
+  // Hora do servidor: o "Entrou há 3 h" sai igual no servidor e no navegador.
+  const [now] = useState(() => (initialData.renderedAt ? new Date(initialData.renderedAt) : new Date()));
   const members = useMemo(() => initialData.members.filter((member) => member.name.toLocaleLowerCase("pt-BR").includes(query.trim().toLocaleLowerCase("pt-BR"))), [initialData.members, query]);
 
   function invoke(action: typeof resendInviteAction, invitationId: string) {
@@ -171,6 +174,7 @@ export function ManagerLiteTeam({ initialData, initialTransfers }: { initialData
                   chip={<Badge tone={tone} size="sm">{label}</Badge>}
                   preview={[`${member.inService} em atendimento`, member.late > 0 ? `${member.late} atrasado${member.late === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
                   previewTone={member.late > 0 ? "alert" : "muted"}
+                  meta={member.status === "pending" ? undefined : <LastAccessMeta value={member.lastAccessAt} now={now} />}
                   dot={member.late > 0 ? "alert" : null}
                   dotLabel={member.late > 0 ? "Tem lead atrasado" : undefined}
                   action={<BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este corretor." closeLabel="Fechar" detents={[0.38, 0.7]}>

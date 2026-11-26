@@ -64,6 +64,21 @@ export function formatLastAccessDetail(value: Date | string | null | undefined):
   return `${parts.day}/${parts.month}/${parts.year} às ${parts.hour}:${parts.minute}`;
 }
 
+/** Texto da linha nas listas do gestor e do supervisor: "Entrou há 3 h", "Entrou ontem" ou "Nunca entrou". */
+export function formatLastAccessMeta(value: Date | string | null | undefined, now: Date = new Date()): string {
+  const text = formatLastAccess(value, now);
+  return toDate(value) ? `Entrou ${text}` : text;
+}
+
+/**
+ * Último acesso de uma pessoa a partir do mapa da consulta agregada (getLastAccessByUser). undefined quando a consulta
+ * falhou (a tela não mostra nada); null quando a pessoa nunca entrou ou ainda não tem usuário.
+ */
+export function lastAccessOf(map: Map<string, string | null> | null, userId: string | null | undefined): string | null | undefined {
+  if (!map) return undefined;
+  return userId ? map.get(userId) ?? null : null;
+}
+
 /** Ordem por último acesso: mais antigo primeiro, quem nunca entrou no topo. */
 export function compareLastAccess(a: string | null | undefined, b: string | null | undefined): number {
   const ta = toDate(a)?.getTime() ?? Number.NEGATIVE_INFINITY;

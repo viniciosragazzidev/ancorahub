@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compareLastAccess, formatLastAccess, formatLastAccessDetail, isLastAccessStale } from "./last-access";
+import { compareLastAccess, formatLastAccess, formatLastAccessDetail, formatLastAccessMeta, isLastAccessStale, lastAccessOf } from "./last-access";
 
 // 25/11/2026 14:00 em São Paulo (UTC-3).
 const now = new Date("2026-11-25T17:00:00.000Z");
@@ -61,5 +61,25 @@ describe("compareLastAccess", () => {
   it("ordena do mais antigo para o mais recente, com quem nunca entrou primeiro", () => {
     const list = ["2026-11-20T10:00:00.000Z", null, "2026-11-01T10:00:00.000Z", "2026-11-25T10:00:00.000Z"];
     expect([...list].sort(compareLastAccess)).toEqual([null, "2026-11-01T10:00:00.000Z", "2026-11-20T10:00:00.000Z", "2026-11-25T10:00:00.000Z"]);
+  });
+});
+
+describe("formatLastAccessMeta", () => {
+  it("diz Entrou antes do tempo e mantém Nunca entrou", () => {
+    expect(formatLastAccessMeta("2026-11-25T14:00:00.000Z", now)).toBe("Entrou há 3 h");
+    expect(formatLastAccessMeta("2026-11-24T15:00:00.000Z", now)).toBe("Entrou ontem");
+    expect(formatLastAccessMeta(null, now)).toBe("Nunca entrou");
+  });
+});
+
+describe("lastAccessOf", () => {
+  const map = new Map<string, string | null>([["u1", "2026-11-25T14:00:00.000Z"]]);
+  it("lê do mapa agregado e trata quem não está nele como nunca entrou", () => {
+    expect(lastAccessOf(map, "u1")).toBe("2026-11-25T14:00:00.000Z");
+    expect(lastAccessOf(map, "u2")).toBeNull();
+    expect(lastAccessOf(map, null)).toBeNull();
+  });
+  it("consulta indisponível: undefined, para a tela não dizer Nunca entrou a todos", () => {
+    expect(lastAccessOf(null, "u1")).toBeUndefined();
   });
 });

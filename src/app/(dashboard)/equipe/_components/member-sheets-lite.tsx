@@ -7,7 +7,7 @@
  * Feedback (FEEDBACK.md, nível 1): o botão mostra o envio; depois que o servidor confirma, o painel fecha e
  * `onDone` leva a confirmação para a lista (o objeto). A falha fica no painel, com a causa e "Tentar de novo".
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound } from "lucide-react";
 
@@ -21,6 +21,7 @@ import type { TenantRole } from "@/shared/db/schema";
 
 import { setMemberAgentAccessAction } from "@/features/agent/access-actions";
 import { formatLastAccess, formatLastAccessDetail } from "@/features/team/last-access";
+import { formatLeadPhone } from "@/features/leads/format-lead-phone";
 
 import { deleteTeamMemberAction, generateResetPasswordLinkAction, transferLeadsAction, updateTeamMemberAction } from "../actions";
 import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
@@ -258,6 +259,41 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
         </div>
         {status.edit?.state === "error" ? <ActionNote status={status.edit} /> : null}
       </form>
+    </LiteSidePanel>
+  );
+}
+
+/**
+ * Ver membro só para leitura: abre pelo clique na linha quando quem está vendo não pode editar este acesso.
+ * Mostra nome, papel, unidade, WhatsApp, status e último acesso, sem nenhum campo editável.
+ */
+export function ViewMemberLite({ member, open, onOpenChange }: { member: TeamMemberLite; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const fields: Array<{ label: string; value: ReactNode }> = [
+    { label: "Nome", value: member.name ?? "Sem nome" },
+    { label: "Papel", value: [JOB_TITLE_LABELS[member.jobTitle] ?? ROLE_LABELS[member.role], member.customRoleName].filter(Boolean).join(" · ") },
+    { label: "Unidade", value: member.branchId ? member.branchName ?? "Unidade vinculada" : "Geral da empresa" },
+    { label: "WhatsApp", value: member.phone ? <span className={page.numeric}>{formatLeadPhone(member.phone)}</span> : "Não informado" },
+    { label: "Status", value: STATUS_LABELS[member.status] },
+  ];
+  if (member.userId) {
+    fields.push({
+      label: "Último acesso",
+      value: <><span className={page.numeric}>{formatLastAccessDetail(member.lastAccessAt)}</span>{member.lastAccessAt ? <span>&nbsp;· {formatLastAccess(member.lastAccessAt)}</span> : null}</>,
+    });
+  }
+  return (
+    <LiteSidePanel open={open} onOpenChange={onOpenChange} title={member.name ?? "Membro da equipe"} description="Só leitura. Você não pode editar este acesso.">
+      <div className={form.form}>
+        {fields.map((field) => (
+          <div key={field.label} className={form.field}>
+            <span className={form.label}>{field.label}</span>
+            <span className={styles.locked}>{field.value}</span>
+          </div>
+        ))}
+        <div className={form.actions}>
+          <button type="button" className={page.button} onClick={() => onOpenChange(false)}>Fechar</button>
+        </div>
+      </div>
     </LiteSidePanel>
   );
 }

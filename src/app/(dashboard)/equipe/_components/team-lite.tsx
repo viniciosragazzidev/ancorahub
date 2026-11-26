@@ -32,7 +32,7 @@ import type { TenantRole } from "@/shared/db/schema";
 import { bulkToggleTeamMemberStatusAction, resendInviteAction, revokeInviteAction, toggleTeamMemberStatusAction } from "../actions";
 import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import { TeamInviteLite } from "./team-invite-lite";
-import { DeleteMemberLite, EditMemberLite, JOB_TITLE_LABELS, ROLE_LABELS, ResetPasswordLite, STATUS_LABELS, TransferLeadsLite, type BranchOption, type CustomRoleOption, type TeamMemberLite } from "./member-sheets-lite";
+import { DeleteMemberLite, EditMemberLite, JOB_TITLE_LABELS, ROLE_LABELS, ResetPasswordLite, STATUS_LABELS, TransferLeadsLite, ViewMemberLite, type BranchOption, type CustomRoleOption, type TeamMemberLite } from "./member-sheets-lite";
 import styles from "./team-lite.module.css";
 
 export type TeamLiteStats = { total: number; active: number; unassignedLeads: number; salesTotal: number; membersTrend: number[]; leadsTrend: number[]; salesTrend: number[] };
@@ -110,7 +110,12 @@ function TransferRequestsLite({ initial }: { initial: PendingTransferRequest[] }
   );
 }
 
-type Sheet = { kind: "edit" | "delete" | "transfer" | "password"; member: TeamMemberLite } | null;
+type Sheet = { kind: "edit" | "view" | "delete" | "transfer" | "password"; member: TeamMemberLite } | null;
+
+/** Clique na linha: quem pode editar abre a edição; quem não pode vê os dados só para leitura. */
+export function rowSheetKind(member: Pick<TeamMemberLite, "canEditAuthority">): "edit" | "view" {
+  return member.canEditAuthority ? "edit" : "view";
+}
 /** Ordem da lista: nome (padrão do servidor) ou último acesso, para achar quem não abre o sistema. */
 type MemberOrder = "name" | "access-old" | "access-new";
 const ORDER_OPTIONS: Array<{ value: MemberOrder; label: string }> = [
@@ -361,6 +366,7 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
           columns={columns}
           rows={pageRows}
           rowKey={(member) => member.id}
+          onRowOpen={(member) => setSheet({ kind: rowSheetKind(member), member })}
           rowTone={(member) => (member.status === "disabled" ? "muted" : undefined)}
           selection={canBulk ? {
             isSelected: (member) => multiSelect.isSelected(member.id),
@@ -388,6 +394,7 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
       ) : null}
 
       {sheet?.kind === "edit" ? <EditMemberLite key={sheet.member.id} member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} branches={branches} currentRole={currentRole} currentBranchId={currentBranchId} customRoles={customRoles} allMembers={members} onDone={doneInList} /> : null}
+      {sheet?.kind === "view" ? <ViewMemberLite key={sheet.member.id} member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} /> : null}
       {sheet?.kind === "delete" ? <DeleteMemberLite member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} onDone={doneInList} /> : null}
       {sheet?.kind === "transfer" ? <TransferLeadsLite member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} allMembers={members} onDone={doneInList} /> : null}
       {sheet?.kind === "password" ? <ResetPasswordLite member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} /> : null}

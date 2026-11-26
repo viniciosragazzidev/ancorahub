@@ -5,11 +5,15 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-scope";
 import { getManagerLiteLeads } from "@/features/supervisor-workspace/manager-lite-queries";
+import { getLastAccessByUser } from "@/features/team/last-access-query";
+import { lastAccessOf } from "@/features/team/last-access";
 
 export type ManagerLiteTeamData = {
   unitBranchId: string | null;
   unitName: string | null;
   slaMinutes: number;
+  /** Hora do servidor (ISO): o "há 3 h" do último acesso sai igual no servidor e no navegador. */
+  renderedAt?: string;
   counts: { brokers: number; inService: number; late: number };
   unassignedBrokers: Array<{ userId: string; name: string }>;
   supervisorInvites: Array<{ id: string; name: string; email: string; createdAt: string }>;
@@ -17,13 +21,15 @@ export type ManagerLiteTeamData = {
     id: string; userId: string | null; name: string; image: string | null; email: string;
     availability: string; status: "active" | "disabled" | "pending"; inviteId: string | null;
     inService: number; late: number;
+    /** Sessão mais recente (ISO); null quando nunca entrou; ausente quando a consulta falhou. */
+    lastAccessAt?: string | null;
   }>;
 };
 
 export async function getManagerLiteTeam(context: TenantContext): Promise<ManagerLiteTeamData> {
   if (context.role !== "manager") throw new Error("Esta lista está disponível apenas para gestores.");
   const scope = getManagerUnitScope(context);
-  if (!scope) return { unitBranchId: null, unitName: null, slaMinutes: 15, counts: { brokers: 0, inService: 0, late: 0 }, unassignedBrokers: [], supervisorInvites: [], members: [] };
+  if (!scope) return { unitBranchId: null, unitName: null, slaMinutes: 15, renderedAt: new Date().toISOString(), counts: { brokers: 0, inService: 0, late: 0 }, unassignedBrokers: [], supervisorInvites: [], members: [] };
   const db = getDatabase();
   const [branchRows, rows, leadData, serviceRows, supervisorInviteRows] = await Promise.all([
     db.select({ name: schema.branches.name }).from(schema.branches).where(and(eq(schema.branches.id, scope.branchId), eq(schema.branches.tenantId, scope.tenantId))).limit(1),
@@ -61,6 +67,8 @@ export async function getManagerLiteTeam(context: TenantContext): Promise<Manage
       ))
       .orderBy(desc(schema.brokerInvitations.createdAt)),
   ]);
+  // Último acesso (26/11): só dos corretores desta unidade que a lista mostra, numa consulta agregada.
+  const lastAccess = await getLastAccessByUser(rows.map((row) => row.userId), "equipe-gestor");
   const activity = new Map(leadData.team.map((member) => [member.id, member]));
   const serviceByBroker = new Map(serviceRows.map((row) => [row.brokerId, Number(row.total)]));
   const members = rows.map((row) => ({
@@ -79,6 +87,7 @@ export async function getManagerLiteTeam(context: TenantContext): Promise<Manage
     unitBranchId: scope.branchId,
     unitName: branchRows[0]?.name ?? null,
     slaMinutes: leadData.slaMinutes,
+    renderedAt: new Date().toISOString(),
     unassignedBrokers: members.filter((member) => member.status === "active" && rows.find((row) => (row.userId ?? row.id) === member.id)?.supervisorId === null)
       .map((member) => ({ userId: member.userId!, name: member.name })),
     supervisorInvites: supervisorInviteRows.map((invite) => ({ ...invite, createdAt: invite.createdAt.toISOString() })),
@@ -89,7 +98,7 @@ export async function getManagerLiteTeam(context: TenantContext): Promise<Manage
     },
     members: members.map((member) => {
       const memberActivity = member.userId ? activity.get(member.userId) : null;
-      return { ...member, availability: memberActivity?.availability ?? member.availability, inService: member.userId ? serviceByBroker.get(member.userId) ?? 0 : 0, late: memberActivity?.late ?? 0 };
+      return { ...member, availability: memberActivity?.availability ?? member.availability, inService: member.userId ? serviceByBroker.get(member.userId) ?? 0 : 0, late: memberActivity?.late ?? 0, lastAccessAt: lastAccessOf(lastAccess, member.userId) };
     }).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
   };
 }
