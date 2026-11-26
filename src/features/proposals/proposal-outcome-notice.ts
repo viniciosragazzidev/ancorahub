@@ -17,7 +17,7 @@ export type ProposalOutcomeNotice = {
 
 const OUTCOME: Partial<Record<ProposalStatus, { capability: ProposalOutcomeCapability; type: string; verb: string }>> = {
   aprovada: { capability: "proposal_approved", type: "proposal_approved", verb: "aprovada" },
-  perdida: { capability: "proposal_rejected", type: "proposal_rejected", verb: "recusada" },
+  perdida: { capability: "proposal_rejected", type: "proposal_rejected", verb: "encerrada sem venda" },
 };
 
 export function buildProposalOutcomeNotice(input: {
@@ -35,7 +35,8 @@ export function buildProposalOutcomeNotice(input: {
   const name = input.leadName?.trim() || "seu cliente";
   const operator = input.operatorName?.trim() || "operadora";
   const since = input.previousUpdatedAt ? new Date(input.previousUpdatedAt).getTime() : 0;
-  const text = `Proposta de ${name} ${outcome.verb} pela ${operator}`;
+  // "Perdida" cobre recusa da operadora e desistência do cliente: o texto fica neutro, sem citar a operadora.
+  const text = input.newStatus === "perdida" ? `Proposta de ${name} encerrada sem venda` : `Proposta de ${name} ${outcome.verb} pela ${operator}`;
   return {
     capability: outcome.capability,
     type: outcome.type,

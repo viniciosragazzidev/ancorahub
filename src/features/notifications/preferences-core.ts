@@ -124,7 +124,7 @@ const PRIVATE_TEXT_BY_CAPABILITY: Partial<Record<NotificationCapabilityId, strin
   lead_arrived: "Lead novo na fila",
   lead_reassigned: "Um lead seu foi reatribuído",
   proposal_approved: "Uma proposta sua foi aprovada",
-  proposal_rejected: "Uma proposta sua foi recusada",
+  proposal_rejected: "Uma proposta sua foi encerrada sem venda",
 };
 
 const PRIVATE_TEXT_BY_GROUP: Record<NotificationPreferenceGroupId, string> = {

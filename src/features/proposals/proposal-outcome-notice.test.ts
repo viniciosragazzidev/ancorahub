@@ -14,7 +14,7 @@ describe("aviso de proposta aprovada ou recusada", () => {
     });
     expect(buildProposalOutcomeNotice({ ...base, newStatus: "perdida" })).toMatchObject({
       capability: "proposal_rejected",
-      title: "Proposta de Maria Silva recusada pela Amil",
+      title: "Proposta de Maria Silva encerrada sem venda",
     });
   });
 
@@ -44,6 +44,6 @@ describe("aviso de proposta aprovada ou recusada", () => {
     const privateOn = { ...defaultNotificationPreferences(), pushPrivacy: true };
     const notice = buildProposalOutcomeNotice({ ...base, newStatus: "aprovada" })!;
     expect(applyPushPrivacy({ title: notice.title, body: notice.message }, privateOn, notice.capability).body).toBe("Uma proposta sua foi aprovada");
-    expect(applyPushPrivacy({ title: "x", body: "y" }, privateOn, "proposal_rejected").body).toBe("Uma proposta sua foi recusada");
+    expect(applyPushPrivacy({ title: "x", body: "y" }, privateOn, "proposal_rejected").body).toBe("Uma proposta sua foi encerrada sem venda");
   });
 });
