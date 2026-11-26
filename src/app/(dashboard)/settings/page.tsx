@@ -53,6 +53,8 @@ import { AccountLite } from "./_components/lite/account-lite";
 import { EmpresaLite } from "./_components/lite/empresa-lite";
 import { ProposalsDefaultsLite } from "./_components/lite/proposals-defaults-lite";
 import { getProposalDefaults } from "@/features/proposals/defaults";
+import { getPostSaleSequenceSettings } from "@/features/leads/post-sale-sequence";
+import { PostSaleSequenceLite } from "./_components/lite/post-sale-sequence-lite";
 import { UnitLite, WhatsappLite } from "./_components/lite/unit-lite";
 import { FeedbackLite, StageModeLite } from "./_components/lite/atendimento-lite";
 import { IntegrationsLite } from "./_components/lite/integrations-lite";
@@ -264,6 +266,10 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const proposalsSection: SettingsLiteSection | null = context.role === "director"
       ? { id: "propostas", title: "Propostas", description: "Validade e condições padrão das propostas", node: <ProposalsDefaultsLite defaults={await getProposalDefaults(context.tenantId)} /> }
       : null;
+    // Sequência de pós-venda (26/11): tarefas D+1, D+15 e D+30 a cada venda, só o diretor; a action confere o papel de novo.
+    const postSaleSequenceSection: SettingsLiteSection | null = context.role === "director"
+      ? { id: "sequencia-pos-venda", title: "Sequência de pós-venda", description: "Tarefas do corretor depois de cada venda", node: <PostSaleSequenceLite settings={await getPostSaleSequenceSettings(context.tenantId)} /> }
+      : null;
     // Recursos (25/11): diretor e gestor, só leitura; "Ajustar" só no que o diretor decide. Etiquetas: quem já gerencia hoje.
     const showResources = context.role === "director" || context.role === "manager";
     const [resourceGroups, tagList] = await Promise.all([
@@ -288,7 +294,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     const internalSection: SettingsLiteSection | null = internal
       ? { id: "numeros-internos", title: "Números internos", description: "Quem escreve no WhatsApp e não é lead", node: <InternalNumbersLite initialText={formatInternalNumberLines(internal[0])} teamCount={internal[1].team.size} /> }
       : null;
-    const extraSections = [proposalsSection, tagsSection, internalSection, resourcesSection, lgpdSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
+    const extraSections = [proposalsSection, postSaleSequenceSection, tagsSection, internalSection, resourcesSection, lgpdSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
     const sections = [...tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section)), ...extraSections];
     return (
       <>

@@ -657,6 +657,11 @@ export async function convertProposalToSaleAction(
       origin: { kind: "person", actorUserId: context.userId },
     });
 
+    // Sequência de pós-venda (26/11): tarefas do corretor dono, depois do commit e sem lançar.
+    void import("@/features/leads/post-sale-sequence")
+      .then(({ startPostSaleSequence }) => startPostSaleSequence({ tenantId: context.tenantId, leadId: lead.id, convertedAt: now, actorUserId: context.userId }))
+      .catch((error) => console.warn("[post-sale-sequence] import_failed", error instanceof Error ? error.message : error));
+
     // Conversions API for CRM: "Venda" (Lead Ads leads only, never throws).
     await enqueueMetaConversionEvent({ tenantId: context.tenantId, leadId: lead.id, stage: "sale", at: now });
 

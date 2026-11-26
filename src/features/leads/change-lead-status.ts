@@ -572,6 +572,10 @@ export async function changeLeadStatus(
         ? { kind: "ai", signals: system!.saleEvidence?.signals ?? [], quote: system!.saleEvidence?.quote ?? null }
         : { kind: "person", actorUserId },
     });
+    // Sequência de pós-venda (26/11): tarefas D+1, D+15 e D+30 para o corretor dono. Fora da transação e sem lançar.
+    void import("./post-sale-sequence")
+      .then(({ startPostSaleSequence }) => startPostSaleSequence({ tenantId: lead.tenantId, leadId: lead.id, convertedAt: now, actorUserId }))
+      .catch((error) => console.warn("[post-sale-sequence] import_failed", error instanceof Error ? error.message : error));
   }
 
   // Desfecho do fechamento (09/11): saiu de Documentação ou Em análise por uma pessoa, a direção fica sabendo.

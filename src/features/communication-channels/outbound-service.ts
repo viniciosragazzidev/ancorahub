@@ -839,6 +839,61 @@ export async function enqueuePostSaleSurveyWahaMessage(input: {
   return resolvePostSaleOutboundInsert({ insertedId: inserted.id, intendedStatus: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued" });
 }
 
+/**
+ * "Enviar teste para mim" do pós-venda (26/11): a abertura já montada vai para o celular de quem testa, pelo mesmo
+ * número WAHA do disparo. Destinatário é o próprio usuário (nunca entra na conversa do lead) e o propósito é outro,
+ * para não contar como pesquisa nem esperar o espaçamento dos envios em massa.
+ */
+export async function enqueuePostSaleTestWahaMessage(input: {
+  tenantId: string;
+  userId: string;
+  wahaNumberId: string;
+  destinationPhone: string;
+  body: string;
+  idempotencyKey: string;
+}) {
+  const destinationPhone = phoneSchema.parse(input.destinationPhone);
+  const body = z.string().trim().min(1).max(4096).parse(input.body);
+  const db = getDatabase();
+  const [number] = await db.select({ id: schema.wahaNumbers.id, pausedUntil: schema.wahaNumbers.pausedUntil })
+    .from(schema.wahaNumbers)
+    .where(and(
+      eq(schema.wahaNumbers.id, input.wahaNumberId),
+      eq(schema.wahaNumbers.tenantId, input.tenantId),
+      inArray(schema.wahaNumbers.scope, ["tenant", "branch"]),
+      inArray(schema.wahaNumbers.status, TENANT_CHANNEL_CONNECTED_STATUSES),
+    ))
+    .limit(1);
+  if (!number || (number.pausedUntil && number.pausedUntil > new Date())) {
+    throw Object.assign(new Error("O número de origem está indisponível."), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
+  }
+  const id = randomUUID();
+  const now = new Date();
+  const [inserted] = await db.insert(schema.whatsappOutboundMessages).values({
+    id,
+    tenantId: input.tenantId,
+    channelId: null,
+    deliveryRoute: "waha_direct",
+    wahaNumberId: number.id,
+    recipientType: "user",
+    recipientId: input.userId,
+    destinationPhone,
+    purpose: "postSaleTest",
+    messageType: "text",
+    templateName: "__text__",
+    templateLanguage: "pt_BR",
+    variables: [body],
+    renderedBody: body,
+    status: "queued",
+    idempotencyKey: input.idempotencyKey,
+    queuedAt: now,
+    requestedBy: input.userId,
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing().returning({ id: schema.whatsappOutboundMessages.id });
+  return { id: inserted?.id ?? id, status: "queued" as WhatsAppOutboundStatus, duplicate: !inserted };
+}
+
 function textBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || "https://crm.ancorasaude.cloud";
 }
@@ -1032,6 +1087,8 @@ async function mirrorPostSaleSurveyMessage(row: OutboundRow) {
 
 async function syncPostSaleSurveyOutbound(row: OutboundRow, result: { status: "sent" | "failed" | "skipped"; reason?: string }) {
   if (row.purpose !== "postSaleSurvey") return;
+  // "Enviar teste para mim" (26/11): vai para quem testa, não é pesquisa de nenhum lead.
+  if (row.idempotencyKey.startsWith("post-sale-test:")) return;
   const reminderPrefix = "post-sale-reminder:";
   if (row.idempotencyKey.startsWith(reminderPrefix)) {
     // "post-sale-reminder:<surveyId>" or "post-sale-reminder:<surveyId>:<step reference>" (one reminder per step).

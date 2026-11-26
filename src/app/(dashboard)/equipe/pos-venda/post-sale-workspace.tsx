@@ -5,23 +5,26 @@
  * painel com os leads), Leads (lista filtrável com a conversa no painel), Campanhas e Automações (com "O que sai
  * hoje"). Tudo sai de uma lista de pesquisas do período; os filtros não voltam ao servidor.
  */
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { LiteSelect } from "@/components/lite/controls";
+import { LiteActionButton, LiteMenu, LiteSelect } from "@/components/lite/controls";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createPostSaleCampaignAction,
+  duplicatePostSaleCampaignAction,
   getPostSaleWorkspaceAction,
   previewPostSaleAudienceAction,
   retryFailedPostSaleCampaignAction,
+  sendPostSaleTestAction,
   startPostSaleCampaignAction,
 } from "@/features/post-sale-audit/actions";
 import { AUTO_RULE_LIMITS, postSaleRuleLabel } from "@/features/post-sale-audit/auto-rules";
 import { describePostSaleRetryResult } from "@/features/post-sale-audit/campaign-retry";
+import { POST_SALE_TEST_HOURLY_LIMIT, postSaleAudienceToForm } from "@/features/post-sale-audit/campaign-test";
 import {
   EMPTY_POST_SALE_FILTERS,
   postSaleByBroker,
@@ -217,15 +220,27 @@ function PostSaleCampaigns({ data, initialAudience, initialPreview, initialFeedb
   const [preview, setPreview] = useState<Preview | null>(initialPreview ?? null);
   const [feedback, setFeedback] = useState(initialFeedback ?? "");
   const [retryFeedback, setRetryFeedback] = useState<{ campaignId: string; text: string; error: boolean } | null>(null);
+  // "Duplicar" (26/11): o rascunho copiado e o público salvo dele, usado enquanto ninguém mexe no público.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftAudience, setDraftAudience] = useState<PostSaleAudience | null>(null);
+  const [leadIdsAudience, setLeadIdsAudience] = useState<PostSaleAudience | null>(initialAudience?.kind === "leadIds" ? initialAudience : null);
+  const [testNote, setTestNote] = useState("");
+  const formRef = useRef<HTMLElement>(null);
   const [busy, startTransition] = useTransition();
 
+  /** Mexer no público solta o público copiado: vale o que está no formulário. */
+  function audienceChanged<T>(set: (value: T) => void) {
+    return (value: T) => { setDraftAudience(null); setPreview(null); set(value); };
+  }
+
   const audience = useMemo(() => {
-    if (kind === "leadIds") return initialAudience?.kind === "leadIds" ? initialAudience : null;
+    if (draftAudience) return draftAudience;
+    if (kind === "leadIds") return leadIdsAudience;
     const dates = { ...(from ? { arrivalFrom: from } : {}), ...(to ? { arrivalTo: to } : {}) };
     if (kind === "broker") return brokerId ? { kind: "broker" as const, brokerId, ...dates } : null;
     if (kind === "queue") return queueId ? { kind: "filters" as const, queueId, ...dates } : null;
     return { kind: "filters" as const, ...dates };
-  }, [brokerId, from, initialAudience, kind, queueId, to]);
+  }, [brokerId, draftAudience, from, kind, leadIdsAudience, queueId, to]);
 
   function previewAudience() {
     if (!audience) { setFeedback("Escolha um corretor ou uma fila."); return; }
@@ -241,12 +256,49 @@ function PostSaleCampaigns({ data, initialAudience, initialPreview, initialFeedb
     if (!audience || !preview?.ok || !preview.data.canStart) return;
     setFeedback("");
     startTransition(async () => {
-      const created = await createPostSaleCampaignAction({ name, audience, openingMessage });
+      const created = await createPostSaleCampaignAction({ name, audience, openingMessage, ...(draftId ? { draftId } : {}) });
       if (!created.ok) { setFeedback(created.error); return; }
       const started = await startPostSaleCampaignAction(created.data.id);
       if (!started.ok) { setFeedback(started.error); return; }
       setFeedback(`Campanha iniciada. ${started.data.queued} mensagens na fila, ${started.data.skipped} ignoradas e ${started.data.failed} falhas.`);
       setPreview(null);
+      setDraftId(null);
+      setDraftAudience(null);
+      await onChanged();
+    });
+  }
+
+  async function sendTest() {
+    if (!audience) return { ok: false as const, error: "Escolha um corretor ou uma fila." };
+    setTestNote("");
+    const result = await sendPostSaleTestAction({ audience, openingMessage });
+    if (!result.ok) return result;
+    const left = result.data.remaining;
+    const channel = result.data.channelType === "meta" ? "canal Meta" : "WhatsApp";
+    setTestNote(`Teste enviado para o seu celular com os dados de ${result.data.exampleName}, pelo ${channel} do disparo. ${left === 0 ? "O próximo teste libera em até 1 hora." : `Ainda dá para mandar ${left} nesta hora.`}`);
+    return { ok: true as const };
+  }
+
+  function duplicate(campaign: WorkspaceData["campaigns"][number]) {
+    setFeedback("");
+    startTransition(async () => {
+      const result = await duplicatePostSaleCampaignAction(campaign.id);
+      if (!result.ok) { setFeedback(`${result.error} Nada foi copiado.`); return; }
+      const values = postSaleAudienceToForm(result.data.audience);
+      setKind(values.kind);
+      setBrokerId(values.kind === "broker" ? values.brokerId : "");
+      setQueueId(values.kind === "queue" ? values.queueId : "");
+      setFrom(values.kind === "leadIds" ? "" : values.from);
+      setTo(values.kind === "leadIds" ? "" : values.to);
+      if (values.kind === "leadIds") setLeadIdsAudience({ kind: "leadIds", leadIds: values.leadIds });
+      setName(result.data.name);
+      setOpeningMessage(result.data.openingMessage);
+      setDraftId(result.data.id);
+      setDraftAudience(result.data.audience);
+      setPreview(null);
+      setTestNote("");
+      setFeedback(`Rascunho "${result.data.name}" criado com o mesmo público e texto. Revise, veja a prévia e dispare.`);
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       await onChanged();
     });
   }
@@ -267,20 +319,20 @@ function PostSaleCampaigns({ data, initialAudience, initialPreview, initialFeedb
 
   return (
     <div className={page.stack}>
-      <section className={page.card} aria-labelledby="pos-venda-nova-campanha">
+      <section ref={formRef} className={page.card} aria-labelledby="pos-venda-nova-campanha">
         <div className={page.cardHead}>
           <h2 id="pos-venda-nova-campanha" className={page.cardTitle}>Nova campanha</h2>
           <p className={page.cardDescription}>Escolha o público e veja a prévia com as exclusões antes de disparar.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <LiteSelect label="Público" value={kind} onChange={(value) => setKind(value as AudienceKind)} options={[
-            { value: "broker", label: "Por corretor" }, { value: "queue", label: "Por fila" }, { value: "period", label: "Por período de chegada" }, ...(initialAudience?.kind === "leadIds" ? [{ value: "leadIds", label: "Leads selecionados" }] : []),
+          <LiteSelect label="Público" value={kind} onChange={audienceChanged((value: string) => setKind(value as AudienceKind))} options={[
+            { value: "broker", label: "Por corretor" }, { value: "queue", label: "Por fila" }, { value: "period", label: "Por período de chegada" }, ...(leadIdsAudience?.kind === "leadIds" ? [{ value: "leadIds", label: "Leads selecionados" }] : []),
           ]} />
-          {kind === "leadIds" && initialAudience?.kind === "leadIds" ? <p className={`${page.muted} self-end`}>{initialAudience.leadIds.length} leads selecionados na lista.</p> : null}
-          {kind === "broker" ? <LiteSelect label="Corretor" value={brokerId} onChange={setBrokerId} placeholder="Selecione o corretor" options={data.brokers.map((broker) => ({ value: broker.id, label: broker.name }))} /> : null}
-          {kind === "queue" ? <LiteSelect label="Fila" value={queueId} onChange={setQueueId} placeholder="Selecione a fila" options={data.queues.map((queue) => ({ value: queue.id, label: queue.name }))} /> : null}
-          <label className={form.field}><span className={form.label}>Chegada a partir de</span><input className={form.input} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-          <label className={form.field}><span className={form.label}>Chegada até</span><input className={form.input} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
+          {kind === "leadIds" && leadIdsAudience?.kind === "leadIds" ? <p className={`${page.muted} self-end`}>{leadIdsAudience.leadIds.length} leads selecionados.</p> : null}
+          {kind === "broker" ? <LiteSelect label="Corretor" value={brokerId} onChange={audienceChanged(setBrokerId)} placeholder="Selecione o corretor" options={data.brokers.map((broker) => ({ value: broker.id, label: broker.name }))} /> : null}
+          {kind === "queue" ? <LiteSelect label="Fila" value={queueId} onChange={audienceChanged(setQueueId)} placeholder="Selecione a fila" options={data.queues.map((queue) => ({ value: queue.id, label: queue.name }))} /> : null}
+          <label className={form.field}><span className={form.label}>Chegada a partir de</span><input className={form.input} type="date" value={from} onChange={(event) => audienceChanged(setFrom)(event.target.value)} /></label>
+          <label className={form.field}><span className={form.label}>Chegada até</span><input className={form.input} type="date" value={to} onChange={(event) => audienceChanged(setTo)(event.target.value)} /></label>
           <label className={form.field}><span className={form.label}>Nome da campanha</span><input className={form.input} value={name} onChange={(event) => setName(event.target.value)} maxLength={120} /></label>
         </div>
         <label className={form.field}>
@@ -290,8 +342,21 @@ function PostSaleCampaigns({ data, initialAudience, initialPreview, initialFeedb
         </label>
         <div className={styles.actions}>
           <button type="button" className={page.button} onClick={previewAudience} disabled={busy}>{busy ? "Calculando…" : "Ver prévia"}</button>
+          <LiteActionButton
+            tone="secondary"
+            busyLabel="Enviando teste…"
+            doneLabel="Teste enviado"
+            keeps="A campanha não foi disparada."
+            errorFallback="Não deu para enviar o teste agora."
+            disabled={busy || !audience}
+            onAction={sendTest}
+          >
+            Enviar teste para mim
+          </LiteActionButton>
           <button type="button" className={page.primaryButton} onClick={dispatchCampaign} disabled={busy || !preview?.ok || !preview.data.canStart}>Disparar campanha</button>
         </div>
+        <span className={form.hint}>O teste vai para o celular do seu perfil, com os dados de um cliente do público e pelo mesmo canal do disparo. Até {POST_SALE_TEST_HOURLY_LIMIT} por hora.</span>
+        {testNote ? <p className={page.muted} role="status">{testNote}</p> : null}
         {feedback ? <p className={page.muted} role="status">{feedback}</p> : null}
         {preview?.ok ? (
           <section className={page.group} aria-label="Prévia da campanha">
@@ -321,6 +386,9 @@ function PostSaleCampaigns({ data, initialAudience, initialPreview, initialFeedb
                 </div>
                 {campaign.ruleKey === null && campaign.status !== "draft" && campaign.counts.retryable > 0 ? (
                   <button type="button" className={page.button} disabled={busy} onClick={() => retryFailed(campaign)}>Reenviar as que falharam ({campaign.counts.retryable})</button>
+                ) : null}
+                {campaign.ruleKey === null ? (
+                  <LiteMenu label={`Ações de ${campaign.name}`} items={[{ id: "duplicar", label: "Duplicar", onSelect: () => duplicate(campaign), disabled: busy }]} />
                 ) : null}
               </li>
             ))}

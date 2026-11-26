@@ -674,6 +674,11 @@ async function registerSale(input: SaleCoreInput, conversation: ConversationSale
     origin: { kind: "person", actorUserId: context.userId },
   });
 
+  // Sequência de pós-venda (26/11): só depois do commit e sem lançar; se a IA já converteu, nada se repete.
+  void import("@/features/leads/post-sale-sequence")
+    .then(({ startPostSaleSequence }) => startPostSaleSequence({ tenantId: context.tenantId, leadId: lead.id, convertedAt: now, actorUserId: context.userId }))
+    .catch((error) => console.warn("[post-sale-sequence] import_failed", error instanceof Error ? error.message : error));
+
   // Only after the commit: a rolled-back sale never fires the "venda realizada" automation.
   const { triggerInstantAutomation } = await import("@/features/automations/engine");
   void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);

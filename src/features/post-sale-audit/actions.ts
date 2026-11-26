@@ -6,7 +6,8 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
-import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
+import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage, enqueuePostSaleTestWahaMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { getOwnBrokerPhone } from "@/features/broker-phone-change/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag, getSystemSetting, setSystemSetting } from "@/features/system-settings/queries";
 import { isBusinessHours, nextBusinessOpening } from "@/features/team-notices/guard";
@@ -17,7 +18,8 @@ import type { PostSaleSurveyRow } from "./overview";
 import { postSaleAlertReasons } from "./alert-rules";
 import type { PostSaleBrokerReportRow } from "./reporting";
 import { firstName, findUnknownPostSaleOpeningVariables, renderPostSaleOpeningMessage } from "./rules";
-import { postSaleAudienceSchema, POST_SALE_CAMPAIGN_MAX_LEADS } from "./rules";
+import { postSaleAudienceSchema, POST_SALE_CAMPAIGN_MAX_LEADS, type PostSaleAudience } from "./rules";
+import { buildPostSaleTestMessage, duplicatePostSaleCampaignDraft, POST_SALE_TEST_HOURLY_LIMIT, POST_SALE_TEST_KEY_PREFIX, POST_SALE_TEST_WINDOW_MS, postSaleTestIdempotencyKey, postSaleTestQuota } from "./campaign-test";
 import { resolvePostSaleAudience } from "./audience";
 import { canResumePostSaleNow } from "./conversation-rules";
 import { sendPostSaleNudge } from "./conversation";
@@ -33,6 +35,12 @@ import { loadPostSaleCampaignCounts, retryFailedPostSaleSurveys } from "./campai
 
 const campaignInput = z.object({
   name: z.string().trim().min(2, "Informe o nome da campanha.").max(120),
+  audience: z.unknown(),
+  openingMessage: z.string().trim().min(20, "A apresentação precisa ter pelo menos 20 caracteres.").max(4096),
+  draftId: z.string().trim().min(1).max(80).optional(),
+});
+
+const testInput = z.object({
   audience: z.unknown(),
   openingMessage: z.string().trim().min(20, "A apresentação precisa ter pelo menos 20 caracteres.").max(4096),
 });
@@ -189,6 +197,21 @@ export async function createPostSaleCampaignAction(rawInput: unknown): Promise<A
     const preview = await resolvePostSaleAudience(context, audience);
     if (!preview.totalEligible) throw new PostSaleActionError("Nenhum lead está elegível para esta campanha.");
     if (!preview.canStart) throw new PostSaleActionError(`A campanha pode ter no máximo ${POST_SALE_CAMPAIGN_MAX_LEADS} leads elegíveis.`);
+    // Rascunho vindo de "Duplicar": o disparo usa o mesmo registro, com o que estiver no formulário agora.
+    if (parsed.draftId) {
+      const [updated] = await getDatabase().update(schema.postSaleCampaigns).set({
+        name: parsed.name,
+        audience: { ...audience },
+        openingMessage: parsed.openingMessage,
+        totals: { selected: preview.totalSelected, eligible: preview.totalEligible },
+      }).where(and(
+        eq(schema.postSaleCampaigns.id, parsed.draftId),
+        eq(schema.postSaleCampaigns.tenantId, context.tenantId),
+        eq(schema.postSaleCampaigns.createdBy, context.userId),
+        eq(schema.postSaleCampaigns.status, "draft"),
+      )).returning({ id: schema.postSaleCampaigns.id });
+      if (updated) return { ok: true, data: { id: updated.id } };
+    }
     const id = randomUUID();
     await getDatabase().insert(schema.postSaleCampaigns).values({
       id,
@@ -345,6 +368,124 @@ export async function startPostSaleCampaignAction(campaignId: string): Promise<A
     await db.update(schema.postSaleCampaigns).set({ totals }).where(and(eq(schema.postSaleCampaigns.id, campaign.id), eq(schema.postSaleCampaigns.tenantId, context.tenantId)));
     await recordPostSaleAudit({ tenantId: context.tenantId, userId: context.userId, campaignId: campaign.id, action: "post_sale_campaign.started", metadata: { ...totals } });
     return { ok: true, data: { queued, skipped, failed } };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/**
+ * "Enviar teste para mim" (26/11): a abertura já montada com um cliente de exemplo do público vai para o celular do
+ * perfil de quem testa, pelo mesmo canal do disparo (número WAHA ou canal Meta do exemplo). Até 3 por hora.
+ */
+export async function sendPostSaleTestAction(rawInput: unknown): Promise<ActionResult<{ channelType: "waha" | "meta"; exampleName: string; phone: string; remaining: number; body: string }>> {
+  try {
+    const context = await authorizedContext();
+    const parsed = testInput.parse(rawInput);
+    const requestedAudience = postSaleAudienceSchema.parse(parsed.audience);
+    const audience = context.role === "manager" && requestedAudience.kind === "filters"
+      ? { ...requestedAudience, branchId: context.branchId! }
+      : requestedAudience;
+    const unknownVariables = findUnknownPostSaleOpeningVariables(parsed.openingMessage);
+    if (unknownVariables.length) throw new PostSaleActionError(`Variável não reconhecida: {{${unknownVariables[0]}}}.`);
+
+    const db = getDatabase();
+    const now = new Date();
+    const recent = await db.select({ createdAt: schema.whatsappOutboundMessages.createdAt }).from(schema.whatsappOutboundMessages).where(and(
+      eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+      eq(schema.whatsappOutboundMessages.requestedBy, context.userId),
+      sql`${schema.whatsappOutboundMessages.idempotencyKey} like ${`${POST_SALE_TEST_KEY_PREFIX}%`}`,
+      gte(schema.whatsappOutboundMessages.createdAt, new Date(now.getTime() - POST_SALE_TEST_WINDOW_MS)),
+    )).limit(POST_SALE_TEST_HOURLY_LIMIT + 1);
+    const quota = postSaleTestQuota(recent.map((row) => row.createdAt), now);
+    if (quota.remaining === 0) {
+      const at = quota.retryAt ? quota.retryAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }) : null;
+      throw new PostSaleActionError(`Você já mandou ${POST_SALE_TEST_HOURLY_LIMIT} testes na última hora.${at ? ` Dá para mandar outro às ${at}.` : ""}`);
+    }
+
+    const own = await getOwnBrokerPhone(context);
+    if (!own?.phone) throw new PostSaleActionError("Seu perfil não tem celular. Cadastre em Configurações, Minha conta.");
+
+    const preview = await resolvePostSaleAudience(context, audience);
+    const example = preview.recipients[0];
+    if (!example) throw new PostSaleActionError("Nenhum cliente deste público pode receber agora. Ajuste o público para testar.");
+
+    const [tenant] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
+    const [config] = await db.select({ assistantName: schema.aiQualificationConfigs.assistantName }).from(schema.aiQualificationConfigs).where(eq(schema.aiQualificationConfigs.tenantId, context.tenantId)).limit(1);
+    const [broker] = await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, example.brokerId)).limit(1);
+    const message = buildPostSaleTestMessage({
+      channelType: example.channelType,
+      openingMessage: parsed.openingMessage,
+      exampleName: example.name,
+      companyName: tenant?.name,
+      assistantName: config?.assistantName,
+      brokerName: broker?.name,
+    });
+    const idempotencyKey = postSaleTestIdempotencyKey(context.userId, now);
+    let outbound: { id: string; status: string };
+    try {
+      outbound = message.channelType === "waha"
+        ? await enqueuePostSaleTestWahaMessage({ tenantId: context.tenantId, userId: context.userId, wahaNumberId: example.channelRef, destinationPhone: own.phone, body: message.body, idempotencyKey })
+        : await enqueueMetaTemplateMessage({
+          tenantId: context.tenantId,
+          channelId: example.channelRef,
+          recipientType: "user",
+          recipientId: context.userId,
+          destinationPhone: own.phone,
+          purpose: "postSaleSurvey",
+          variables: message.variables,
+          requestedBy: context.userId,
+          idempotencyKey,
+          requireApprovedMetaTemplate: true,
+          templateName: POST_SALE_META_TEMPLATE.name,
+          strictSourceChannel: true,
+        });
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code) : "";
+      if (code === "FIRST_CONTACT_TEMPLATE_UNAVAILABLE") throw new PostSaleActionError("O template pos_venda_apresentacao ainda não foi aprovado pela Meta.");
+      if (code === "POST_SALE_SOURCE_UNAVAILABLE" || code === "META_CHANNEL_UNAVAILABLE") throw new PostSaleActionError("O número de origem deste público está indisponível agora.");
+      throw error;
+    }
+    if (["failed", "cancelled", "expired", "skipped"].includes(outbound.status)) throw new PostSaleActionError("O canal não aceitou o teste agora.");
+    // Pelo id exato: o teste sai na hora, sem esperar a fila dos disparos.
+    await processMetaOutboundBatch(1, context.tenantId, outbound.id).catch(() => undefined);
+    await recordPostSaleAudit({ tenantId: context.tenantId, userId: context.userId, campaignId: "test", action: "post_sale_campaign.test_sent", metadata: { channelType: message.channelType, exampleLeadId: example.leadId, outboundId: outbound.id } });
+    return { ok: true, data: { channelType: message.channelType, exampleName: example.name, phone: own.phone, remaining: quota.remaining - 1, body: message.body } };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/** "Duplicar" no ⋯ de um envio do histórico (26/11): cria um rascunho igual (público e texto) para revisar e disparar. */
+export async function duplicatePostSaleCampaignAction(campaignId: string): Promise<ActionResult<{ id: string; name: string; audience: PostSaleAudience; openingMessage: string }>> {
+  try {
+    const context = await authorizedContext();
+    const validId = z.string().trim().min(1).max(80).parse(campaignId);
+    const db = getDatabase();
+    const [campaign] = await db.select().from(schema.postSaleCampaigns).where(and(
+      eq(schema.postSaleCampaigns.id, validId),
+      eq(schema.postSaleCampaigns.tenantId, context.tenantId),
+    )).limit(1);
+    if (!campaign) throw new PostSaleActionError("Campanha não encontrada.");
+    const parsedAudience = postSaleAudienceSchema.safeParse(campaign.audience);
+    if (!parsedAudience.success) throw new PostSaleActionError("O público desta campanha não pode ser copiado.");
+    if (context.role === "manager" && campaign.createdBy !== context.userId && !(await campaignIsInManagerBranch(context.tenantId, context.branchId, parsedAudience.data))) {
+      throw new PostSaleActionError("Esta campanha não pertence à sua unidade.");
+    }
+    const draft = duplicatePostSaleCampaignDraft({ name: campaign.name, audience: parsedAudience.data, openingMessage: campaign.openingMessage });
+    const id = randomUUID();
+    await db.insert(schema.postSaleCampaigns).values({
+      id,
+      tenantId: context.tenantId,
+      name: draft.name,
+      audience: { ...draft.audience },
+      openingMessage: draft.openingMessage,
+      createdBy: context.userId,
+      status: "draft",
+      totals: {},
+      createdAt: new Date(),
+    });
+    await recordPostSaleAudit({ tenantId: context.tenantId, userId: context.userId, campaignId: id, action: "post_sale_campaign.duplicated", metadata: { sourceCampaignId: campaign.id } });
+    return { ok: true, data: { id, ...draft } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }
