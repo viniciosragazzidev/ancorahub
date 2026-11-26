@@ -471,7 +471,8 @@
 }
 
 .arc-venancor[data-skin="diretor"] .director-command-result:hover,
-.arc-venancor[data-skin="diretor"] .director-command-result:focus-visible {
+.arc-venancor[data-skin="diretor"] .director-command-result:focus-visible,
+.arc-venancor[data-skin="diretor"] .director-command-result[data-active="true"] {
   background: var(--surface-muted);
 }
 

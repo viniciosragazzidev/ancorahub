@@ -31,10 +31,10 @@ describe("paleta do diretor", () => {
     render(<ArcScopeProvider enabled><CommandPalette /></ArcScopeProvider>);
 
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    fireEvent.change(screen.getByPlaceholderText("Buscar páginas, leads e clientes..."), { target: { value: "Marina" } });
+    fireEvent.change(screen.getByPlaceholderText("Buscar páginas, leads, clientes e pessoas..."), { target: { value: "Marina" } });
 
     expect(screen.getByRole("status")).toHaveTextContent("Buscando no CRM");
-    expect(screen.queryByText("Nenhum resultado encontrado.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nada encontrado/)).not.toBeInTheDocument();
   });
 
   it("Ctrl+K abre a busca unificada de páginas e leads", async () => {
@@ -43,26 +43,49 @@ describe("paleta do diretor", () => {
     render(<ArcScopeProvider enabled><CommandPalette /></ArcScopeProvider>);
 
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    fireEvent.change(screen.getByPlaceholderText("Buscar páginas, leads e clientes..."), { target: { value: "Marina" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: /Marina Costa/ })).toBeInTheDocument());
+    fireEvent.change(screen.getByPlaceholderText("Buscar páginas, leads, clientes e pessoas..."), { target: { value: "Marina" } });
+    await waitFor(() => expect(screen.getByRole("option", { name: /Marina Costa/ })).toBeInTheDocument());
     expect(screen.queryByText("Nenhuma funcionalidade encontrada")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Marina Costa/ }));
+    fireEvent.click(screen.getByRole("option", { name: /Marina Costa/ }));
     expect(navigation.push).toHaveBeenCalledWith("/leads/lead-1");
   });
 
-  it("mantem o ramo normal sem a chave", () => {
+  it("fora do Lite usa o mesmo cadastro: sem busca lista o menu por área e limpa ao fechar", async () => {
+    vi.mocked(getUserDisplayInfo).mockResolvedValueOnce({ roleKey: "director", jobTitle: null, permissions: ["acessar_vendas", "ver_comissionamento"] } as never);
     render(<ArcScopeProvider enabled={false}><CommandPalette /></ArcScopeProvider>);
 
+    await waitFor(() => expect(getUserDisplayInfo).toHaveBeenCalled());
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    const input = screen.getByRole("textbox");
-    expect(input).toHaveAttribute("placeholder", "Digite para buscar p\u00e1ginas, fun\u00e7\u00f5es ou comandos (ex: 'resetar mem\u00f3ria', 'comiss\u00f5es', 'leads')...");
-    expect(screen.getByTestId("scroll-area")).toHaveClass("max-h-[380px]", "p-2");
-    fireEvent.change(input, { target: { value: "lead" } });
+    await waitFor(() => expect(screen.getByText("Comercial")).toBeInTheDocument());
+    expect(screen.getByRole("option", { name: /Vendas/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "lead" } });
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
 
-    expect(screen.getByRole("textbox")).toHaveValue("lead");
+    expect(screen.getByRole("textbox")).toHaveValue("");
   });
+
+  it("setas escolhem o resultado e Enter abre", async () => {
+    navigation.push.mockClear();
+    vi.mocked(getUserDisplayInfo).mockResolvedValueOnce({ roleKey: "director", jobTitle: null, permissions: ["acessar_vendas", "ver_comissionamento"] } as never);
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(<ArcScopeProvider enabled><CommandPalette /></ArcScopeProvider>);
+
+    await waitFor(() => expect(getUserDisplayInfo).toHaveBeenCalled());
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "vendas" } });
+    await waitFor(() => expect(screen.getAllByRole("option").length).toBeGreaterThan(1));
+    const options = screen.getAllByRole("option");
+    expect(options[0]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(screen.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
+    const target = screen.getAllByRole("option")[1].textContent ?? "";
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(navigation.push).toHaveBeenCalledTimes(1);
+    expect(target.length).toBeGreaterThan(0);
+  });
+
   it("mostra as páginas do menu na hora, sem acento, antes dos resultados do servidor", async () => {
     vi.mocked(getUserDisplayInfo).mockResolvedValueOnce({ roleKey: "director", jobTitle: null, permissions: ["acessar_vendas", "ver_comissionamento"] } as never);
     vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
@@ -70,11 +93,11 @@ describe("paleta do diretor", () => {
 
     await waitFor(() => expect(getUserDisplayInfo).toHaveBeenCalled());
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    fireEvent.change(screen.getByPlaceholderText("Buscar páginas, leads e clientes..."), { target: { value: "comissoes" } });
+    fireEvent.change(screen.getByPlaceholderText("Buscar páginas, leads, clientes e pessoas..."), { target: { value: "comissoes" } });
 
-    await waitFor(() => expect(screen.getByRole("button", { name: /Comercial: Comissões/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("option", { name: /Comercial: Comissões/ })).toBeInTheDocument());
     expect(screen.getByText("Páginas")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Comercial: Comissões/ }));
+    fireEvent.click(screen.getByRole("option", { name: /Comercial: Comissões/ }));
     expect(navigation.push).toHaveBeenCalledWith("/settings?tab=comissoes");
   });
 });

@@ -11,7 +11,22 @@ export function normalizeSearchText(value: string) {
   return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 }
 
-/** Abas visíveis ao usuário cujo nome, área ou descrição da área contém todas as palavras buscadas. */
+function pageTitle(areaLabel: string, tabLabel: string) {
+  return tabLabel === areaLabel ? areaLabel : `${areaLabel}: ${tabLabel}`;
+}
+
+/** Busca vazia: todas as abas que a pessoa enxerga, agrupadas pela área, na ordem do menu. */
+export function browseNavPages(user: NavAccessUser | null): { area: string; pages: NavSearchPage[] }[] {
+  if (!user) return [];
+  return NAV_AREAS.flatMap((area) => {
+    const pages = area.tabs
+      .filter((tab) => canShowNavTab(tab, user))
+      .map((tab) => ({ id: `${area.id}:${tab.id}`, title: tab.label, subtitle: tab.description, href: tab.href }));
+    return pages.length > 0 ? [{ area: area.label, pages }] : [];
+  });
+}
+
+/** Abas visíveis ao usuário cujo nome, área ou descrição contém todas as palavras buscadas. */
 export function searchNavPages(query: string, user: NavAccessUser | null, limit = 8): NavSearchPage[] {
   const words = normalizeSearchText(query).split(/\s+/).filter(Boolean);
   if (words.length === 0 || !user) return [];
@@ -19,9 +34,9 @@ export function searchNavPages(query: string, user: NavAccessUser | null, limit 
   for (const area of NAV_AREAS) {
     for (const tab of area.tabs) {
       if (!canShowNavTab(tab, user)) continue;
-      const title = tab.label === area.label ? area.label : `${area.label}: ${tab.label}`;
-      const haystack = normalizeSearchText(`${area.label} ${tab.label} ${area.fullLabel}`);
-      if (words.every((word) => haystack.includes(word))) pages.push({ id: `${area.id}:${tab.id}`, title, subtitle: area.fullLabel, href: tab.href });
+      const title = pageTitle(area.label, tab.label);
+      const haystack = normalizeSearchText(`${area.label} ${tab.label} ${area.fullLabel} ${tab.description}`);
+      if (words.every((word) => haystack.includes(word))) pages.push({ id: `${area.id}:${tab.id}`, title, subtitle: tab.description, href: tab.href });
     }
   }
   // Quem bate no nome da aba vem antes de quem só bate na área.

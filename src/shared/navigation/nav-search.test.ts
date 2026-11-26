@@ -19,7 +19,7 @@ describe("busca de páginas do menu", () => {
 
   it("acha a aba pelo nome sem acento e aponta para o mesmo destino do menu", () => {
     const pages = searchNavPages("comissoes", director);
-    expect(pages[0]).toEqual({ id: "comercial:comissoes", title: "Comercial: Comissões", subtitle: "Negociações, propostas, vendas e clientes", href: "/settings?tab=comissoes" });
+    expect(pages[0]).toEqual({ id: "comercial:comissoes", title: "Comercial: Comissões", subtitle: "Regras de comissão por operadora e plano", href: "/settings?tab=comissoes" });
   });
 
   it("exige todas as palavras e põe primeiro quem bate no nome da aba", () => {

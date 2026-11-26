@@ -4,15 +4,11 @@ import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/superv
 import { NextRequest } from "next/server";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { getUserDisplayInfo } from "@/shared/auth/actions";
-import { canShowNavigationItem } from "@/shared/navigation-access";
-import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
 import type { TenantRole } from "@/shared/db/schema";
 
-import { FEATURE_SEARCH_INDEX } from "@/shared/feature-search-index";
 import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string, teamScoped = false) {
@@ -36,30 +32,9 @@ export async function GET(request: NextRequest) {
   const feature = await getSystemSetting("feature_global_search_enabled");
   if (feature === "false") return Response.json({ enabled: false, groups: [] });
 
-  // The menu-permission filter belongs to the director Lite palette; with the key off the results stay as before.
-  const directorLite = await shouldUseDirectorLiteStyle(context);
-  // Gestor de unidade (10/11): o filtro do menu vale sempre, para a busca não apontar áreas que saíram dele.
-  const displayUser = directorLite || isOutsideManagerScope(context.role, context.jobTitle) ? await getUserDisplayInfo() : null;
-  const qLower = query.toLowerCase();
-  const matchingFeatures = FEATURE_SEARCH_INDEX.filter((feat) => {
-    const matchesQuery = (
-      feat.title.toLowerCase().includes(qLower) ||
-      feat.description.toLowerCase().includes(qLower) ||
-      feat.keywords.some((k) => k.toLowerCase().includes(qLower))
-    );
-    return matchesQuery && (!displayUser || canShowNavigationItem(feat, displayUser));
-  }).slice(0, 6);
-
+  // Páginas e funcionalidades vêm do cadastro do menu, no próprio Ctrl+K (lote 2, 26/11/2026). Aqui só dados do CRM.
   // A manager without an authenticated unit has no operational search scope.
-  // Gestor (10/11): sem unidade, só funcionalidades; com unidade, só leads e pessoas da unidade (clientes e tarefas
-  // ficaram fora da área dele).
-  if (context.role === "manager" && !context.branchId) {
-    return Response.json({ enabled: true, groups: matchingFeatures.length ? [{
-      type: "features", label: "Funcionalidades & Módulos", items: matchingFeatures.map((feature) => ({
-        id: feature.id, title: feature.title, subtitle: `${feature.domain} · ${feature.description}`, href: feature.url,
-      })),
-    }] : [] });
-  }
+  if (context.role === "manager" && !context.branchId) return Response.json({ enabled: true, groups: [] });
 
   const pattern = `%${query.replace(/[%_]/g, "\\$&")}%`.trim();
   const teamScoped = isSupervisorTeamScoped(context);
@@ -88,20 +63,11 @@ export async function GET(request: NextRequest) {
   return Response.json({
     enabled: true,
     groups: [
-      {
-        type: "features",
-        label: "Funcionalidades & Módulos",
-        items: matchingFeatures.map((f) => ({
-          id: f.id,
-          title: f.title,
-          subtitle: `${f.domain} · ${f.description}`,
-          href: f.url,
-        })),
-      },
       { type: "leads", label: "Leads", items: leads.map((item) => ({ ...item, href: `/leads/${item.id}` })) },
-      { type: "clients", label: "Clientes", items: clients.map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, href: `/clientes?leadId=${item.leadId}` })) },
+      { type: "clients", label: "Clientes", items: clients.map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, href: `/clientes/${item.id}` })) },
       { type: "tasks", label: "Tarefas", items: tasks.map((item) => ({ id: item.id, title: item.title, subtitle: item.subtitle, href: `/leads/${item.leadId}#tarefas` })) },
-      { type: "team", label: "Equipe", items: team.map((item) => ({ ...item, href: "/equipe" })) },
+      // Corretor só acha a si mesmo; a ficha de pessoa é de quem gere equipe.
+      { type: "team", label: "Equipe", items: context.role === "broker" ? [] : team.map((item) => ({ ...item, href: `/equipe/${item.id}` })) },
     ].filter((group) => group.items.length),
   });
 }

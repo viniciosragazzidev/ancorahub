@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { NavPending } from "@/components/nav-pending";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "@/components/ui/sonner";
 
@@ -119,11 +119,12 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
   // Diretor vê a Área de Plantão sempre (23/11: a Taina, diretora com cargo "Plantões", ficou sem o botão). Antes dependia
   // de isCurrentUserOnDuty no navegador; se a chamada falhava (aba de antes de um deploy, rede), o botão sumia calado.
   const showDutyArea = roleKey === "director" || (onDuty && roleKey !== "manager");
-  const isPlantaoActive =
-    (pathname.startsWith("/distribuicao") && pathname.includes("view=plantao")) ||
-    pathname.startsWith("/leads/distribuicao/plantao");
-
-  const activeAreaId = resolveNavLocation(pathname)?.area.id ?? null;
+  // A query decide a aba (Comissões mora em /settings?tab=comissoes, Plantões em /distribuicao?view=plantao):
+  // sem ela o menu acendia Configurações em Comissões e nunca acendia a Área de Plantão.
+  const searchParams = useSearchParams();
+  const activeLocation = resolveNavLocation(pathname, searchParams);
+  const isPlantaoActive = activeLocation?.area.id === "distribuicao" && activeLocation.tab.id === "plantoes";
+  const activeAreaId = activeLocation?.area.id ?? null;
   const navCounts = useNavCounts(Boolean(user) && roleKey !== "broker");
   const visibleItems: NavItemConfig[] = visibleNavAreas(user ? { ...user, negotiationsEnabled, postSaleAuditEnabled, erpPaths } : null).map(({ area, href }) => ({
     id: area.id,

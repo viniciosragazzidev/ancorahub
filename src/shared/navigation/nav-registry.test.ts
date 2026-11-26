@@ -31,7 +31,6 @@ function dashboardPages(dir = DASHBOARD_DIR, prefix = ""): string[] {
  * A new page must join an area in nav-registry or be listed here with a reason.
  */
 const OUTSIDE_AREAS: Record<string, string> = {
-  "/minha-fila": "redirect para /leads (next.config)",
   "/call-ancora": "Demonstração: item próprio no rodapé da barra lateral, fora das áreas",
   "/meu-financeiro": "Light do corretor (as próprias comissões)",
   "/agenda": "Light do corretor",
@@ -56,15 +55,24 @@ const OUTSIDE_AREAS: Record<string, string> = {
   "/assistente": "sai na limpeza final",
   "/assinatura": "entra em Configurações numa fase própria",
   "/integridade": "vai para o super-dev",
-  "/roadmap": "redirect",
-  "/internal/design-system": "interna",
-  "/internal/design-system/motion": "interna",
-  "/conversas/dashboard": "tela morta, sai na limpeza final",
-  "/leads/dashboard": "tela morta, sai na limpeza final",
-  "/distribuicao/dashboard": "tela morta, sai na limpeza final",
-  "/vendas/dashboard": "tela morta, sai na limpeza final",
-  "/equipe/dashboard": "tela morta, sai na limpeza final",
+  "/roadmap": "redirect antigo, sem tela",
+  "/internal/design-system": "vitrine interna do design",
+  "/internal/design-system/motion": "vitrine interna do design",
+  "/conversas/dashboard": "redirect para a área (visão antiga removida em 26/11)",
+  "/leads/dashboard": "redirect para a área (visão antiga removida em 26/11)",
+  "/distribuicao/dashboard": "redirect para a área (visão antiga removida em 26/11)",
+  "/vendas/dashboard": "redirect para a área (visão antiga removida em 26/11)",
+  "/equipe/dashboard": "redirect para a área (visão antiga removida em 26/11)",
   "/settings/waha-diagnostic": "entra em Configurações > WhatsApp numa fase própria",
+  "/tarefas/dashboard": "redirect para a área (visão antiga removida em 26/11)",
+  "/conversas/broker": "Light do corretor (dicas de atendimento)",
+  "/equipe/controle": "Light do supervisor",
+  "/equipe/observacoes": "Light do supervisor",
+  "/integrations/whats_alt": "redirect para Configurações > WhatsApp",
+  "/marketing/meta": "redirect para Marketing > Campanhas",
+  "/settings/integrations": "redirect para Configurações > Integrações",
+  "/settings/meta": "redirect para Configurações > Integrações",
+  "/settings/whatsapp": "redirect para Configurações > WhatsApp",
 };
 
 const director: NavAccessUser = {
@@ -83,11 +91,46 @@ describe("nav-registry", () => {
     expect(canShowNavTab(tab, { ...manager, erpPaths: ["/implantacoes"] })).toBe(true);
     expect(visibleNavAreas({ ...manager, erpPaths: ["/implantacoes"] }).some((row) => row.area.id === "comercial")).toBe(false);
   });
+  // Toda tela tem porta (26/11/2026, docs/research/deskcomm-interface-conversao.md, lote 3). Tela fixa precisa estar
+  // escrita no cadastro (href, paths ou alsoAt), não basta casar pelo começo do endereço: era assim que /equipe/observacoes
+  // e outras ficavam "dentro" de uma área por acaso. Só o detalhe de uma entidade ([id]) herda a área pelo prefixo.
   it("every dashboard page belongs to an area or is listed outside on purpose", () => {
+    const declared = new Set(NAV_AREAS.flatMap((area) => area.tabs.flatMap((tab) => [tab.href.split(/[?#]/, 1)[0], ...(tab.paths ?? []), ...(tab.alsoAt ?? [])])));
     const loose = dashboardPages()
       .filter((page) => !OUTSIDE_AREAS[page])
-      .filter((page) => !resolveNavLocation(page.replace(/\[[^\]]+\]/g, "x")));
+      .filter((page) => (page.includes("[") ? !resolveNavLocation(page.replace(/\[[^\]]+\]/g, "x")) : !declared.has(page)));
     expect(loose).toEqual([]);
+  });
+
+  it("the outside list has no stale entries and every reason says why", () => {
+    const pages = new Set(dashboardPages());
+    for (const [page, reason] of Object.entries(OUTSIDE_AREAS)) {
+      expect(pages.has(page), `${page} não existe mais: tire da lista`).toBe(true);
+      expect(reason.length, `${page}: escreva o motivo`).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it("every tab opens a page that exists and says what it is for", () => {
+    const pages = new Set(dashboardPages());
+    for (const area of NAV_AREAS) {
+      for (const tab of area.tabs) {
+        expect(pages.has(tab.href.split(/[?#]/, 1)[0]), `${area.id}:${tab.id} aponta para ${tab.href}, que não existe`).toBe(true);
+        expect(tab.description.trim().length, `${area.id}:${tab.id} sem descrição`).toBeGreaterThan(10);
+        expect(tab.description).not.toMatch(/—/);
+      }
+    }
+  });
+
+  // Teste de altura (DeskComm): com todos os grupos abertos, o menu do diretor com tudo ligado cabe em 1280x900 sem
+  // rolar. Conta linhas de 44px (alvo de toque) mais o topo (logo e atalhos) e o rodapé (Call Âncora, Agente IA, perfil).
+  it("the full director menu fits 900px of height without scrolling", () => {
+    const everything: NavAccessUser = { ...director, permissions: [...(director.permissions ?? []), "ver_comissao_propria", "acessar_financeiro", "erp_view_finance", "erp_view_operations", "erp_manage_referrals", "erp_view_analytics", "erp_import_data", "erp_manage_modules"], postSaleAuditEnabled: true, autoSaleEnabled: true, erpPaths: NAV_AREAS.flatMap((area) => area.tabs.map((tab) => tab.href.split(/[?#]/, 1)[0])) };
+    const groups = groupNavItems(visibleNavAreas(everything).map(({ area }) => area));
+    const rows = groups.reduce((total, { items }) => total + (items.length > 1 ? items.length + 1 : 1), 0);
+    const ROW = 44;
+    const TOP = 64 + ROW; // logo + Área de Plantão
+    const BOTTOM = ROW * 3; // Call Âncora, Agente IA, perfil
+    expect(TOP + rows * ROW + BOTTOM).toBeLessThanOrEqual(900);
   });
 
   it("tab ids are unique inside each area", () => {
