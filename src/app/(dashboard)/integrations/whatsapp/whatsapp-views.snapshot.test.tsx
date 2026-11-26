@@ -29,6 +29,13 @@ vi.mock("@/features/waha-group-capture/safe-load", () => ({
 vi.mock("../whats_alt/_components/team-notices-card", () => ({ TeamNoticesCard: () => <div data-stub="team-notices" /> }));
 vi.mock("../whats_alt/_components/tenant-channel-card", () => ({ TenantChannelCard: () => <div data-stub="tenant-channel" /> }));
 vi.mock("../whats_alt/_components/material-groups-card", () => ({ MaterialGroupsCard: () => <div data-stub="material-groups" /> }));
+vi.mock("@/features/whatsapp-equipe/actions", () => ({ pedirReconexaoAction: vi.fn() }));
+vi.mock("@/features/whatsapp-equipe/queries", () => ({
+  getWhatsAppDaEquipe: async () => [
+    { corretorId: "b1", nome: "Davi", unidade: "Centro", situacao: "caiu", desde: "2026-11-25T11:00:00Z", tentativas: [{ em: "2026-11-25T11:05:00Z", resultado: "erro" }] },
+    { corretorId: "b2", nome: "Ana", unidade: null, situacao: "conectado", desde: "2026-11-25T09:00:00Z", tentativas: [] },
+  ],
+}));
 vi.mock("./whatsapp-integration-heading", () => ({ WhatsAppIntegrationHeading: ({ active }: { active: string }) => <div data-stub={`heading-${active}`} /> }));
 
 import { DirectorWhatsAppView } from "./director-whatsapp-view";
@@ -52,6 +59,10 @@ describe("visões do WhatsApp com a chave", () => {
     expect(director).toContain('data-stub="tenant-channel"');
     expect(director).toContain('data-stub="team-notices"');
     expect(director).not.toContain("shadow-sm");
+    expect(director).toContain("WhatsApp da equipe");
+    expect(director).toContain("1 de 2 corretores está sem WhatsApp agora");
+    expect(director.indexOf("Davi")).toBeLessThan(director.indexOf("Ana"));
+    expect(director).toContain("Caiu");
     const materials = renderToStaticMarkup(await MaterialsWhatsAppView({ context, lite: true }));
     expect(materials).toContain("Material publicado");
     expect(materials).toContain('data-stub="material-groups"');

@@ -7,6 +7,7 @@ import { getNoticeRecipients } from "@/features/leads/closing-director-alert";
 import { teamNoticesFor } from "@/features/team-notices/catalog";
 import { getTeamNoticeSettings } from "@/features/team-notices/service";
 import { getTenantChannel } from "@/features/waha-cadence/tenant-channel";
+import { getWhatsAppDaEquipe } from "@/features/whatsapp-equipe/queries";
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/types";
 import { TeamNoticesCard, type TeamNoticeRow } from "../whats_alt/_components/team-notices-card";
@@ -32,6 +33,8 @@ const PREVIEW_VARIABLES: Record<string, string[]> = {
 };
 
 export async function DirectorWhatsAppView({ context, lite = false }: { context: TenantContext; lite?: boolean }) {
+  // Só o Lite mostra o WhatsApp da equipe; começa junto com o resto e, se falhar, a seção avisa sem derrubar a página.
+  const teamPromise = lite ? getWhatsAppDaEquipe(context).catch(() => null) : null;
   const [channel, settings, freeMessages, dutyReminderEnabled, recipientsByNotice] = await Promise.all([
     getTenantChannel(context),
     getTeamNoticeSettings(context.tenantId),
@@ -63,8 +66,11 @@ export async function DirectorWhatsAppView({ context, lite = false }: { context:
     };
   });
 
-  // Visual Lite: os mesmos cartões (canal e avisos), na página Lite com a troca de visão em chips.
-  if (lite) return <DirectorWhatsAppLite channel={channel} notices={notices} freeMessages={freeMessages} />;
+  // Visual Lite: os mesmos cartões (canal e avisos), na página Lite com a troca de visão em chips, e o WhatsApp da equipe.
+  if (lite) {
+    const team = await teamPromise;
+    return <DirectorWhatsAppLite channel={channel} notices={notices} freeMessages={freeMessages} team={team} />;
+  }
 
   return <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) antialiased sm:gap-6 lg:p-6">
     <WhatsAppIntegrationHeading active="diretoria" canViewDirector />

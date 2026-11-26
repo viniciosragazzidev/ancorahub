@@ -103,3 +103,60 @@
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
+
+/* WhatsApp da equipe: faixa de alerta (só texto e token de status) e a gaveta do corretor. */
+.teamAlert {
+  margin: 0;
+}
+
+.teamAlert > span {
+  min-height: 32px;
+  font-size: var(--text-sm);
+  white-space: normal;
+}
+
+.drawerBody {
+  display: grid;
+  gap: 24px;
+}
+
+.drawerBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.drawerBlock > p {
+  margin: 0;
+}
+
+.drawerTitle {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.drawerText {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.drawerList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.drawerList li {
+  display: flex;
+  gap: 12px;
+}
+
+.drawerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
