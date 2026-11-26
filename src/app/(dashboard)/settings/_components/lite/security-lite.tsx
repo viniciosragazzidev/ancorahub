@@ -19,10 +19,13 @@ import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import { authClient } from "@/shared/auth/client";
 
+import type { TwoFactorPolicy } from "@/features/security/two-factor-policy";
+
 import { recordSecurityAuditAction } from "../../security-actions";
 import styles from "@/components/lite/page/lite-sections.module.css";
 
 import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
+import { TeamTwoFactorLite } from "./team-two-factor-lite";
 
 function getSecretFromUri(uri: string | null) {
   if (!uri) return null;
@@ -52,11 +55,13 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function SecurityLite({ enabled: initialEnabled, email }: { enabled: boolean; email: string }) {
+/** `teamPolicy` só chega para o diretor: com ela aparece "Exigir verificação em duas etapas da equipe". */
+export function SecurityLite({ enabled: initialEnabled, email, teamPolicy }: { enabled: boolean; email: string; teamPolicy?: TwoFactorPolicy | null }) {
   return (
     <>
       <TwoFactorLite initialEnabled={initialEnabled} email={email} />
       <PasskeysLite />
+      {teamPolicy ? <TeamTwoFactorLite policy={teamPolicy} /> : null}
     </>
   );
 }

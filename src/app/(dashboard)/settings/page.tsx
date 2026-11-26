@@ -64,6 +64,7 @@ import { TagsLite } from "./_components/lite/tags-lite";
 import { getTenantResourceGroups } from "@/features/system-settings/resources";
 import { listLeadTagsWithUsage } from "@/features/lead-tags/service";
 import { canManageLeadTags } from "@/features/lead-tags/rules";
+import { getTwoFactorPolicy } from "@/features/security/two-factor-policy-server";
 
 export default async function SettingsPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
   // /configuracoes/comissoes redireciona para cá com ?tab=comissoes (next.config.ts): mostra as regras de comissão (20/11).
@@ -246,7 +247,8 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
       } : undefined,
       whatsapp: { id: "whatsapp", title: "WhatsApp", description: "O número que você usa no atendimento", node: <WhatsappLite /> },
       integracoes: integrations ? { id: "integracoes", title: "Integrações", description: "Fontes de captura, webhooks e pixels", node: <IntegrationsLite branches={integrations.branches} integrations={integrations.integrations} /> } : undefined,
-      seguranca: { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityLite enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
+      // Exigir 2FA da equipe (26/11): só o diretor vê e decide; a action confere o papel de novo.
+      seguranca: { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityLite enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} teamPolicy={context.role === "director" ? await getTwoFactorPolicy(context.tenantId) : null} /> },
       extensao: extensionPilot ? { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLite /> } : undefined,
     };
     // Voz do Sasá (teste de 23/11): a key do ElevenLabs é da empresa e só o diretor conecta; as ações conferem de novo.

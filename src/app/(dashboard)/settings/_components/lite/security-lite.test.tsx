@@ -12,6 +12,7 @@ const auth = vi.hoisted(() => ({
 }));
 vi.mock("@/shared/auth/client", () => ({ authClient: auth }));
 vi.mock("../../security-actions", () => ({ recordSecurityAuditAction: vi.fn(async () => undefined) }));
+vi.mock("@/features/security/two-factor-policy-actions", () => ({ updateTwoFactorPolicyAction: vi.fn(async () => ({ success: true })) }));
 
 import { SecurityLite } from "./security-lite";
 
@@ -56,5 +57,16 @@ describe("segurança Lite", () => {
     expect(screen.getByText("Biometria cadastrada")).toBeInTheDocument();
     expect(auth.passkey.listUserPasskeys).toHaveBeenCalledTimes(2);
     expect(toast.success).not.toHaveBeenCalled();
+  });
+  it("exigir da equipe aparece só quando a política chega (diretor)", async () => {
+    render(<SecurityLite enabled={false} email="ana@exemplo.com" />);
+    expect(screen.queryByText("Exigir verificação em duas etapas da equipe")).toBeNull();
+    cleanup();
+    await act(async () => {
+      render(<SecurityLite enabled={false} email="ana@exemplo.com" teamPolicy={{ scope: "team", graceDays: 7, since: "2026-11-26T15:00:00.000Z" }} />);
+    });
+    expect(screen.getByText("Exigir verificação em duas etapas da equipe")).toBeTruthy();
+    expect(screen.getByText("Exigido")).toBeTruthy();
+    expect((screen.getByRole("spinbutton") as HTMLInputElement).value).toBe("7");
   });
 });

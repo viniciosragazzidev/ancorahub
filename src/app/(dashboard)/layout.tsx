@@ -1,7 +1,7 @@
 ﻿import { isBrokerMyWalletEnabled } from "@/features/customers/broker-my-wallet-flag";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { and, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
@@ -45,6 +45,9 @@ import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 import { getBrokerProfileTeamIds } from "@/features/team/broker-profile-team";
 import { canUseCallAncora } from "@/features/call-ancora/visibility";
 import { canUseDirectorAgent } from "@/features/agent/access";
+import { getTwoFactorPolicy } from "@/features/security/two-factor-policy-server";
+import { evaluateTwoFactorRequirement, isTwoFactorSetupPath, TWO_FACTOR_SETUP_HREF } from "@/features/security/two-factor-policy";
+import { TwoFactorRequiredNotice } from "@/features/security/components/two-factor-required-notice";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -109,6 +112,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const autoSaleFlagPromise = context.role === "director" || context.role === "manager"
     ? isAutoSaleEnabled(context.tenantId).catch(() => false)
     : Promise.resolve(false);
+  // Exigência de 2FA da equipe (26/11): vem do cache de system_settings, sem consulta a mais.
+  const twoFactorPolicyPromise = getTwoFactorPolicy(context.tenantId);
   const headersPromise = headers();
   // Tenant branding, the signed-in user and their membership in one round trip:
   // the layout renders on every navigation and every realtime refresh, and the
@@ -123,6 +128,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       isPlatformAdmin: schema.user.isPlatformAdmin,
       availabilityStatus: schema.tenantMemberships.availabilityStatus,
       leadToastEnabled: schema.tenantMemberships.leadToastEnabled,
+      // Exigência de 2FA: o segundo fator (2FA ou chave de acesso) e a entrada na empresa vêm nesta mesma consulta.
+      twoFactorEnabled: schema.user.twoFactorEnabled,
+      hasPasskey: sql<boolean>`exists (select 1 from ${schema.passkey} where ${schema.passkey.userId} = ${context.userId})`,
+      memberSince: schema.tenantMemberships.createdAt,
     })
     .from(schema.tenants)
     .leftJoin(schema.user, eq(schema.user.id, context.userId))
@@ -208,6 +217,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     brokerMyWalletFlag,
     callAncoraSetting,
     sasaVoiceEnabled,
+    twoFactorPolicy,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -230,6 +240,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     brokerMyWalletPromise,
     callAncoraFlagPromise,
     sasaVoicePromise,
+    twoFactorPolicyPromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
@@ -244,6 +255,20 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const pathname = headersList.get("x-pathname") || "";
   const erpRouteAllowed = await canEnterErpRoute(pathname.split("?")[0]);
   const erpLinks = await getErpNavigation();
+
+  // Exigência de 2FA da equipe: depois da carência, quem não tem 2FA nem chave de acesso só usa as configurações
+  // (onde ativa). Sair é do cliente e não passa por aqui. "Ver como" não trava o admin da plataforma.
+  const [shellRow] = shellRows;
+  const twoFactorRequirement = context.viewAs || !shellRow
+    ? { state: "free" as const }
+    : evaluateTwoFactorRequirement({
+      policy: twoFactorPolicy,
+      role: context.role,
+      hasTwoFactor: Boolean(shellRow.twoFactorEnabled),
+      hasPasskey: Boolean(shellRow.hasPasskey),
+      memberSince: shellRow.memberSince,
+    });
+  if (twoFactorRequirement.state === "blocked" && pathname !== "" && !isTwoFactorSetupPath(pathname)) redirect(TWO_FACTOR_SETUP_HREF);
 
   if (isLightBroker && brokerJourneyFlag !== "true" && (pathname === "/jornada" || pathname === "/dashboard/c/jornada")) redirect("/dashboard");
   if (isLightBroker || isLightSupervisor || isLightManager) {
@@ -370,6 +395,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
             {!isLightManager && <CommandPalette />}
             {!isLightBroker && !isLightManager && <SystemFeedbackDrawer />}
             {agentAllowed && !isLightBroker && !isLightManager && !isOutsideManagerScope(context.role, context.jobTitle) && <AgentDrawer />}
+            <TwoFactorRequiredNotice requirement={twoFactorRequirement} />
             <BrokerProfileViewerProvider viewerRole={context.role} teamBrokerIds={brokerProfileTeamIds}>{children}</BrokerProfileViewerProvider>
           </NotificationCountProvider>
         </RealtimeSyncProvider>

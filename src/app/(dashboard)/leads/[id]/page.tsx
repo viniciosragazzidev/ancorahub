@@ -48,6 +48,8 @@ import { getLeadJourneyRow } from "@/features/lead-journey/queries";
 import litePageStyles from "../leads-lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { DeleteLeadControl } from "./delete-lead-control";
+import { LeadDataSubjectMenu } from "@/features/leads/lgpd/lead-data-subject-menu";
+import { isLeadAnonymized } from "@/features/leads/lgpd/data-subject";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-workspace/components/light-lead-detail";
 import { lightContactFields, redactClientInfo } from "@/features/broker-workspace/lead-contact-privacy";
@@ -779,6 +781,8 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
                     <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="outline" size="xs" />
                   ) : null}
                   {context.role === "director" ? <DeleteLeadControl leadId={lead.id} leadName={lead.nome} /> : null}
+                  {/* Pedido do titular (LGPD, 26/11): exportar e anonimizar, só o diretor; as actions conferem papel e empresa. */}
+                  {context.role === "director" ? <LeadDataSubjectMenu leadId={lead.id} anonymized={isLeadAnonymized(lead)} /> : null}
                   {canDirectorMarkLeadInService({ role: context.role, corretorId: lead.corretorId, status: lead.status }) ? (
                     <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} />
                   ) : null}
