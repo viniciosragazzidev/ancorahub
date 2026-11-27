@@ -21,6 +21,8 @@ import { isColdLeadsQueueName } from "@/features/lead-distribution/cold-age-rele
 import { ColdAgeReleaseSection } from "./cold-age-release-section";
 import { MetaEntries, type MetaEntriesData } from "./meta-entries";
 import { assignmentLabel, queueDutyScheduleIds, type DutySchedule, type Queue } from "./types";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { PanelSheet1a1, QueueDetail1a1 } from "./queues-1a1";
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -62,6 +64,9 @@ export function QueueDetailSheet({
   onEdit: (queue: Queue) => void;
   onDelete: (queue: Queue) => void;
 }) {
+  // Lite (27/11/2026): a gaveta no molde do Lite, com os mesmos dados e ações.
+  const lite = useDirectorLitePage();
+  if (lite) return <QueueDetail1a1 queue={queue} onOpenChange={onOpenChange} dutySchedules={dutySchedules} brokerNames={brokerNames} meta={meta} canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />;
   const duties = queue
     ? queueDutyScheduleIds(queue).map((id) => dutySchedules.find((duty) => duty.id === id)?.name).filter(Boolean)
     : [];
@@ -161,6 +166,8 @@ export function PanelSheet({
   description?: string;
   children: ReactNode;
 }) {
+  const lite = useDirectorLitePage();
+  if (lite) return <PanelSheet1a1 open={open} onOpenChange={onOpenChange} title={title} description={description}>{children}</PanelSheet1a1>;
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="data-[side=right]:w-[min(100vw-1rem,36rem)]">
