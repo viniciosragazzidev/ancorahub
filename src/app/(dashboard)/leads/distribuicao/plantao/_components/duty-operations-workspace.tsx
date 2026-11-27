@@ -1283,6 +1283,11 @@ function DutyInspector({
         >
           {schedule ? (
             <>
+              {/* Volta do atalho para a página do plantão (27/11/2026): dia a dia, presença, leads e histórico completo. */}
+              <Link href={`/leads/distribuicao/plantao/${schedule.id}`} className={cn(pl.pill, pl.pillQuiet)} style={{ alignSelf: "flex-start" }}>
+                Abrir página do plantão
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg>
+              </Link>
               <dl className={pl.dl}>
                 <dt>Unidades</dt><dd>{units}</dd>
                 <dt>Fila</dt><dd>{schedule.queueName}</dd>
