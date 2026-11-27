@@ -346,7 +346,8 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
         </div>
         {previews === null ? <p className={pl.empty}>Não foi possível montar a prévia da fila agora. A distribuição dos leads segue normal.</p> : !previews.length ? <p className={pl.empty}>Nenhum plantão está em andamento agora.</p> : (
           <div className={pl.queueGrid}>
-            {previews.map((preview, previewIndex) => {
+            {/* Do plantão com mais gente para o com menos (27/11/2026): cartões de tamanho parecido lado a lado. */}
+            {[...previews].sort((a, b) => (b.order.length + b.blocked.length) - (a.order.length + a.blocked.length)).map((preview, previewIndex) => {
               const orderedRows = ordered(preview);
               const tieIds = new Set(preview.order.filter((item) => item.tie).map((item) => item.id));
               const isSaving = savingScheduleId === preview.scheduleId;
