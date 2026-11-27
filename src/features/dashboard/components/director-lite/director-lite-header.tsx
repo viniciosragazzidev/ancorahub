@@ -124,7 +124,7 @@ function PhoneMenuButton({ initials }: { initials: string }) {
     sidebar = null;
   }
   return (
-    <button type="button" className={styles.iconbtn} aria-label="Abrir menu principal" style={{ fontSize: 13, fontWeight: 500 }} onClick={() => sidebar?.setOpenMobile(true)}>
+    <button type="button" data-mobile-nav className={styles.iconbtn} aria-label="Abrir menu principal" style={{ fontSize: 13, fontWeight: 500 }} onClick={() => sidebar?.setOpenMobile(true)}>
       {initials}
     </button>
   );

@@ -3322,7 +3322,7 @@ function WwMenuButton() {
   if (!sidebar) return null;
   const open = sidebar.setOpenMobile;
   return (
-    <button type="button" className={cn(ww.iconbtn, ww.narrowOnly)} aria-label="Abrir menu principal" onClick={() => open(true)}>
+    <button type="button" data-mobile-nav className={cn(ww.iconbtn, ww.narrowOnly)} aria-label="Abrir menu principal" onClick={() => open(true)}>
       <Menu aria-hidden="true" />
     </button>
   );

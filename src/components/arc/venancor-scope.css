@@ -218,3 +218,29 @@ html[data-drag-scrolling="true"], html[data-drag-scrolling="true"] * { cursor: g
 [data-drag-scrolling="true"] { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
 [data-drag-scrolling="true"] :is(a, img) { -webkit-user-drag: none; pointer-events: none; }
 [data-drag-scrolling="true"] * { cursor: grabbing !important; }
+
+/* Barra de topo do celular (27/11/2026, components/lite/mobile-bar.tsx): menu e voltar nas telas sem a faixa de topo. */
+.lite-mobile-bar { display: none; }
+@media (max-width: 767px) {
+  [data-slot="app-content"]:not(:has([data-slot="dashboard-header"], [data-mobile-nav])) .lite-mobile-bar {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; gap: 4px;
+    min-height: calc(56px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 8px 0;
+    background: var(--surface); border-bottom: 1px solid var(--border-subtle, var(--border));
+    font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  }
+}
+.lite-mobile-bar-icon {
+  display: grid; place-items: center; flex: none; width: 44px; height: 44px;
+  border: 0; border-radius: 9999px; background: transparent; color: var(--foreground); cursor: pointer;
+}
+.lite-mobile-bar-icon:hover { background: var(--surface-muted); }
+.lite-mobile-bar-icon svg { width: 20px; height: 20px; }
+.lite-mobile-bar-back {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 0; padding: 0 12px 0 6px;
+  border-radius: 9999px; font-size: 14px; font-weight: 500; color: var(--text-secondary, var(--muted-foreground)); text-decoration: none;
+}
+.lite-mobile-bar-back:hover { background: var(--surface-muted); color: var(--foreground); }
+.lite-mobile-bar-back svg { width: 18px; height: 18px; flex: none; }
+.lite-mobile-bar-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
