@@ -2,82 +2,112 @@
 
 /**
  * Arrastar para rolar (27/11/2026): com o mouse, qualquer tabela ou faixa de abas que role de lado pode ser puxada com
- * o botão esquerdo, como no celular. Vale para toda área com rolagem horizontal real (overflow-x auto ou scroll e
- * conteúdo maior que a caixa). O arraste só começa depois de 6px de movimento; quando acontece, o clique que viria a
- * seguir é cancelado, para não abrir a linha ou trocar de aba sem querer. Campos de texto, seleção de texto e o toque
- * ficam como estão (o toque já rola nativamente). Uma área pode recusar com `data-drag-scroll="off"`.
+ * o botão esquerdo, como no celular. Nas tabelas, puxar para cima ou para baixo também rola (a própria área, ou a
+ * página quando a tabela não tem rolagem dela): numa tela larga a tabela cabe inteira e só sobra rolar na vertical.
+ * O arraste só começa depois de 6px; quando acontece, o clique seguinte é cancelado (não abre a linha nem troca de
+ * aba sem querer). Campos de texto e o toque ficam como estão; uma área pode recusar com `data-drag-scroll="off"`.
  */
 import { useEffect } from "react";
 
 const THRESHOLD = 6;
 const SKIP = "input, textarea, select, [contenteditable=''], [contenteditable='true'], [data-drag-scroll='off']";
+const TABLE = "table, [role='table'], [role='grid'], [data-drag-scroll='y']";
 
-function scrollableX(start: Element | null): HTMLElement | null {
+function scrollable(start: Element | null, axis: "x" | "y"): HTMLElement | null {
   let node: Element | null = start;
-  while (node && node !== document.body) {
-    if (node instanceof HTMLElement && node.scrollWidth > node.clientWidth + 1) {
-      const overflowX = getComputedStyle(node).overflowX;
-      if (overflowX === "auto" || overflowX === "scroll") return node;
+  while (node && node !== document.body && node !== document.documentElement) {
+    if (node instanceof HTMLElement) {
+      const overflows = axis === "x" ? node.scrollWidth > node.clientWidth + 1 : node.scrollHeight > node.clientHeight + 1;
+      if (overflows) {
+        const style = getComputedStyle(node);
+        const overflow = axis === "x" ? style.overflowX : style.overflowY;
+        if (overflow === "auto" || overflow === "scroll") return node;
+      }
     }
     node = node.parentElement;
+  }
+  if (axis === "y") {
+    const page = document.scrollingElement as HTMLElement | null;
+    if (page && page.scrollHeight > page.clientHeight + 1) return page;
   }
   return null;
 }
 
+type Axis = { el: HTMLElement; start: number; snap: string; behavior: string };
+
 export function DragScroll() {
   useEffect(() => {
-    let target: HTMLElement | null = null;
+    let x: Axis | null = null;
+    let y: Axis | null = null;
     let startX = 0;
-    let startScroll = 0;
+    let startY = 0;
     let dragging = false;
     let pointerId = -1;
-    let savedSnap = "";
-    let savedBehavior = "";
+    let marked: HTMLElement | null = null;
+
+    const reset = () => {
+      x = null;
+      y = null;
+      dragging = false;
+      marked = null;
+    };
 
     const onDown = (event: PointerEvent) => {
       if (event.pointerType !== "mouse" || event.button !== 0) return;
       const origin = event.target as Element | null;
       if (!origin || origin.closest(SKIP)) return;
-      const scroller = scrollableX(origin);
-      if (!scroller) return;
-      target = scroller;
+      const sx = scrollable(origin, "x");
+      const inTable = Boolean(origin.closest(TABLE));
+      const sy = inTable ? scrollable(origin, "y") : null;
+      if (!sx && !sy) return;
+      x = sx ? { el: sx, start: sx.scrollLeft, snap: "", behavior: "" } : null;
+      y = sy ? { el: sy, start: sy.scrollTop, snap: "", behavior: "" } : null;
       startX = event.clientX;
-      startScroll = scroller.scrollLeft;
+      startY = event.clientY;
       dragging = false;
       pointerId = event.pointerId;
     };
 
+    const freeze = (axis: Axis | null) => {
+      if (!axis) return;
+      // Encaixe (scroll-snap) e rolagem suave puxavam de volta a cada movimento: ficam desligados enquanto se puxa.
+      axis.snap = axis.el.style.scrollSnapType;
+      axis.behavior = axis.el.style.scrollBehavior;
+      axis.el.style.scrollSnapType = "none";
+      axis.el.style.scrollBehavior = "auto";
+    };
+    const thaw = (axis: Axis | null) => {
+      if (!axis) return;
+      axis.el.style.scrollSnapType = axis.snap;
+      axis.el.style.scrollBehavior = axis.behavior;
+    };
+
     const onMove = (event: PointerEvent) => {
-      if (!target || event.pointerId !== pointerId) return;
-      const delta = event.clientX - startX;
+      if ((!x && !y) || event.pointerId !== pointerId) return;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
       if (!dragging) {
-        if (Math.abs(delta) < THRESHOLD) return;
+        if (Math.abs(dx) < THRESHOLD && Math.abs(dy) < THRESHOLD) return;
         dragging = true;
-        target.dataset.dragScrolling = "true";
-        // Encaixe (scroll-snap) e rolagem suave brigam com o arraste: puxavam de volta para o item mais perto a cada
-        // movimento. Ficam desligados enquanto se puxa e voltam ao soltar.
-        savedSnap = target.style.scrollSnapType;
-        savedBehavior = target.style.scrollBehavior;
-        target.style.scrollSnapType = "none";
-        target.style.scrollBehavior = "auto";
-        window.getSelection()?.removeAllRanges();
+        freeze(x);
+        freeze(y);
+        marked = (x ?? y)!.el;
+        marked.dataset.dragScrolling = "true";
+        document.documentElement.dataset.dragScrolling = "true";
       }
-      target.scrollLeft = startScroll - delta;
+      if (x) x.el.scrollLeft = x.start - dx;
+      if (y) y.el.scrollTop = y.start - dy;
       window.getSelection()?.removeAllRanges();
       event.preventDefault();
     };
 
     const end = () => {
-      if (!target) return;
-      const was = dragging;
-      delete target.dataset.dragScrolling;
-      if (was) {
-        target.style.scrollSnapType = savedSnap;
-        target.style.scrollBehavior = savedBehavior;
-      }
-      target = null;
-      dragging = false;
-      if (was) {
+      if (!x && !y) return;
+      if (dragging) {
+        thaw(x);
+        thaw(y);
+        if (marked) delete marked.dataset.dragScrolling;
+        delete document.documentElement.dataset.dragScrolling;
         // O clique que o navegador dispara logo depois do arraste não abre nada.
         const block = (click: MouseEvent) => {
           click.stopPropagation();
@@ -86,21 +116,21 @@ export function DragScroll() {
         window.addEventListener("click", block, { capture: true, once: true });
         window.setTimeout(() => window.removeEventListener("click", block, { capture: true }), 0);
       }
+      reset();
     };
 
-    // Começando em cima de um link, imagem ou texto, o navegador iniciava o "arrastar link" ou a seleção de texto, que
-    // cancelam os eventos do ponteiro: a área não rolava. Sobre uma área que rola de lado, os dois ficam desligados.
+    // Começando num link, imagem ou texto, o navegador iniciava o "arrastar link" ou a seleção, que cancelam o ponteiro.
     const onDragStart = (event: DragEvent) => {
-      if (target) event.preventDefault();
+      if (x || y) event.preventDefault();
     };
     const onSelectStart = (event: Event) => {
-      if (target && dragging) event.preventDefault();
+      if ((x || y) && dragging) event.preventDefault();
     };
     const onMouseDown = (event: MouseEvent) => {
       if (event.button !== 0) return;
       const origin = event.target as Element | null;
-      if (!origin || origin.closest(SKIP) || !scrollableX(origin)) return;
-      // Sem isso o navegador começa a selecionar texto já no primeiro pixel; o clique e o foco seguem normais.
+      if (!origin || origin.closest(SKIP)) return;
+      if (!scrollable(origin, "x") && !origin.closest(TABLE)) return;
       if (origin.closest("a, img")) event.preventDefault();
     };
 
