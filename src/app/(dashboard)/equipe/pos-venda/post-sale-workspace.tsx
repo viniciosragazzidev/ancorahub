@@ -45,6 +45,7 @@ import { PostSaleLeadPanel } from "./post-sale-lead-panel";
 import { PostSaleLeads } from "./post-sale-leads";
 import { PostSaleOverview } from "./post-sale-overview";
 import { PostSaleR0Settings } from "./post-sale-r0-settings";
+import { PostSaleHandoffSettings } from "./post-sale-handoff-settings";
 import { PostSaleToday } from "./post-sale-today";
 import { POST_SALE_TAB_LABELS, POST_SALE_TABS, postSaleTabHref, type PostSaleTab } from "./post-sale-tabs";
 import styles from "./post-sale.module.css";
@@ -184,6 +185,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
             </div>
           </details>
           <PostSaleR0Settings initial={data.r0} queues={data.queues} onSaved={(r0) => setData((current) => ({ ...current, r0: { ...current.r0, ...r0 } }))} />
+          <PostSaleHandoffSettings initial={data.handoff} onSaved={(handoff) => setData((current) => ({ ...current, handoff: { ...current.handoff, ...handoff } }))} />
           <PostSaleAutoRules initial={data.autoRules} queues={data.queues} branches={data.branches} brokers={data.brokers} onSaved={(rule) => setData((current) => ({ ...current, autoRules: { ...current.autoRules, rules: current.autoRules.rules.map((item) => item.key === rule.key ? rule : item) } }))} />
           {!data.r0.canEdit ? <p className={page.muted}>Só a direção pode alterar as automações.</p> : null}
         </TabsContent>

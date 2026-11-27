@@ -506,6 +506,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
   alerts: Awaited<ReturnType<typeof loadPostSaleOpenAlerts>>;
   periodDays: number;
   r0: R0Settings & { canEdit: boolean };
+  handoff: PostSaleHandoffSettings & { canEdit: boolean };
   ruleFilter: PostSaleRuleFilter;
   autoRules: { ready: boolean; canEdit: boolean; rules: AutoRuleSettings[]; tenantDailyLimit: number };
 }>> {
@@ -517,6 +518,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
     const db = getDatabase();
     const branchFilter = context.role === "manager" ? context.branchId : undefined;
     const r0Settings = parseR0Settings(await getSystemSetting(postSaleR0SettingKey(context.tenantId)).catch(() => null));
+    const handoffSettings = parsePostSaleHandoffSettings(await getSystemSetting(postSaleHandoffSettingKey(context.tenantId)).catch(() => null));
     const [brokers, queues, campaigns, surveys, alerts, branches, autoRules] = await Promise.all([
       db.select({ id: schema.tenantMemberships.userId, name: schema.user.name }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
@@ -544,6 +546,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
       alerts,
       periodDays,
       r0: { ...r0Settings, canEdit: context.role === "director" },
+      handoff: { ...handoffSettings, canEdit: context.role === "director" },
       ruleFilter,
       branches,
       autoRules: { ready: autoRules.ready, canEdit: context.role === "director" && autoRules.ready, rules: autoRules.rules, tenantDailyLimit },

@@ -14,6 +14,7 @@ const actions = vi.hoisted(() => ({
   savePostSaleAutoRuleAction: vi.fn(),
   previewPostSaleAutoRuleAction: vi.fn(),
   savePostSaleR0SettingsAction: vi.fn(),
+  savePostSaleHandoffSettingsAction: vi.fn(),
   getPostSaleSurveyMessagesAction: vi.fn(),
   resumePostSaleSurveyAction: vi.fn(),
   previewPostSaleTodayAction: vi.fn(),
@@ -49,6 +50,7 @@ function data(overrides: Partial<WorkspaceData> = {}): WorkspaceData {
     alerts: [],
     periodDays: 30,
     r0: { enabled: false, queueIds: [], canEdit: true },
+    handoff: { enabled: false, canEdit: true },
     ruleFilter: "all",
     autoRules: { ready: true, canEdit: true, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)), tenantDailyLimit: 150 },
     ...overrides,
@@ -165,8 +167,27 @@ describe("régua automática: a chave salva na hora", () => {
     expect(screen.getByText("Filas do piloto (obrigatório para ligar)")).toBeVisible();
   });
 
+  it("diretor liga a troca de corretor sem contato e a chave só muda depois do servidor", async () => {
+    actions.savePostSaleHandoffSettingsAction.mockResolvedValue({ ok: true, data: { enabled: true } });
+    render(<PostSaleWorkspace initialData={data()} initialTab="automacoes" />);
+    const toggle = screen.getByRole("switch", { name: "Ligar a troca automática de corretor" });
+    await act(async () => { fireEvent.click(toggle); });
+    expect(actions.savePostSaleHandoffSettingsAction).toHaveBeenCalledWith({ enabled: true });
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Troca automática ligada."));
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("troca de corretor: erro do servidor volta a chave", async () => {
+    actions.savePostSaleHandoffSettingsAction.mockResolvedValue({ ok: false, error: "Apenas diretores podem ligar a troca automática de corretor." });
+    render(<PostSaleWorkspace initialData={data()} initialTab="automacoes" />);
+    const toggle = screen.getByRole("switch", { name: "Ligar a troca automática de corretor" });
+    await act(async () => { fireEvent.click(toggle); });
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Não salvou: Apenas diretores"));
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
+
   it("gestor vê as regras sem poder mudar", () => {
-    render(<PostSaleWorkspace initialData={data({ r0: { enabled: false, queueIds: [], canEdit: false }, autoRules: { ready: true, canEdit: false, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)), tenantDailyLimit: 150 } })} initialTab="automacoes" />);
+    render(<PostSaleWorkspace initialData={data({ r0: { enabled: false, queueIds: [], canEdit: false }, handoff: { enabled: false, canEdit: false }, autoRules: { ready: true, canEdit: false, rules: AUTO_RULE_KEYS.map((key) => defaultAutoRuleSettings(key)), tenantDailyLimit: 150 } })} initialTab="automacoes" />);
     for (const toggle of screen.getAllByRole("switch")) expect(toggle).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText("Só a direção pode alterar as automações.")).toBeVisible();
   });
