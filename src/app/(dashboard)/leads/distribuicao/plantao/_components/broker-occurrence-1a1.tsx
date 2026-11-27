@@ -263,7 +263,7 @@ export function BrokerOccurrence1a1(props: BrokerOccurrence1a1Props) {
           {presence ? <span className={cn(pl.badge, presence.cls)}>{presence.label}</span> : null}
           {absent ? null : <LiveBadge status={props.liveStatus} nextEventAt={props.nextEventAt} receiving={receiving} />}
           {/* Pulos no rodízio (27/11/2026): oferta expirada ou recusada gasta a vez; no 3º o corretor entra em pausa. */}
-          {!absent && props.turn ? <span className={cn(pl.badge, (props.turn.skips ?? 0) >= 2 ? pl.bWarn : undefined)} title="Oferta expirada ou recusada gasta a vez; no 3º pulo o corretor entra em pausa.">{(props.turn.skips ?? 0) === 0 ? "Sem pulos" : `${props.turn.skips} de 3 pulos`}</span> : null}
+          {!absent && (props.turn?.skips ?? 0) > 0 ? <span className={cn(pl.badge, (props.turn?.skips ?? 0) >= 2 ? pl.bWarn : undefined)} title="Oferta expirada ou recusada gasta a vez; no 3º pulo o corretor entra em pausa.">{props.turn?.skips} de 3 pulos</span> : null}
           {props.swapNotice ? <span className={cn(pl.badge, pl.bInfo)} title={swapNoticeText(props.swapNotice)}>Troca feita</span> : null}
           {props.onlineOverride ? <span className={pl.badge}>Online</span> : null}
         </span>
