@@ -7,6 +7,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowsClockwise } from "@/components/huge-icons";
 import { GripVertical } from "lucide-react";
@@ -357,7 +358,8 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
                   <div className={pl.qcardHead}>
                     <div className={pl.qcardTitleBox}>
                       <p className={pl.qtitle}>
-                        {preview.scheduleName} · {dateLabel(preview.dutyDate)}
+                        {/* O nome abre a página do plantão (27/11/2026). */}
+                        <Link href={`/leads/distribuicao/plantao/${preview.scheduleId}`} className={pl.qtitleLink}>{preview.scheduleName} · {dateLabel(preview.dutyDate)}</Link>
                         {preview.rotation ? <span className={pl.badge}>Rodízio</span> : preview.manual ? <span className={pl.badge}>Fila manual</span> : null}
                       </p>
                       <p className={cn(pl.qsub, pl.num)}>{preview.queueName}</p>

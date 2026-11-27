@@ -391,3 +391,7 @@
 
 /* Ao fechar, sem animação de saída: a gaveta e o diálogo somem na hora (nada fica preso esperando a animação). */
 .sheet[data-ending-style], .dialog[data-ending-style], .scrim[data-ending-style], .menu[data-ending-style] { animation: none; opacity: 0; }
+
+.qtitleLink { color: var(--foreground) !important; text-decoration: none; border-radius: 6px; }
+.qtitleLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.qtitleLink:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 72%, transparent); outline-offset: 2px; }
