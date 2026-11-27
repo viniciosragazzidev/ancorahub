@@ -22,6 +22,18 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { LiteActionButton, LiteSelect } from "@/components/lite/controls";
+import styles from "./manual-qualification-dialog.module.css";
+
+type Rating = "qualified" | "hot" | "warm" | "cold" | "not_qualified";
+
+const LITE_RATINGS: { value: Rating; name: string; hint: string }[] = [
+  { value: "hot", name: "Quente", hint: "Quer fechar logo" },
+  { value: "warm", name: "Morno", hint: "Está analisando" },
+  { value: "cold", name: "Frio", hint: "Só pesquisando" },
+  { value: "not_qualified", name: "Desqualificado", hint: "Sai da fila de venda" },
+];
 
 type Broker = { id: string; name: string; branchId: string | null };
 type Queue = { id: string; name: string; branchId: string | null };
@@ -42,7 +54,8 @@ export function ManualQualificationDialog({
   queues?: Queue[];
 }) {
   const router = useRouter();
-  const [rating, setRating] = useState<"qualified" | "hot" | "warm" | "cold" | "not_qualified">("qualified");
+  const lite = useArcScopeEnabled();
+  const [rating, setRating] = useState<Rating>(lite ? "hot" : "qualified");
   const [targetBrokerId, setTargetBrokerId] = useState<string>("");
   const [note, setNote] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
@@ -75,6 +88,103 @@ export function ManualQualificationDialog({
     } else {
       toast.error(res.error ?? "Erro ao qualificar lead.");
     }
+  }
+
+  // Lite (27/11/2026): mesmo envio, marcação nova; o botão segue o padrão de feedback (repouso, enviando, confirmado, falhou).
+  async function submitLite() {
+    const isQualified = rating !== "not_qualified";
+    const res = await manuallyChangeQualificationStageAction({
+      leadId,
+      targetStage: isQualified ? "qualificado" : "humano",
+      brokerId: targetBrokerId || null,
+      rating,
+      sendMessageToCustomer: isQualified && sendMessage,
+      customCustomerMessage: sendMessage ? customMessage : undefined,
+    });
+    return res.success ? { ok: true as const } : { ok: false as const, error: res.error ?? "Não deu para qualificar o lead." };
+  }
+
+  if (lite) {
+    const brokerOptions = [{ value: "", label: "Automático, pela fila da unidade" }, ...brokers.map((b) => ({ value: b.id, label: b.name }))];
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogPopup key={open ? "open" : "closed"} className={styles.popup}>
+          <div className={styles.head}>
+            <div>
+              <DialogTitle className={styles.title}>Qualificar manualmente</DialogTitle>
+              <DialogDescription className={styles.description}>Defina como {leadName || "o lead"} segue no atendimento.</DialogDescription>
+            </div>
+            <DialogClose className={styles.close} aria-label="Fechar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </DialogClose>
+          </div>
+          <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
+            <fieldset className={styles.field}>
+              <legend className={styles.label}>Classificação</legend>
+              <div className={styles.ratings} role="radiogroup" aria-label="Classificação">
+                {LITE_RATINGS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={rating === option.value}
+                    className={styles.rating}
+                    onClick={() => setRating(option.value)}
+                  >
+                    <span className={styles.ratingName}>{option.name}</span>
+                    <span className={styles.ratingHint}>{option.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <div className={styles.field}>
+              {brokers.length ? (
+                <LiteSelect label="Corretor" value={targetBrokerId} options={brokerOptions} onChange={setTargetBrokerId} searchPlaceholder="Buscar corretor" />
+              ) : (
+                <>
+                  <span className={styles.label}>Corretor</span>
+                  <p className={styles.fixed}>Automático, pela fila da unidade.</p>
+                </>
+              )}
+            </div>
+            {rating !== "not_qualified" ? (
+              <div className={styles.field}>
+                <label className={styles.switchRow}>
+                  Enviar confirmação no WhatsApp
+                  <button type="button" role="switch" aria-checked={sendMessage} className={styles.switch} onClick={() => setSendMessage((current) => !current)} />
+                </label>
+                {sendMessage ? (
+                  <>
+                    <div className={styles.messageHead}>
+                      <label htmlFor="manual-qual-message" className={styles.label}>Mensagem</label>
+                      <button type="button" className={styles.restore} onClick={() => setCustomMessage(defaultMsgTemplate)}>Restaurar padrão</button>
+                    </div>
+                    <textarea id="manual-qual-message" className={styles.textarea} value={customMessage} onChange={(e) => setCustomMessage(e.target.value)} rows={4} />
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+            <div className={styles.foot}>
+              <DialogClose className={styles.cancel}>Cancelar</DialogClose>
+              <LiteActionButton
+                busyLabel="Qualificando…"
+                doneLabel="Lead qualificado"
+                keeps="O lead continua como estava."
+                onAction={submitLite}
+                onDone={() => {
+                  window.setTimeout(() => {
+                    onOpenChange(false);
+                    router.refresh();
+                  }, 600);
+                }}
+              >
+                Confirmar qualificação
+              </LiteActionButton>
+            </div>
+          </form>
+        </DialogPopup>
+      </Dialog>
+    );
   }
 
   return (
