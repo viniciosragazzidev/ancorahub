@@ -348,7 +348,7 @@ export default async function DirectorShellRealPage({
       ) : screen === "plantoes" ? (
         <PlantoesShellScreen />
       ) : screen === "plantao" ? (
-        <PlantaoShellScreen />
+        <PlantaoShellScreen search={params} />
       ) : screen === "distribuicao" ? (
         <DistribuicaoShellScreen />
       ) : screen === "lead" ? (

@@ -14,8 +14,16 @@ import { BrokerDayHistoryTrigger } from "./broker-day-history-trigger";
 import { DutyLeadsCutControl } from "./duty-leads-cut-control";
 import { DutyTurnAutoRefresh } from "./duty-turn-auto-refresh";
 import { DutyTurnSortableGrid } from "./duty-turn-sortable-grid";
-import { PlantaoActions, PlantaoHistoryDistributions, PlantaoLeadsTable, PlantaoPendingRoster, PlantaoSinceControl, PlantaoTurnStrip, pp, type PlantaoLeadRow } from "./plantao-pagina-1a1";
-import { TypeDot, initials, pl } from "./plantoes-1a1-kit";
+import { PlantaoActions, PlantaoHistoryDistributions, PlantaoLeadsTable, PlantaoPendingRoster, PlantaoSinceControl, PlantaoTurnStrip, type PlantaoLeadRow } from "./plantao-pagina-1a1";
+import { TypeDot } from "./plantoes-1a1-kit";
+// Este arquivo roda no servidor: as classes e funções vêm direto daqui, nunca de um módulo "use client" (lá elas chegam
+// como referência de cliente e a página saía sem estilo em produção, 27/11/2026).
+import pp from "./plantao-pagina-1a1.module.css";
+import pl from "./plantoes-1a1.module.css";
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toLocaleUpperCase("pt-BR");
+}
 
 type Tone = "good" | "info" | "warn" | "neutral";
 const TONE: Record<Tone, string> = { good: pl.bGood, info: pl.bInfo, warn: pl.bWarn, neutral: "" };

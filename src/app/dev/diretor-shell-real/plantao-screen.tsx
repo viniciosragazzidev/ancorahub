@@ -1,7 +1,5 @@
-"use client";
 
 /** ?tela=plantao: a página de um plantão 1:1 (27/11/2026) com dados de exemplo, na moldura real. ?historico=1 mostra uma ocorrência encerrada. */
-import { useSearchParams } from "next/navigation";
 
 import { PlantaoPagina1a1 } from "@/app/(dashboard)/leads/distribuicao/plantao/_components/plantao-pagina-1a1-view";
 import type { BrokerOccurrence1a1Props } from "@/app/(dashboard)/leads/distribuicao/plantao/_components/broker-occurrence-1a1";
@@ -53,8 +51,9 @@ const groups = [
   ] },
 ];
 
-export function PlantaoShellScreen() {
-  const params = useSearchParams();
+/** Montada no servidor, como a página real (27/11/2026): no cliente a prévia escondia que os estilos não chegavam. */
+export function PlantaoShellScreen({ search }: { search: Record<string, string | string[] | undefined> }) {
+  const params = { get: (key: string) => { const value = search[key]; return typeof value === "string" ? value : null; } };
   const history = params?.get("historico") === "1";
   const custom = params?.get("desde") === "custom";
   const customValue = params?.get("desdeEm") ?? null;
