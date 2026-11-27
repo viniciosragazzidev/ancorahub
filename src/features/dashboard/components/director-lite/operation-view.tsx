@@ -1,15 +1,14 @@
 "use client";
 
 /**
- * Aba "Visão da operação" do Painel (Lite). Reorganizada em 20/11/2026 pela skill `interface-enxuta` e pela
- * referência P3 do Jubayer: faixa de números num painel só, coluna principal com o funil e a tabela de filas, e
- * coluna lateral com "Precisa de atenção" (até 3 itens, um verbo cada) e "Agora" (plantões e WhatsApp).
- * Os dados são os mesmos do painel essencial. No celular, "Precisa de atenção" vem primeiro.
+ * Aba "Visão geral" do Painel (Lite). Desde 27/11/2026, o desenho aprovado no artifact "Painel da gestão no estilo
+ * do corretor": números em cartões; plantões e WhatsApp lado a lado; funil e leads por fila com a temperatura.
+ * "Precisa de você" saiu daqui e virou o botão do topo com gaveta (attention-drawer.tsx). Os dados são os mesmos.
  */
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { ArrowRight, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
@@ -17,7 +16,6 @@ import { motionTokens as m } from "@/components/arc/motion-tokens";
 import kit from "@/features/broker-performance/components/broker-performance-lite.module.css";
 import type { EssentialDashboard } from "@/features/dashboard/essential/essential-data";
 
-import { attentionItems } from "./attention";
 import local from "./operation-view.module.css";
 import { n, plural } from "./format";
 import { LiteItem, LiteNumber, useReduce } from "./motion";
@@ -58,12 +56,19 @@ export function operationInsight(data: EssentialDashboard): string | null {
   return `${leader.name} concentra ${share(leader.arrived, data.queues.totals.arrived)}% dos leads que entraram.`;
 }
 
+/** Iniciais do nome para o círculo da lista ("Adriana Moreira" vira "AM"). */
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter((part) => /^[A-Za-zÀ-ÿ]/.test(part));
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1]![0] : "")).toUpperCase() || "?";
+}
+
 export function OperationView({ data, canOpenConversations = true }: { data: EssentialDashboard; canOpenConversations?: boolean }) {
   const { totals, rows, label } = data.queues;
   const { whatsapp, duties } = data;
   const { pageRows: whatsappPage, pagination: whatsappPagination } = useLitePages(whatsapp.brokers, 8);
+  // Os 4 com mais atendimentos ativos ficam no cartão; o resto, em "Ver todos os corretores".
+  const topBrokers = [...whatsapp.brokers].sort((a, b) => b.active - a.active).slice(0, 4);
   const [brokersOpen, setBrokersOpen] = useState(false);
-  const attention = attentionItems(data);
   const insight = operationInsight(data);
   const empty = totals.arrived === 0;
   const qualifiedRate = share(totals.qualified, totals.arrived);
@@ -80,7 +85,6 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
     { key: "hot", label: "Quentes", value: totals.hot },
   ];
   const topStage = Math.max(...stages.map((stage) => stage.value), 1);
-  const topQueue = Math.max(...rows.map((row) => row.arrived), 1);
   const whatsappNote = whatsapp.connected === 0
     ? whatsapp.total
       ? `Nenhum dos ${n(whatsapp.total)} corretores conectou o WhatsApp pessoal ainda.`
@@ -107,142 +111,146 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
       </LiteItem>
 
       <div className={local.columns}>
-        {/* Coluna lateral primeiro no DOM: no celular a atenção aparece antes da análise. */}
-        <div className={local.side}>
-          <LiteItem index={1}>
-            <section className={local.panel} aria-labelledby="operation-attention-title">
-              <header className={local.panelHead}>
-                <h2 id="operation-attention-title" className={local.panelTitle}>
-                  Precisa de atenção
-                  {attention.length ? <span className={local.count}>{attention.length}</span> : null}
-                </h2>
-              </header>
-              {attention.length ? (
-                <ul className={local.attentionList}>
-                  {attention.map((item) => (
-                    <li key={item.id} className={local.attentionItem} data-tone={item.tone}>
-                      <span className={local.dot} aria-hidden="true" />
-                      <div className={local.attentionBody}>
-                        <p className={local.attentionTitle}>{item.title}</p>
-                        <p className={local.attentionDetail}>{item.detail}</p>
-                        <Link href={item.href} className={local.verb}>
-                          {item.action}
-                          <ArrowUpRight aria-hidden="true" size={14} />
-                        </Link>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={local.allClear}>
-                  <CheckCircle2 aria-hidden="true" size={16} />
-                  Tudo em dia. Nada pedindo decisão agora.
-                </p>
-              )}
-            </section>
-          </LiteItem>
+        <LiteItem index={1}>
+          <section className={local.panel} aria-labelledby="operation-duties-title">
+            <header className={local.panelHead}>
+              <h2 id="operation-duties-title" className={local.panelTitle}>Plantões agora</h2>
+              <Link href="/leads/distribuicao?view=plantao" className={local.headLink}>Ver escala</Link>
+            </header>
+            {duties.running.length ? (
+              <ul className={local.dutyList}>
+                {duties.running.map((duty) => (
+                  <li key={duty.scheduleId}>
+                    <Link href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className={local.dutyRow}>
+                      <span style={{ display: "grid", gap: 4, minWidth: 0 }}>
+                        <span className={local.dutyName}><span className={local.dutyDot} data-low={duty.belowMinimum ? "true" : undefined} aria-hidden="true" /><span>{duty.name}</span></span>
+                        <span className={local.dutyTime}>{duty.startsAt} às {duty.endsAt}</span>
+                      </span>
+                      <span className={local.dutyFigures}>
+                        <span><strong>{n(duty.available)}</strong><small>disponíveis</small></span>
+                        <span><strong>{n(duty.distributed)}</strong><small>distribuídos</small></span>
+                        <span data-low={duty.belowMinimum ? "true" : undefined}><strong>{duty.activeBrokers}/{duty.brokerCount}</strong><small>{duty.belowMinimum ? "abaixo do mínimo" : "corretores"}</small></span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className={local.nowDetail}>
+                Nenhum plantão ativo.{duties.next ? ` Próximo: ${duties.next.name}, ${duties.next.dutyDate.slice(8, 10)}/${duties.next.dutyDate.slice(5, 7)} às ${duties.next.startsAt}.` : ""}
+              </p>
+            )}
+          </section>
+        </LiteItem>
 
-          <LiteItem index={2}>
-            <section className={local.panel} aria-labelledby="operation-now-title">
-              <header className={local.panelHead}>
-                <h2 id="operation-now-title" className={local.panelTitle}>Agora</h2>
-              </header>
-              <p className={local.groupLabel}>Plantões</p>
-              {duties.running.length ? (
-                <ul className={local.nowList}>
-                  {duties.running.map((duty) => (
-                    <li key={duty.scheduleId}>
-                      <Link href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className={local.nowRow}>
-                        <span className={local.nowName}>{duty.name}</span>
-                        <span className={local.nowTime}>{duty.startsAt} às {duty.endsAt}</span>
-                      </Link>
-                      <p className={local.nowDetail}>
-                        {n(duty.available)} disponíveis · {n(duty.distributed)} distribuídos ·{" "}
-                        <span className={duty.belowMinimum ? local.warn : undefined}>{duty.activeBrokers}/{duty.brokerCount} corretores</span>
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={local.nowDetail}>
-                  Nenhum plantão ativo.{duties.next ? ` Próximo: ${duties.next.name}, ${duties.next.dutyDate.slice(8, 10)}/${duties.next.dutyDate.slice(5, 7)} às ${duties.next.startsAt}.` : ""}{" "}
-                  <Link href="/leads/distribuicao?view=plantao" className={local.inlineLink}>Ver plantões</Link>
-                </p>
-              )}
-
-              <p className={local.groupLabel}>WhatsApp dos corretores</p>
+        <LiteItem index={2}>
+          <section className={local.panel} aria-labelledby="operation-whatsapp-title">
+            <header className={local.panelHead}>
+              <h2 id="operation-whatsapp-title" className={local.panelTitle}>WhatsApp dos corretores</h2>
+              {whatsapp.total ? <span className={local.panelMeta}>{n(whatsapp.connected)} de {n(whatsapp.total)} conectados</span> : null}
+            </header>
+            {whatsapp.connected > 0 ? (
+              <dl className={local.figures}>
+                <div><dt>recebidos</dt><dd><LiteNumber value={whatsapp.received} /></dd></div>
+                <div><dt>respondendo · {whatsapp.responseRate}%</dt><dd><LiteNumber value={whatsapp.responding} /></dd></div>
+                <div><dt>atendimentos ativos</dt><dd><LiteNumber value={whatsapp.active} /></dd></div>
+              </dl>
+            ) : (
               <p className={local.nowDetail}>{whatsappNote}</p>
-              {whatsapp.connected > 0 ? (
-                <dl className={local.figures}>
-                  <div><dt>Recebidos</dt><dd><LiteNumber value={whatsapp.received} /></dd></div>
-                  <div><dt>Respondendo · {whatsapp.responseRate}%</dt><dd><LiteNumber value={whatsapp.responding} /></dd></div>
-                  <div><dt>Ativos</dt><dd><LiteNumber value={whatsapp.active} /></dd></div>
-                </dl>
-              ) : null}
-              {whatsapp.brokers.length ? (
-                <button type="button" className={local.panelFooterLink} onClick={() => setBrokersOpen(true)} aria-haspopup="dialog">
-                  Ver corretores ({n(whatsapp.brokers.length)})
-                  <ArrowRight aria-hidden="true" size={14} />
-                </button>
-              ) : null}
-            </section>
-          </LiteItem>
-        </div>
+            )}
+            {topBrokers.length ? (
+              <ul className={local.brokerList} aria-label="Corretores com mais atendimentos ativos">
+                {topBrokers.map((broker) => {
+                  const body = (
+                    <>
+                      <span className={local.brokerInitials} aria-hidden="true">{initials(broker.name)}</span>
+                      <span className={local.brokerName}>{broker.name}</span>
+                      <span className={local.brokerCount}>{n(broker.active)}</span>
+                    </>
+                  );
+                  return (
+                    <li key={broker.id}>
+                      {canOpenConversations
+                        ? <Link href={`/conversas?tab=leads&brokerId=${encodeURIComponent(broker.id)}`} className={local.brokerRow} title={`Ver conversas de ${broker.name}`}>{body}</Link>
+                        : <div className={local.brokerRow}>{body}</div>}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+            {whatsapp.brokers.length > topBrokers.length ? (
+              <button type="button" className={local.panelFooterLink} onClick={() => setBrokersOpen(true)} aria-haspopup="dialog">
+                Ver todos os corretores ({n(whatsapp.brokers.length)})
+                <ArrowRight aria-hidden="true" size={14} />
+              </button>
+            ) : null}
+          </section>
+        </LiteItem>
+      </div>
 
-        <div className={local.main}>
-          <LiteItem index={1}>
-            <section className={local.panel} aria-labelledby="operation-funnel-title">
-              <header className={local.panelHead}>
-                <h2 id="operation-funnel-title" className={local.panelTitle}>Funil de qualificação</h2>
-                {empty ? null : <span className={local.panelMeta}>{qualifiedRate}% qualificados · {plural(totals.hot, "quente", "quentes")} · {plural(totals.warm, "morno", "mornos")}</span>}
-              </header>
-              {empty ? (
-                <p className={local.emptyText}>Nenhum lead entrou {label}. Quando entrar, o funil aparece aqui.</p>
-              ) : (
-                <>
-                  <div className={local.stages}>
-                    {stages.map((stage, index) => (
-                      <div key={stage.key} className={local.stage}>
-                        <span className={local.stageLabel}>{stage.label}</span>
-                        <Bar percent={Math.max(Math.round((stage.value / topStage) * 100), stage.value > 0 ? 4 : 0)} step={index} />
-                        <span className={local.stageValue}><LiteNumber value={stage.value} /></span>
-                      </div>
-                    ))}
+      <LiteItem index={3}>
+        <section className={local.panel} aria-labelledby="operation-funnel-title">
+          <header className={local.panelHead}>
+            <h2 id="operation-funnel-title" className={local.panelTitle}>Funil de qualificação</h2>
+            {empty ? null : <span className={local.panelMeta}>{qualifiedRate}% qualificados · {plural(totals.hot, "quente", "quentes")} · {plural(totals.warm, "morno", "mornos")}</span>}
+          </header>
+          {empty ? (
+            <p className={local.emptyText}>Nenhum lead entrou {label}. Quando entrar, o funil aparece aqui.</p>
+          ) : (
+            <>
+              <div className={local.stages}>
+                {stages.map((stage, index) => (
+                  <div key={stage.key} className={local.stage}>
+                    <span className={local.stageLabel}>{stage.label}</span>
+                    <Bar percent={Math.max(Math.round((stage.value / topStage) * 100), stage.value > 0 ? 4 : 0)} step={index} />
+                    <span className={local.stageValue}><LiteNumber value={stage.value} /></span>
                   </div>
-                  <p className={local.panelFoot}>
-                    {plural(totals.requalification.attempts, "tentativa", "tentativas")} de requalificação · {plural(totals.requalification.coldLeads, "frio", "frios")}: {n(totals.requalification.once)} com 1, {n(totals.requalification.twice)} com 2, {n(totals.requalification.threePlus)} com 3+
-                    {insight ? <><br />{insight}</> : null}
-                  </p>
-                </>
-              )}
-            </section>
-          </LiteItem>
+                ))}
+              </div>
+              <p className={local.panelFoot}>
+                {plural(totals.requalification.attempts, "tentativa", "tentativas")} de requalificação · {plural(totals.requalification.coldLeads, "frio", "frios")}: {n(totals.requalification.once)} com 1, {n(totals.requalification.twice)} com 2, {n(totals.requalification.threePlus)} com 3+
+                {insight ? <><br />{insight}</> : null}
+              </p>
+            </>
+          )}
+        </section>
+      </LiteItem>
 
-          <LiteItem index={2}>
-            <section className={local.panel} aria-labelledby="operation-queues-title">
-              <header className={local.panelHead}>
-                <h2 id="operation-queues-title" className={local.panelTitle}>
-                  Leads por fila
-                  {rows.length ? <span className={local.count}>{rows.length}</span> : null}
-                </h2>
-              </header>
-              {empty ? (
-                <p className={local.emptyText}>Nenhum lead entrou {label}. Quando entrar, aparece aqui separado por fila.</p>
-              ) : (
-                <>
-                  <table className={local.table}>
-                    <thead>
-                      <tr>
-                        <th scope="col">Fila</th>
-                        <th scope="col" className={local.num}>Entraram</th>
-                        <th scope="col" className={local.num}>Qualificados</th>
-                        <th scope="col" className={local.num}>Frios</th>
-                        <th scope="col" className={local.num}>Aguardando</th>
-                        <th scope="col" className={local.barCol}><span className={local.srOnly}>Volume</span></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row, index) => (
+      <LiteItem index={4}>
+        <section className={local.panel} aria-labelledby="operation-queues-title">
+          <header className={local.panelHead}>
+            <h2 id="operation-queues-title" className={local.panelTitle}>
+              Leads por fila
+              {rows.length ? <span className={local.count}>{rows.length}</span> : null}
+            </h2>
+            {empty ? null : (
+              <span className={local.legend} aria-hidden="true">
+                <span><i style={{ background: "oklch(64% .2 30)" }} />Quentes</span>
+                <span><i style={{ background: "oklch(75% .16 75)" }} />Mornos</span>
+                <span><i style={{ background: "oklch(68% .12 235)" }} />Frios</span>
+              </span>
+            )}
+          </header>
+          {empty ? (
+            <p className={local.emptyText}>Nenhum lead entrou {label}. Quando entrar, aparece aqui separado por fila.</p>
+          ) : (
+            <>
+              <div className={local.tableWrap}>
+                <table className={local.table}>
+                  <thead>
+                    <tr>
+                      <th scope="col">Fila</th>
+                      <th scope="col" className={local.num}>Entraram</th>
+                      <th scope="col" className={local.num}>Qualificados</th>
+                      <th scope="col" className={local.num}>Frios</th>
+                      <th scope="col" className={local.num}>Aguardando</th>
+                      <th scope="col" className={local.barCol}>Temperatura</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => {
+                      const tempTotal = row.hot + row.warm + row.cold;
+                      return (
                         <tr key={row.id ?? row.name}>
                           <th scope="row">
                             {row.id ? <Link href={`/leads?fila=${encodeURIComponent(row.id)}`} className={local.rowName}>{row.name}</Link> : <span className={local.rowName}>{row.name}</span>}
@@ -251,20 +259,30 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
                           <td className={local.num}>{n(row.qualified)}</td>
                           <td className={local.num}>{n(row.cold)}</td>
                           <td className={local.num} data-warn={row.waiting > 0 ? "true" : undefined}>{n(row.waiting)}</td>
-                          <td className={local.barCol}><Bar percent={Math.max(Math.round((row.arrived / topQueue) * 100), 4)} step={Math.min(index, 2)} /></td>
+                          <td className={local.barCol}>
+                            <span className={local.temperature} role="img" aria-label={`${row.hot} quentes, ${row.warm} mornos, ${row.cold} frios`}>
+                              {tempTotal ? (
+                                <>
+                                  <span data-level="hot" style={{ width: `${share(row.hot, tempTotal)}%` }} />
+                                  <span data-level="warm" style={{ width: `${share(row.warm, tempTotal)}%` }} />
+                                  <span data-level="cold" style={{ width: `${share(row.cold, tempTotal)}%` }} />
+                                </>
+                              ) : null}
+                            </span>
+                          </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <p className={local.tableFoot}>
-                    {plural(rows.length, "fila", "filas")} · {plural(totals.arrived, "lead", "leads")} {label}
-                  </p>
-                </>
-              )}
-            </section>
-          </LiteItem>
-        </div>
-      </div>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className={local.tableFoot}>
+                {plural(rows.length, "fila", "filas")} · {plural(totals.arrived, "lead", "leads")} {label}
+              </p>
+            </>
+          )}
+        </section>
+      </LiteItem>
 
       <LiteSidePanel open={brokersOpen} onOpenChange={setBrokersOpen} title="WhatsApp dos corretores" description={whatsappNote}>
         <ul className={kit.carrierList} aria-label="Corretores conectados, com atendimentos ativos">

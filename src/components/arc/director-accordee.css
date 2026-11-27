@@ -340,3 +340,52 @@
   .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] { width: 40px; height: 40px; margin-inline: auto; padding: 0; justify-content: center; }
   .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"] [data-slot="avatar"] { width: 32px; height: 32px; font-size: 13px; }
 }
+
+/* ------------------------------------------------------------------ barra lateral no estilo Lite (27/11/2026)
+ * Desenho aprovado no artifact "Painel da gestão no estilo do corretor": a mesma estrutura (grupos, áreas, contadores),
+ * com o visual do modo corretor. Linhas de 40px em pílula, área ativa em branco com sombra de repouso, subitens com
+ * uma linha à esquerda e o escolhido no azul suave de ação. Só com mouse; no toque seguem os 44px.
+ */
+@media (hover: hover) and (pointer: fine) {
+  [data-slot="sidebar-wrapper"]:has(> .arc-venancor[data-skin="diretor"] .director-sidebar) { --sidebar-width: 17rem !important; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-content"] { padding: 8px 12px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [aria-label="Menu principal"] { gap: 6px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"] {
+    min-height: 40px; height: 40px; gap: 10px; padding: 0 40px 0 12px;
+    border: 1px solid transparent; border-radius: 9999px;
+    color: var(--text-secondary); font-size: 14px; line-height: 20px;
+    transition: background-color 160ms var(--ease-standard), color 160ms var(--ease-standard);
+  }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-label"] { font-size: 14px; font-weight: 500; color: inherit; background: transparent; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-icon"] { width: 18px; min-width: 18px; height: 18px; color: inherit; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-icon"] svg { width: 18px; height: 18px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"]:hover { background: var(--surface-muted); color: var(--foreground); }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"][aria-current="page"],
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"][aria-current="page"]:hover {
+    border-color: var(--border); background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting);
+  }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"][aria-current="page"] :is([data-slot="sidebar-nav-label"], [data-slot="sidebar-nav-icon"]) { background: transparent; color: var(--foreground); }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-group-toggle"] { width: 28px; height: 28px; color: var(--text-muted); }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-sub"] {
+    margin: 4px 0 6px 21px; padding-left: 12px; gap: 1px; border-left: 1px solid var(--border);
+  }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-sublink"] {
+    min-height: 36px; padding: 0 12px; border-radius: 9999px;
+    color: var(--text-muted); font-size: 14px; font-weight: 400;
+  }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-sublink"]:hover { background: var(--surface-muted); color: var(--foreground); }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-sublink"][aria-current="page"] {
+    background: var(--chat-action-soft, oklch(62% .2 255 / .1)); color: var(--chat-action-text, oklch(48% .2 258)); font-weight: 500;
+  }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-count"] {
+    min-width: 22px; height: 20px; padding: 0 7px; border-radius: 9999px; display: inline-grid; place-items: center;
+    background: var(--surface-muted); color: var(--text-secondary); font-size: 12px; font-weight: 500;
+  }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [aria-label="Menu principal"] > div > p {
+    text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 400; color: var(--text-muted);
+  }
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-footer"] button[data-slot="tooltip-trigger"] { height: 44px; border-radius: 9999px; font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"] { transition: none; }
+}

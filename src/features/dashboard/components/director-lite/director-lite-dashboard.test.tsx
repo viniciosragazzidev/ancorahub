@@ -25,6 +25,7 @@ vi.mock("motion/react", async (importOriginal) => {
 import { buildEssential, emptyEssential } from "@/app/dev/diretor-dashboard-preview/_components/essential-example";
 
 import { displacementOf, readMotion } from "@/components/lite/motion/capture-motion";
+import { summarizeWhatsApp, type BrokerWhatsAppRow } from "@/features/dashboard/essential/essential-summary";
 
 vi.mock("@/components/dashboard-header", () => ({
   DashboardHeader: ({ breadcrumb, title }: { breadcrumb: string; title: string }) => <header data-testid="director-dashboard-header"><span>{breadcrumb}</span><h1>{title}</h1></header>,
@@ -39,6 +40,22 @@ const BRANCHES = [
   { id: "branch-barra", name: "Barra da Tijuca" },
 ];
 
+/** Seis corretores conectados e um sem WhatsApp: o cartão mostra 4, "Ver todos os corretores" abre o resto. */
+const MANY_BROKERS: BrokerWhatsAppRow[] = [
+  { id: "ana", name: "Ana Souza", connected: true, received: 14, responding: 6, active: 4 },
+  { id: "bruno", name: "Bruno Lima", connected: true, received: 12, responding: 3, active: 1 },
+  { id: "carla", name: "Carla Dias", connected: true, received: 9, responding: 4, active: 3 },
+  { id: "fabio", name: "Fábio Rocha", connected: true, received: 8, responding: 5, active: 6 },
+  { id: "gabi", name: "Gabriela Nunes", connected: true, received: 5, responding: 2, active: 2 },
+  { id: "hugo", name: "Hugo Prado", connected: true, received: 3, responding: 1, active: 0 },
+  { id: "diego", name: "Diego Reis", connected: false, received: 0, responding: 0, active: 0 },
+];
+
+function withBrokers(rows: BrokerWhatsAppRow[]) {
+  const data = buildEssential("today", "all", NOW);
+  return { ...data, whatsapp: { ...data.whatsapp, ...summarizeWhatsApp(rows) } };
+}
+
 afterEach(() => {
   cleanup();
   motionState.reduce = false;
@@ -48,12 +65,13 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
   it("mostra o topo global, as abas e a nota de que o período muda só os leads por fila", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1, name: /Ol\u00e1, Renata/ })).not.toBeInTheDocument();
-    // 20/11/2026: a saudação saiu; abas, unidade e período numa faixa só.
-    expect(screen.queryByText(/Ol\u00e1, Renata/)).not.toBeInTheDocument();
+    // 27/11/2026: a saudação voltou (16h42 UTC são 13h42 em Brasília) com a frase da situação.
+    const data = buildEssential("today", "all", NOW);
+    expect(screen.getByRole("heading", { level: 1, name: "Boa tarde, Renata" })).toBeInTheDocument();
+    expect(screen.getByText(`Hoje entraram ${data.queues.totals.arrived} leads. 2 coisas pedem você agora.`)).toBeInTheDocument();
     expect(screen.getByRole("main", { name: "Painel" })).toHaveClass(styles.pageContainer);
-    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
-    expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("aria-current", "page");
+    const tabs = within(screen.getByRole("navigation", { name: "Seções do painel" }));
+    expect(tabs.getByRole("link", { name: "Visão geral" })).toHaveAttribute("aria-current", "page");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=hoje");
     expect(screen.getByLabelText("Sobre o per\u00edodo")).toBeInTheDocument();
     expect(screen.getByText("O per\u00edodo altera apenas os leads por fila.")).toBeInTheDocument();
@@ -64,21 +82,29 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(container.querySelector("[data-live-status-strip]")).toBeNull();
   });
 
-  it("organização de 20/11: números, Precisa de atenção e Agora antes da análise (funil e tabela de filas)", () => {
+  it("organização de 27/11: números, plantões e WhatsApp antes da análise (funil e tabela de filas); Precisa de você fica no topo", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     const blocks = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent ?? "");
     expect(blocks.map((text) => text.replace(/\d+$/, ""))).toEqual([
       "Leads desde sex 19h",
-      "Precisa de atenção",
-      "Agora",
+      "Plantões agora",
+      "WhatsApp dos corretores",
       "Funil de qualificação",
       "Leads por fila",
     ]);
+    // O que pede decisão não é mais um bloco da página: é o botão do topo, junto dos filtros, com a gaveta fechada.
+    expect(screen.getByRole("button", { name: /Precisa de você/ }).closest("header")).not.toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("Precisa de atenção mostra até 3 itens, cada um com um verbo só", () => {
+  it("Precisa de você mostra a contagem e abre a gaveta com até 3 itens, cada um com um verbo só", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const attention = within(screen.getByRole("heading", { name: /Precisa de atenção/ }).closest("section") as HTMLElement);
+    const button = screen.getByRole("button", { name: /Precisa de você/ });
+    expect(button).toHaveTextContent("Precisa de você2");
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    const attention = within(screen.getByRole("dialog", { name: "Precisa de você agora" }));
     const items = attention.getAllByRole("listitem");
     expect(items.length).toBeGreaterThan(0);
     expect(items.length).toBeLessThanOrEqual(3);
@@ -87,9 +113,13 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(attention.getByRole("link", { name: /Ver plantão/ })).toHaveAttribute("href", "/leads/distribuicao/plantao/pme");
   });
 
-  it("sem pendência, Precisa de atenção diz que está tudo em dia", () => {
+  it("sem pendência, o botão diz Tudo em dia e a gaveta confirma que nada pede decisão", () => {
     render(<DirectorLiteDashboard data={emptyEssential(NOW)} period="today" branchId={null} branches={[]} now={NOW} />);
-    expect(screen.getByText("Tudo em dia. Nada pedindo decisão agora.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Precisa de você/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tudo em dia" }));
+    const drawer = within(screen.getByRole("dialog", { name: "Precisa de você agora" }));
+    expect(drawer.getByText("Tudo em dia. Nada pedindo decisão agora.")).toBeInTheDocument();
+    expect(drawer.queryByRole("listitem")).not.toBeInTheDocument();
   });
 
   it("mostra os quatro números da janela e nenhum dado de venda", () => {
@@ -103,10 +133,12 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
 
   it("as abas têm rótulo curto para o celular, escondido do leitor de tela (o nome acessível segue completo)", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
-    const quality = tabs.getByRole("link", { name: "Qualidade dos leads" });
-    expect(quality.querySelector('[aria-hidden="true"]')).toHaveTextContent("Qualidade");
-    expect(tabs.getByRole("link", { name: "Funil de qualificação" }).querySelector('[aria-hidden="true"]')).toHaveTextContent("Funil");
+    const tabs = within(screen.getByRole("navigation", { name: "Seções do painel" }));
+    // O ícone também é aria-hidden; o rótulo curto é o span escondido do leitor de tela.
+    const short = (name: string) => tabs.getByRole("link", { name }).querySelector('span[aria-hidden="true"]');
+    expect(short("Visão geral")).toHaveTextContent("Geral");
+    expect(short("Qualidade dos leads")).toHaveTextContent("Qualidade");
+    expect(short("Funil")).toHaveTextContent("Funil");
   });
 
   it("marca o período ativo e leva o filtro de unidade junto", () => {
@@ -135,11 +167,18 @@ describe("bloco 1: plantões acontecendo agora", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     const pme = screen.getByRole("link", { name: /Plantão PME/ });
     expect(pme).toHaveAttribute("href", "/leads/distribuicao/plantao/pme");
-    const row = pme.closest("li") as HTMLElement;
-    expect(row).toHaveTextContent("6 disponíveis · 9 distribuídos");
-    // PME tem 2 corretores confirmados de 3 escalados: em alerta (e no "Precisa de atenção") por estar abaixo do mínimo.
-    expect(within(row).getByText("2/3 corretores")).toBeInTheDocument();
+    const figure = (duty: HTMLElement, label: string) => within(duty).getByText(label).parentElement?.querySelector("strong")?.textContent;
+    expect(figure(pme, "disponíveis")).toBe("6");
+    expect(figure(pme, "distribuídos")).toBe("9");
+    // PME tem 2 corretores confirmados de 3 escalados: em alerta (e no "Precisa de você") por estar abaixo do mínimo.
+    expect(figure(pme, "abaixo do mínimo")).toBe("2/3");
+    expect(within(pme).queryByText("corretores")).not.toBeInTheDocument();
     expect(within(pme).getByText("08:00 às 19:00")).toBeInTheDocument();
+    const presencial = screen.getByRole("link", { name: /Plantão Presencial/ });
+    expect(presencial).toHaveAttribute("href", "/leads/distribuicao/plantao/presencial");
+    expect(figure(presencial, "disponíveis")).toBe("0");
+    expect(figure(presencial, "distribuídos")).toBe("4");
+    expect(figure(presencial, "corretores")).toBe("3/3");
   });
 
   it("sem plantão ativo, mostra o estado vazio com o próximo plantão", () => {
@@ -182,19 +221,33 @@ describe("bloco 2: leads por fila", () => {
 describe("bloco 3: WhatsApp dos corretores", () => {
   it("mostra quantos conectaram, recebidos, respondendo, taxa e atendimentos ativos", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    expect(screen.getByText("3 de 5 corretores conectaram o WhatsApp pessoal", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("Recebidos")).toBeInTheDocument();
-    expect(screen.getByText("Respondendo · 37%")).toBeInTheDocument();
-    expect(screen.getByText("Ativos")).toBeInTheDocument();
+    const card = within(screen.getByRole("heading", { name: "WhatsApp dos corretores" }).closest("section") as HTMLElement);
+    expect(card.getByText("3 de 5 conectados")).toBeInTheDocument();
+    expect(card.getByText("recebidos")).toBeInTheDocument();
+    expect(card.getByText("respondendo · 37%")).toBeInTheDocument();
+    expect(card.getByText("atendimentos ativos")).toBeInTheDocument();
   });
 
-  it("lista só os corretores conectados, ordenados por atendimentos ativos, no painel lateral", () => {
+  it("no cartão, só os conectados, ordenados por atendimentos ativos, com link para as conversas; sem botão quando cabem todos", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    const links = within(screen.getByRole("list", { name: "Corretores com mais atendimentos ativos" })).getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("title"))).toEqual(["Ver conversas de Ana Souza", "Ver conversas de Carla Dias", "Ver conversas de Bruno Lima"]);
+    expect(links[0]).toHaveAttribute("href", "/conversas?tab=leads&brokerId=ana");
+    expect(screen.queryByText("Diego Reis")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ver todos os corretores/ })).not.toBeInTheDocument();
+  });
+
+  it("com mais de 4 conectados, o cartão mostra os 4 primeiros e o painel lateral lista todos na mesma ordem", () => {
+    render(<DirectorLiteDashboard data={withBrokers(MANY_BROKERS)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    const order = ["Fábio Rocha", "Ana Souza", "Carla Dias", "Gabriela Nunes", "Bruno Lima", "Hugo Prado"].map((name) => `Ver conversas de ${name}`);
+    const card = within(screen.getByRole("list", { name: "Corretores com mais atendimentos ativos" }));
+    expect(card.getAllByRole("link").map((link) => link.getAttribute("title"))).toEqual(order.slice(0, 4));
     expect(screen.queryByRole("list", { name: "Corretores conectados, com atendimentos ativos" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Ver corretores \(3\)/ }));
-    const list = within(screen.getByRole("list", { name: "Corretores conectados, com atendimentos ativos" }));
-    const names = list.getAllByRole("link").map((link) => link.getAttribute("title"));
-    expect(names).toEqual(["Ver conversas de Ana Souza", "Ver conversas de Carla Dias", "Ver conversas de Bruno Lima"]);
+    fireEvent.click(screen.getByRole("button", { name: /Ver todos os corretores \(6\)/ }));
+    const panel = within(screen.getByRole("dialog", { name: "WhatsApp dos corretores" }));
+    expect(panel.getByText("6 de 7 corretores conectaram o WhatsApp pessoal", { exact: false })).toBeInTheDocument();
+    const list = within(panel.getByRole("list", { name: "Corretores conectados, com atendimentos ativos" }));
+    expect(list.getAllByRole("link").map((link) => link.getAttribute("title"))).toEqual(order);
     expect(screen.queryByText("Diego Reis")).not.toBeInTheDocument();
   });
 
@@ -249,12 +302,12 @@ describe("movimento", () => {
   });
 
   it("agrupa o milhar em pt-BR nas contagens por corretor e de requalificação", () => {
-    const data = buildEssential("today", "all", NOW);
-    const [first] = data.whatsapp.brokers;
-    const big = { ...data, whatsapp: { ...data.whatsapp, brokers: [{ ...first!, received: 1234, responding: 1000 }] } };
+    const [first, ...rest] = MANY_BROKERS;
+    const big = withBrokers([{ ...first!, received: 1234, responding: 1000, active: 2345 }, ...rest]);
     render(<DirectorLiteDashboard data={big} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    fireEvent.click(screen.getByRole("button", { name: /Ver corretores/ }));
-    expect(screen.getByText(/1\.000 de 1\.234 respondendo/)).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Corretores com mais atendimentos ativos" })).getByText("2.345")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Ver todos os corretores/ }));
+    expect(screen.getByText(/2\.345 ativos · 1\.000 de 1\.234 respondendo/)).toBeInTheDocument();
   });
 });
 
@@ -265,7 +318,7 @@ describe("painel Lite para papéis do modo normal que não são diretor", () => 
     );
     expect(screen.getByRole("main", { name: "Painel" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Qualidade dos leads" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Funil de qualificação" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Funil" })).not.toBeInTheDocument();
     expect(screen.queryByText("Todas as unidades")).not.toBeInTheDocument();
     expect(container.querySelector('a[href^="/conversas"]')).toBeNull();
     expect(container).not.toHaveTextContent(/diretor/i);
@@ -273,8 +326,8 @@ describe("painel Lite para papéis do modo normal que não são diretor", () => 
 
   it("gestor sem unidade com a central de qualidade: Qualidade aparece, Funil não", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={[]} now={NOW} availableTabs={["overview", "quality"]} />);
-    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
+    const tabs = within(screen.getByRole("navigation", { name: "Seções do painel" }));
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toBeInTheDocument();
-    expect(tabs.queryByRole("link", { name: "Funil de qualificação" })).not.toBeInTheDocument();
+    expect(tabs.queryByRole("link", { name: "Funil" })).not.toBeInTheDocument();
   });
 });

@@ -31,7 +31,11 @@ export function dashboardHref(tab: DirectorLiteTab, periodValue: string, branchI
   return `${TAB_BASE[tab]}${TAB_BASE[tab].includes("?") ? "&" : "?"}${params.toString()}`;
 }
 
-export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, availableTabs, queues, queueId = null, customRange = null, allowCustomRange = false, children }: {
+export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, availableTabs, queues, queueId = null, customRange = null, allowCustomRange = false, headline = null, action = null, children }: {
+  /** Frase da situação abaixo da saudação (27/11/2026). */
+  headline?: string | null;
+  /** Ação do momento no topo (o botão "Precisa de você" da visão geral). */
+  action?: ReactNode;
   now: Date;
   tab: DirectorLiteTab;
   period: OverviewPeriod;
@@ -56,9 +60,9 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
   const rangeValue = customRange ? rangeParam(customRange) : null;
   const periodValue = rangeValue ?? PERIOD_OPTIONS.find((option) => option.period === period)?.value ?? "hoje";
   const tabs = [
-    { value: "overview", label: "Visão da operação", short: "Operação", href: dashboardHref("overview", periodValue, branchId) },
+    { value: "overview", label: "Visão geral", short: "Geral", href: dashboardHref("overview", periodValue, branchId) },
     { value: "quality", label: "Qualidade dos leads", short: "Qualidade", href: dashboardHref("quality", periodValue, branchId) },
-    { value: "funnel", label: "Funil de qualificação", short: "Funil", href: dashboardHref("funnel", periodValue, branchId) },
+    { value: "funnel", label: "Funil", short: "Funil", href: dashboardHref("funnel", periodValue, branchId) },
   ].filter((item) => !availableTabs || availableTabs.includes(item.value as DirectorLiteTab));
   const byQueue = Boolean(queues);
   const periods = PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label, href: dashboardHref(tab, option.value, branchId, queueId) }));
@@ -89,6 +93,8 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
             onUnit={(value) => router.push(byQueue ? dashboardHref(tab, periodValue, branchId, value || null) : dashboardHref(tab, periodValue, value || null))}
             customRange={customRange}
             onCustomRange={allowCustomRange ? (range) => router.push(dashboardHref(tab, rangeParam(range), branchId, queueId)) : undefined}
+            headline={headline}
+            action={action}
           />
           {children}
         </div>

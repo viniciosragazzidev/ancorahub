@@ -49,14 +49,13 @@ describe("filtros da aba Funil Lite", () => {
   it("mantém o período e a unidade nas opções e expõe só as unidades recebidas do servidor", () => {
     render(<DirectorLiteQualificationFunnelPage data={data} branchId="branch-autorizada" branches={branches} firstName="Renata" now={now} />);
     expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1, name: /Ol\u00e1, Renata/ })).not.toBeInTheDocument();
-    // 20/11/2026: a saudação saiu (o topo já diz "Painel · período · unidade").
-    expect(screen.queryByText(/Ol\u00e1, Renata/)).not.toBeInTheDocument();
+    // 27/11/2026: a saudação voltou, pelo horário de Brasília (12h UTC são 9h).
+    expect(screen.getByRole("heading", { level: 1, name: "Bom dia, Renata" })).toBeInTheDocument();
     expect(screen.getByRole("main", { name: "Painel" })).toHaveClass(styles.pageContainer);
-    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
-    expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("href", "/dashboard?periodo=30&unidade=branch-autorizada");
+    const tabs = within(screen.getByRole("navigation", { name: "Seções do painel" }));
+    expect(tabs.getByRole("link", { name: "Visão geral" })).toHaveAttribute("href", "/dashboard?periodo=30&unidade=branch-autorizada");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=30&unidade=branch-autorizada");
-    expect(tabs.getByRole("link", { name: "Funil de qualificação" })).toHaveAttribute("href", "/dashboard?tab=funnel&periodo=30&unidade=branch-autorizada");
+    expect(tabs.getByRole("link", { name: "Funil" })).toHaveAttribute("href", "/dashboard?tab=funnel&periodo=30&unidade=branch-autorizada");
     const periods = within(screen.getByRole("navigation", { name: "Período" }));
     expect(periods.getByRole("link", { name: "30 dias" })).toHaveAttribute("aria-current", "true");
     expect(periods.getByRole("link", { name: "Hoje" })).toHaveAttribute("href", "/dashboard?tab=funnel&periodo=hoje&unidade=branch-autorizada");
@@ -71,8 +70,8 @@ describe("filtros da aba Funil Lite", () => {
 
   it("mantém Hoje ao trocar de aba", () => {
     render(<DirectorLiteQualificationFunnelPage data={{ ...data, period: "today" }} branchId={null} branches={[]} firstName="Renata" now={now} />);
-    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
-    expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("href", "/dashboard?periodo=hoje");
+    const tabs = within(screen.getByRole("navigation", { name: "Seções do painel" }));
+    expect(tabs.getByRole("link", { name: "Visão geral" })).toHaveAttribute("href", "/dashboard?periodo=hoje");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=hoje");
     expect(within(screen.getByRole("navigation", { name: "Período" })).getByRole("link", { name: "Hoje" })).toHaveAttribute("aria-current", "true");
   });

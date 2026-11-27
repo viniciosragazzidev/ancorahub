@@ -6,6 +6,8 @@ import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
 import { DirectorLiteChrome, type DashboardBranch, type DirectorLiteTab } from "./director-lite-chrome";
 import { OperationView } from "./operation-view";
+import { AttentionDrawerButton } from "./attention-drawer";
+import { attentionItems } from "./attention";
 import { EntriesView } from "./entries-view";
 import { customRangeLabel, type CustomRange } from "./custom-range";
 import type { EntriesByTurn } from "@/features/dashboard/entries/entries-by-turn-core";
@@ -33,8 +35,14 @@ export function DirectorLiteDashboard({ data, period, branchId, branches, now, a
 }) {
   const queueName = queues?.find((queue) => queue.id === queueId)?.name ?? null;
   const periodText = customRange ? customRangeLabel(customRange) : period === "today" ? "Hoje" : period === "7d" ? "Últimos 7 dias" : "Últimos 30 dias";
+  const attention = attentionItems(data);
+  // Uma frase com a situação (27/11/2026): quantos entraram no recorte e quantas coisas pedem decisão.
+  const arrived = data.queues.totals.arrived;
+  const when = customRange ? `Entre ${customRangeLabel(customRange)}` : period === "today" ? "Hoje" : period === "7d" ? "Nos últimos 7 dias" : "Nos últimos 30 dias";
+  const leadsText = `${when} ${arrived === 1 ? "entrou 1 lead" : `entraram ${arrived.toLocaleString("pt-BR")} leads`}${queueName ? ` em ${queueName}` : ""}.`;
+  const headline = `${leadsText} ${attention.length === 0 ? "Nada pedindo você agora." : attention.length === 1 ? "1 coisa pede você agora." : `${attention.length} coisas pedem você agora.`}`;
   return (
-    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs} queues={queues} queueId={queueId} customRange={customRange} allowCustomRange>
+    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs} queues={queues} queueId={queueId} customRange={customRange} allowCustomRange headline={headline} action={<AttentionDrawerButton items={attention} />}>
       <OperationView data={data} canOpenConversations={canOpenConversations} />
       {entries ? <div className="mt-6"><EntriesView data={entries} queueName={queueName} periodText={periodText} current={!customRange} /></div> : null}
     </DirectorLiteChrome>

@@ -898,7 +898,7 @@ button.heatCell:hover { transform: scale(1.12); }
 }
 
 /* Intervalo personalizado (20/11/2026). */
-.rangeForm { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; width: min(360px, 90vw); }
+.rangeForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; width: min(360px, 90vw); }
 .rangeTitle { grid-column: 1 / -1; margin: 0; color: var(--foreground); font-weight: 600; }
 .rangeField { display: grid; gap: 4px; color: var(--text-secondary); font-size: var(--text-xs); }
 .rangeField input { min-height: 40px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); }
@@ -937,4 +937,57 @@ button.heatCell:hover { transform: scale(1.12); }
 @media (max-width: 767px) {
   .periodGroup { flex-wrap: wrap; min-width: 0; }
   .periodGroup > .pills { min-width: 0; }
+}
+
+/* ------------------------------------------------------------------ topo novo (27/11/2026)
+ * Desenho aprovado no artifact "Painel da gestão no estilo do corretor": volta ao Lite do corretor (pílulas de 44px,
+ * superfície branca na ativa), por cima do Accordee de 21/11 que deixava os controles com 22 a 28px.
+ */
+.headerV2 { gap: 20px; }
+.viewTabs { display: flex; min-width: 0; }
+.viewTabs .pills { padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-muted); }
+.viewTabs .pill { gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: var(--text-sm); font-weight: 500; color: var(--text-muted); }
+.viewTabs .pill:hover { color: var(--foreground); background: transparent; }
+.viewTabs .pill[data-active="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
+.tabIcon { flex: none; }
+.greetingBlock { display: grid; gap: 6px; min-width: 0; }
+.greetingTitle { margin: 0; color: var(--foreground); font-size: var(--text-3xl, 36px); font-weight: 500; letter-spacing: var(--tracking-display, -0.03em); line-height: 1.1; }
+.greetingText { margin: 0; color: var(--text-secondary); font-size: var(--text-base); }
+.headerV2 .periodGroup { align-items: center; gap: 8px; }
+.headerV2 .periodGroup .pills { padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-muted); }
+.headerV2 .periodGroup .pill { min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: var(--text-sm); font-weight: 500; color: var(--text-muted); }
+.headerV2 .periodGroup .pill[data-active="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
+.headerV2 .unitSelect { min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: var(--text-sm); font-weight: 500; box-shadow: var(--shadow-resting); }
+.headerV2 .helpButton { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); }
+.calendarButton { display: inline-grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); cursor: pointer; list-style: none; transition: background-color var(--duration-fast, 160ms) var(--ease-standard); }
+.calendarButton::-webkit-details-marker { display: none; }
+.calendarButton:hover { background: var(--surface-muted); }
+.calendarButton[data-active="true"] { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 30%, transparent); background: var(--surface-muted); }
+.attentionButton { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px 0 18px; border: 0; border-radius: 999px; background: var(--chat-action, oklch(62% .2 255)); color: #fff; font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; transition: background-color var(--duration-fast, 160ms) var(--ease-standard), transform 120ms var(--ease-standard); }
+.attentionButton:hover { background: var(--chat-action-strong, oklch(55% .21 258)); }
+.attentionButton:active { transform: scale(0.98); }
+.attentionButton[data-calm="true"] { padding: 0 18px; background: var(--surface-muted); color: var(--text-secondary); }
+.attentionCount { display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; background: #fff; color: var(--chat-action-text, oklch(48% .2 258)); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .attentionButton, .calendarButton { transition: none; } .attentionButton:active { transform: none; } }
+
+/* Celular (27/11/2026): no topo ficam as abas, "Precisa de você" e o calendário; período e unidade abrem no calendário. */
+.calendarPanel { display: grid; gap: 14px; width: min(360px, 90vw); }
+.phoneOnly { display: grid; gap: 10px; }
+@media (max-width: 767px) {
+  .phoneOnly .pills { width: 100%; }
+  .phoneOnly .pill { flex: 1; }
+  .phoneOnly .unitSelect { width: 100%; }
+  .headerV2 { position: relative; }
+  .headerV2 .periodGroup .help { position: static; }
+  .calendarPanel { left: 0; right: 0; width: auto; }
+  .headerV2 .filters { flex-wrap: nowrap; }
+  .headerV2 .periodGroup { flex: none; }
+}
+@media (min-width: 768px) {
+  .help[data-desktop="hidden"] { display: none; }
+}
+
+/* Celular (27/11/2026): "Precisa de você" igual ao computador e no topo, logo abaixo das abas, antes da saudação. */
+@media (max-width: 767px) {
+  .headerV2 .pageHead { flex-direction: column-reverse; align-items: stretch; }
 }
