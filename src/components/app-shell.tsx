@@ -178,6 +178,16 @@ export function AppShell({
     };
   }, [branding?.brandColor, directorLiteEnabled, readableBrandForeground]);
 
+  // Zoom de 80% no modo gestão (27/11/2026, pedido do Vinicios): a moldura da gestão marca o <html> e o CSS
+  // (venancor-scope.css) aplica o zoom só no computador, compensando as alturas de tela cheia.
+  const gestaoZoom = directorLiteEnabled && !directorLiteRouteOptedOut;
+  useEffect(() => {
+    if (!gestaoZoom) return;
+    const root = document.documentElement;
+    root.dataset.gestaoZoom = "true";
+    return () => { delete root.dataset.gestaoZoom; };
+  }, [gestaoZoom]);
+
   // The authenticated shell owns vertical scrolling. Route changes must start at
   // its top, while query-only navigation (for example choosing a conversation)
   // keeps the current position intact.
