@@ -1,0 +1,28 @@
+/* Requalificar leads frios no Lite (27/11/2026). Tokens do .arc-venancor e o kit da aba Plantões. */
+.panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; font-family: var(--font-inter), Inter, system-ui, sans-serif; }
+.queue { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.group { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.selectAll { padding: 0 12px 0 8px; color: var(--text-secondary); }
+.list { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rowOn { background: color-mix(in oklab, var(--d-accent, #3b2dff) 6%, var(--surface)); }
+.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--foreground); }
+.time { flex: none; }
+.result { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 20px; background: var(--surface-muted); }
+.resultTitle { margin: 0; font-size: 14px; font-weight: 500; color: var(--foreground); }
+.skipped { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.skippedName { font-weight: 500; color: var(--foreground); }
+.foot {
+  position: sticky; bottom: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-subtle, var(--border)); background: var(--surface);
+}
+.footCount { display: inline-flex; align-items: center; gap: 8px; }
+.clear { min-height: 32px; padding: 0 8px; border: 0; border-radius: 9999px; background: transparent; font: inherit; font-size: 12px; color: var(--d-action-text, var(--foreground)); cursor: pointer; }
+.clear:hover { background: var(--surface-muted); }
+.footActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 767px) {
+  .footActions { width: 100%; }
+  .footActions > button { flex: 1; }
+}
+.panel [role="radiogroup"] button { white-space: normal; min-height: 52px; text-align: center; }
