@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => "/distribuicao" }));
 vi.mock("@/features/lead-distribution/monthly-duty-actions", () => ({
   generateMonthlyDutyPlanAction: vi.fn(),
   getMonthlyDutyPlanAction: vi.fn().mockResolvedValue(null),

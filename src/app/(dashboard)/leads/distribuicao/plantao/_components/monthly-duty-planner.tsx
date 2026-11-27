@@ -35,7 +35,10 @@ import {
   type PlanBrokerModality,
 } from "@/features/lead-distribution/monthly-duty-plan";
 import { cn } from "@/lib/utils";
-import { DutyTypeTag, MODALITY_LABEL, typeStripe, typeUnitsLabel, type DutyTypeOption } from "./duty-type-ui";
+import { DutyTypeTag, MODALITY_LABEL, typeColor, typeStripe, typeUnitsLabel, type DutyTypeOption } from "./duty-type-ui";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { CloseIcon, PlConfirm, PlField, PlSearchAdd, PlSection, PlSegmented, PlSelect, PlSheet, PlStepper, PlSwitch, PlusIcon, SearchIcon, TypeDot, TypeName, WarnIcon, initials, pl } from "./plantoes-1a1-kit";
 
 type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null; internalCode?: string | null; pending?: boolean };
 type Branch = { id: string; name: string };
@@ -208,6 +211,7 @@ export function MonthlyDutyPlanner({
   const [reviewView, setReviewView] = useState<"days" | "brokers">("days");
   // The escala step shows the types of the latest generation; the rest on demand.
   const [showAllTypes, setShowAllTypes] = useState(false);
+  const directorLite = useDirectorLitePage();
 
   useEffect(() => {
     if (open) queueMicrotask(() => { void load(month); });
@@ -452,6 +456,445 @@ export function MonthlyDutyPlanner({
   ];
   const editingEntry = qualified.find((entry) => entry.brokerId === editingBroker) ?? null;
   const branchOptions = [{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))];
+
+  // Lite (27/11/2026): a escala do mês no molde de gaveta do artifact "Distribuição · Plantões" (larga, 720px).
+  if (directorLite) {
+    const typeLabel = (key: string) => typeInfo.get(key)?.name ?? "Sem tipo";
+    const typeHue = (key: string) => typeInfo.get(key)?.hue ?? null;
+    const description = !canEdit ? "Escala dos corretores da sua unidade."
+      : published && !redo ? `Publicada${plan?.publishedAt ? ` em ${new Date(plan.publishedAt).toLocaleDateString("pt-BR")}` : ""} · ${shortDate(plan!.rangeFrom)} a ${shortDate(plan!.rangeUntil)}. Para mudar, gere uma nova: ela vale nas datas que ainda não passaram.`
+        : redo ? "Nova escala: escolha os tipos que quer refazer. Os outros tipos continuam como estão."
+        : "Escolha os tipos de plantão e o período, defina as cadeiras de cada corretor e publique.";
+    const footer = enabled && canEdit && published && !redo ? (
+      <button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} onClick={() => { setRedoByMonth((previous) => ({ ...previous, [month]: true })); setStep("types"); }}>Gerar nova escala</button>
+    ) : enabled && editing && plan !== undefined ? (
+      step === "types" ? (
+        <button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} disabled={!chosen.size || Boolean(rangeError)} onClick={() => setStep("brokers")}>Continuar para corretores</button>
+      ) : step === "brokers" ? (
+        <>
+          <button type="button" className={cn(pl.pill, pl.pillQuiet)} onClick={() => setStep("types")} disabled={pending}>Voltar</button>
+          <button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} disabled={pending || seatsRequested === 0 || !chosen.size} onClick={generate}>
+            {busyKey === "generate" ? "Gerando…" : plan ? "Gerar nova proposta" : "Gerar proposta"}
+          </button>
+        </>
+      ) : plan ? (
+        <>
+          <button type="button" className={cn(pl.pill, pl.pillQuiet)} onClick={() => setStep("brokers")} disabled={pending || !chosen.size}>Voltar aos corretores</button>
+          <button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} disabled={pending || !plan.totalAssigned || plan.problems.length > 0} onClick={() => setConfirmPublish(true)}>Publicar escala</button>
+        </>
+      ) : null
+    ) : null;
+
+    return (
+      <>
+        <PlSheet wide open={open} onOpenChange={(next) => { if (!next) setAddingTo(null); onOpenChange(next); }} title={`Escala de ${monthLabel(month)}`} description={description}
+          badges={plan ? <span className={cn(pl.badge, published ? pl.bGood : pl.bInfo)}>{published ? "Publicada" : "Rascunho"}</span> : null}
+          footer={footer}>
+          {!enabled ? (
+            <div className={pl.box}>
+              <p className={pl.h4}>Escala mensal indisponível</p>
+              <p className={pl.p}>Peça ao Super-admin para habilitar o planejamento mensal. Os plantões semanais continuam funcionando normalmente.</p>
+            </div>
+          ) : failed.has(month) ? (
+            <div className={cn(pl.alert, pl.alertBad)} role="alert">
+              <WarnIcon />
+              <div className={pl.section} style={{ gap: 8 }}>
+                <span>Não foi possível carregar a escala deste mês.</span>
+                <button type="button" className={cn(pl.pill, pl.pillQuiet, pl.pillSm)} style={{ alignSelf: "flex-start" }} onClick={() => { void load(month, true); }}>Tentar de novo</button>
+              </div>
+            </div>
+          ) : loading.has(month) || plan === undefined ? (
+            <p className={pl.small} role="status" aria-label="Carregando escala">Carregando a escala…</p>
+          ) : (
+            <>
+              {editing ? (
+                <div className={pl.segment} role="list" aria-label="Etapas">
+                  {steps.map((item, index) => (
+                    <button key={item.id} type="button" role="listitem" className={pl.segbtn} aria-current={step === item.id ? "step" : undefined} disabled={item.disabled} onClick={() => setStep(item.id)}>
+                      {index + 1}. {item.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {step === "types" ? (
+                <>
+                  <PlSection id="plan-range" title="Período da escala" hint={rangeError ? undefined : `${rangeDays + 1} dias. Pode passar do fim do mês quando os plantões continuam no mês seguinte.`}>
+                    <div className={pl.grid2}>
+                      <PlField label="De" htmlFor="plan-range-from">
+                        <input id="plan-range-from" type="date" className={pl.input} value={range.from} min={monthStart} max={monthEnd(month)} onChange={(event) => setRange({ from: event.target.value, until: event.target.value > range.until ? event.target.value : range.until })} />
+                      </PlField>
+                      <PlField label="Até" htmlFor="plan-range-until">
+                        <input id="plan-range-until" type="date" className={pl.input} value={range.until} min={range.from} max={addDays(range.from, MAX_PLAN_RANGE_DAYS)} onChange={(event) => setRange({ until: event.target.value })} />
+                      </PlField>
+                    </div>
+                    {rangeError ? <p className={cn(pl.small, pl.dangerText)}>{rangeError}</p> : null}
+                  </PlSection>
+                  <PlSection id="plan-types" title="Tipos que entram nesta escala"
+                    aside={<button type="button" className={cn(pl.pill, pl.pillQuiet, pl.pillSm)} onClick={onCreateSchedule}><PlusIcon />Novo plantão</button>}
+                    hint={`${chosen.size ? `${chosen.size} ${chosen.size === 1 ? "tipo" : "tipos"} · ${chosenDates} datas de plantão no período.` : "Escolha um ou mais tipos."}${plan ? " Os tipos que você não escolher continuam como estão na escala." : ""}`}>
+                    {typeList.length ? (
+                      <div className={pl.rows}>
+                        {typeList.map((info) => {
+                          const period = periodByType.get(info.key);
+                          return (
+                            <label key={info.key} className={cn(pl.checkRow, !period && pl.checkRowOff)}>
+                              <input type="checkbox" className={pl.checkBox} checked={chosen.has(info.key)} disabled={!period} onChange={(event) => toggleType(info.key, event.target.checked)} aria-label={`Incluir ${info.name ?? "Sem tipo"}`} />
+                              <TypeDot hue={info.hue} name={info.name} />
+                              <span className={pl.rowBody}>
+                                <span className={pl.rowName}>{info.name ?? "Sem tipo"}</span>
+                                <span className={pl.rowMeta}>{info.modality ? `${MODALITY_LABEL[info.modality]} · ` : ""}{info.key === NO_TYPE_KEY ? "Plantões criados antes dos tipos" : typeUnitsLabel(info, branches)}</span>
+                              </span>
+                              <span className={cn(pl.rowMeta, pl.right)}>{period ? <>{period.plantoes.size} {period.plantoes.size === 1 ? "plantão" : "plantões"}<br />{period.dates} {period.dates === 1 ? "data" : "datas"}</> : "Nada no período"}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : <p className={pl.emptyBox}>Nenhum plantão ainda vai acontecer neste período. Crie um novo.</p>}
+                  </PlSection>
+                </>
+              ) : step === "brokers" ? (
+                <>
+                  <span className={pl.badges}>
+                    {chosenList.map((info) => <span key={info.key} className={pl.badge}><TypeDot hue={info.hue} name={info.name} />{info.name ?? "Sem tipo"}</span>)}
+                    <span className={cn(pl.badge, pl.num)}>{shortDate(range.from)} a {shortDate(range.until)}</span>
+                  </span>
+                  <PlSearchAdd
+                    items={eligibleBrokers.filter((broker) => !qualified.some((entry) => entry.brokerId === broker.id)).map((broker) => {
+                      const fits = chosenList.some((info) => unitInType(info.key, broker.branchId));
+                      return {
+                        id: broker.id,
+                        label: broker.name,
+                        hint: <>{broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ?? "Sem unidade"}{broker.pending ? <span className={pl.warnText}> · convite pendente</span> : null}{fits ? null : <span className={pl.warnText}> · fora das unidades dos tipos</span>}</>,
+                        keywords: `${broker.internalCode ?? ""} ${broker.branchName ?? ""}`,
+                      };
+                    })}
+                    placeholder="Buscar corretor por nome ou código"
+                    emptyLabel="Nenhum corretor encontrado."
+                    disabled={pending}
+                    onAdd={(item) => { const broker = brokerById.get(item.id); if (broker) addBroker(broker); }}
+                  />
+                  <PlSection id="plan-qualified" title="Corretores da escala"
+                    aside={qualified.length > 1 ? (
+                      <PlSegmented label="Ordenar corretores" value={brokerOrder} onChange={setBrokerOrder}
+                        options={(["added", "seats", "name"] as const).map((order) => ({ value: order, label: BROKER_ORDER_LABEL[order] }))} />
+                    ) : null}
+                    hint={`${qualified.length} ${qualified.length === 1 ? "corretor qualificado" : "corretores qualificados"} · ${seatsRequested} cadeiras para ${chosenDates} datas`}>
+                    {qualified.length > 1 ? (
+                      <div className={pl.sectionRow} style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                        <label className={pl.small} htmlFor="plan-bulk-lite">Mesmas cadeiras para todos</label>
+                        <input id="plan-bulk-lite" type="number" min={0} max={62} className={pl.input} style={{ width: 80 }} value={bulkSeats} onChange={(event) => setBulkSeats(event.target.value)} />
+                        {chosenList.length > 1 ? (
+                          <PlSelect aria-label="Tipo" style={{ width: 160 }} value={bulkType || chosenList[0].key} onChange={setBulkType} options={chosenList.map((info) => ({ value: info.key, label: info.name ?? "Sem tipo" }))} />
+                        ) : null}
+                        <button type="button" className={cn(pl.pill, pl.pillQuiet, pl.pillSm)} onClick={applyBulk}>Aplicar</button>
+                      </div>
+                    ) : null}
+                    {qualified.length ? (
+                      <ul className={pl.rows}>
+                        {orderedQualified.map((entry) => {
+                          const broker = brokerById.get(entry.brokerId)!;
+                          const keys = entry.allowed.filter((key) => chosen.has(key));
+                          const single = keys.length === 1 ? keys[0] : null;
+                          return (
+                            <li key={entry.brokerId} className={pl.row}>
+                              <span className={pl.av} aria-hidden="true">{initials(broker.name)}</span>
+                              <button type="button" className={cn(pl.rowBody, pl.rowBtn)} onClick={() => setEditingBroker(entry.brokerId)} aria-label={`Configurar ${broker.name}`}>
+                                <span className={pl.rowName}>{broker.name}</span>
+                                <span className={pl.rowMeta}>
+                                  {broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ?? "Sem unidade"}
+                                  {entry.modality !== "any" ? ` · só ${MODALITY_LABEL[entry.modality].toLocaleLowerCase("pt-BR")}` : ""}
+                                  {chosenList.length > 1 ? ` · ${keys.map(typeLabel).join(", ")}` : ""}
+                                  {entry.forced.some((key) => chosen.has(key)) ? <span className={pl.warnText}> · fora da unidade (confirmado)</span> : null}
+                                </span>
+                              </button>
+                              {broker.pending ? <span className={cn(pl.badge, pl.bWarn)}>Convite pendente</span> : null}
+                              {isPending(entry) ? <span className={cn(pl.badge, pl.bWarn)}>Cadeiras pendentes</span> : null}
+                              {single ? (
+                                <PlStepper value={entry.seats[single] ?? 0} onChange={(value) => setSeats(entry.brokerId, single, value)} label={`cadeiras de ${broker.name}`} disabled={pending} />
+                              ) : (
+                                <button type="button" className={cn(pl.pill, pl.pillQuiet, pl.pillSm, pl.num)} onClick={() => setEditingBroker(entry.brokerId)}>{seatTotal(entry, chosen)} cadeiras</button>
+                              )}
+                              <button type="button" className={cn(pl.iconbtn, pl.iconbtnGhost)} aria-label={`Remover ${broker.name} da escala`} disabled={pending}
+                                onClick={() => setEntries((current) => current.map((item) => (item.brokerId === entry.brokerId ? { ...item, allowed: item.allowed.filter((key) => !chosen.has(key)), seats: Object.fromEntries(Object.entries(item.seats).filter(([key]) => !chosen.has(key))) } : item)))}>
+                                <CloseIcon />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : <p className={pl.emptyBox}>Busque pelo nome ou código e adicione os corretores qualificados para esta escala. Toque no corretor para definir modalidade, tipos e cadeiras.</p>}
+                    {pendingCount ? (
+                      <div className={cn(pl.alert, pl.alertWarn)}><WarnIcon /><span>{pendingCount} {pendingCount === 1 ? "corretor está" : "corretores estão"} com cadeiras pendentes: sem cadeira, o tipo é ignorado para ele.</span></div>
+                    ) : null}
+                  </PlSection>
+                </>
+              ) : plan ? (
+                <>
+                  <dl className={pl.metrics}>
+                    {[
+                      { label: "Período", value: `${shortDate(plan.rangeFrom)} a ${shortDate(plan.rangeUntil)}` },
+                      { label: "Datas", value: plan.occurrences.length },
+                      { label: "Alocações", value: plan.totalAssigned },
+                      { label: "Abaixo do mínimo", value: plan.belowMinimum, warn: plan.belowMinimum > 0 },
+                    ].map((metric) => (
+                      <div key={metric.label} className={pl.metric}>
+                        <dt>{metric.label}</dt>
+                        <dd style={metric.warn ? { color: "var(--warning)" } : undefined}>{metric.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {plan.settings?.excludedDates?.length ? (
+                    <div className={pl.choice} aria-label="Dias fora da escala">
+                      <span className={pl.small} style={{ alignSelf: "center" }}>Dias fora da escala:</span>
+                      {plan.settings.excludedDates.map((date) => (
+                        <span key={date} className={cn(pl.daychip, pl.daychipOff)} style={{ textDecoration: "none" }}>
+                          <span style={{ textDecoration: "line-through" }}>{shortDate(date)}</span>
+                          {canEdit ? (
+                            <button type="button" className={cn(pl.pill, pl.pillGhost, pl.pillSm)} style={{ minHeight: 28, padding: "0 8px" }} disabled={pending} onClick={() => setDayExcluded(date, true)} aria-label={`Devolver ${shortDate(date)} para a escala`}>
+                              {busyKey === `day:${date}` ? "…" : "Devolver"}
+                            </button>
+                          ) : null}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {plan.problems.length ? <div role="alert" className={cn(pl.alert, pl.alertBad)}><WarnIcon /><div>{plan.problems.map((problem) => <p key={problem} style={{ margin: 0 }}>{problem}</p>)}</div></div> : null}
+                  {plan.warnings.length ? <div className={cn(pl.alert, pl.alertWarn)}><WarnIcon /><div>{plan.warnings.map((warning) => <p key={warning} style={{ margin: 0 }}>{warning}</p>)}</div></div> : null}
+                  {plan.replacesPublished && !published ? (
+                    <p className={pl.small}>Ao publicar, esta escala substitui a publicada nas datas que ainda não passaram. Quem continua no mesmo plantão mantém presença e pausa.</p>
+                  ) : null}
+
+                  <div className={pl.box}>
+                    <div className={pl.choice}>
+                      {canEdit ? <PlSelect aria-label="Unidade" style={{ width: 200 }} value={filterBranch} onChange={setFilterBranch} options={branchOptions} /> : null}
+                      <PlSelect aria-label="Modalidade" style={{ width: 170 }} value={filterModality} onChange={(value) => setFilterModality(value as typeof filterModality)} options={[{ value: "", label: "Toda modalidade" }, { value: "presencial", label: "Presencial" }, { value: "online", label: "Online" }]} />
+                      <label className={pl.searchField} style={{ flex: "1 1 180px" }}>
+                        <SearchIcon />
+                        <span className={pl.srOnly}>Buscar corretor ou código</span>
+                        <input type="search" value={filterSearch} onChange={(event) => setFilterSearch(event.target.value)} placeholder="Corretor ou código" />
+                      </label>
+                    </div>
+                    <div className={pl.choice}>
+                      <PlSwitch checked={onlyShort} onChange={setOnlyShort} label="Só com falta" />
+                      {hiddenTypes ? <PlSwitch checked={showAllTypes} onChange={setShowAllTypes} label={`Ver os outros tipos da escala (${hiddenTypes})`} /> : null}
+                    </div>
+                    <p className={cn(pl.small, pl.num)} aria-label="Legenda dos corretores">
+                      <span className={pl.person} style={{ marginRight: 6 }}>Já escalados · {originCounts.kept}</span>
+                      <span className={cn(pl.person, pl.personNew)}>{published ? "Escalados nesta escala" : "Novos nesta geração"} · {originCounts.added}</span>
+                    </p>
+                    {planTypeKeys.length > 1 ? (
+                      <div className={pl.choice} role="group" aria-label="Filtrar por tipo">
+                        {planTypeKeys.map((key) => {
+                          const active = filterTypes.includes(key);
+                          return (
+                            <button key={key} type="button" className={pl.typechip} aria-pressed={active} onClick={() => setFilterTypes((current) => (active ? current.filter((item) => item !== key) : [...current, key]))}>
+                              <TypeDot hue={typeHue(key)} name={typeInfo.get(key)?.name ?? null} />{typeLabel(key)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    <div className={pl.sectionRow}>
+                      <div className={pl.segment} role="tablist" aria-label="Ver escala">
+                        {([["days", "Por dia"], ["brokers", "Por corretor"]] as const).map(([value, label]) => (
+                          <button key={value} type="button" role="tab" className={pl.segbtn} aria-selected={reviewView === value} onClick={() => setReviewView(value)}>{label}</button>
+                        ))}
+                      </div>
+                      <button type="button" className={cn(pl.pill, pl.pillQuiet, pl.pillSm)} onClick={() => setPdfOpen(true)}>Gerar PDF</button>
+                    </div>
+                  </div>
+
+                  {reviewView === "brokers" ? (
+                    <ScrollArea orientation="horizontal" className={pl.tableWrap}>
+                      <table className={pl.table}>
+                        <thead>
+                          <tr>
+                            <th>Corretor</th>
+                            <th>Unidade</th>
+                            {planTypeKeys.map((key) => <th key={key} className={pl.center}><TypeName name={typeInfo.get(key)?.name ?? null} hue={typeHue(key)} /></th>)}
+                            <th className={pl.right}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {brokerRows.map((row) => {
+                            const seats = plan.settings?.brokers.find((item) => item.brokerId === row.broker.id)?.seats ?? {};
+                            return (
+                              <tr key={row.broker.id}>
+                                <td><span style={{ fontWeight: 500 }}>{row.broker.name}</span>{row.broker.code ? <span className={pl.muted}> · {row.broker.code}</span> : null}{row.broker.pending ? <span className={cn(pl.badge, pl.bWarn)} style={{ marginLeft: 8 }}>Convite pendente</span> : null}</td>
+                                <td className={pl.muted}>{row.broker.branchName ?? "Sem unidade"}</td>
+                                {planTypeKeys.map((key) => {
+                                  const given = row.byType.get(key) ?? 0;
+                                  const asked = seats[key] ?? 0;
+                                  return <td key={key} className={pl.center} style={asked > given ? { color: "var(--warning)" } : undefined}>{asked ? `${given}/${asked}` : given || "–"}</td>;
+                                })}
+                                <td className={pl.right} style={{ fontWeight: 500 }}>{row.total}</td>
+                              </tr>
+                            );
+                          })}
+                          {!brokerRows.length ? <tr><td colSpan={planTypeKeys.length + 3} className={cn(pl.center, pl.muted)}>Nenhum corretor neste filtro.</td></tr> : null}
+                        </tbody>
+                      </table>
+                    </ScrollArea>
+                  ) : reviewDates.length ? reviewDates.map((date) => (
+                    <section key={date} aria-label={dateLabel(date)} className={pl.section} style={{ gap: 8 }}>
+                      <div className={pl.sectionRow}>
+                        <p className={pl.subhead}>{dateLabel(date)}</p>
+                        {canEdit && reviewOccurrences.some((occurrence) => occurrence.dutyDate === date && !occurrence.started) ? (
+                          <button type="button" className={cn(pl.pill, pl.pillGhost, pl.pillSm)} disabled={pending} onClick={() => setConfirmDay(date)} aria-label={`Tirar ${dateLabel(date)} da escala`}>Tirar dia</button>
+                        ) : null}
+                      </div>
+                      {reviewOccurrences.filter((occurrence) => occurrence.dutyDate === date).map((occurrence) => {
+                        const key = typeKeyOfOccurrence(occurrence);
+                        const info = typeInfo.get(key);
+                        const below = occurrence.assignedCount < occurrence.minimumBrokers;
+                        const full = occurrence.maximumBrokers !== null && occurrence.assignedCount >= occurrence.maximumBrokers;
+                        const editable = (canEdit || Boolean(plan.canEditSeats)) && !occurrence.ended;
+                        const shown = filterBranch ? occurrence.brokers.filter((broker) => broker.branchId === filterBranch) : occurrence.brokers;
+                        const modality = occurrence.attendanceMode ?? (schedules.find((schedule) => schedule.id === occurrence.scheduleId)?.attendanceMode === "presencial" ? "presencial" : "online");
+                        const candidates = eligibleBrokers
+                          .filter((broker) => !occurrence.brokers.some((item) => item.id === broker.id))
+                          .map((broker) => ({
+                            id: broker.id,
+                            label: broker.name,
+                            hint: <>{broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ?? ""}{broker.pending ? <span className={pl.warnText}> · convite pendente</span> : null}{occurrence.allowedBrokerIds.includes(broker.id) ? null : <span className={pl.warnText}> · fora da unidade do tipo</span>}</>,
+                            keywords: `${broker.internalCode ?? ""} ${broker.branchName ?? ""}`,
+                          }));
+                        return (
+                          <article key={occurrence.id} className={cn(pl.occ, occurrence.ended ? pl.occEnded : below && pl.occBelow)}>
+                            <span className={pl.ptype} style={{ background: info?.name ? typeColor(info.hue) : "var(--text-muted)" }} />
+                            <div className={pl.occBody}>
+                              <div className={pl.sectionRow} style={{ alignItems: "flex-start" }}>
+                                <span className={pl.rowBody}>
+                                  <span className={pl.rowName}>{occurrence.scheduleName}</span>
+                                  <span className={pl.rowMeta}>{info?.name ?? "Sem tipo"} · {occurrence.startsAt.slice(0, 5)} às {occurrence.endsAt.slice(0, 5)} · {MODALITY_LABEL[modality]}</span>
+                                </span>
+                                {occurrence.ended ? (
+                                  <span className={pl.badge}>Já passou · não será publicado</span>
+                                ) : (
+                                  <span className={cn(pl.badge, below ? pl.bWarn : undefined, pl.num)}>{occurrence.assignedCount}/{occurrence.minimumBrokers} mín.{occurrence.maximumBrokers !== null ? ` · máx. ${occurrence.maximumBrokers}` : ""}</span>
+                                )}
+                              </div>
+                              <ul className={pl.people}>
+                                {shown.map((broker) => {
+                                  const kept = broker.origin === "existing" || broker.origin === "weekly";
+                                  return (
+                                    <li key={broker.id} data-origin={kept ? "kept" : "new"} className={cn(pl.person, !kept && pl.personNew, broker.forced && pl.personForced)}
+                                      title={`${kept ? (broker.origin === "weekly" ? "Já escalado (escala semanal)" : "Já escalado") : "Novo nesta geração"}${broker.branchName ? ` · ${broker.branchName}` : ""}${broker.forced ? " · fora da unidade do tipo" : ""}`}>
+                                      {broker.code ? <span className={pl.num} style={{ fontWeight: 500 }}>{broker.code}</span> : null}
+                                      <span>{broker.name}</span>
+                                      {broker.pending ? <span className={pl.warnText}>· convite pendente</span> : null}
+                                      {!filterBranch && broker.branchName ? <span className={pl.muted}>· {broker.branchName}</span> : null}
+                                      {editable && broker.origin !== "weekly" && !occurrence.started ? (
+                                        <>
+                                          <button type="button" className={pl.personBtn} aria-label={`Passar o plantão de ${broker.name} em ${occurrence.scheduleName}, ${dateLabel(date)}, para outra pessoa`} aria-expanded={passing?.occurrenceId === occurrence.id && passing.brokerId === broker.id} disabled={pending}
+                                            onClick={() => { setAddingTo(null); setPassing(passing?.occurrenceId === occurrence.id && passing.brokerId === broker.id ? null : { occurrenceId: occurrence.id, brokerId: broker.id }); }}>
+                                            <ArrowRight />
+                                          </button>
+                                          <button type="button" className={pl.personBtn} aria-label={`Remover ${broker.name} de ${occurrence.scheduleName} em ${dateLabel(date)}`} disabled={pending} onClick={() => editDraft(occurrence.id, broker.id, "remove")}>
+                                            {busyKey === `remove:${occurrence.id}:${broker.id}` ? "…" : <CloseIcon />}
+                                          </button>
+                                        </>
+                                      ) : <span style={{ width: 6 }} />}
+                                    </li>
+                                  );
+                                })}
+                                {!shown.length ? <li className={pl.small}>{filterBranch && occurrence.brokers.length ? "Ninguém desta unidade" : "Ninguém escalado"}</li> : null}
+                                {editable && !full ? (
+                                  <li><button type="button" className={pl.addPerson} onClick={() => { setPassing(null); setAddingTo(addingTo === occurrence.id ? null : occurrence.id); }}><PlusIcon />Adicionar</button></li>
+                                ) : null}
+                              </ul>
+                              {editable && passing?.occurrenceId === occurrence.id ? (
+                                <DutyPassPicker key={passing.brokerId} occurrenceId={occurrence.id} fromBrokerId={passing.brokerId} onCancel={() => setPassing(null)} onDone={() => {
+                                  setPassing(null);
+                                  void getMonthlyDutyPlanAction(month).then((view) => { if (view) setPlan(view); }, () => null);
+                                }} />
+                              ) : null}
+                              {editable && addingTo === occurrence.id ? (
+                                <PlSearchAdd
+                                  items={candidates}
+                                  placeholder="Buscar corretor por nome ou código"
+                                  emptyLabel="Nenhum corretor encontrado."
+                                  addingId={busyKey?.startsWith(`add:${occurrence.id}:`) ? busyKey.split(":").at(-1) : null}
+                                  disabled={pending}
+                                  onAdd={(item) => {
+                                    if (occurrence.allowedBrokerIds.includes(item.id)) { editDraft(occurrence.id, item.id, "add"); return; }
+                                    const broker = brokerById.get(item.id);
+                                    setConfirmForce({
+                                      title: `Escalar ${broker?.name ?? "o corretor"} mesmo assim?`,
+                                      message: `A unidade dele (${broker?.branchName ?? "sem unidade"}) não participa do tipo ${info?.name ?? "deste plantão"}.`,
+                                      onConfirm: () => editDraft(occurrence.id, item.id, "add", true),
+                                    });
+                                  }}
+                                />
+                              ) : null}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </section>
+                  )) : <p className={pl.emptyBox}>Nenhum plantão neste filtro.</p>}
+                </>
+              ) : (
+                <p className={pl.emptyBox}>O Diretor ainda não montou a escala deste mês.</p>
+              )}
+            </>
+          )}
+        </PlSheet>
+
+        <PlSheet
+          open={Boolean(editingEntry)}
+          onOpenChange={(next) => { if (!next) setEditingBroker(null); }}
+          title={editingEntry ? brokerById.get(editingEntry.brokerId)?.name ?? "Corretor" : "Corretor"}
+          description={editingEntry ? (() => { const broker = brokerById.get(editingEntry.brokerId); return `${broker?.internalCode ? `${broker.internalCode} · ` : ""}${broker?.branchName ?? "Sem unidade"}. Defina como ele tira os plantões desta escala.`; })() : undefined}
+          footer={<button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} onClick={() => setEditingBroker(null)}>Pronto</button>}
+        >
+          {editingEntry ? (() => {
+            const broker = brokerById.get(editingEntry.brokerId)!;
+            return (
+              <>
+                <PlField as="p" label="Modalidade" hint={editingEntry.modality === "any" ? "Pode cair em plantão presencial ou online." : `Só entra em plantões ${MODALITY_LABEL[editingEntry.modality].toLocaleLowerCase("pt-BR")}.`}>
+                  <PlSegmented label="Modalidade do corretor" value={editingEntry.modality} onChange={(value) => updateEntry(editingEntry.brokerId, (entry) => ({ ...entry, modality: value }))} options={MODALITY_CHOICES} />
+                </PlField>
+                <PlSection id="plan-broker-types" title="Tipos e cadeiras" hint="Cadeira = um plantão (uma data) daquele tipo no período.">
+                  <ul className={pl.rows}>
+                    {chosenList.map((info) => {
+                      const allowed = editingEntry.allowed.includes(info.key);
+                      const outside = !unitInType(info.key, broker.branchId);
+                      const mismatch = allowed && editingEntry.modality !== "any" && info.modality !== null && info.modality !== editingEntry.modality;
+                      return (
+                        <li key={info.key} className={pl.section} style={{ gap: 2 }}>
+                          <div className={pl.checkRow} style={{ cursor: "default" }}>
+                            <input type="checkbox" className={pl.checkBox} checked={allowed} onChange={(event) => setAllowed(editingEntry, info.key, event.target.checked)} aria-label={`Pode tirar ${info.name ?? "Sem tipo"}`} />
+                            <TypeDot hue={info.hue} name={info.name} />
+                            <span className={pl.rowBody}><span className={pl.rowName}>{info.name ?? "Sem tipo"}</span>{info.modality ? <span className={pl.rowMeta}>{MODALITY_LABEL[info.modality]}</span> : null}</span>
+                            {allowed ? <PlStepper value={editingEntry.seats[info.key] ?? 0} onChange={(value) => setSeats(editingEntry.brokerId, info.key, value)} label={`cadeiras de ${info.name ?? "Sem tipo"}`} /> : <span className={pl.rowMeta}>Não tira</span>}
+                          </div>
+                          {outside ? <p className={cn(pl.small, pl.warnText)} style={{ paddingLeft: 40 }}>{allowed ? "Unidade fora deste tipo (você confirmou)." : "A unidade dele não participa deste tipo."}</p> : null}
+                          {mismatch ? <p className={cn(pl.small, pl.warnText)} style={{ paddingLeft: 40 }}>Os plantões deste tipo são {MODALITY_LABEL[info.modality!].toLocaleLowerCase("pt-BR")}; com a modalidade escolhida ele não entra neles.</p> : null}
+                          {allowed && !(editingEntry.seats[info.key] > 0) ? <p className={cn(pl.small, pl.warnText)} style={{ paddingLeft: 40 }}>Defina quantas cadeiras ele tem neste tipo.</p> : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </PlSection>
+              </>
+            );
+          })() : null}
+        </PlSheet>
+
+        <PlConfirm open={Boolean(confirmForce)} onOpenChange={(next) => { if (!next) setConfirmForce(null); }} title={confirmForce?.title ?? ""} description={confirmForce?.message ?? ""}
+          confirmLabel="Confirmar mesmo assim" onConfirm={() => { confirmForce?.onConfirm(); setConfirmForce(null); }} />
+        {plan ? <EscalaPdfDialog key={plan.id} open={pdfOpen} onOpenChange={setPdfOpen} planId={plan.id} rangeFrom={plan.rangeFrom} rangeUntil={plan.rangeUntil} canChooseUnit={canEdit} branches={branches} types={allPlanTypeKeys.map((key) => ({ key, name: typeInfo.get(key)?.name ?? "Sem tipo" }))} /> : null}
+        <PlConfirm open={confirmDay !== null} onOpenChange={(next) => { if (!next) setConfirmDay(null); }} title={`Tirar ${confirmDay ? dateLabel(confirmDay) : ""} da escala?`} cancelLabel="Voltar"
+          description={`Todos os plantões desse dia saem da escala de ${monthLabel(month)}.${published || plan?.replacesPublished ? " Quem estava escalado sai e recebe um aviso." : ""} Ao gerar a escala de novo, esse dia fica de fora. Plantão que já começou continua como está.`}
+          confirmLabel={confirmDay && busyKey === `day:${confirmDay}` ? "Tirando…" : "Tirar dia"} pending={pending} onConfirm={() => { if (confirmDay) setDayExcluded(confirmDay); }} />
+        <PlConfirm open={confirmPublish} onOpenChange={setConfirmPublish} title={`Publicar a escala de ${monthLabel(month)}?`} cancelLabel="Voltar"
+          description={`${plan?.totalAssigned ?? 0} alocações passam a valer na distribuição nas datas publicadas e cada corretor recebe uma notificação.${plan?.belowMinimum ? ` ${plan.belowMinimum} datas ficam abaixo do mínimo.` : ""}${plan?.replacesPublished ? " Ela substitui a escala publicada nas datas que ainda não passaram; quem continua no mesmo plantão não perde presença nem pausa." : ""}`}
+          confirmLabel={busyKey === "publish" ? "Publicando…" : "Publicar escala"} pending={pending} onConfirm={publish} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -1052,6 +1495,7 @@ function EscalaPdfDialog({ open, onOpenChange, planId, rangeFrom, rangeUntil, ca
   branches: readonly Branch[];
   types: ReadonlyArray<{ key: string; name: string }>;
 }) {
+  const directorLite = useDirectorLitePage();
   const [scope, setScope] = useState<"geral" | "unidade" | "tipo">(canChooseUnit ? "geral" : "unidade");
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const [typeKey, setTypeKey] = useState(types[0]?.key ?? "");
@@ -1069,6 +1513,25 @@ function EscalaPdfDialog({ open, onOpenChange, planId, rangeFrom, rangeUntil, ca
     params.set("until", until);
     return `/api/reports/duty-escala/${planId}?${params}`;
   };
+  const invalidChoice = invalidPeriod || (scope === "unidade" && canChooseUnit && !branchId) || (scope === "tipo" && !typeKey);
+  if (directorLite) {
+    return (
+      <PlSheet open={open} onOpenChange={onOpenChange} title="Gerar PDF da escala"
+        description="Um quadro diário com as cores de cada tipo, os nomes dos corretores e, quando aplicável, suas unidades."
+        footer={<button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} disabled={invalidChoice} onClick={() => { window.open(href(), "_blank", "noopener"); onOpenChange(false); }}>Baixar PDF</button>}>
+        <PlField as="p" label="Recorte do PDF">
+          <PlSegmented label="Recorte do PDF" value={scope} onChange={setScope} options={choices.map(([value, label]) => ({ value, label }))} />
+        </PlField>
+        {scope === "unidade" && canChooseUnit ? <PlField label="Unidade" htmlFor="escala-pdf-branch"><PlSelect id="escala-pdf-branch" value={branchId} onChange={setBranchId} options={branches.map((branch) => ({ value: branch.id, label: branch.name }))} /></PlField> : null}
+        {scope === "tipo" ? <PlField label="Tipo" htmlFor="escala-pdf-type"><PlSelect id="escala-pdf-type" value={typeKey} onChange={setTypeKey} options={types.map((type) => ({ value: type.key, label: type.name }))} /></PlField> : null}
+        <div className={pl.grid2}>
+          <PlField label="De" htmlFor="escala-pdf-from"><input id="escala-pdf-from" type="date" className={pl.input} value={from} min={rangeFrom} max={until || rangeUntil} onChange={(event) => setFrom(event.target.value)} /></PlField>
+          <PlField label="Até" htmlFor="escala-pdf-until"><input id="escala-pdf-until" type="date" className={pl.input} value={until} min={from || rangeFrom} max={rangeUntil} onChange={(event) => setUntil(event.target.value)} /></PlField>
+        </div>
+        {invalidPeriod ? <p className={cn(pl.small, pl.dangerText)}>Escolha um período com a data inicial antes da final.</p> : null}
+      </PlSheet>
+    );
+  }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPopup>

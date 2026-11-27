@@ -59,6 +59,7 @@ import { getLiveStatuses } from "@/features/live-status/service";
 import { AssignSection1a1, DistributionHead1a1, LiveStrip1a1 } from "./_components/resumo-1a1-shell";
 import { DirectorDailySummary1a1 } from "./_components/director-daily-summary-1a1";
 import resumo1a1 from "./_components/resumo-1a1.module.css";
+import plantoes1a1 from "./plantao/_components/plantoes-1a1.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -715,7 +716,7 @@ export default async function LeadDistributionPage({
       <>
         <DashboardHeader breadcrumb="Gestão da unidade" title="Plantão" />
         <main className={directorDistributionStyles.page}>
-          <section className={directorDistributionStyles.stack} aria-label="Plantão da unidade">
+          <section className={`${directorDistributionStyles.stack} ${plantoes1a1.gx}`} aria-label="Plantão da unidade">
             {plantaoWorkspace}
             <p className="text-xs text-muted-foreground">Você vê só os plantões, corretores e filas exclusivos da sua unidade.</p>
           </section>
@@ -924,6 +925,16 @@ export default async function LeadDistributionPage({
           branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
           canFilterBranch={context.role === "director"}
         />
+      </main>
+    );
+  }
+
+  // Plantões 1:1 (27/11/2026, artifact "Distribuição · Plantões"): mesmo topo e abas do Resumo, a aba na marcação do artifact.
+  if (directorLite && view === "plantao") {
+    return (
+      <main className={`arc-venancor ${resumo1a1.gx} ${resumo1a1.page}`} data-skin="diretor">
+        <DistributionHead1a1 available={totalAvailable} waiting={totalNewLeads} />
+        <div className={plantoes1a1.gx} style={{ display: "contents" }}>{plantaoWorkspace}</div>
       </main>
     );
   }

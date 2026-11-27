@@ -80,7 +80,10 @@ import { DutyQueueOrderBoard, DutyQueueOrderBoardLoading, StreamedDutyQueueOrder
 import type { DutyQueueOrderPreview } from "@/features/lead-distribution/duty-queue-order-queries";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import directorLiteStyles from "./director-duty-operations.module.css";
-import { UNIT_PHOTO_OPTIONS, UnitPhotoDefaultsButton } from "./unit-photo-defaults-dialog";
+import { UNIT_PHOTO_OPTIONS, UnitPhotoDefaultsButton, UnitPhotoDefaultsSheet } from "./unit-photo-defaults-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { LiteActionButton } from "@/components/lite/controls/action-button";
+import { ChevronIcon, CloseIcon, DotsIcon, PlConfirm, PlField, PlMenu, PlSection, PlSegmented, PlSelect, PlSheet, PlSwitch, PlusIcon, SearchIcon, TypeDot, initials, pl } from "./plantoes-1a1-kit";
 
 type Snapshot = DutyRosterSnapshot;
 type Schedule = Snapshot["schedules"][number];
@@ -247,8 +250,9 @@ function DutyFormSheet({
   defaultStartDate?: string;
 }) {
   const router = useRouter();
+  const directorLite = useDirectorLitePage();
   const [pending, startTransition] = useTransition();
-  const activeTypes = snapshot.types.filter((type) => type.status === "active" || type.id === schedule?.typeId);
+  const activeTypes =snapshot.types.filter((type) => type.status === "active" || type.id === schedule?.typeId);
   // The type comes first (DEC-138): it fills name, modality, hours and coverage.
   const [typeId, setTypeId] = useState<string>(() => schedule?.typeId ?? "");
   const [typeDialogOpen, setTypeDialogOpen] = useState(false);
@@ -365,6 +369,248 @@ function DutyFormSheet({
       router.refresh();
       onOpenChange(false);
     });
+  }
+
+  const submitLabel = pending
+    ? "Salvando…"
+    : schedule
+      ? "Salvar alterações"
+      : mode === "dates"
+        ? `Criar ${createdCount || ""} ${createdCount === 1 ? "plantão" : "plantões"}`.replace("  ", " ")
+        : twoShifts ? "Criar plantões semanais" : "Criar plantão semanal";
+
+  // Lite (27/11/2026): Novo e Editar plantão no molde de gaveta do artifact "Distribuição · Plantões".
+  if (directorLite) {
+    const formId = "duty-form-lite";
+    return (
+      <>
+        <PlSheet
+          open={open}
+          onOpenChange={onOpenChange}
+          title={title}
+          description={schedule
+            ? "Edite a data, o horário, a fila que recebe e a cobertura deste plantão."
+            : "Escolha o tipo, o período e os dias da semana: cada dia vira um plantão daquele tipo."}
+          footer={<button type="submit" form={formId} className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} disabled={pending || !canSubmit}>{submitLabel}</button>}
+        >
+          <form id={formId} className={pl.section} style={{ gap: 20 }} onSubmit={submit}>
+            <PlField label="Tipo de plantão" htmlFor="duty-type" hint={selectedType
+              ? `${MODALITY_LABEL[selectedType.attendanceMode]} · ${typeUnitsLabel(selectedType, snapshot.branches)}`
+              : "O tipo é o grupo do plantão (PME, Premium, Extra). Não existe? Crie em Novo tipo."}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {selectedType ? <TypeDot hue={selectedType.colorHue} name={selectedType.name} /> : null}
+                <PlSelect
+                  id="duty-type"
+                  value={typeId}
+                  onChange={chooseType}
+                  options={[
+                    ...(!typeId ? [{ value: "", label: activeTypes.length ? "Escolha o tipo" : "Nenhum tipo ainda" }] : []),
+                    ...(schedule && !schedule.typeId && typeId ? [{ value: "", label: "Sem tipo" }] : []),
+                    ...activeTypes.map((type) => ({ value: type.id, label: type.name })),
+                  ]}
+                />
+                <button type="button" className={cn(pl.pill, pl.pillQuiet, pl.flexNone)} onClick={() => setTypeDialogOpen(true)}><PlusIcon />Novo tipo</button>
+              </span>
+            </PlField>
+            {!typeId ? <input type="hidden" name="typeName" value={schedule?.typeName ?? ""} /> : null}
+            <PlField label="Nome" htmlFor="duty-name" hint={!schedule && twoShifts ? `Vira ${fields.name || "Nome"} · Manhã e ${fields.name || "Nome"} · Tarde.` : undefined}>
+              <input id="duty-name" name="name" className={pl.input} value={fields.name} onChange={(event) => setField({ name: event.target.value })} placeholder="Ex.: PME" required />
+            </PlField>
+            <PlField as="p" label="Modalidade" hint="No presencial, o gestor confirma cada corretor na unidade antes de ele receber leads.">
+              <input type="hidden" name="attendanceMode" value={fields.attendanceMode} />
+              <PlSegmented label="Modalidade" value={fields.attendanceMode} onChange={(value) => setField({ attendanceMode: value })}
+                options={(["presencial", "online"] as const).map((item) => ({ value: item, label: MODALITY_LABEL[item] }))} />
+            </PlField>
+            <input type="hidden" name="presencePhotoChoice" value={photoChoice} />
+            <PlField label="Exigir foto na confirmação" htmlFor="duty-photo-choice" hint={!snapshot.photoSettingReady
+              ? "Disponível depois da atualização do banco. Até lá, presencial pede foto e online não."
+              : photoChoice === "default"
+                ? photoDefault.hint
+                : photoChoice === "always"
+                  ? "O corretor confirma com uma foto do local e é liberado depois de aprovado, mesmo se a unidade mudar."
+                  : "O corretor confirma a presença com um toque, sem foto, mesmo se a unidade mudar."}>
+              <PlSelect id="duty-photo-choice" value={photoChoice} disabled={!snapshot.photoSettingReady}
+                onChange={(value) => setPhotoChoice(value === "always" || value === "never" ? value : "default")}
+                options={[{ value: "default", label: photoDefault.label }, { value: "always", label: "Sempre exigir foto" }, { value: "never", label: "Nunca exigir foto" }]} />
+            </PlField>
+
+            <div className={pl.box}>
+              <div className={pl.sectionRow}>
+                <p className={pl.label} style={{ margin: 0 }}>Quando</p>
+                {!schedule || !isSingleDaySchedule(schedule) ? (
+                  <PlSwitch checked={mode === "weekly"} disabled={Boolean(schedule)} onChange={(checked) => setMode(checked ? "weekly" : "dates")} label="Repetir toda semana" />
+                ) : null}
+              </div>
+              {mode === "dates" ? (
+                schedule ? (
+                  <PlField label="Data" htmlFor="duty-date" hint="Este plantão vale só neste dia.">
+                    <input id="duty-date" type="date" className={pl.input} value={rangeFrom} onChange={(event) => setRangeFrom(event.target.value)} required />
+                  </PlField>
+                ) : (
+                  <>
+                    <div className={pl.grid2}>
+                      <PlField label="De" htmlFor="duty-range-from">
+                        <input id="duty-range-from" type="date" className={pl.input} value={rangeFrom} onChange={(event) => { setRangeFrom(event.target.value); if (event.target.value > rangeUntil) setRangeUntil(event.target.value); }} required />
+                      </PlField>
+                      <PlField label="Até" htmlFor="duty-range-until">
+                        <input id="duty-range-until" type="date" className={pl.input} value={rangeUntil} min={rangeFrom} onChange={(event) => setRangeUntil(event.target.value)} required />
+                      </PlField>
+                    </div>
+                    <div className={pl.choice} role="group" aria-label="Dias da semana">
+                      {WEEKDAY_ORDER.map((index) => {
+                        const selected = selectedDays.includes(index);
+                        const inRange = datesInRange(rangeFrom, rangeUntil, [index]);
+                        const count = inRange.length;
+                        return (
+                          <button key={index} type="button" className={pl.daychip} aria-pressed={selected && count > 0} disabled={count === 0}
+                            onClick={() => setSelectedDays((current) => (selected ? current.filter((day) => day !== index) : [...current, index].sort((a, b) => a - b)))}>
+                            {DAYS[index]}{count ? ` · ${count === 1 ? `${inRange[0].slice(8, 10)}/${inRange[0].slice(5, 7)}` : `${count}×`}` : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className={pl.small}>
+                      {tooManyDates ? "Escolha no máximo 93 dias (cerca de 3 meses) por vez." : plannedDates.length ? `Serão criados ${plannedDates.length} ${plannedDates.length === 1 ? "plantão de um dia" : "plantões de um dia cada"}:` : rangeDates.length ? "Todos os dias do período foram tirados." : "Nenhum dia selecionado no período."}
+                    </p>
+                    {rangeDates.length && !tooManyDates ? (
+                      <>
+                        <div className={pl.dates} role="group" aria-label="Dias que terão plantão">
+                          {rangeDates.map((date) => {
+                            const excluded = excludedDates.includes(date);
+                            return (
+                              <button key={date} type="button" className={cn(pl.daychip, excluded && pl.daychipOff)} aria-pressed={!excluded}
+                                aria-label={`${dateTag(date)}: ${excluded ? "fora, sem plantão" : "com plantão"}`}
+                                title={excluded ? "Clique para devolver o plantão neste dia" : "Clique para tirar este dia (feriado, reunião...)"}
+                                onClick={() => toggleExcludedDate(date)}>
+                                {dateTag(date)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className={pl.small}>
+                          {excludedInRange.length
+                            ? `${excludedInRange.length} ${excludedInRange.length === 1 ? "dia fora" : "dias fora"}, sem plantão: ${excludedInRange.map(dateTag).join(", ")}.`
+                            : "Tem feriado, reunião ou outro dia sem plantão? Clique no dia para tirá-lo antes de criar."}
+                        </p>
+                      </>
+                    ) : null}
+                  </>
+                )
+              ) : (
+                <>
+                  <PlField as="p" label="Dias da semana" hint={schedule ? "Esta regra vale para um único dia." : "Selecione um ou mais dias."}>
+                    <div className={pl.choice} role="group" aria-label="Dias da semana">
+                      {WEEKDAY_ORDER.map((index) => {
+                        const selected = selectedDays.includes(index);
+                        return (
+                          <button key={index} type="button" className={pl.daychip} aria-pressed={selected} disabled={Boolean(schedule) || (selected && selectedDays.length === 1)}
+                            onClick={() => setSelectedDays((current) => (selected ? (current.length === 1 ? current : current.filter((day) => day !== index)) : [...new Set([...current, index])].sort((a, b) => a - b)))}>
+                            {DAYS_FULL[index]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </PlField>
+                  <div className={pl.grid2}>
+                    <PlField label="Repete toda semana a partir de" htmlFor="duty-valid-from">
+                      <input id="duty-valid-from" name="validFrom" type="date" className={pl.input} defaultValue={schedule ? dateInputValue(schedule.validFrom) : defaultStartDate ?? dateInputValue(new Date())} required />
+                    </PlField>
+                    <PlField label="Até (opcional)" htmlFor="duty-valid-until" hint="Em branco: repete sem data para acabar. O dia informado entra.">
+                      <input id="duty-valid-until" name="validUntil" type="date" className={pl.input} defaultValue={dateInputValue(lastIncludedDay(schedule?.validUntil ?? null))} />
+                    </PlField>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className={pl.grid2}>
+              <PlField label="Início" htmlFor="duty-start">
+                <input id="duty-start" name="startsAt" type="time" className={pl.input} value={fields.startsAt} onChange={(event) => setField({ startsAt: event.target.value })} required />
+              </PlField>
+              <PlField label="Fim" htmlFor="duty-end">
+                <input id="duty-end" name="endsAt" type="time" className={pl.input} value={fields.endsAt} onChange={(event) => setField({ endsAt: event.target.value })} required />
+              </PlField>
+            </div>
+            {!schedule ? (
+              <div className={pl.field}>
+                <PlSwitch checked={twoShifts} onChange={setTwoShifts} label="Possui turnos (manhã e tarde)" />
+                <p className={pl.small}>
+                  {twoShifts
+                    ? shiftsFit
+                      ? `Cada dia vira 2 plantões do mesmo tipo e modalidade: ${fields.startsAt} às ${DEFAULT_SHIFT_SPLIT_AT} e ${DEFAULT_SHIFT_SPLIT_AT} às ${fields.endsAt}. Cada turno tem a própria escala.`
+                      : `Para ter turnos, o plantão precisa começar antes das ${DEFAULT_SHIFT_SPLIT_AT} e terminar depois.`
+                    : `O corte entre os turnos é sempre às ${DEFAULT_SHIFT_SPLIT_AT}.`}
+                </p>
+              </div>
+            ) : null}
+            <div className={pl.grid2}>
+              <PlField label="Mínimo de corretores" htmlFor="duty-minimum" hint="Abaixo do mínimo, o plantão vira uma pendência; a distribuição não é bloqueada.">
+                <input id="duty-minimum" name="minimumBrokers" type="number" min={1} max={99} className={pl.input} value={fields.minimumBrokers} onChange={(event) => setField({ minimumBrokers: event.target.value })} required />
+              </PlField>
+              <PlField label="Máximo (opcional)" htmlFor="duty-maximum" hint="Em branco, sem limite. Não pode ser menor que o mínimo.">
+                <input id="duty-maximum" name="maximumBrokers" type="number" min={1} max={99} className={pl.input} value={fields.maximumBrokers} onChange={(event) => setField({ maximumBrokers: event.target.value })} />
+              </PlField>
+            </div>
+            <PlField label="Limite de leads por corretor neste plantão (opcional)" htmlFor="duty-max-leads"
+              hint="Quantos leads cada corretor pode receber em cada dia deste plantão. Quem atinge o limite para de receber até o próximo dia do plantão; oferta expirada ou recusada não conta. Em branco, sem limite.">
+              <input id="duty-max-leads" name="maxLeadsPerBroker" type="number" min={1} max={500} className={pl.input} defaultValue={schedule?.maxLeadsPerBroker ?? ""} />
+            </PlField>
+            {schedule?.shiftSplitAt ? (
+              <div className={pl.field}>
+                <PlSwitch checked={splitOn} onChange={setSplitOn} label="Dividir em turnos (manhã e tarde)" />
+                <input type="hidden" name="shiftSplitAt" value={splitOn ? splitAt : ""} />
+                {splitOn ? (
+                  <PlField label="A tarde começa às" htmlFor="duty-split-at" hint="Cada corretor fica na manhã, na tarde ou no dia todo. Ele só recebe leads e só é chamado para confirmar presença no turno dele.">
+                    <input id="duty-split-at" type="time" className={pl.input} style={{ maxWidth: 160 }} value={splitAt} onChange={(event) => setSplitAt(event.target.value)} />
+                  </PlField>
+                ) : null}
+              </div>
+            ) : null}
+            <PlSection id="duty-queues" title="Filas que recebem este plantão"
+              hint={`${queueIds.length === 0
+                ? schedule ? "Nenhuma fila: o plantão não recebe leads de fila." : "Nenhuma agora: dá para vincular depois."
+                : `Os leads ${queueIds.length === 1 ? "dessa fila" : `dessas ${queueIds.length} filas`} vão para os corretores deste plantão.`} Fica sincronizado com Filas → Exclusividade de Plantão.`}>
+              {queueChoices.length ? (
+                <div className={pl.rows}>
+                  {queueChoices.map((queue) => (
+                    <label key={queue.id} className={pl.checkRow}>
+                      <input type="checkbox" className={pl.checkBox} checked={queueIds.includes(queue.id)} onChange={(event) => toggleQueue(queue.id, event.target.checked)} aria-label={queue.name} />
+                      <span className={pl.rowName}>{queue.name}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : <p className={pl.emptyBox}>Nenhuma fila ativa.</p>}
+            </PlSection>
+            <PlField label="Origem de entrada" htmlFor="duty-credential"
+              hint="A origem representa a Página ou integração que recebe o lead. Campanhas da mesma Página seguem este plantão; regras específicas de campanha continuam na Matriz de Roteamento.">
+              <select id="duty-credential" name="webhookCredentialId" className={pl.select} defaultValue={schedule?.webhookCredentialId ?? ""}>
+                <option value="">Todas as origens</option>
+                {snapshot.credentials.map((credential) => <option key={credential.id} value={credential.id}>{credential.name}</option>)}
+              </select>
+            </PlField>
+            <section aria-labelledby="duty-review" className={cn(pl.box, pl.boxAction)}>
+              <h3 id="duty-review" className={pl.h4}>Resumo da criação</h3>
+              <p className={pl.p}>
+                {schedule
+                  ? "As mudanças valem para este plantão. Editar o tipo não muda os plantões já criados."
+                  : `${createdCount} ${createdCount === 1 ? "plantão será criado" : "plantões serão criados"}${selectedType ? ` do tipo ${selectedType.name}` : ""}. Na escala, só entram corretores das unidades do tipo.`}
+              </p>
+              <span className={pl.badges}>
+                {selectedType ? <span className={pl.badge}><TypeDot hue={selectedType.colorHue} name={selectedType.name} />{selectedType.name}</span> : null}
+                <span className={pl.badge}>{MODALITY_LABEL[fields.attendanceMode]}</span>
+                {twoShifts && !schedule ? <span className={pl.badge}>2 turnos por dia</span> : null}
+                <span className={pl.badge}>{selectedType ? typeUnitsLabel(selectedType, snapshot.branches) : "Todas as unidades"}</span>
+              </span>
+            </section>
+            <p className={pl.small}>Fuso operacional: America/Sao_Paulo. A fila de entrada seleciona os leads; a escala do plantão reúne corretores de todas as unidades.</p>
+            {needsType ? <p className={cn(pl.small, pl.warnText)}>Escolha o tipo do plantão para continuar.</p> : null}
+          </form>
+        </PlSheet>
+        {typeDialogOpen ? (
+          <DutyTypeDialog open onOpenChange={setTypeDialogOpen} branches={snapshot.branches} usedHues={snapshot.types.map((type) => type.colorHue)} onSaved={(id) => setPendingTypeId(id)} />
+        ) : null}
+      </>
+    );
   }
 
   return (
@@ -804,6 +1050,7 @@ function DutyInspector({
   onEdit: (schedule: Schedule) => void;
 }) {
   const router = useRouter();
+  const directorLite = useDirectorLitePage();
   const [pending, startTransition] = useTransition();
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -977,6 +1224,253 @@ function DutyInspector({
   }
 
   const coverage = schedule ? coverageLabel(schedule, snapshot) : null;
+
+  // Lite (27/11/2026): a gaveta do plantão no molde do artifact "Distribuição · Plantões".
+  if (directorLite) {
+    const single = schedule ? isSingleDaySchedule(schedule) : false;
+    const archived = schedule?.status === "archived";
+    const query = brokerSearch.trim();
+    const sections = schedule
+      ? (shifts ? shifts.filter((shift) => shift.key !== "dia").map((shift) => ({
+          key: shift.key,
+          label: shift.label as string | null,
+          entries: assignments.filter((assignment) => worksInShift(assignmentShift(schedule, assignment), shift.key as "manha" | "tarde")),
+        })) : [{ key: "todos", label: null as string | null, entries: assignments }])
+      : [];
+    const statusBadge = schedule?.status === "active"
+      ? <span className={cn(pl.badge, pl.bGood)}>Ativo</span>
+      : archived ? <span className={pl.badge}>Arquivado</span> : <span className={pl.badge}>Inativo</span>;
+    const units = schedule ? (schedule.typeBranchIds.length ? typeUnitsLabel({ branchIds: schedule.typeBranchIds }, snapshot.branches) : schedule.branchName ?? "Todas as unidades") : "";
+    return (
+      <>
+        <PlSheet
+          open={open}
+          onOpenChange={onOpenChange}
+          title={schedule?.name ?? "Plantão"}
+          badges={schedule ? (
+            <>
+              <span className={pl.badge}><TypeDot hue={schedule.typeHue} name={schedule.typeName ?? null} />{schedule.typeName ?? "Sem tipo"}</span>
+              {statusBadge}
+              <span className={cn(pl.badge, pl.num)}>{single ? dateTag(singleDutyDate(schedule)!) : "↻ Toda semana"}</span>
+              <span className={pl.badge}>{MODALITY_LABEL[schedule.attendanceMode === "presencial" ? "presencial" : "online"]}</span>
+            </>
+          ) : null}
+          footer={schedule ? (
+            <>
+              {archived ? (
+                <button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} disabled={pending} onClick={() => runAction(restoreDutyScheduleAction, "Plantão restaurado como inativo.")}>
+                  {pending ? "Restaurando…" : "Restaurar"}
+                </button>
+              ) : (
+                <button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} disabled={pending} onClick={() => onEdit(schedule)}>Editar plantão</button>
+              )}
+              <PlMenu
+                side="top"
+                triggerClassName={pl.iconbtn}
+                triggerLabel="Mais ações"
+                trigger={<DotsIcon />}
+                items={archived ? [
+                  { label: "Excluir", danger: true, onSelect: () => setConfirmDelete(true), disabled: pending },
+                ] : [
+                  { label: "Duplicar", onSelect: () => runAction(duplicateDutyScheduleAction, "Cópia criada como inativa."), disabled: pending },
+                  { label: schedule.status === "active" ? "Desativar" : "Ativar", onSelect: () => runAction(toggleDutyScheduleAction, schedule.status === "active" ? "Plantão desativado." : "Plantão ativado."), disabled: pending },
+                  { label: "Arquivar", danger: true, onSelect: () => setConfirmArchive(true), disabled: pending },
+                  { label: "Excluir", danger: true, onSelect: () => setConfirmDelete(true), disabled: pending },
+                ]}
+              />
+            </>
+          ) : null}
+        >
+          {schedule ? (
+            <>
+              <dl className={pl.dl}>
+                <dt>Unidades</dt><dd>{units}</dd>
+                <dt>Fila</dt><dd>{schedule.queueName}</dd>
+                <dt>Origem dos leads</dt><dd>{schedule.credentialName ?? "Todas as origens"}</dd>
+                <dt>{single ? "Data" : "Repete toda semana"}</dt>
+                <dd>{single ? dateTag(singleDutyDate(schedule)!) : `${DAYS_FULL[schedule.dayOfWeek]} · ${dateLabel(schedule.validFrom)} a ${dateLabel(lastIncludedDay(schedule.validUntil))}`}</dd>
+                <dt>Horário</dt><dd>{schedule.startsAt.slice(0, 5)} às {schedule.endsAt.slice(0, 5)}</dd>
+                <dt>Corretores</dt><dd>mínimo {schedule.minimumBrokers}{schedule.maximumBrokers ? ` · máximo ${schedule.maximumBrokers}` : ""}</dd>
+                <dt>Limite por corretor</dt><dd>{schedule.maxLeadsPerBroker ? `${schedule.maxLeadsPerBroker} leads por dia de plantão` : "Sem limite"}</dd>
+                <dt>Fuso</dt><dd>{schedule.timezone}</dd>
+              </dl>
+
+              <PlSection
+                id="plantao-escalados"
+                title="Escalados"
+                aside={<span className={cn(pl.badge, coverage?.covered ? pl.bGood : pl.bWarn, pl.num)}>{coverage?.assigned} de {coverage?.minimum} mín.</span>}
+                hint={coverage?.covered ? "Mínimo de corretores atendido. A escala não bloqueia a distribuição." : `Faltam ${(coverage?.minimum ?? 0) - (coverage?.assigned ?? 0)} corretor(es) para o mínimo. A distribuição não é bloqueada.`}
+              >
+                {shifts ? (
+                  <PlSegmented
+                    label="Turno de quem você adicionar"
+                    value={addShift}
+                    onChange={setAddShift}
+                    options={shifts.map((shift) => ({ value: shift.key, label: shift.label.split(" · ")[0], sub: shift.label.split(" · ")[1] }))}
+                  />
+                ) : null}
+                <label className={pl.searchField}>
+                  <SearchIcon />
+                  <span className={pl.srOnly}>Adicionar corretor por nome ou código</span>
+                  <input type="search" value={brokerSearch} onChange={(event) => setBrokerSearch(event.target.value)} placeholder="Adicionar corretor por nome ou código" disabled={pending || schedule.status !== "active"} />
+                </label>
+                {query && schedule.status === "active" ? (
+                  <div className={pl.results}>
+                    {searchingBrokers ? (
+                      <p className={cn(pl.small, pl.row)} role="status">Buscando corretores…</p>
+                    ) : filteredEligibleBrokers.length || filteredInvited.length ? (
+                      <>
+                        {filteredInvited.map((person) => (
+                          <div key={`invite:${person.id}`} className={pl.row}>
+                            <span className={pl.av} aria-hidden="true">{initials(person.name)}</span>
+                            <span className={pl.rowBody}>
+                              <span className={pl.rowName}>{person.name}</span>
+                              <span className={pl.rowMeta}>{person.internalCode ? `${person.internalCode} · ` : ""}{person.branchName ? `${person.branchName} · ` : ""}<span className={pl.warnText}>Ainda sem conta: entra com convite pendente</span></span>
+                            </span>
+                            <button type="button" className={cn(pl.iconbtn, pl.iconbtnGhost)} aria-label={`Adicionar ${person.name} a este plantão com convite pendente`} disabled={pending} onClick={() => addInvited(person)}>
+                              {addingBrokerId === person.id ? <Loader2Icon className="animate-spin" /> : <PlusIcon />}
+                            </button>
+                          </div>
+                        ))}
+                        {filteredEligibleBrokers.map((broker) => (
+                          <div key={broker.id} className={pl.row}>
+                            <span className={pl.av} aria-hidden="true">{initials(broker.name)}</span>
+                            <span className={pl.rowBody}>
+                              <span className={pl.rowName}>{broker.name}</span>
+                              <span className={pl.rowMeta}>
+                                {broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ? `${broker.branchName} · ` : ""}{broker.availabilityStatus === "available" ? "Disponível" : "Pausado"}
+                                {outsideType(broker) ? <span className={pl.warnText}> · fora das unidades do tipo</span> : null}
+                              </span>
+                            </span>
+                            <button type="button" className={cn(pl.iconbtn, pl.iconbtnGhost)} aria-label={`Adicionar ${broker.name} a este plantão`} disabled={pending}
+                              onClick={() => (outsideType(broker) ? setConfirmOutside({ id: broker.id, name: broker.name, branchName: broker.branchName }) : assignBroker(broker.id))}>
+                              {addingBrokerId === broker.id ? <Loader2Icon className="animate-spin" /> : <PlusIcon />}
+                            </button>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <p className={cn(pl.small, pl.row)}>Nenhum corretor elegível encontrado.</p>
+                    )}
+                  </div>
+                ) : null}
+                {sections.map((section) => (
+                  <div key={section.key} className={pl.section} style={{ gap: 4 }}>
+                    {section.label ? <p className={cn(pl.subhead, pl.num)}>{section.label} · {section.entries.length}</p> : null}
+                    <ul className={pl.rows}>
+                      {section.entries.map((assignment) => (
+                        <li key={`${section.key}:${assignment.id}`} className={pl.row}>
+                          <span className={pl.av} aria-hidden="true">{initials(assignment.brokerName)}</span>
+                          <span className={pl.rowBody}>
+                            <span className={pl.rowName}>{assignment.brokerName}</span>
+                            <span className={pl.rowMeta}>
+                              {shifts ? (shifts.find((shift) => shift.key === assignmentShift(schedule, assignment))?.label ?? `${assignment.startsAt.slice(0, 5)} às ${assignment.endsAt.slice(0, 5)}`) : "Escalado neste horário"}
+                              {assignment.published ? " · escala do mês" : ""}
+                            </span>
+                          </span>
+                          {shifts && !assignment.published ? (
+                            <PlSelect
+                              aria-label={`Turno de ${assignment.brokerName}`}
+                              style={{ width: 116, flex: "none" }}
+                              value={assignmentShift(schedule, assignment) ?? ""}
+                              disabled={pending}
+                              onChange={(value) => { if (value) changeShift(assignment, value as DutyShiftKey); }}
+                              options={shifts.map((shift) => ({ value: shift.key, label: shift.label.split(" · ")[0] }))}
+                            />
+                          ) : null}
+                          {passDate ? (
+                            <button type="button" className={cn(pl.pill, pl.pillGhost, pl.pillSm)} aria-label={`Passar o plantão de ${assignment.brokerName} para outra pessoa`} aria-expanded={passingBrokerId === assignment.brokerId} disabled={pending}
+                              onClick={() => setPassingBrokerId(passingBrokerId === assignment.brokerId ? null : assignment.brokerId)}>
+                              Passar
+                            </button>
+                          ) : null}
+                          <button type="button" className={cn(pl.iconbtn, pl.iconbtnGhost)} aria-label={`Tirar ${assignment.brokerName} do plantão`} disabled={pending} onClick={() => removeAssignment(assignment)}>
+                            <CloseIcon />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    {passDate && passingBrokerId && section.entries.some((entry) => entry.brokerId === passingBrokerId) ? (
+                      <DutyPassPicker
+                        key={passingBrokerId}
+                        occurrenceId={`${schedule.id}:${passDate}`}
+                        fromBrokerId={passingBrokerId}
+                        onCancel={() => setPassingBrokerId(null)}
+                        onDone={() => { setPassingBrokerId(null); router.refresh(); }}
+                      />
+                    ) : null}
+                    {!section.entries.length ? <p className={pl.emptyBox}>{section.label ? "Ninguém neste turno." : "Nenhum corretor escalado."}</p> : null}
+                  </div>
+                ))}
+                {pendingInvites?.entries.length ? (
+                  <div className={pl.section} style={{ gap: 4 }}>
+                    <p className={cn(pl.subhead, pl.num)}>Convite pendente · {pendingInvites.entries.length}</p>
+                    <ul className={pl.rows}>
+                      {pendingInvites.entries.map((entry) => (
+                        <li key={entry.entryId} className={cn(pl.row, pl.rowDashed)}>
+                          <span className={pl.av} aria-hidden="true">{initials(entry.name)}</span>
+                          <span className={pl.rowBody}>
+                            <span className={pl.rowName}>{entry.name}</span>
+                            <span className={pl.rowMeta}>Ainda sem conta: não recebe leads até aceitar o convite.</span>
+                          </span>
+                          <span className={cn(pl.badge, pl.bWarn)}>Convite pendente</span>
+                          <button type="button" className={cn(pl.iconbtn, pl.iconbtnGhost)} aria-label={`Tirar ${entry.name} do plantão`} disabled={pending} onClick={() => removeInvited(entry)}>
+                            <CloseIcon />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </PlSection>
+
+              <PlSection
+                id="plantao-historico"
+                title="Histórico"
+                aside={<Link href={`/leads/distribuicao/plantao/${schedule.id}`} className={cn(pl.pill, pl.pillGhost, pl.pillSm)} style={{ color: "var(--d-action-text)" }}>Ver tudo</Link>}
+              >
+                {history.length ? history.map((event, index) => (
+                  <p key={`${event.action}-${event.createdAt.toISOString()}-${index}`} className={cn(pl.p, pl.num)}>
+                    {actionLabel(event.action)}{event.actorName ? ` por ${event.actorName}` : ""} · {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(event.createdAt).replace(", ", " às ")}
+                  </p>
+                )) : <p className={pl.small}>Nenhum evento de histórico disponível.</p>}
+              </PlSection>
+            </>
+          ) : null}
+        </PlSheet>
+        <PlConfirm
+          open={Boolean(confirmOutside)}
+          onOpenChange={(next) => { if (!next) setConfirmOutside(null); }}
+          title={`Escalar ${confirmOutside?.name ?? ""} mesmo assim?`}
+          description={`A unidade dele (${confirmOutside?.branchName ?? "sem unidade"}) não participa do tipo ${schedule?.typeName ?? "deste plantão"}. Ele vai receber os leads do plantão normalmente.`}
+          confirmLabel="Escalar mesmo assim"
+          pending={pending}
+          onConfirm={() => { if (confirmOutside) assignBroker(confirmOutside.id); setConfirmOutside(null); }}
+        />
+        <PlConfirm
+          open={confirmArchive}
+          onOpenChange={setConfirmArchive}
+          title="Arquivar este plantão?"
+          description={`Ele sairá da distribuição e os ${assignments.length} corretor(es) da escala ficarão inativos neste plantão. O histórico será preservado e a regra poderá ser restaurada.`}
+          confirmLabel={pending ? "Arquivando…" : "Arquivar plantão"}
+          danger
+          pending={pending}
+          onConfirm={() => runAction(archiveDutyScheduleAction, "Plantão arquivado.", true)}
+        />
+        <PlConfirm
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          title="Excluir este plantão permanentemente?"
+          description="Esta ação remove a regra e a escala de corretores de forma definitiva. O registro de auditoria será preservado, mas o plantão não poderá ser restaurado."
+          confirmLabel={pending ? "Excluindo…" : "Excluir plantão"}
+          danger
+          pending={pending}
+          onConfirm={() => runAction(deleteDutyScheduleAction, "Plantão excluído permanentemente.", true)}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -1488,6 +1982,9 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
   const [createDate, setCreateDate] = useState<string | null>(null);
   const plansState = useMonthlyDutyPlans(monthlySchedulingEnabled);
   const { load: loadPlan } = plansState;
+  // Lite 1:1: "N plantões não acontecem" abre e fecha; "Foto na confirmação por unidade" abre pela gaveta.
+  const [outsideOpen, setOutsideOpen] = useState(false);
+  const [unitPhotoOpen, setUnitPhotoOpen] = useState(false);
 
   useEffect(() => {
     // The previous month's escala may run into this month (a period that crosses it).
@@ -1619,6 +2116,208 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
   const monthStart = `${month}-01`;
   const todayKey = dateInputValue(new Date());
   const defaultStartDate = monthStart > todayKey ? monthStart : todayKey;
+
+  const drawers = (
+    <>
+      {monthlySchedulingEnabled ? (
+        <MonthlyDutyPlanner
+          brokers={[...snapshot.brokers, ...snapshot.pendingBrokers]}
+          branches={snapshot.branches}
+          types={snapshot.types}
+          enabled={monthlySchedulingEnabled}
+          canEdit={canPlanMonthlySchedule}
+          month={month}
+          open={plannerOpen}
+          onOpenChange={setPlanner}
+          schedules={plannerSchedules}
+          plansState={plansState}
+          onCreateSchedule={() => {
+            setReturnToPlanner(true);
+            setPlannerOpen(false);
+            openCreate(null);
+          }}
+        />
+      ) : null}
+      {typesOpen ? <DutyTypesSheet open onOpenChange={setTypesOpen} types={snapshot.types} branches={snapshot.branches} /> : null}
+      <DutyInspector
+        key={`${selectedSchedule?.id ?? "closed"}-${selectedSchedule ? "open" : "closed"}`}
+        schedule={selectedSchedule}
+        open={Boolean(selectedSchedule)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSchedule(null);
+        }}
+        snapshot={snapshot}
+        onEdit={openEdit}
+      />
+      <DutyFormSheet
+        key={formSchedule?.id ?? (formOpen ? `new-${createDate ?? month}` : "closed")}
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open && returnToPlanner) {
+            setReturnToPlanner(false);
+            setPlannerOpen(true);
+          }
+        }}
+        schedule={formSchedule}
+        snapshot={snapshot}
+        queues={queues}
+        defaultStartDate={createDate ?? defaultStartDate}
+      />
+    </>
+  );
+
+  // Lite (27/11/2026): aba Plantões 1:1 ao artifact "Distribuição · Plantões".
+  if (directorLite) {
+    const monthName = monthLabel(month).replace(/ de \d{4}$/, "").toLocaleLowerCase("pt-BR");
+    const settingsItems = [
+      monthlySchedulingEnabled ? { label: `Escala de ${monthName}`, onSelect: () => setPlanner(true) } : null,
+      canPlanMonthlySchedule ? { label: "Tipos de plantão", onSelect: () => setTypesOpen(true) } : null,
+      snapshot.branches.length ? { label: snapshot.branches.length === 1 ? "Foto na confirmação da unidade" : "Foto na confirmação por unidade", onSelect: () => setUnitPhotoOpen(true) } : null,
+    ];
+    const desktopSettings = settingsItems.slice(1);
+    return (
+      <>
+        <div className={cn(pl.top, pl.in)}>
+          <div className={pl.topText}>
+            <h2 className={pl.h2}>Plantões de {monthName}</h2>
+            <p className={pl.lead}>
+              <span className={pl.leadLong}>Cada plantão tem um tipo e vale no dia escolhido. ↻ marca os que repetem toda semana.</span>
+              <span className={pl.leadShort}>↻ marca os que repetem toda semana.</span>
+            </p>
+          </div>
+          <div className={pl.actions}>
+            {monthlySchedulingEnabled ? (
+              <button type="button" className={cn(pl.pill, pl.pillQuiet)} onClick={() => setPlanner(true)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3" /><path d="M3.5 10h17M8 3v4M16 3v4" /><path d="m9 15 2 2 4-4" /></svg>
+                Escala de {monthName}
+              </button>
+            ) : null}
+            {desktopSettings.some(Boolean) ? (
+              <PlMenu triggerClassName={cn(pl.pill, pl.pillQuiet)} trigger={<>Configurações <ChevronIcon /></>} items={desktopSettings} />
+            ) : null}
+            <button type="button" className={cn(pl.pill, pl.pillPrimary)} onClick={() => openCreate()}>
+              <PlusIcon />
+              Novo plantão
+            </button>
+          </div>
+          <div className={pl.actionsMobile}>
+            <button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} onClick={() => openCreate()}><PlusIcon />Novo plantão</button>
+            {settingsItems.some(Boolean) ? (
+              <PlMenu triggerClassName={pl.iconbtn} triggerLabel="Escala, tipos e foto por unidade" trigger={<DotsIcon />} items={settingsItems} />
+            ) : null}
+          </div>
+        </div>
+
+        <section className={cn(pl.stats, pl.in)} aria-label="Números do mês">
+          <article className={cn(pl.card, pl.stat)}>
+            <p className={pl.statLabel}><span className={pl.statLabelLong}>Dias com plantão em {monthName}</span><span className={pl.statLabelShort}>Dias com plantão</span></p>
+            <p className={pl.statValue}>{monthDays.total}</p>
+            <p className={pl.statDetail}>{monthDays.upcoming} por acontecer<span className={pl.statLabelLong}> · {monthDays.finished} {monthDays.finished === 1 ? "encerrado" : "encerrados"}</span></p>
+          </article>
+          <article className={cn(pl.card, pl.stat)}>
+            <p className={pl.statLabel}>Dias sem cobertura</p>
+            <p className={pl.statValue} style={gapCount ? { color: "var(--warning)" } : undefined}>{gapCount}</p>
+            <p className={pl.statDetail}><span className={pl.statLabelLong}>abaixo do mínimo de corretores na escala</span><span className={pl.statLabelShort}>abaixo do mínimo</span></p>
+          </article>
+        </section>
+
+        {isPreviewPromise(queueOrders) ? (
+          <Suspense fallback={<DutyQueueOrderBoardLoading />}>
+            <StreamedDutyQueueOrderBoard previews={queueOrders} canReorder={canPlanMonthlySchedule} />
+          </Suspense>
+        ) : (
+          <DutyQueueOrderBoard previews={queueOrders} canReorder={canPlanMonthlySchedule} />
+        )}
+
+        <section className={cn(pl.card, pl.in, pl.month)} aria-labelledby="plantoes-mes">
+          <div className={pl.monthHead}>
+            <div className={pl.monthNav}>
+              <button type="button" className={cn(pl.iconbtn, pl.iconbtnGhost)} aria-label="Mês anterior" disabled={month <= firstMonth} onClick={() => chooseMonth(shiftMonth(month, -1))}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+              </button>
+              <h3 id="plantoes-mes" className={pl.monthTitle}>{monthLabel(month)}</h3>
+              <button type="button" className={cn(pl.iconbtn, pl.iconbtnGhost)} aria-label="Próximo mês" disabled={month >= lastMonth} onClick={() => chooseMonth(shiftMonth(month, 1))}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+              </button>
+            </div>
+            {legendTypes.length > 1 ? (
+              <ScrollArea orientation="horizontal" className={pl.chips}>
+                <div className={pl.chipsRow} role="group" aria-label="Filtrar por tipo de plantão">
+                  {legendTypes.map((type) => {
+                    const active = typeFilter.includes(type.key);
+                    return (
+                      <button key={type.key} type="button" className={pl.typechip} aria-pressed={active}
+                        onClick={() => setTypeFilter((current) => (active ? current.filter((key) => key !== type.key) : [...current, type.key]))}>
+                        <TypeDot hue={type.hue} name={type.name} />
+                        {type.name ?? "Sem tipo"}
+                      </button>
+                    );
+                  })}
+                  {typeFilter.length ? <button type="button" className={cn(pl.pill, pl.pillSm, pl.clear)} onClick={() => setTypeFilter([])}>Limpar</button> : null}
+                </div>
+              </ScrollArea>
+            ) : null}
+          </div>
+          {monthSchedules.length ? (
+            <DutyMonthCalendar
+              month={month}
+              schedules={monthSchedules}
+              progressById={progressById}
+              publishedScheduleIds={publishedScheduleIds}
+              draftScheduleIds={draftScheduleIds}
+              gapScheduleIds={gapScheduleIds}
+              repeatingScheduleIds={repeatingScheduleIds}
+              canCreate
+              onOpen={setSelectedSchedule}
+              onCreateOnDate={(date) => openCreate(date)}
+            />
+          ) : (
+            <div className={pl.emptyMonth}>
+              <p className={pl.h4}>Nenhum plantão acontece em {monthLabel(month)}</p>
+              <button type="button" className={cn(pl.pill, pl.pillQuiet)} onClick={() => openCreate()}><PlusIcon />Novo plantão</button>
+            </div>
+          )}
+          <div className={pl.monthFoot}>
+            {outsideSchedules.length ? (
+              <button type="button" className={cn(pl.pill, pl.pillQuiet, pl.pillSm)} aria-expanded={outsideOpen} onClick={() => setOutsideOpen((value) => !value)}>
+                {outsideSchedules.length} {outsideSchedules.length === 1 ? "plantão não acontece" : "plantões não acontecem"} em {monthName}
+                <ChevronIcon open={outsideOpen} />
+              </button>
+            ) : <span />}
+            <PlSwitch checked={showArchived} onChange={setShowArchived} label="Mostrar arquivados" />
+          </div>
+          {outsideOpen && outsideSchedules.length ? (
+            <ul className={pl.outside}>
+              {outsideSchedules.map((schedule) => {
+                const coverage = coverageById.get(schedule.id);
+                const reason = coverage && !coverage.covered ? coverage.reason : "no_weekday";
+                return (
+                  <li key={schedule.id} className={pl.outsideRow}>
+                    <button type="button" className={pl.outsideOpen} onClick={() => setSelectedSchedule(schedule)}>
+                      <span className={pl.outsideName}>{schedule.name} · {DAYS_FULL[schedule.dayOfWeek].toLocaleLowerCase("pt-BR")} {schedule.startsAt.slice(0, 5)} às {schedule.endsAt.slice(0, 5)}</span>
+                      <span className={pl.outsideReason}>{outsideLabel(schedule, reason)}</span>
+                    </button>
+                    {reason === "ends_before" && schedule.status === "active" ? (
+                      <LiteActionButton size="sm" tone="secondary" busyLabel="Estendendo…" doneLabel="Estendido"
+                        onAction={async () => { const ok = await extendSchedule(schedule.id); return ok ? { ok: true } : { ok: false, reason: "Não foi possível estender o plantão." }; }}>
+                        Estender até o fim do mês
+                      </LiteActionButton>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </section>
+
+        {drawers}
+        {snapshot.branches.length ? (
+          <UnitPhotoDefaultsSheet open={unitPhotoOpen} onOpenChange={setUnitPhotoOpen} branches={snapshot.branches} defaults={snapshot.unitPhotoDefaults ?? {}} />
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
@@ -1763,51 +2462,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
         </CardContent>
       </Card>
 
-      {monthlySchedulingEnabled ? (
-        <MonthlyDutyPlanner
-          brokers={[...snapshot.brokers, ...snapshot.pendingBrokers]}
-          branches={snapshot.branches}
-          types={snapshot.types}
-          enabled={monthlySchedulingEnabled}
-          canEdit={canPlanMonthlySchedule}
-          month={month}
-          open={plannerOpen}
-          onOpenChange={setPlanner}
-          schedules={plannerSchedules}
-          plansState={plansState}
-          onCreateSchedule={() => {
-            setReturnToPlanner(true);
-            setPlannerOpen(false);
-            openCreate(null);
-          }}
-        />
-      ) : null}
-      {typesOpen ? <DutyTypesSheet open onOpenChange={setTypesOpen} types={snapshot.types} branches={snapshot.branches} /> : null}
-      <DutyInspector
-        key={`${selectedSchedule?.id ?? "closed"}-${selectedSchedule ? "open" : "closed"}`}
-        schedule={selectedSchedule}
-        open={Boolean(selectedSchedule)}
-        onOpenChange={(open) => {
-          if (!open) setSelectedSchedule(null);
-        }}
-        snapshot={snapshot}
-        onEdit={openEdit}
-      />
-      <DutyFormSheet
-        key={formSchedule?.id ?? (formOpen ? `new-${createDate ?? month}` : "closed")}
-        open={formOpen}
-        onOpenChange={(open) => {
-          setFormOpen(open);
-          if (!open && returnToPlanner) {
-            setReturnToPlanner(false);
-            setPlannerOpen(true);
-          }
-        }}
-        schedule={formSchedule}
-        snapshot={snapshot}
-        queues={queues}
-        defaultStartDate={createDate ?? defaultStartDate}
-      />
+      {drawers}
     </div>
   );
 }

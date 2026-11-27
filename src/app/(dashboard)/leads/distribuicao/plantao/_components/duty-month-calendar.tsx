@@ -10,6 +10,7 @@ import { typeStripe } from "./duty-type-tag";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { formatLiteDate } from "@/components/lite/format/date";
 import styles from "./director-duty-calendar.module.css";
+import { DutyMonthCalendar1a1 } from "./plantoes-1a1-calendar";
 
 type CalendarSchedule = { id: string; name: string; startsAt: string; endsAt: string; status: string; validFrom: Date; validUntil: Date | null; typeName?: string | null; typeHue?: number | null };
 type Progress = { dates: Array<{ date: string; done: boolean }> };
@@ -164,6 +165,35 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
     const weekendCount = weeks.flatMap((week) => week.slice(5)).reduce((sum, date) => sum + (date ? map.get(date)?.length ?? 0 : 0), 0);
     return { cells: visibleWeeks.flatMap((week) => week.slice(0, 5)), byDate: map, weekendCount, pastWeekCount };
   }, [month, progressById, schedules, showPastWeeks, today]);
+
+  // Lite (27/11/2026): calendário 1:1 ao artifact "Distribuição · Plantões".
+  if (directorLite) {
+    return (
+      <DutyMonthCalendar1a1
+        month={month}
+        today={today}
+        cells={cells}
+        byDate={byDate}
+        stateOf={(date, item) => shiftState(date, today, clock, item.schedule.startsAt, item.schedule.endsAt, item.done)}
+        weekendCount={weekendCount}
+        pastWeekCount={pastWeekCount}
+        showPastWeeks={showPastWeeks}
+        onTogglePastWeeks={() => setShowPastWeeks((current) => !current)}
+        openFullDays={openFullDays}
+        onToggleFullDay={toggleFullDay}
+        openPastDays={openPastDays}
+        onTogglePastDay={togglePastDay}
+        upcomingVisible={UPCOMING_VISIBLE}
+        publishedScheduleIds={publishedScheduleIds}
+        draftScheduleIds={draftScheduleIds}
+        gapScheduleIds={gapScheduleIds}
+        repeatingScheduleIds={repeatingScheduleIds}
+        canCreate={canCreate}
+        onOpen={onOpen}
+        onCreateOnDate={onCreateOnDate}
+      />
+    );
+  }
 
   return (
     <>

@@ -4,34 +4,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/arc/use-director-lite-page", () => ({ useDirectorLitePage: () => true }));
 
-import styles from "./director-duty-calendar.module.css";
+import styles from "./plantoes-1a1.module.css";
 import { DutyMonthCalendar } from "./duty-month-calendar";
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-function renderCalendar(matches: boolean) {
-  vi.stubGlobal("matchMedia", vi.fn(() => ({
-    matches,
-    media: "(max-width: 767px)",
-    onchange: null,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })));
-
+function renderCalendar() {
   const schedule = {
     id: "duty-1",
     name: "Plantão da unidade Centro",
     startsAt: "09:00",
     endsAt: "17:00",
     status: "active",
-    validFrom: new Date("2026-10-25T03:00:00.000Z"),
+    validFrom: new Date("2026-10-26T03:00:00.000Z"),
     validUntil: null,
   };
 
@@ -39,7 +27,7 @@ function renderCalendar(matches: boolean) {
     <DutyMonthCalendar
       month="2026-10"
       schedules={[schedule]}
-      progressById={new Map([["duty-1", { dates: [{ date: "2026-10-25", done: false }] }]])}
+      progressById={new Map([["duty-1", { dates: [{ date: "2026-10-26", done: false }] }]])}
       publishedScheduleIds={new Set(["duty-1"])}
       gapScheduleIds={new Set()}
       repeatingScheduleIds={new Set()}
@@ -50,27 +38,27 @@ function renderCalendar(matches: boolean) {
   );
 
   return {
-    desktop: container.querySelector<HTMLElement>(`.${styles.desktop}`)!,
-    mobile: container.querySelector<HTMLElement>(`.${styles.mobile}`)!,
+    desktop: container.querySelector<HTMLElement>(`.${styles.calDesktop}`),
+    mobile: container.querySelector<HTMLElement>(`.${styles.mDays}`),
   };
 }
 
-describe("DutyMonthCalendar Lite: foco por viewport", () => {
-  it("retira os controles do calendário desktop da árvore de foco no celular", () => {
-    const { desktop, mobile } = renderCalendar(true);
-
-    expect(desktop.getAttribute("aria-hidden")).toBe("true");
-    expect(desktop.hasAttribute("inert")).toBe(true);
-    expect(mobile.hasAttribute("aria-hidden")).toBe(false);
-    expect(mobile.hasAttribute("inert")).toBe(false);
+/*
+ * Plantões 1:1 (27/11/2026): a grade do computador e a lista do celular são trocadas pelo CSS do artifact
+ * (`display: none` por largura), o que já tira a versão escondida da árvore de foco e da leitura de tela.
+ */
+describe("DutyMonthCalendar Lite: grade no computador, lista no celular", () => {
+  it("monta a grade de segunda a sexta dentro do bloco do computador", () => {
+    const { desktop } = renderCalendar();
+    expect(desktop).not.toBeNull();
+    expect(desktop!.querySelector('[role="grid"]')?.getAttribute("aria-label")).toBe("Calendário de plantões");
+    expect(desktop!.querySelectorAll('[role="columnheader"]')).toHaveLength(5);
   });
 
-  it("retira os controles da lista móvel da árvore de foco no desktop", () => {
-    const { desktop, mobile } = renderCalendar(false);
-
-    expect(desktop.hasAttribute("aria-hidden")).toBe(false);
-    expect(desktop.hasAttribute("inert")).toBe(false);
-    expect(mobile.getAttribute("aria-hidden")).toBe("true");
-    expect(mobile.hasAttribute("inert")).toBe(true);
+  it("monta a lista por dia dentro do bloco do celular", () => {
+    const { mobile } = renderCalendar();
+    expect(mobile).not.toBeNull();
+    expect(mobile!.getAttribute("aria-label")).toBe("Plantões do mês");
+    expect(mobile!.textContent).toContain("Plantão da unidade Centro");
   });
 });

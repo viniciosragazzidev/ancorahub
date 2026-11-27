@@ -17,7 +17,9 @@ import { pickDistinctHue, QUEUE_COLOR_SWATCHES } from "@/features/lead-distribut
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
 import type { DutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
 import { cn } from "@/lib/utils";
-import { DutyTypeTag, MODALITY_LABEL, typeUnitsLabel } from "./duty-type-tag";
+import { DutyTypeTag, MODALITY_LABEL, typeColor, typeUnitsLabel } from "./duty-type-tag";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { PlField, PlSegmented, PlSheet, PlSwitch, PlusIcon, TypeDot, pl } from "./plantoes-1a1-kit";
 
 export { DutyTypeTag, MODALITY_LABEL, typeColor, typeStripe, typeUnitsLabel } from "./duty-type-tag";
 
@@ -53,6 +55,7 @@ export function DutyTypeDialog({
   onSaved?: (typeId: string) => void;
 }) {
   const router = useRouter();
+  const directorLite = useDirectorLitePage();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<Form>(() => ({
     name: type?.name ?? "",
@@ -90,6 +93,59 @@ export function DutyTypeDialog({
       onSaved?.(result.typeId);
       onOpenChange(false);
     });
+  }
+
+  // Lite (27/11/2026): o tipo abre no molde de gaveta do artifact "Distribuição · Plantões".
+  if (directorLite) {
+    return (
+      <PlSheet
+        open={open}
+        onOpenChange={onOpenChange}
+        title={type ? `Editar tipo ${type.name}` : "Novo tipo de plantão"}
+        description="O tipo é o grupo do plantão (PME, Premium, Extra...). Ele dá a cor, a modalidade e as unidades que participam."
+        footer={<button type="button" className={`${pl.pill} ${pl.pillPrimary} ${pl.pillWide}`} onClick={save} disabled={pending || !canSave}>{pending ? "Salvando…" : type ? "Salvar tipo" : "Criar tipo"}</button>}
+      >
+        <PlField label="Nome" htmlFor="duty-type-name">
+          <input id="duty-type-name" className={pl.input} value={form.name} onChange={(event) => set({ name: event.target.value })} placeholder="Ex.: PME" maxLength={60} autoFocus />
+        </PlField>
+        <PlField as="p" label="Modalidade" hint={form.attendanceMode === "presencial" ? "O corretor precisa estar na unidade dele; o gestor libera cada um." : "O corretor atende de onde estiver."}>
+          <PlSegmented label="Modalidade" value={form.attendanceMode} onChange={(value) => set({ attendanceMode: value })}
+            options={(["presencial", "online"] as const).map((mode) => ({ value: mode, label: MODALITY_LABEL[mode] }))} />
+        </PlField>
+        <PlField as="p" label="Cor">
+          <div className={pl.swatches}>
+            {QUEUE_COLOR_SWATCHES.map((hue) => (
+              <button key={hue} type="button" className={pl.swatch} aria-pressed={form.colorHue === hue} aria-label={`Cor ${hue}`} onClick={() => set({ colorHue: hue })}>
+                <span className={pl.dot} style={{ background: typeColor(hue) }} />
+              </button>
+            ))}
+          </div>
+        </PlField>
+        <section className={pl.section} aria-labelledby="duty-type-units">
+          <h3 id="duty-type-units" className={pl.h4}>Unidades que participam</h3>
+          <PlSwitch checked={form.allUnits} onChange={(checked) => set({ allUnits: checked })} label="Todas as unidades" />
+          {!form.allUnits ? (
+            <div className={pl.rows}>
+              {branches.map((branch) => (
+                <label key={branch.id} className={pl.checkRow}>
+                  <input type="checkbox" className={pl.checkBox} checked={form.branchIds.includes(branch.id)}
+                    onChange={(event) => set({ branchIds: event.target.checked ? [...new Set([...form.branchIds, branch.id])] : form.branchIds.filter((id) => id !== branch.id) })} />
+                  <span className={pl.rowName}>{branch.name}</span>
+                </label>
+              ))}
+            </div>
+          ) : null}
+          <p className={pl.small}>Na escala, só corretores dessas unidades entram nos plantões do tipo. Dá para forçar um de fora, com confirmação.</p>
+        </section>
+        <div className={pl.grid2}>
+          <PlField label="Início padrão" htmlFor="duty-type-start"><input id="duty-type-start" type="time" className={pl.input} value={form.defaultStartsAt} onChange={(event) => set({ defaultStartsAt: event.target.value })} /></PlField>
+          <PlField label="Fim padrão" htmlFor="duty-type-end"><input id="duty-type-end" type="time" className={pl.input} value={form.defaultEndsAt} onChange={(event) => set({ defaultEndsAt: event.target.value })} /></PlField>
+          <PlField label="Mínimo de corretores" htmlFor="duty-type-min"><input id="duty-type-min" type="number" min={1} max={99} className={pl.input} value={form.defaultMinimumBrokers} onChange={(event) => set({ defaultMinimumBrokers: event.target.value })} /></PlField>
+          <PlField label="Máximo (opcional)" htmlFor="duty-type-max"><input id="duty-type-max" type="number" min={1} max={99} className={pl.input} value={form.defaultMaximumBrokers} onChange={(event) => set({ defaultMaximumBrokers: event.target.value })} /></PlField>
+        </div>
+        <p className={pl.small}>Ao criar um plantão do tipo, esses valores já vêm preenchidos. Com turnos, o corte é sempre às 13:30.</p>
+      </PlSheet>
+    );
   }
 
   return (
@@ -192,6 +248,7 @@ export function DutyTypeDialog({
 /** The tenant's plantão types, to edit or archive them. */
 export function DutyTypesSheet({ open, onOpenChange, types, branches }: { open: boolean; onOpenChange: (open: boolean) => void; types: readonly DutyTypeOption[]; branches: readonly Branch[] }) {
   const router = useRouter();
+  const directorLite = useDirectorLitePage();
   const [editing, setEditing] = useState<DutyTypeOption | null>(null);
   const [creating, setCreating] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -204,6 +261,47 @@ export function DutyTypesSheet({ open, onOpenChange, types, branches }: { open: 
       plantaoDone(type.status === "archived" ? "Tipo restaurado." : "Tipo arquivado. Os plantões dele continuam como estão.");
       router.refresh();
     });
+  }
+
+  const dialogs = (
+    <>
+      {creating ? <DutyTypeDialog open onOpenChange={setCreating} branches={branches} usedHues={usedHues} /> : null}
+      {editing ? <DutyTypeDialog key={editing.id} open onOpenChange={(next) => { if (!next) setEditing(null); }} type={editing} branches={branches} usedHues={usedHues} /> : null}
+    </>
+  );
+
+  // Lite (27/11/2026): Tipos de plantão no molde de gaveta do artifact "Distribuição · Plantões".
+  if (directorLite) {
+    return (
+      <>
+        <PlSheet
+          open={open}
+          onOpenChange={onOpenChange}
+          title="Tipos de plantão"
+          description="Cada plantão pertence a um tipo. A cor do tipo aparece no calendário, na escala e no PDF."
+          footer={<button type="button" className={`${pl.pill} ${pl.pillPrimary} ${pl.pillWide}`} onClick={() => setCreating(true)}><PlusIcon />Novo tipo</button>}
+        >
+          {types.length ? (
+            <ul className={pl.rows}>
+              {types.map((type) => (
+                <li key={type.id} className={pl.row} style={type.status === "archived" ? { opacity: 0.6 } : undefined}>
+                  <TypeDot hue={type.colorHue} name={type.name} />
+                  <button type="button" className={`${pl.rowBody} ${pl.rowBtn}`} onClick={() => setEditing(type)} aria-label={`Editar ${type.name}`}>
+                    <span className={pl.rowName}>{type.name}</span>
+                    <span className={pl.rowMeta}>{MODALITY_LABEL[type.attendanceMode]} · {typeUnitsLabel(type, branches)} · {type.defaultStartsAt} às {type.defaultEndsAt}</span>
+                  </button>
+                  {type.status === "archived" ? <span className={pl.badge}>Arquivado</span> : null}
+                  <button type="button" className={`${pl.pill} ${pl.pillGhost} ${pl.pillSm}`} disabled={pending} onClick={() => toggleArchived(type)}>{type.status === "archived" ? "Restaurar" : "Arquivar"}</button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={pl.emptyBox}>Nenhum tipo ainda. Crie o primeiro (ex.: PME, Presencial, Online).</p>
+          )}
+        </PlSheet>
+        {dialogs}
+      </>
+    );
   }
 
   return (
@@ -240,8 +338,7 @@ export function DutyTypesSheet({ open, onOpenChange, types, branches }: { open: 
           </SheetBody>
         </SheetContent>
       </Sheet>
-      {creating ? <DutyTypeDialog open onOpenChange={setCreating} branches={branches} usedHues={usedHues} /> : null}
-      {editing ? <DutyTypeDialog key={editing.id} open onOpenChange={(next) => { if (!next) setEditing(null); }} type={editing} branches={branches} usedHues={usedHues} /> : null}
+      {dialogs}
     </>
   );
 }

@@ -20,6 +20,8 @@ import type { DutyBrokerTurnStats, DutyQueueOrderPreview } from "@/features/lead
 import { cn } from "@/lib/utils";
 
 import styles from "./duty-queue-order-board.module.css";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { initials, pl } from "./plantoes-1a1-kit";
 import { isRotationSignal } from "./duty-turn-auto-refresh";
 
 const timeZone = "America/Sao_Paulo";
@@ -163,12 +165,80 @@ function SortableBrokerRow({
   );
 }
 
+/** Linha da fila no Lite (artifact "Distribuição · Plantões"): alça, iniciais, nome com "Próximo", meta e posição. */
+function SortableBrokerRow1a1({ preview, position, canReorder, tied, reduceMotion, rotation }: {
+  preview: DutyQueueOrderPreview["order"][number];
+  position: number;
+  canReorder: boolean;
+  tied: boolean;
+  reduceMotion: boolean;
+  rotation: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: preview.id, disabled: !canReorder });
+  return (
+    <motion.li
+      ref={setNodeRef}
+      layout={reduceMotion ? false : "position"}
+      transition={reduceMotion ? { duration: 0 } : motionTokens.spring.smooth}
+      className={cn(pl.qrow, preview.isNext && pl.qrowNext)}
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 1 : undefined, opacity: isDragging ? 0.7 : 1 }}
+      aria-current={preview.isNext ? "true" : undefined}
+    >
+      {canReorder ? (
+        <button type="button" className={pl.grip} aria-label={`Reordenar ${preview.name}`} data-drag-scroll="off" {...attributes} {...listeners}>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" /></svg>
+        </button>
+      ) : null}
+      <span className={pl.av} aria-hidden="true">{initials(preview.name)}</span>
+      <span className={pl.qbody}>
+        <span className={pl.qname}>
+          <span className={pl.qnameText}>{preview.name}</span>
+          {preview.isNext ? <span className={cn(pl.badge, pl.bInfo, pl.flexNone)}>Próximo</span> : null}
+          {tied ? <span className={cn(pl.badge, pl.bWarn, pl.flexNone)}>Empate no sorteio</span> : null}
+        </span>
+        <span className={pl.qmeta}>
+          {rotation
+            ? turnStatsLine(preview)
+            : `${preview.receivedInDuty} ${preview.receivedInDuty === 1 ? "indicação" : "indicações"} na operação · ${preview.activeLeads} ${preview.activeLeads === 1 ? "lead" : "leads"} no plantão`}
+        </span>
+      </span>
+      <span className={pl.pos}>{position}º</span>
+    </motion.li>
+  );
+}
+
+/** Vez do rodízio no Lite: anterior, recebendo agora e próximo. */
+function TurnStrip1a1({ preview, nextName, reduceMotion }: { preview: Pick<DutyQueueOrderPreview, "scheduleName" | "previous" | "current">; nextName: string | null; reduceMotion: boolean }) {
+  const slots = [
+    { role: "previous", label: "Anterior", id: preview.previous?.id ?? null, name: preview.previous?.name ?? null, detail: preview.previous ? `${OUTCOME_LABEL[preview.previous.outcome]} · ${clock.format(new Date(preview.previous.offeredAt))}` : "Ninguém ainda" },
+    { role: "current", label: "Recebendo agora", id: preview.current?.id ?? null, name: preview.current?.name ?? null, detail: preview.current ? `Aguardando aceite desde ${clock.format(new Date(preview.current.offeredAt))}` : "Nenhum lead em oferta" },
+    { role: "next", label: "Próximo", id: nextName, name: nextName, detail: nextName ? "Recebe o próximo lead" : "Ninguém disponível" },
+  ] as const;
+  return (
+    <div className={pl.turn} role="group" aria-label={`Vez no ${preview.scheduleName}`}>
+      {slots.map((slot) => (
+        <div key={slot.role} className={pl.turnSlot} data-turn={slot.role}>
+          <span className={pl.turnLabel}>{slot.label}</span>
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span key={slot.id ?? "empty"} initial={reduceMotion ? false : { opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -16 }} transition={reduceMotion ? { duration: 0 } : motionTokens.spring.smooth}>
+              <span className={pl.turnName}>{slot.name ?? "Sem corretor"}</span>
+              <span className={pl.turnDetail}>{slot.detail}</span>
+            </motion.span>
+          </AnimatePresence>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function orderSignature(preview: DutyQueueOrderPreview) {
   return preview.savedBrokerIds.join("\u0000");
 }
 
 export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQueueOrderPreview[] | null; canReorder: boolean }) {
   const router = useRouter();
+  const lite = useDirectorLitePage();
+  const [showAllQueues, setShowAllQueues] = useState(false);
   const reduceMotion = useReduceMotionPreference();
   const [orders, setOrders] = useState<Record<string, { source: string; order: string[] }>>({});
   const [savingScheduleId, setSavingScheduleId] = useState<string | null>(null);
@@ -253,6 +323,98 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
       preview.blocked.map((item) => item.id),
     );
     await saveOrder(preview, nextOrder);
+  }
+
+  if (lite) {
+    const ordered = (preview: DutyQueueOrderPreview) => {
+      const localOrder = orders[preview.scheduleId];
+      const currentOrder = localOrder?.source === orderSignature(preview) ? localOrder.order : preview.savedBrokerIds;
+      const visibleIds = new Set(preview.order.map((item) => item.id));
+      return currentOrder.filter((id) => visibleIds.has(id)).flatMap((id) => {
+        const item = preview.order.find((candidate) => candidate.id === id);
+        return item ? [item] : [];
+      });
+    };
+    return (
+      <section className={cn(pl.card, pl.in, pl.queue)} aria-labelledby="duty-queue-order-title">
+        <div className={pl.sectionHead}>
+          <div className={pl.sectionText}>
+            <h3 id="duty-queue-order-title" className={pl.h3}>Quem recebe o próximo lead</h3>
+            <p className={cn(pl.lead, pl.queueIntro)}>Prévia da fila de cada plantão em andamento. A escolha final é recalculada quando o lead chega.</p>
+          </div>
+          <span className={cn(pl.badge, pl.bGood, pl.flexNone)}><span className={pl.dot} style={{ background: "var(--success)" }} aria-hidden="true" />Ao vivo</span>
+        </div>
+        {previews === null ? <p className={pl.empty}>Não foi possível montar a prévia da fila agora. A distribuição dos leads segue normal.</p> : !previews.length ? <p className={pl.empty}>Nenhum plantão está em andamento agora.</p> : (
+          <div className={pl.queueGrid}>
+            {previews.map((preview, previewIndex) => {
+              const orderedRows = ordered(preview);
+              const tieIds = new Set(preview.order.filter((item) => item.tie).map((item) => item.id));
+              const isSaving = savingScheduleId === preview.scheduleId;
+              const blockedRows = preview.rotation && preview.current ? preview.blocked.filter((entry) => entry.id !== preview.current!.id) : preview.blocked;
+              return (
+                <article key={preview.scheduleId} className={cn(pl.qcard, previewIndex > 0 && !showAllQueues && pl.qcardRest)}>
+                  <div className={pl.qcardHead}>
+                    <div className={pl.qcardTitleBox}>
+                      <p className={pl.qtitle}>
+                        {preview.scheduleName} · {dateLabel(preview.dutyDate)}
+                        {preview.rotation ? <span className={pl.badge}>Rodízio</span> : preview.manual ? <span className={pl.badge}>Fila manual</span> : null}
+                      </p>
+                      <p className={cn(pl.qsub, pl.num)}>{preview.queueName}</p>
+                    </div>
+                    {canReorder && (preview.manual || preview.rotation) ? (
+                      <button type="button" className={cn(pl.pill, pl.pillQuiet, pl.pillSm, pl.qreset)} disabled={isSaving} onClick={() => { void resetOrder(preview); }}>
+                        {preview.rotation ? "Restaurar ordem de chegada" : "Voltar ao automático"}
+                      </button>
+                    ) : null}
+                  </div>
+                  {preview.rotation ? <TurnStrip1a1 preview={preview} nextName={orderedRows[0]?.name ?? null} reduceMotion={reduceMotion} /> : null}
+                  <p className={pl.qnote}>{isSaving
+                    ? "Salvando a ordem…"
+                    : preview.rotation
+                      ? "Cada um tem sua vez, na ordem em que chegou: quem recebe vai para o fim. Lead expirado ou recusado gasta a vez e conta como pulo; no 3º pulo o corretor entra em pausa."
+                      : preview.manual ? "O corretor disponível no início da fila recebe e vai para o fim." : "Ordem automática, com indicação quando houver empate."}</p>
+                  {orderedRows.length ? (
+                    <DndContext id={`duty-queue-${preview.scheduleId}`} sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={(event) => { void onDragEnd(event, preview); }}>
+                      <SortableContext items={orderedRows.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+                        <ol className={pl.qlist} aria-label={`Fila de ${preview.scheduleName}`}>
+                          {orderedRows.map((item, index) => (
+                            <SortableBrokerRow1a1
+                              key={item.id}
+                              preview={{ ...item, isNext: preview.manual || preview.rotation ? index === 0 : item.isNext }}
+                              position={index + 1}
+                              canReorder={canReorder && !isSaving}
+                              tied={!preview.manual && !preview.rotation && tieIds.has(item.id)}
+                              reduceMotion={reduceMotion}
+                              rotation={preview.rotation}
+                            />
+                          ))}
+                        </ol>
+                      </SortableContext>
+                    </DndContext>
+                  ) : <p className={pl.empty}>Ninguém está disponível para receber agora.</p>}
+                  {blockedRows.length ? (
+                    <div className={pl.blocked}>
+                      <p className={pl.blockedTitle}>Bloqueados nesta rodada</p>
+                      {blockedRows.map((entry) => (
+                        <div key={entry.id} className={pl.blockedRow}>
+                          <span>{entry.name}</span>
+                          <span className={pl.blockedReason}>{preview.rotation && entry.skips ? `${entry.reason} · ${entry.skips} ${entry.skips === 1 ? "pulo" : "pulos"}` : entry.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
+        {previews && previews.length > 1 ? (
+          <button type="button" className={cn(pl.pill, pl.pillGhost, pl.queueMore)} style={{ color: "var(--d-action-text)" }} aria-expanded={showAllQueues} onClick={() => setShowAllQueues((value) => !value)}>
+            {showAllQueues ? "Ver só a primeira fila" : `Ver as ${previews.length} filas`}
+          </button>
+        ) : null}
+      </section>
+    );
   }
 
   return (
@@ -356,6 +518,18 @@ export function StreamedDutyQueueOrderBoard({ previews, canReorder }: { previews
 }
 
 export function DutyQueueOrderBoardLoading() {
+  const lite = useDirectorLitePage();
+  if (lite) {
+    return (
+      <section className={cn(pl.card, pl.queue)} aria-labelledby="duty-queue-order-title" aria-busy="true">
+        <div className={pl.sectionText}>
+          <h3 id="duty-queue-order-title" className={pl.h3}>Quem recebe o próximo lead</h3>
+          <p className={pl.lead}>Prévia da fila de cada plantão em andamento. A escolha final é recalculada quando o lead chega.</p>
+        </div>
+        <p className={pl.empty} role="status">Montando a prévia da fila.</p>
+      </section>
+    );
+  }
   return (
     <section className={styles.board} aria-labelledby="duty-queue-order-title" aria-busy="true">
       <div className={styles.intro}>
