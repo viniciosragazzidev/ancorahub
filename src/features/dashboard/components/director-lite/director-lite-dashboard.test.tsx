@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -24,7 +27,6 @@ vi.mock("motion/react", async (importOriginal) => {
 // Fixtures: os construtores de exemplo da prévia devolvem o painel essencial tipado.
 import { buildEssential, emptyEssential } from "@/app/dev/diretor-dashboard-preview/_components/essential-example";
 
-import { displacementOf, readMotion } from "@/components/lite/motion/capture-motion";
 import { summarizeWhatsApp, type BrokerWhatsAppRow } from "@/features/dashboard/essential/essential-summary";
 
 vi.mock("@/components/dashboard-header", () => ({
@@ -32,7 +34,7 @@ vi.mock("@/components/dashboard-header", () => ({
 }));
 
 import { DirectorLiteDashboard } from "./director-lite-dashboard";
-import styles from "./director-lite.module.css";
+import styles from "./painel.module.css";
 
 const NOW = new Date("2026-10-24T16:42:00.000Z");
 const BRANCHES = [
@@ -56,25 +58,30 @@ function withBrokers(rows: BrokerWhatsAppRow[]) {
   return { ...data, whatsapp: { ...data.whatsapp, ...summarizeWhatsApp(rows) } };
 }
 
+/** Cópia 1:1 do artifact (27/11/2026): celular e computador moram no mesmo HTML; `m-*` são os blocos do celular. */
+const section = (id: string) => within(document.querySelector(`section[aria-labelledby="${id}"]`) as HTMLElement);
+const numbersRegion = () => within(screen.getByRole("region", { name: "Números do período" }));
+const kpiCard = (label: string) => numbersRegion().getByRole("heading", { level: 3, name: label }).closest("article") as HTMLElement;
+
 afterEach(() => {
   cleanup();
   motionState.reduce = false;
 });
 
 describe("painel essencial: ordem, cabeçalho e filtros", () => {
-  it("mostra o topo global, as abas e a nota de que o período muda só os leads por fila", () => {
-    render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
-    // 27/11/2026: a saudação voltou (16h42 UTC são 13h42 em Brasília) com a frase da situação.
+  it("mostra a saudação com a frase da situação e as abas, sem a faixa de topo global", () => {
     const data = buildEssential("today", "all", NOW);
+    render(<DirectorLiteDashboard data={data} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    // 27/11/2026: a página começa nas abas, sem o título "Painel" da faixa global.
+    expect(screen.queryByRole("heading", { level: 1, name: "Painel" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("director-dashboard-header")).not.toBeInTheDocument();
+    // 16h42 UTC são 13h42 em Brasília.
     expect(screen.getByRole("heading", { level: 1, name: "Boa tarde, Renata" })).toBeInTheDocument();
     expect(screen.getByText(`Hoje entraram ${data.queues.totals.arrived} leads. 2 coisas pedem você agora.`)).toBeInTheDocument();
-    expect(screen.getByRole("main", { name: "Painel" })).toHaveClass(styles.pageContainer);
+    expect(screen.getByRole("main", { name: "Painel" })).toHaveClass(styles.main);
     const tabs = within(screen.getByRole("navigation", { name: "Seções do painel" }));
     expect(tabs.getByRole("link", { name: "Visão geral" })).toHaveAttribute("aria-current", "page");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=hoje");
-    expect(screen.getByLabelText("Sobre o per\u00edodo")).toBeInTheDocument();
-    expect(screen.getByText("O per\u00edodo altera apenas os leads por fila.")).toBeInTheDocument();
   });
 
   it("não inclui a faixa de status vivos no painel do diretor", () => {
@@ -82,17 +89,16 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(container.querySelector("[data-live-status-strip]")).toBeNull();
   });
 
-  it("organização de 27/11: números, plantões e WhatsApp antes da análise (funil e tabela de filas); Precisa de você fica no topo", () => {
+  it("organização do artifact: números no topo; plantões e WhatsApp, leads por fila e entradas por hora; Precisa de você fica no topo", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const blocks = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent ?? "");
-    expect(blocks.map((text) => text.replace(/\d+$/, ""))).toEqual([
-      "Leads desde sex 19h",
-      "Plantões agora",
-      "WhatsApp dos corretores",
-      "Funil de qualificação",
-      "Leads por fila",
-    ]);
-    // O que pede decisão não é mais um bloco da página: é o botão do topo, junto dos filtros, com a gaveta fechada.
+    const headings = screen.getAllByRole("heading", { level: 2 });
+    const titles = (phone: boolean) => headings.filter((heading) => heading.id.startsWith("m-") === phone).map((heading) => heading.textContent);
+    expect(titles(false)).toEqual(["Plantões agora", "WhatsApp dos corretores", "Leads por fila", "Entradas por hora"]);
+    // No celular a fila vem antes do WhatsApp, e as entradas por hora ficam de fora.
+    expect(titles(true)).toEqual(["Plantões agora", "Leads por fila", "WhatsApp dos corretores"]);
+    const numbers = screen.getByRole("region", { name: "Números do período" });
+    expect(numbers.compareDocumentPosition(headings[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // O que pede decisão não é um bloco da página: é o botão do topo, junto dos filtros, com a gaveta fechada.
     expect(screen.getByRole("button", { name: /Precisa de você/ }).closest("header")).not.toBeNull();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -122,13 +128,32 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(drawer.queryByRole("listitem")).not.toBeInTheDocument();
   });
 
-  it("mostra os quatro números da janela e nenhum dado de venda", () => {
-    const { container } = render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const cards = within(screen.getByRole("heading", { name: "Leads desde sex 19h" }).closest("section") as HTMLElement);
-    for (const label of ["Entraram", "Qualificados", "Em qualificação", "Frios"]) expect(cards.getByText(label)).toBeInTheDocument();
-    expect(cards.getByText("56% do que entrou")).toBeInTheDocument();
-    expect(screen.getByText("56% qualificados", { exact: false })).toBeInTheDocument();
-    expect(container).not.toHaveTextContent(/R\$|venda/i);
+  it("mostra os quatro números do período (entraram, qualificados, distribuídos e vendas) com a comparação", () => {
+    render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(numbersRegion().getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(["Entraram", "Qualificados", "Distribuídos", "Vendas"]);
+    expect(kpiCard("Entraram")).toHaveTextContent("36");
+    // 36 contra 29 ontem.
+    expect(within(kpiCard("Entraram")).getByText("+24% sobre ontem")).toBeInTheDocument();
+    expect(within(kpiCard("Qualificados")).getByText("56% dos que entraram")).toBeInTheDocument();
+    expect(kpiCard("Distribuídos")).toHaveTextContent("68");
+    expect(within(kpiCard("Distribuídos")).getByText("Tempo médio até o corretor: 4 min")).toBeInTheDocument();
+    // Antes o painel escondia venda; o desenho de 27/11/2026 traz o número e o valor vendido.
+    expect(kpiCard("Vendas")).toHaveTextContent("4");
+    expect(within(kpiCard("Vendas")).getByText("R$ 3.980 vendidos")).toBeInTheDocument();
+  });
+
+  it("sem movimento, os números dizem que nada aconteceu e a nota de Entraram mostra a janela", () => {
+    const data = emptyEssential(NOW);
+    render(<DirectorLiteDashboard data={data} period="today" branchId={null} branches={[]} now={NOW} />);
+    expect(within(kpiCard("Entraram")).getByText(data.queues.label)).toBeInTheDocument();
+    expect(numbersRegion().getByText("Nenhum distribuído no período")).toBeInTheDocument();
+    expect(numbersRegion().getByText("Nenhuma venda no período")).toBeInTheDocument();
+    expect(screen.getByText("Hoje entraram 0 leads. Nada pedindo você agora.")).toBeInTheDocument();
+  });
+
+  it("em 7 dias, Entraram compara com a semana anterior", () => {
+    render(<DirectorLiteDashboard data={buildEssential("7d", "all", NOW)} period="7d" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(within(kpiCard("Entraram")).getByText(/sobre a semana anterior$/)).toBeInTheDocument();
   });
 
   it("as abas têm rótulo curto para o celular, escondido do leitor de tela (o nome acessível segue completo)", () => {
@@ -143,9 +168,10 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
 
   it("marca o período ativo e leva o filtro de unidade junto", () => {
     render(<DirectorLiteDashboard data={buildEssential("7d", "all", NOW)} period="7d" branchId="branch-centro" branches={BRANCHES} now={NOW} />);
-    const periods = within(screen.getByRole("navigation", { name: "Período" }));
+    const periods = within(screen.getByRole("group", { name: "Período" }));
     expect(periods.getByRole("link", { name: "7 dias" })).toHaveAttribute("aria-current", "true");
     expect(periods.getByRole("link", { name: "Hoje" })).toHaveAttribute("href", "/dashboard?periodo=hoje&unidade=branch-centro");
+    expect(screen.getByText(/^Nos últimos 7 dias entraram 180 leads\./)).toBeInTheDocument();
   });
 
   it("oferece só as unidades autorizadas num seletor e marca a escolhida", () => {
@@ -163,74 +189,96 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
 });
 
 describe("bloco 1: plantões acontecendo agora", () => {
-  it("mostra um card por plantão ativo, com disponíveis, distribuídos e corretores ativos", () => {
+  it("mostra um card por plantão ativo, com esperando, distribuídos e corretores confirmados", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const pme = screen.getByRole("link", { name: /Plantão PME/ });
+    const duties = section("plantoes");
+    expect(duties.getByRole("link", { name: "Ver escala" })).toHaveAttribute("href", "/leads/distribuicao?view=plantao");
+    const pme = duties.getByRole("link", { name: /Plantão PME/ });
     expect(pme).toHaveAttribute("href", "/leads/distribuicao/plantao/pme");
     const figure = (duty: HTMLElement, label: string) => within(duty).getByText(label).parentElement?.querySelector("strong")?.textContent;
-    expect(figure(pme, "disponíveis")).toBe("6");
+    expect(figure(pme, "esperando")).toBe("6");
     expect(figure(pme, "distribuídos")).toBe("9");
     // PME tem 2 corretores confirmados de 3 escalados: em alerta (e no "Precisa de você") por estar abaixo do mínimo.
     expect(figure(pme, "abaixo do mínimo")).toBe("2/3");
-    expect(within(pme).queryByText("corretores")).not.toBeInTheDocument();
+    expect(within(pme).queryByText("confirmados")).not.toBeInTheDocument();
     expect(within(pme).getByText("08:00 às 19:00")).toBeInTheDocument();
-    const presencial = screen.getByRole("link", { name: /Plantão Presencial/ });
+    const presencial = duties.getByRole("link", { name: /Plantão Presencial/ });
     expect(presencial).toHaveAttribute("href", "/leads/distribuicao/plantao/presencial");
-    expect(figure(presencial, "disponíveis")).toBe("0");
+    expect(figure(presencial, "esperando")).toBe("0");
     expect(figure(presencial, "distribuídos")).toBe("4");
-    expect(figure(presencial, "corretores")).toBe("3/3");
+    expect(figure(presencial, "confirmados")).toBe("3/3");
+    // No celular, o mesmo plantão numa linha só.
+    expect(section("m-plantoes").getByRole("link", { name: /Plantão PME/ })).toHaveTextContent("6 esperando · 9 distribuídos · 2/3 corretores, abaixo do mínimo");
   });
 
   it("sem plantão ativo, mostra o estado vazio com o próximo plantão", () => {
     const data = { ...emptyEssential(NOW), duties: { running: [], next: { scheduleId: "x", name: "Plantão Noturno", dutyDate: "2026-10-26", startsAt: "19:00", endsAt: "23:00", running: false, queueName: null, brokerCount: 0, minimumBrokers: 1 } } };
     render(<DirectorLiteDashboard data={data} period="today" branchId={null} branches={[]} now={NOW} />);
-    expect(screen.getByText(/Nenhum plantão ativo\. Próximo: Plantão Noturno, 26\/10 às 19:00\./)).toBeInTheDocument();
+    for (const id of ["plantoes", "m-plantoes"]) {
+      expect(section(id).getByText(/Nenhum plantão ativo\. Próximo: Plantão Noturno, 26\/10 às 19:00\./)).toBeInTheDocument();
+    }
   });
 });
 
 describe("bloco 2: leads por fila", () => {
-  it("mostra a janela do dia no cabeçalho (sábado vem da sexta 19h)", () => {
+  it("mostra a janela do dia na nota das temperaturas (sábado vem da sexta 19h)", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    expect(screen.getByText("desde sex 19h")).toBeInTheDocument();
+    expect(section("m-filas").getByText("Quentes, mornos e frios de quem entrou desde sex 19h")).toBeInTheDocument();
   });
 
-  it("tem uma linha por fila com entraram, qualificados e frios", () => {
+  it("tem uma linha por fila com entraram, qualificados, frios e na IA, a temperatura e o total", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const queues = within(screen.getByRole("heading", { name: /Leads por fila/ }).closest("section") as HTMLElement);
-    const cells = (name: string) => within(queues.getByRole("row", { name: new RegExp(name) })).getAllByRole("cell").slice(0, 3).map((cell) => cell.textContent);
-    expect(cells("Fila Tatiana")).toEqual(["26", "15", "7"]);
-    expect(cells("PF Renan")).toEqual(["10", "5", "5"]);
-    expect(screen.getByText("12 quentes · 8 mornos", { exact: false })).toBeInTheDocument();
+    const table = within(screen.getByRole("table", { name: "Leads por fila" }));
+    expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["Fila", "Entraram", "Qualificados", "Frios", "Na IA", "Temperatura"]);
+    const cells = (name: string) => within(table.getByRole("row", { name: new RegExp(`^${name}`) })).getAllByRole("cell").slice(1, 5).map((cell) => cell.textContent);
+    expect(cells("Fila Tatiana")).toEqual(["26", "15", "7", "4"]);
+    expect(cells("PF Renan")).toEqual(["10", "5", "5", "0"]);
+    expect(cells("Total")).toEqual(["36", "20", "12", "4"]);
+    expect(table.getByRole("link", { name: "Fila Tatiana" })).toHaveAttribute("href", "/leads?fila=tatiana");
+    expect(table.getByLabelText("9 quentes, 6 mornos, 7 frios")).toBeInTheDocument();
   });
 
-  it("conta as tentativas de requalificação e quantos frios tiveram 1, 2 ou 3+", () => {
-    render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    // Fila Tatiana: 7 tentativas; PF Renan: 1 (um frio com 0 tentativas conta como frio, mas não como tentativa). Total: 8.
-    expect(screen.getAllByText(/8 tentativas/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/6 frios: 3 com 1, 1 com 2, 1 com 3\+/)).toBeInTheDocument();
-  });
-
-  it("sem leads na janela, o estado vazio aparece no lugar da tabela", () => {
+  it("sem leads na janela, o estado vazio aparece no lugar das filas", () => {
     render(<DirectorLiteDashboard data={emptyEssential(NOW)} period="today" branchId={null} branches={[]} now={NOW} />);
-    expect(screen.getByText("Nenhum lead entrou desde sex 19h. Quando entrar, aparece aqui separado por fila.")).toBeInTheDocument();
-    expect(screen.getByText("Nenhum lead entrou desde sex 19h. Quando entrar, o funil aparece aqui.")).toBeInTheDocument();
-    expect(screen.queryByText(/entraram ·/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table", { name: "Leads por fila" })).getByText("Nenhum lead entrou no período.")).toBeInTheDocument();
+    expect(section("m-filas").getByText("Nenhum lead entrou no período.")).toBeInTheDocument();
+  });
+});
+
+describe("entradas por hora", () => {
+  it("mostra WhatsApp x formulário das 06h às 19h, com o pico e a hora de agora", () => {
+    render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    const hours = section("horas");
+    expect(hours.getByRole("img", { name: "Entradas por hora, das 06h às 19h; o pico foi às 15h" })).toBeInTheDocument();
+    for (const label of ["WhatsApp", "Formulário", "Agora"]) expect(hours.getByText(label)).toBeInTheDocument();
+    // 16h42 UTC são 13h em Brasília.
+    expect(hours.getByText("13h")).toHaveAttribute("data-now", "true");
+    expect(hours.getByText("06h")).not.toHaveAttribute("data-now");
+  });
+
+  it("fora de hoje não marca a hora de agora; sem entradas, não fala de pico", () => {
+    render(<DirectorLiteDashboard data={emptyEssential(NOW)} period="7d" branchId={null} branches={[]} now={NOW} />);
+    const hours = section("horas");
+    expect(hours.getByRole("img", { name: "Entradas por hora, das 06h às 19h" })).toBeInTheDocument();
+    expect(hours.queryByText("Agora")).not.toBeInTheDocument();
   });
 });
 
 describe("bloco 3: WhatsApp dos corretores", () => {
-  it("mostra quantos conectaram, recebidos, respondendo, taxa e atendimentos ativos", () => {
+  it("mostra quantos conectaram, recebidas, a taxa de resposta e quantas em atendimento", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const card = within(screen.getByRole("heading", { name: "WhatsApp dos corretores" }).closest("section") as HTMLElement);
+    const card = section("whats");
     expect(card.getByText("3 de 5 conectados")).toBeInTheDocument();
-    expect(card.getByText("recebidos")).toBeInTheDocument();
-    expect(card.getByText("respondendo · 37%")).toBeInTheDocument();
-    expect(card.getByText("atendimentos ativos")).toBeInTheDocument();
+    const figure = (label: string) => card.getByText(label).parentElement?.querySelector("strong")?.textContent;
+    expect(figure("recebidas")).toBe("35");
+    expect(figure("respondidas")).toBe("37%");
+    expect(figure("em atendimento")).toBe("8");
+    expect(section("m-whats").getByText("3 de 5 corretores com WhatsApp conectado")).toBeInTheDocument();
   });
 
   it("no cartão, só os conectados, ordenados por atendimentos ativos, com link para as conversas; sem botão quando cabem todos", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const links = within(screen.getByRole("list", { name: "Corretores com mais atendimentos ativos" })).getAllByRole("link");
+    const links = within(screen.getByRole("list", { name: "Corretores com mais atendimentos" })).getAllByRole("link");
     expect(links.map((link) => link.getAttribute("title"))).toEqual(["Ver conversas de Ana Souza", "Ver conversas de Carla Dias", "Ver conversas de Bruno Lima"]);
     expect(links[0]).toHaveAttribute("href", "/conversas?tab=leads&brokerId=ana");
     expect(screen.queryByText("Diego Reis")).not.toBeInTheDocument();
@@ -240,74 +288,63 @@ describe("bloco 3: WhatsApp dos corretores", () => {
   it("com mais de 4 conectados, o cartão mostra os 4 primeiros e o painel lateral lista todos na mesma ordem", () => {
     render(<DirectorLiteDashboard data={withBrokers(MANY_BROKERS)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     const order = ["Fábio Rocha", "Ana Souza", "Carla Dias", "Gabriela Nunes", "Bruno Lima", "Hugo Prado"].map((name) => `Ver conversas de ${name}`);
-    const card = within(screen.getByRole("list", { name: "Corretores com mais atendimentos ativos" }));
+    const card = within(screen.getByRole("list", { name: "Corretores com mais atendimentos" }));
     expect(card.getAllByRole("link").map((link) => link.getAttribute("title"))).toEqual(order.slice(0, 4));
-    expect(screen.queryByRole("list", { name: "Corretores conectados, com atendimentos ativos" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Ver todos os corretores \(6\)/ }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ver todos os corretores (6)" }));
     const panel = within(screen.getByRole("dialog", { name: "WhatsApp dos corretores" }));
-    expect(panel.getByText("6 de 7 corretores conectaram o WhatsApp pessoal", { exact: false })).toBeInTheDocument();
-    const list = within(panel.getByRole("list", { name: "Corretores conectados, com atendimentos ativos" }));
-    expect(list.getAllByRole("link").map((link) => link.getAttribute("title"))).toEqual(order);
+    expect(panel.getByText("6 de 7 conectados, por atendimentos ativos.")).toBeInTheDocument();
+    expect(panel.getAllByRole("link").map((link) => link.getAttribute("title"))).toEqual(order);
     expect(screen.queryByText("Diego Reis")).not.toBeInTheDocument();
   });
 
-  it("nenhum corretor conectado: estado vazio no lugar da lista", () => {
+  it("nenhum corretor com WhatsApp pessoal: estado vazio no lugar da lista, sem a contagem de conectados", () => {
     render(<DirectorLiteDashboard data={emptyEssential(NOW)} period="today" branchId={null} branches={[]} now={NOW} />);
-    expect(screen.getByText(/Nenhum corretor ativo para mostrar/)).toBeInTheDocument();
-    expect(screen.queryByText(/0 de 0/)).not.toBeInTheDocument();
+    const card = section("whats");
+    expect(card.getByText("Nenhum corretor com WhatsApp pessoal.")).toBeInTheDocument();
+    expect(card.queryByText(/0 de 0/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Corretores com mais atendimentos" })).not.toBeInTheDocument();
+  });
+
+  it("com corretores mas nenhum conectado, o estado vazio diz que ninguém está conectado agora", () => {
+    render(<DirectorLiteDashboard data={withBrokers([MANY_BROKERS[6]!])} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    const card = section("whats");
+    expect(card.getByText("Nenhum corretor conectado agora.")).toBeInTheDocument();
+    expect(card.getByText("0 de 1 conectados")).toBeInTheDocument();
   });
 });
 
 describe("movimento", () => {
-  it("move nada com movimento reduzido: sem y, x ou escala em repouso em nenhum bloco", () => {
-    motionState.reduce = true;
+  it("com movimento reduzido (do sistema ou do site), o CSS desliga toda animação do painel", () => {
+    const css = readFileSync(join(__dirname, "painel.module.css"), "utf8");
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.in, \.bar, \.segFill, \.working, \.popover \{ animation: none; \}/);
+    expect(css).toContain(':global(html[data-reduce-motion="1"]) .gx :is(.in, .bar, .segFill, .working, .popover) { animation: none; }');
+  });
+
+  it("os números entram em sequência, com atraso crescente, dentro do escopo das animações", () => {
     const { container } = render(<DirectorLiteDashboard data={buildEssential("30d", "all", NOW)} period="30d" branchId={null} branches={BRANCHES} now={NOW} />);
-    const animated = Array.from(container.querySelectorAll("[data-initial]"));
-    expect(animated.length).toBeGreaterThan(0);
-    for (const element of animated) {
-      expect(displacementOf(readMotion(element).initial)).toEqual([]);
-    }
+    expect(container.querySelector('[data-painel="lite"]')).toHaveClass(styles.gx);
+    const kpis = ["Entraram", "Qualificados", "Distribuídos", "Vendas"].map(kpiCard);
+    for (const kpi of kpis) expect(kpi).toHaveClass(styles.in);
+    expect(kpis.map((kpi) => kpi.style.animationDelay)).toEqual(["160ms", "200ms", "240ms", "280ms"]);
   });
 
-  it("entra com opacidade sem deslocar o layout", () => {
-    motionState.reduce = false;
+  it("os números aparecem prontos em texto, sem odômetro de dígitos", () => {
     const { container } = render(<DirectorLiteDashboard data={buildEssential("30d", "all", NOW)} period="30d" branchId={null} branches={BRANCHES} now={NOW} />);
-    const entering = Array.from(container.querySelectorAll("[data-initial]")).filter((element) => readMotion(element).initial?.opacity === 0);
-    expect(entering.length).toBeGreaterThan(0);
-    for (const element of entering) {
-      const motion = readMotion(element);
-      expect(displacementOf(motion.initial)).toEqual([]);
-      const nestedTransition = motion.animate?.transition as { duration?: number } | undefined;
-      expect(motion.transition?.duration ?? nestedTransition?.duration).toBeGreaterThan(0);
-    }
+    expect(container.querySelectorAll('span[style*="inline-flex"]')).toHaveLength(0);
+    // 30 dias: o total de entradas do exemplo é 576 (36 x 16).
+    expect(kpiCard("Entraram").querySelector("p")).toHaveTextContent(/^576$/);
   });
 
-  it("com a preferência de movimento do site, o odômetro dos números não roda", () => {
-    const digitsRolling = (container: HTMLElement) => container.querySelectorAll('span[style*="inline-flex"]').length;
-    const data = buildEssential("30d", "all", NOW);
-    motionState.reduce = false;
-    const { container, unmount } = render(<DirectorLiteDashboard data={data} period="30d" branchId={null} branches={BRANCHES} now={NOW} />);
-    expect(digitsRolling(container)).toBeGreaterThan(0);
-    unmount();
-
-    document.documentElement.dataset.reduceMotion = "1";
-    try {
-      const reduced = render(<DirectorLiteDashboard data={data} period="30d" branchId={null} branches={BRANCHES} now={NOW} />);
-      expect(digitsRolling(reduced.container)).toBe(0);
-      // 30 dias: o total de entradas do exemplo é 576 (36 x 16).
-      expect(reduced.container.textContent).toContain("576");
-    } finally {
-      delete document.documentElement.dataset.reduceMotion;
-    }
-  });
-
-  it("agrupa o milhar em pt-BR nas contagens por corretor e de requalificação", () => {
+  it("agrupa o milhar em pt-BR nas contagens por corretor e nos totais do WhatsApp", () => {
     const [first, ...rest] = MANY_BROKERS;
     const big = withBrokers([{ ...first!, received: 1234, responding: 1000, active: 2345 }, ...rest]);
     render(<DirectorLiteDashboard data={big} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    expect(within(screen.getByRole("list", { name: "Corretores com mais atendimentos ativos" })).getByText("2.345")).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Corretores com mais atendimentos" })).getByText("2.345")).toBeInTheDocument();
+    // 1.234 + 12 + 9 + 8 + 5 + 3 recebidas.
+    expect(section("whats").getByText("recebidas").parentElement?.querySelector("strong")).toHaveTextContent("1.271");
     fireEvent.click(screen.getByRole("button", { name: /Ver todos os corretores/ }));
-    expect(screen.getByText(/2\.345 ativos · 1\.000 de 1\.234 respondendo/)).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog", { name: "WhatsApp dos corretores" })).getByText("2.345")).toBeInTheDocument();
   });
 });
 

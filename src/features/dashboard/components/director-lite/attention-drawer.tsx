@@ -4,7 +4,8 @@
  * "Precisa de você" (27/11/2026, cópia 1:1 do artifact): pílula azul com a contagem que abre a gaveta (lateral no
  * computador, de baixo no celular). Os itens são os mesmos de `attentionItems`.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
@@ -17,6 +18,9 @@ const TONE_LABEL: Record<AttentionItem["tone"], string> = { danger: "Urgente", w
 export function AttentionDrawerButton({ items }: { items: AttentionItem[] }) {
   const [open, setOpen] = useState(false);
   const calm = items.length === 0;
+  // A gaveta abre na página, fora do cabeçalho (27/11/2026): dentro dele ficava presa no topo, cortada.
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => setPortalTarget(document.body), []);
   return (
     <>
       <button type="button" className={`${styles.pill} ${styles.pillPrimary}`} data-calm={calm ? "true" : undefined} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
@@ -24,6 +28,8 @@ export function AttentionDrawerButton({ items }: { items: AttentionItem[] }) {
         {calm ? "Tudo em dia" : "Precisa de você"}
         {calm ? null : <span className={`${styles.pillCount} ${styles.num}`}>{items.length}</span>}
       </button>
+      {portalTarget ? createPortal(
+        <div className="arc-venancor" data-skin="diretor">
       <LiteSidePanel open={open} onOpenChange={setOpen} title="Precisa de você agora" description={calm ? "Nada pedindo decisão agora." : "Do mais urgente ao que dá para acompanhar."}>
         <div className={styles.gx} style={{ background: "transparent", minHeight: 0 }}>
           {calm ? (
@@ -46,6 +52,9 @@ export function AttentionDrawerButton({ items }: { items: AttentionItem[] }) {
           )}
         </div>
       </LiteSidePanel>
+        </div>,
+        portalTarget,
+      ) : null}
     </>
   );
 }

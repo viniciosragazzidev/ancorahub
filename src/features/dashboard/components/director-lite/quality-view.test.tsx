@@ -126,12 +126,13 @@ describe("filtros do topo na aba Qualidade", () => {
         <p>conteúdo</p>
       </DirectorLiteChrome>,
     );
-    // O título "Painel" mora no topo da moldura; a saudação virou subtítulo de uma linha (contrato de espaçamento).
-    expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
-    // 20/11/2026: a saudação saiu (o topo já diz "Painel · período · unidade").
-    expect(screen.queryByText(/^Olá, Renata/)).not.toBeInTheDocument();
+    // 27/11/2026 (cópia 1:1 do artifact): sem a faixa "Painel" do topo; a saudação voltou (16h42 UTC são 13h42 em Brasília).
+    expect(screen.queryByRole("heading", { level: 1, name: "Painel" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Boa tarde, Renata" })).toBeInTheDocument();
+    // No celular, o topo resume o recorte escolhido.
+    expect(screen.getByText("Últimos 7 dias · Centro")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("aria-current", "page");
-    const periods = within(screen.getByRole("navigation", { name: "Período" }));
+    const periods = within(screen.getByRole("group", { name: "Período" }));
     expect(periods.getByRole("link", { name: "7 dias" })).toHaveAttribute("aria-current", "true");
     expect(periods.getByRole("link", { name: "30 dias" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=30&unidade=branch-centro");
     expect((screen.getByRole("combobox", { name: "Unidade" }) as HTMLSelectElement).value).toBe("branch-centro");

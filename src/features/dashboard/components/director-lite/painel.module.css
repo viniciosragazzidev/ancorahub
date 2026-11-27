@@ -254,3 +254,8 @@
   .viewLabelShort { display: none; }
   .calendar[data-desktop="hidden"] { display: none; }
 }
+
+/* Campos De e Até como no artifact: pílula com a data, o seletor nativo discreto à direita. */
+.rangeField input { padding: 0 10px 0 14px; min-width: 0; font-variant-numeric: tabular-nums; }
+.rangeField input::-webkit-calendar-picker-indicator { width: 14px; height: 14px; margin: 0; padding: 0; opacity: 0.55; cursor: pointer; }
+.rangeField input::-webkit-datetime-edit { padding: 0; }

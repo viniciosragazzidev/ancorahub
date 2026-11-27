@@ -103,7 +103,6 @@ function PeriodCalendar({ active, onApply, phoneExtras }: { active: CustomRange 
                 <label className={styles.rangeField}>De<input className={styles.num} type="date" name="from" required defaultValue={active?.from} /></label>
                 <label className={styles.rangeField}>Até<input className={styles.num} type="date" name="to" required defaultValue={active?.to} /></label>
               </div>
-              <p className={styles.rangeHint}>O dia vai das 19h do dia anterior às 19h.</p>
               <div className={styles.rangeActions}>
                 <button type="button" className={`${styles.pill} ${styles.pillQuiet}`} onClick={() => setOpen(false)}>Cancelar</button>
                 <button type="submit" className={`${styles.pill} ${styles.pillPrimary}`}>Aplicar</button>
