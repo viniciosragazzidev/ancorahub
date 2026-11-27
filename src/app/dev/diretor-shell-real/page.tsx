@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { DragScroll } from "@/components/lite/drag-scroll";
+import { LiteMobileBar } from "@/components/lite/mobile-bar";
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 import { buildEssential } from "@/app/dev/diretor-dashboard-preview/_components/essential-example";
 import type { UserDisplayInfo } from "@/shared/auth/actions";
@@ -314,6 +315,7 @@ export default async function DirectorShellRealPage({
       viewAs={{ canViewAs: isSuperAdminViewingDirector, viewingAs: null }}
     >
       <DragScroll />
+      <LiteMobileBar />
       {papelScreen ?? (showConversations ? (
         isBrokerConversationPreview ? (
           <LightConversationsView
