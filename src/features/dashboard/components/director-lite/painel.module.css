@@ -259,3 +259,6 @@
 .rangeField input { padding: 0 10px 0 14px; min-width: 0; font-variant-numeric: tabular-nums; }
 .rangeField input::-webkit-calendar-picker-indicator { width: 14px; height: 14px; margin: 0; padding: 0; opacity: 0.55; cursor: pointer; }
 .rangeField input::-webkit-datetime-edit { padding: 0; }
+/* Segmentado em pílula como no artifact (27/11/2026): regras antigas do Lite para [role="group"] deixavam o
+   contorno com canto de 6px em produção. */
+.segment, .segment .segbtn { border-radius: 9999px !important; }
