@@ -118,7 +118,7 @@
 .sectionHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .sectionText { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .h3 { margin: 0; font-size: 18px; font-weight: 500; }
-.queueGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 12px; }
+.queueGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); align-items: start; gap: 12px; }
 .qcard { border: 1px solid var(--border); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .qcardHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
 .qcardTitleBox { min-width: 0; flex: 1 1 180px; }
