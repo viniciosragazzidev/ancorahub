@@ -60,6 +60,7 @@ import { QueuesTable } from "./queues/queues-table";
 import { QueuesSection1a1 } from "./queues/queues-1a1";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import type { DutySchedule, Queue } from "./queues/types";
+import { QueueDelete1a1, QueueEditor1a1, Simulator1a1, type QueueFormState } from "./queues/queue-forms-1a1";
 
 const IGNORED_PANEL_ID = "__ignored_campaigns__";
 
@@ -81,7 +82,7 @@ type Simulation = {
   }>;
 };
 
-const emptyQueue = {
+const emptyQueue: QueueFormState = {
   branchId: "",
   exclusiveDutyScheduleId: "",
   exclusiveDutyScheduleIds: [] as string[],
@@ -103,7 +104,7 @@ const emptyQueue = {
   coldLeadRequalification: { enabled: false, intervalMinutes: "120", maxAttempts: "3" },
   attendanceFlowId: null as string | null,
   status: "active",
-  colorHue: null as number | null,
+  colorHue: null,
 };
 
 const QUEUE_DRAFT_STORAGE_KEY = "ancorahub:distribution:queue-draft:v1";
@@ -138,7 +139,7 @@ export function QueueControlCenter({
   const [editorOpen, setEditorOpen] = useState(false);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyQueue);
+  const [form, setForm] = useState<QueueFormState>(emptyQueue);
   const [saving, setSaving] = useState(false);
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [simulating, setSimulating] = useState(false);
@@ -606,6 +607,61 @@ export function QueueControlCenter({
         {activePanel?.content}
       </PanelSheet>
 
+      {/* Lite (27/11/2026): criar e editar fila, excluir e simular no molde das gavetas do Lite. */}
+      {lite ? (
+        <>
+          <QueueEditor1a1
+            open={editorOpen}
+            onOpenChange={setEditorOpen}
+            editingId={editingId}
+            form={form}
+            setForm={setForm}
+            branches={branches}
+            dutySchedules={dutySchedules}
+            queues={queues}
+            availableBrokers={availableBrokersForForm}
+            effectiveAllowedBranchIds={effectiveAllowedBranchIds}
+            otherColors={otherQueueColors(editingId)}
+            attendanceFlows={attendanceFlows}
+            saving={saving}
+            onSave={() => void saveQueue()}
+            onConfigureEntries={() => {
+              persistQueueDraft();
+              setEditorOpen(false);
+              window.setTimeout(() => document.getElementById("entradas-meta")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+            }}
+            onBranchChange={handleBranchChange}
+            onToggleBranch={toggleAllowedBranch}
+            onToggleBroker={toggleAllowedBroker}
+            onToggleDuty={toggleDutySchedule}
+            onFallbackPolicy={setDutyFallbackPolicy}
+            onToggleSource={toggleAllowedSource}
+          />
+          <QueueDelete1a1
+            open={deleteConfirmOpen}
+            onOpenChange={setDeleteConfirmOpen}
+            target={deleteTarget}
+            loading={loadingDependencies}
+            dependencies={deleteDependencies}
+            forceDeleting={forceDeleting}
+            onDelete={() => void confirmDeleteQueue()}
+            onForceDelete={() => void forceDeleteQueue()}
+          />
+          <Simulator1a1
+            open={simulatorOpen}
+            onOpenChange={setSimulatorOpen}
+            branches={branches}
+            branchQueues={branchQueues}
+            form={simulationForm}
+            setForm={setSimulationForm}
+            simulating={simulating}
+            simulation={simulation}
+            onRun={() => void runSimulation()}
+          />
+        </>
+      ) : null}
+
+      {!lite ? (<>
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogPopup className="sm:max-w-2xl max-h-[88vh] p-0 flex flex-col overflow-hidden">
           <DialogPanel className="flex flex-col h-full min-h-0">
@@ -1380,6 +1436,7 @@ export function QueueControlCenter({
           </DialogPanel>
         </DialogPopup>
       </Dialog>
+      </>) : null}
     </>
   );
 }

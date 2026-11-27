@@ -10,6 +10,8 @@ import { DistributionHealth1a1 } from "@/app/(dashboard)/leads/distribuicao/_com
 import { QueueControlCenter } from "@/app/(dashboard)/leads/distribuicao/_components/queue-control-center";
 import { DistributionHead1a1 } from "@/app/(dashboard)/leads/distribuicao/_components/resumo-1a1-shell";
 import { RoutingMatrixPanel } from "@/app/(dashboard)/leads/distribuicao/_components/routing-matrix-panel";
+import { ColdLeadRequalificationPanel } from "@/app/(dashboard)/leads/distribuicao/_components/cold-lead-requalification-panel";
+import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
 import resumo from "@/app/(dashboard)/leads/distribuicao/_components/resumo-1a1.module.css";
 import plantoes from "@/app/(dashboard)/leads/distribuicao/plantao/_components/plantoes-1a1.module.css";
 import type { Queue } from "@/app/(dashboard)/leads/distribuicao/_components/queues/types";
@@ -42,6 +44,30 @@ const queues: Queue[] = [
   exclusiveDutyScheduleIds: id === "q-pf" ? ["d-1"] : [], allowedSourceIds: [], allowedBrokerIds: [],
 }));
 
+const manyBrokers = Array.from({ length: 40 }, (_, index) => ({ id: `bx-${index}`, name: ["Vitória Augusto", "Sara Soares", "Raiana Nunes", "Juliana Portela", "Edinaldo Luiz", "Marcos Teixeira", "Bruno Cardoso", "Ana Paula Reis"][index % 8] + ` ${1000 + index}` }));
+
+const coldNames = ["Paloma Lima", "Mônica Krapp Barros", "Adalberto Silva", "Eliane Ferreira Froes Brum", "Sueli Santos de Araujo", "Dyrce Rosario", "Andreia Marta Francisco Justino", "Vanilda Aguiar", "Roberta Simei Vitalino", "Antônio Carlos de Jesus Almeida", "Leila", "Antonio Fernandes", "Ana Maria Monteiro de Barros", "José Marcos"];
+const coldLead = (name: string, index: number) => ({ id: `c-${index}`, nome: name, createdAt: new Date(day.getTime() - index * 23 * 60_000) });
+const coldReview = {
+  queues: [{ id: "q-pf", name: "Fila PF - Renan" }, { id: "q-ade", name: "Aquisição Corretores" }],
+  leadsByQueue: {
+    "q-pf": { noResponse: coldNames.map(coldLead), respondedStillCold: coldNames.slice(0, 8).map((name, index) => coldLead(name, index + 20)) },
+    "q-ade": { noResponse: [], respondedStillCold: [] },
+  },
+  since: new Date("2026-11-26T22:00:00Z"),
+};
+
+const metaCampaigns = [
+  { campaignId: "cmp-1", name: "PME Rio | Leads formulário | Novembro", status: "ACTIVE" },
+  { campaignId: "cmp-2", name: "Adesão | WhatsApp | Lookalike 3%", status: "ACTIVE" },
+  { campaignId: "cmp-3", name: "Individual Niterói | Remarketing", status: "PAUSED" },
+];
+const metaRoutes = [
+  { campaignId: "cmp-1", queueId: "q-pf", queueName: "Fila PF", enabled: true },
+  { campaignId: "cmp-2", queueId: null, queueName: null, enabled: true },
+  { campaignId: "cmp-3", queueId: "q-pme", queueName: "Fila PME", enabled: false },
+];
+
 const events = Array.from({ length: 27 }, (_, index) => ({
   id: `e-${index}`, leadName: ["Ana Ribeiro", "Paula Rezende", "Marcos Teixeira", "Rita de Cássia França"][index % 4],
   brokerName: index % 5 === 2 ? null : brokers[index % 3].name, queueName: index % 4 === 3 ? null : queueList[index % 3].name,
@@ -70,7 +96,10 @@ export function AbasShellScreen({ tab }: { tab: "entradas" | "filas" | "saude" }
       stats={[
         { key: "queues", label: "Filas ativas", value: 4, hint: "57 leads esperando" },
         { key: "sla", label: "Prazo de aceite", value: "15 min", hint: "depois disso, passa para o próximo", panel: <BrokerAcceptanceSlaPanel initialMinutes={15} initialAutoRedistribute canEdit /> },
-        { key: "ranking", label: "Distribuição inteligente", text: true, value: "Ordem da fila", hint: "sem ranking depois do plantão", tone: "neutral" },
+        { key: "ranking", label: "Distribuição inteligente", text: true, value: "Ordem da fila", hint: "sem ranking depois do plantão", tone: "neutral",
+          panel: <DistributionPolicyPanel canEdit brokers={manyBrokers} policy={{ excludedBrokerIds: ["bx-3", "bx-9"], ranking: { enabled: false, conversionWeight: 45, slaWeight: 35, manualPriorityWeight: 20 } }}
+            plantaoPriority={{ flagOn: false, mode: "shadow", levelByHours: true, types: [{ typeId: "t-1", name: "Adesão", base: 1.15, adaptive: true, effectiveWeight: 1.15, reason: "peso_base" }, { typeId: "t-2", name: "PME", base: 1, adaptive: false, effectiveWeight: 1, reason: "sem_peso" }] }} /> },
+        { key: "cold", label: "Leads frios", text: true, value: "Requalificar", hint: "revisar os frios recebidos hoje", tone: "neutral", panel: <ColdLeadRequalificationPanel {...coldReview} /> },
       ]}
     >
       <QueueControlCenter
@@ -78,9 +107,9 @@ export function AbasShellScreen({ tab }: { tab: "entradas" | "filas" | "saude" }
         branches={branches}
         brokers={brokers.map((broker) => ({ ...broker, branchId: "b-20", branchName: "Matriz 20º Andar" }))}
         dutySchedules={[{ id: "d-1", name: "Adesão Online", startsAt: "09:00", endsAt: "18:00", dayOfWeek: 5 }]}
-        campaigns={[]}
+        campaigns={metaCampaigns}
         ads={[]}
-        campaignRoutes={[]}
+        campaignRoutes={metaRoutes}
         adRoutes={[]}
         canEdit
       />

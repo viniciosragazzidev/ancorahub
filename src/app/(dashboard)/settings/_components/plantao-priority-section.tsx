@@ -1,13 +1,13 @@
 "use client";
 
+/**
+ * Prioridade por tipo de plantão (2026-11-10): peso leve (1,0 a 1,3) para leads quentes e mornos. Comece no modo
+ * sombra; ligue só depois de ver o relatório. No visual Lite (27/11/2026), dentro da gaveta de distribuição
+ * inteligente: o salvar daqui é secundário (o primário da gaveta é "Salvar distribuição").
+ */
 import { useState } from "react";
+
 import { toast } from "@/components/ui/sonner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { AppSelect } from "@/components/ui/select";
 import { savePlantaoPrioritySettingsAction } from "@/features/lead-distribution/plantao-priority-actions";
 import {
   PLANTAO_WEIGHT_MAX,
@@ -16,6 +16,9 @@ import {
   type PlantaoPriorityMode,
   type PlantaoWeightReason,
 } from "@/features/lead-distribution/plantao-priority-core";
+import { cn } from "@/lib/utils";
+import { PlField, PlSection, PlSegmented, pl } from "@/app/(dashboard)/leads/distribuicao/plantao/_components/plantoes-1a1-kit";
+import { Note1a1, ToggleRow1a1, pn } from "@/app/(dashboard)/leads/distribuicao/_components/panels-1a1";
 
 /** Dados já calculados no servidor (só chegam aqui para o Diretor). */
 export type PlantaoPrioritySectionData = {
@@ -32,20 +35,16 @@ export type PlantaoPrioritySectionData = {
   }>;
 };
 
-const MODE_OPTIONS: Array<{ value: PlantaoPriorityMode; label: string }> = [
-  { value: "off", label: "Desligado (distribuição de hoje)" },
-  { value: "shadow", label: "Sombra (só registra o que mudaria)" },
-  { value: "on", label: "Ligado (usa o peso)" },
+const MODE_OPTIONS: Array<{ value: PlantaoPriorityMode; label: string; sub: string }> = [
+  { value: "off", label: "Desligado", sub: "distribuição de hoje" },
+  { value: "shadow", label: "Sombra", sub: "só registra" },
+  { value: "on", label: "Ligado", sub: "usa o peso" },
 ];
 
 function formatWeight(value: number) {
   return value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/**
- * Prioridade por tipo de plantão (2026-11-10): peso leve (1,0 a 1,3) para leads
- * quentes e mornos. Comece no modo sombra; ligue só depois de ver o relatório.
- */
 export function PlantaoPrioritySection({ data }: { data: PlantaoPrioritySectionData }) {
   const [mode, setMode] = useState<PlantaoPriorityMode>(data.mode);
   const [levelByHours, setLevelByHours] = useState(data.levelByHours);
@@ -78,72 +77,52 @@ export function PlantaoPrioritySection({ data }: { data: PlantaoPrioritySectionD
   }
 
   return (
-    <section aria-labelledby="plantao-priority-title" className="grid gap-3 border-t border-border/50 pt-4">
-      <div className="grid gap-1">
-        <h3 id="plantao-priority-title" className="text-sm font-semibold">Prioridade por tipo de plantão</h3>
-        <p className="max-w-3xl text-xs leading-5 text-muted-foreground">
-          Um plantão com peso 1,15 recebe cerca de 15% a mais de leads quentes e mornos que os demais,
-          sem deixar ninguém sem lead. Frios não mudam. Se o tipo passar do teto de fatia do dia, estiver
-          sem corretor ou expirando mais de 12% em 2 horas, o peso volta a 1 sozinho.
-        </p>
-        {!data.flagOn ? (
-          <p className="text-xs text-muted-foreground" role="status">
-            A função está desligada pelo Super-admin. Você pode deixar a configuração pronta; ela só vale quando for liberada.
-          </p>
-        ) : null}
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="plantao-priority-mode">Modo</FieldLabel>
-          <AppSelect
-            id="plantao-priority-mode"
-            aria-label="Modo da prioridade por tipo de plantão"
-            value={mode}
-            onValueChange={(value) => setMode(value as PlantaoPriorityMode)}
-            options={MODE_OPTIONS}
-            disabled={saving}
-          />
-          <FieldDescription>Comece pela sombra por 1 a 2 semanas e compare no relatório antes de ligar.</FieldDescription>
-        </Field>
-        <label className="flex items-center gap-2 self-center text-sm">
-          <Checkbox checked={levelByHours} disabled={saving} onCheckedChange={(checked) => setLevelByHours(checked === true)} />
-          Nivelar por horas de plantão cumpridas (evita a rajada quando a tarde abre)
-        </label>
-      </div>
+    <PlSection
+      id="plantao-priority-title"
+      title="Prioridade por tipo de plantão"
+      hint="Um plantão com peso 1,15 recebe cerca de 15% a mais de leads quentes e mornos que os demais, sem deixar ninguém sem lead. Frios não mudam. Se o tipo passar do teto de fatia do dia, estiver sem corretor ou expirando mais de 12% em 2 horas, o peso volta a 1 sozinho."
+    >
+      {!data.flagOn ? <Note1a1>A função está desligada pelo Super-admin. Você pode deixar a configuração pronta; ela só vale quando for liberada.</Note1a1> : null}
+      <PlField as="p" label="Modo" hint="Comece pela sombra por 1 a 2 semanas e compare no relatório antes de ligar.">
+        <PlSegmented label="Modo da prioridade por tipo de plantão" value={mode} onChange={setMode} options={MODE_OPTIONS} disabled={saving} />
+      </PlField>
+      <ToggleRow1a1
+        title="Nivelar por horas de plantão cumpridas"
+        hint="Evita a rajada quando a tarde abre."
+        checked={levelByHours}
+        onChange={setLevelByHours}
+        disabled={saving}
+        ariaLabel="Nivelar por horas de plantão cumpridas"
+      />
       {data.types.length ? (
-        <div className="grid gap-2">
+        <ul className={pn.list}>
           {data.types.map((type) => {
             const invalid = invalidTypeIds.includes(type.typeId);
             return (
-              <div key={type.typeId} className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_minmax(0,1.4fr)]">
-                <label className="text-sm font-medium" htmlFor={`plantao-weight-${type.typeId}`}>{type.name}</label>
-                <Input
+              <li key={type.typeId} className={pn.row}>
+                <span className={pn.rowBody}>
+                  <label className={pn.rowTitle} htmlFor={`plantao-weight-${type.typeId}`}>{type.name}</label>
+                  <span className={pn.rowMeta}>Hoje {formatWeight(type.effectiveWeight)} · {PLANTAO_WEIGHT_REASON_LABEL[type.reason]}</span>
+                </span>
+                <input
                   id={`plantao-weight-${type.typeId}`}
+                  className={pl.input}
+                  style={{ width: 96, flex: "none", borderColor: invalid ? "var(--danger)" : undefined }}
                   aria-invalid={invalid || undefined}
                   disabled={saving}
                   inputMode="decimal"
                   value={weights[type.typeId] ?? ""}
                   onChange={(event) => setWeights({ ...weights, [type.typeId]: event.target.value })}
                 />
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant={type.effectiveWeight > 1 ? "info" : "secondary"}>
-                    Hoje: {formatWeight(type.effectiveWeight)}
-                  </Badge>
-                  <span>{PLANTAO_WEIGHT_REASON_LABEL[type.reason]}</span>
-                </div>
-              </div>
+              </li>
             );
           })}
-          {invalidTypeIds.length ? (
-            <p className="text-xs text-destructive" role="alert">O peso de cada tipo vai de 1,00 a 1,30.</p>
-          ) : null}
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">Nenhum tipo de plantão ativo. Crie os tipos na aba Plantão.</p>
-      )}
-      <Button className="w-fit" disabled={saving || Boolean(invalidTypeIds.length)} onClick={save} variant="outline">
+        </ul>
+      ) : <p className={pl.emptyBox}>Nenhum tipo de plantão ativo. Crie os tipos na aba Plantões.</p>}
+      {invalidTypeIds.length ? <p className={cn(pl.small)} style={{ color: "var(--danger)" }} role="alert">O peso de cada tipo vai de 1,00 a 1,30.</p> : null}
+      <button type="button" className={cn(pl.pill, pl.pillQuiet)} style={{ alignSelf: "flex-start" }} disabled={saving || Boolean(invalidTypeIds.length)} onClick={() => void save()}>
         {saving ? "Salvando…" : "Salvar prioridade"}
-      </Button>
-    </section>
+      </button>
+    </PlSection>
   );
 }

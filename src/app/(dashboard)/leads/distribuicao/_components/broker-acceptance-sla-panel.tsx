@@ -1,18 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { toast } from "@/components/ui/sonner";
-import { Clock, ShieldCheck, ArrowsClockwise, Warning, Check } from "@phosphor-icons/react";
+/**
+ * Prazo de aceite no Lite (27/11/2026): o interruptor de redistribuir, os minutos em pílulas (ou um número livre) e o
+ * salvar no rodapé. Mesmo envio de antes.
+ */
+import { useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
-import { SectionCardHeader } from "@/components/ui/section-card-header";
+import { LiteActionButton } from "@/components/lite/controls";
 import { saveBrokerAcceptanceSlaAction } from "@/features/lead-distribution/sla-actions";
+import { PlField, pl } from "../plantao/_components/plantoes-1a1-kit";
+import { Chips1a1, Foot1a1, Note1a1, Panel1a1, ToggleRow1a1, pn } from "./panels-1a1";
 
 interface BrokerAcceptanceSlaPanelProps {
   initialMinutes: number;
@@ -29,129 +26,49 @@ export function BrokerAcceptanceSlaPanel({
 }: BrokerAcceptanceSlaPanelProps) {
   const [minutes, setMinutes] = useState<number>(initialMinutes || 15);
   const [autoRedistribute, setAutoRedistribute] = useState<boolean>(initialAutoRedistribute);
-  const [isPending, startTransition] = useTransition();
 
-  const handlePreset = (val: number) => {
-    if (!canEdit) return;
-    setMinutes(val);
-  };
-
-  const handleSave = () => {
-    if (!canEdit) return;
-    startTransition(async () => {
-      const res = await saveBrokerAcceptanceSlaAction({
-        slaFirstContactMinutes: minutes,
-        autoRedistribute,
-      });
-
-      if (res.success) {
-        toast.success("Parâmetros de SLA de aceite salvos com sucesso!");
-      } else {
-        toast.error(res.error || "Não foi possível salvar os parâmetros.");
-      }
-    });
-  };
+  async function save() {
+    const res = await saveBrokerAcceptanceSlaAction({ slaFirstContactMinutes: minutes, autoRedistribute });
+    return res.success ? { ok: true as const } : { ok: false as const, error: res.error || "Não foi possível salvar o prazo." };
+  }
 
   return (
-    <Card variant="overview">
-      <SectionCardHeader
-        icon={<Clock />}
-        title="SLA de aceite e início de atendimento"
-        description="Controle quanto tempo o corretor pode demorar para aceitar o lead e iniciar o primeiro contato antes de perder a oportunidade."
-        actions={
-          <Badge variant={autoRedistribute ? "success" : "secondary"}>
-            {autoRedistribute ? "Redistribuição ativa" : "Apenas alertas"}
-          </Badge>
-        }
+    <Panel1a1 lead="Quanto tempo o corretor pode demorar para aceitar o lead e iniciar o primeiro contato antes de perder a oportunidade.">
+      <ToggleRow1a1
+        title="Tirar o lead e passar para o próximo corretor"
+        hint="Se o corretor não iniciar o atendimento dentro do prazo, o lead é redistribuído automaticamente para o próximo corretor da escala ou do plantão."
+        checked={autoRedistribute}
+        onChange={setAutoRedistribute}
+        disabled={!canEdit}
+        ariaLabel="Redistribuir automaticamente quando o prazo acabar"
+        status={{ on: "Redistribuição ativa", off: "Apenas alertas" }}
       />
 
-      <CardContent className="space-y-5 p-4">
-        {/* Toggle de Redistribuição Automática */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 bg-muted/30 p-3.5">
-          <div className="space-y-0.5">
-            <label htmlFor="auto-redistribute-toggle" className="text-xs font-semibold text-foreground cursor-pointer">
-              Tirar lead e passar para o próximo corretor
-            </label>
-            <p className="text-[11px] text-muted-foreground">
-              Se o corretor não iniciar o atendimento dentro do prazo, o lead é redistribuído automaticamente para o próximo corretor da escala/plantão.
-            </p>
-          </div>
-          <Switch
-            id="auto-redistribute-toggle"
-            checked={autoRedistribute}
-            onCheckedChange={setAutoRedistribute}
-            disabled={!canEdit || isPending}
-          />
-        </div>
+      <PlField as="p" label="Tempo para aceitar e iniciar o contato">
+        <Chips1a1
+          label="Minutos para aceitar"
+          value={PRESET_MINUTES.includes(minutes as (typeof PRESET_MINUTES)[number]) ? minutes : -1}
+          options={PRESET_MINUTES.map((preset) => ({ value: preset, label: `${preset} min` }))}
+          onChange={(value) => setMinutes(value)}
+          disabled={!canEdit}
+        />
+        <span className={pn.inline}>
+          <input className={pl.input} type="number" min={1} max={1440} aria-label="Minutos para aceitar" value={minutes} disabled={!canEdit} onChange={(event) => setMinutes(Math.max(1, Number(event.target.value) || 1))} />
+          <span className={pl.small}>minutos</span>
+        </span>
+      </PlField>
 
-        {/* Seleção do Tempo Limite em Minutos */}
-        <div className="space-y-2.5">
-          <FieldLabel className="text-xs font-semibold text-foreground">
-            Tempo limite para o corretor aceitar/iniciar o contato:
-          </FieldLabel>
+      <Note1a1>
+        A cada minuto o sistema confere os leads distribuídos. Passados {minutes} {minutes === 1 ? "minuto" : "minutos"} sem que o corretor registre o primeiro contato ou abra o atendimento, o lead é transferido, com registro na auditoria.
+      </Note1a1>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {PRESET_MINUTES.map((preset) => {
-              const isSelected = minutes === preset;
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  disabled={!canEdit || isPending}
-                  onClick={() => handlePreset(preset)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-150 active:scale-95 disabled:opacity-50",
-                    isSelected
-                      ? "border-primary bg-primary text-primary-foreground shadow-none font-semibold"
-                      : "border-border bg-card text-foreground hover:bg-muted",
-                  )}
-                >
-                  {isSelected && <Check className="size-3.5 stroke-[2.5]" />}
-                  <span>{preset} min</span>
-                </button>
-              );
-            })}
-
-            <div className="flex items-center gap-1.5 ml-auto min-w-[140px]">
-              <Input
-                type="number"
-                min={1}
-                max={1440}
-                value={minutes}
-                onChange={(e) => setMinutes(Math.max(1, Number(e.target.value) || 1))}
-                disabled={!canEdit || isPending}
-                className="h-10 w-20 text-xs text-center"
-              />
-              <span className="text-xs text-muted-foreground">minutos</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Alerta explicativo do Worker */}
-        <div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-primary/20 bg-primary/[0.03] p-3 text-xs text-foreground">
-          <ShieldCheck className="size-4 text-primary shrink-0 mt-0.5" />
-          <p className="leading-relaxed">
-            O <strong>worker periódico de SLA</strong> verifica a cada minuto os leads com status <code>distribuído</code>. Caso o tempo ultrapasse <strong>{minutes} minutos</strong> sem que o corretor registre o primeiro contato ou abra o atendimento, o lead é transferido de forma transparente e auditável.
-          </p>
-        </div>
-
-        {/* Botão Salvar */}
-        {canEdit && (
-          <div className="flex justify-end pt-1">
-            {/* Secundário (14/11/2026): na aba Filas o único primário é "Nova fila". */}
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isPending}
-              onClick={handleSave}
-              className="gap-2 font-semibold"
-            >
-              {isPending && <ArrowsClockwise className="size-4 animate-spin" />}
-              <span>{isPending ? "Salvando..." : "Salvar prazo"}</span>
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {canEdit ? (
+        <Foot1a1 note="Vale para os próximos leads distribuídos.">
+          <LiteActionButton busyLabel="Salvando…" doneLabel="Prazo salvo" keeps="O prazo anterior continua valendo." onAction={save}>
+            Salvar prazo
+          </LiteActionButton>
+        </Foot1a1>
+      ) : null}
+    </Panel1a1>
   );
 }

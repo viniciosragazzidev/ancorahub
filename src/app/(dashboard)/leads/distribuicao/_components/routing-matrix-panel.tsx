@@ -45,6 +45,10 @@ import {
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { RoutingRules1a1 } from "./routing-rules-1a1";
+import { LiteSelect } from "@/components/lite/controls";
+import { cn } from "@/lib/utils";
+import { PlField, PlSection, PlSegmented, PlSheet, pl } from "../plantao/_components/plantoes-1a1-kit";
+import { Note1a1, ToggleRow1a1, pn } from "./panels-1a1";
 import type { RoutingRule } from "@/features/lead-distribution/routing-engine";
 import { ALL_BRANCHES_TARGET_ID, ALL_ROUTING_SOURCES_ID, getRoutingQualificationStatusLabel, getRoutingSourceLabel, ROUTING_QUALIFICATION_STATUS_OPTIONS, ROUTING_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
 
@@ -582,7 +586,111 @@ export function RoutingMatrixPanel({
     </>
   );
 
-  // Lite (27/11/2026): a tabela de regras no padrão /equipe; o formulário de criar e editar é o mesmo.
+  // Lite (27/11/2026): criar e editar regra numa gaveta de 560px por seções, com os mesmos campos e envio.
+  const targetOptions = targetType === "queue"
+    ? queues.map((q) => ({ value: q.id, label: q.name }))
+    : targetType === "branch"
+      ? branches.map((b) => ({ value: b.id, label: b.name }))
+      : targetType === "all_branches"
+        ? [{ value: ALL_BRANCHES_TARGET_ID, label: "Todas as unidades ativas" }]
+        : brokers.map((br) => ({ value: br.id, label: br.name }));
+  const chip = (selected: boolean, label: string, onClick: () => void, key: string) => (
+    <button key={key} type="button" role="checkbox" aria-checked={selected} className={pn.chip} onClick={onClick}>{label}</button>
+  );
+  const toggleSource = (sourceId: string) => {
+    const isSelected = selectedSources.includes(sourceId);
+    if (sourceId === ALL_ROUTING_SOURCES_ID) {
+      setSelectedSources(isSelected ? [] : [ALL_ROUTING_SOURCES_ID]);
+      return;
+    }
+    setSelectedSources((current) => [
+      ...current.filter((id) => id !== ALL_ROUTING_SOURCES_ID),
+      ...(current.includes(sourceId) ? [] : [sourceId]),
+    ]);
+  };
+  const liteDialog = (
+    <PlSheet
+      open={isModalOpen}
+      onOpenChange={setIsModalOpen}
+      width={560}
+      title={editingRule ? "Editar regra" : "Nova regra"}
+      description="Escolha o destino e os filtros dos leads que entram nesta regra."
+      footer={(
+        <>
+          <button type="button" className={cn(pl.pill, pl.pillGhost)} disabled={isSaving} onClick={() => setIsModalOpen(false)}>Cancelar</button>
+          <button type="button" className={cn(pl.pill, pl.pillPrimary, pl.pillWide)} disabled={isSaving} onClick={() => void handleSaveRule()}>{isSaving ? "Salvando…" : editingRule ? "Salvar regra" : "Criar regra"}</button>
+        </>
+      )}
+    >
+      <Note1a1>
+        O destino só recebe leads que passarem por todos os filtros. Sem origem, plano, cidade ou status escolhido, o filtro vale para qualquer valor. Campanhas Meta são uma regra de entrada separada, na aba Filas: quando configurada, ela define quais leads entram na fila antes destas regras. O status Desqualificado só é enviado a este destino quando marcado.
+      </Note1a1>
+      <PlSection title="Regra">
+        <PlField label="Nome da regra" htmlFor="rule-name">
+          <input id="rule-name" className={pl.input} placeholder="Ex.: Leads PME 5+ vidas para a equipe corporativa" value={name} onChange={(e) => setName(e.target.value)} />
+        </PlField>
+      </PlSection>
+      <PlSection title="Destino">
+        <PlField as="p" label="Tipo de destino">
+          <PlSegmented
+            label="Tipo de destino"
+            value={targetType === "broker_group" ? "queue" : targetType}
+            onChange={(val) => {
+              setTargetType(val);
+              if (val === "queue" && queues[0]) setTargetId(queues[0].id);
+              if (val === "branch" && branches[0]) setTargetId(branches[0].id);
+              if (val === "all_branches") setTargetId(ALL_BRANCHES_TARGET_ID);
+              if (val === "specific_broker" && brokers[0]) setTargetId(brokers[0].id);
+            }}
+            options={[
+              { value: "queue", label: "Fila" },
+              { value: "branch", label: "Unidade" },
+              { value: "all_branches", label: "Todas" },
+              { value: "specific_broker", label: "Corretor" },
+            ]}
+          />
+        </PlField>
+        {targetType !== "all_branches" ? (
+          <LiteSelect label="Destino" value={targetId} onChange={setTargetId} options={targetOptions} placeholder="Selecione o destino" searchPlaceholder="Buscar" />
+        ) : <p className={pl.small}>Todas as unidades ativas.</p>}
+        <div className={pl.field}>
+          <LiteSelect label="Fila de segurança (opcional)" value={fallbackQueueId} onChange={setFallbackQueueId} searchPlaceholder="Buscar fila"
+            options={[{ value: "", label: "Fila geral da empresa (padrão)" }, ...queues.map((q) => ({ value: q.id, label: q.name }))]} />
+          <p className={pl.small}>Se os corretores do destino estiverem lotados ou ausentes, o lead vai para esta fila.</p>
+        </div>
+        <ToggleRow1a1
+          title="Distribuição automática"
+          hint="Desligada, o lead vai ao destino sem ser oferecido a corretores e fica sem responsável, aguardando uma ação manual."
+          checked={distributionMode === "automatic"}
+          onChange={(checked) => setDistributionMode(checked ? "automatic" : "manual")}
+          ariaLabel="Ativar distribuição automática"
+        />
+      </PlSection>
+      <PlSection title="Filtros de entrada" hint="Deixe em branco para qualquer lead.">
+        <PlField as="p" label="Tipos de plano">
+          <div className={pn.chips}>{availablePlanTypes.map((pt) => chip(selectedPlans.includes(pt.id), pt.label, () => toggleArrayItem(selectedPlans, pt.id, setSelectedPlans), pt.id))}</div>
+        </PlField>
+        <PlField as="p" label="Origem ou canal de entrada" hint="Escolha um ou mais canais. Vazio vale para qualquer origem; uma campanha específica é configurada na aba Filas.">
+          <div className={pn.chips}>{ROUTING_SOURCE_OPTIONS.map((sc) => chip(selectedSources.includes(sc.id), sc.label, () => toggleSource(sc.id), sc.id))}</div>
+        </PlField>
+        <PlField label="Cidades" htmlFor="cities-input" hint="Separadas por vírgula.">
+          <input id="cities-input" className={pl.input} placeholder="Ex.: São Paulo, Campinas, Guarulhos" value={citiesText} onChange={(e) => setCitiesText(e.target.value)} />
+        </PlField>
+        <div className={pn.grid2}>
+          <PlField label="Mínimo de vidas" htmlFor="min-lives">
+            <input id="min-lives" className={pl.input} type="number" placeholder="Ex.: 5" value={minLives} onChange={(e) => setMinLives(e.target.value)} />
+          </PlField>
+          <PlField label="Máximo de vidas" htmlFor="max-lives">
+            <input id="max-lives" className={pl.input} type="number" placeholder="Ex.: 50" value={maxLives} onChange={(e) => setMaxLives(e.target.value)} />
+          </PlField>
+        </div>
+        <PlField as="p" label="Status de qualificação" hint="Desqualificado só é roteado quando marcado nesta regra.">
+          <div className={pn.chips}>{ROUTING_QUALIFICATION_STATUS_OPTIONS.map((st) => chip(selectedIAStatuses.includes(st.id), st.label, () => toggleArrayItem(selectedIAStatuses, st.id, setSelectedIAStatuses), st.id))}</div>
+        </PlField>
+      </PlSection>
+    </PlSheet>
+  );
+
   if (lite) {
     const conditionTags = (rule: RoutingRule) => {
       const cond = rule.conditions;
@@ -606,7 +714,7 @@ export function RoutingMatrixPanel({
         onToggle={toggleRuleEnabled}
         onDelete={deleteRuleNow}
         onMove={handleMoveRule}
-        dialog={dialog}
+        dialog={liteDialog}
       />
     );
   }

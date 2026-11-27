@@ -1,14 +1,11 @@
 "use client";
 
+/** Leads desqualificados no Lite (27/11/2026): um interruptor que salva na hora, como antes, com o estado ao lado. */
 import { useState, useTransition } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { ShieldX } from "@/components/huge-icons";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
-import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { saveDisqualifiedRoutingSettingAction } from "@/features/lead-distribution/disqualified-routing-actions";
+import { Note1a1, Panel1a1, ToggleRow1a1 } from "./panels-1a1";
 
 export function DisqualifiedLeadsRoutingPanel({
   initialHoldDisqualifiedLeads,
@@ -24,67 +21,34 @@ export function DisqualifiedLeadsRoutingPanel({
     const previousValue = enabled;
     setEnabled(nextValue);
     startTransition(async () => {
-      const result = await saveDisqualifiedRoutingSettingAction({
-        holdDisqualifiedLeads: nextValue,
-      });
+      const result = await saveDisqualifiedRoutingSettingAction({ holdDisqualifiedLeads: nextValue });
       if (!result.success) {
         setEnabled(previousValue);
         toast.error(result.error);
         return;
       }
-      toast.success(
-        nextValue
-          ? "Leads desqualificados ficarão em espera."
-          : "Leads desqualificados podem voltar ao fluxo automático.",
-      );
+      toast.success(nextValue ? "Leads desqualificados ficarão em espera." : "Leads desqualificados podem voltar ao fluxo automático.");
     });
   }
 
   return (
-    <Card variant="overview">
-      <SectionCardHeader
-        icon={<ShieldX />}
-        title="Leads desqualificados"
-        description="Controle global para manter leads desqualificados em espera, sem enviá-los a um corretor automaticamente."
-        actions={
-          <Badge variant={enabled ? "warning" : "secondary"}>
-            {enabled ? "Em espera" : "Distribuição normal"}
-          </Badge>
-        }
+    <Panel1a1 lead="Controle global para manter leads desqualificados em espera, sem enviá-los a um corretor automaticamente.">
+      <ToggleRow1a1
+        title="Reter desqualificados antes da oferta"
+        hint="Quando ativado, vale para qualquer origem, unidade ou fila. Uma regra de roteamento criada manualmente com o status “Desqualificado” pode liberar uma exceção."
+        checked={enabled}
+        onChange={save}
+        disabled={!canEdit || isPending}
+        ariaLabel="Reter leads desqualificados em espera"
+        status={{ on: "Em espera", off: "Distribuição normal" }}
       />
-      <CardContent className="grid gap-4 p-4">
-        <div className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-3">
-          <div className="min-w-0 space-y-1">
-            <p className="text-sm font-medium text-foreground">
-              Reter desqualificados antes da oferta
-            </p>
-            <p className="text-xs leading-5 text-muted-foreground">
-              Quando ativado, vale para qualquer origem, unidade ou fila. Uma regra de roteamento
-              criada manualmente com o status “Desqualificado” pode liberar uma exceção.
-            </p>
-          </div>
-          <Switch
-            aria-label="Reter leads desqualificados em espera"
-            checked={enabled}
-            disabled={!canEdit || isPending}
-            onCheckedChange={(checked) => save(checked)}
-          />
-        </div>
-        {canEdit ? (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Padrão: desligado. A alteração é registrada na auditoria.
-            </p>
-            <span className="text-xs font-medium text-muted-foreground" aria-live="polite">
-              {isPending ? "Salvando…" : "Salvo"}
-            </span>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Apenas o Diretor pode alterar esta configuração global.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      {canEdit ? (
+        <Note1a1>
+          Padrão: desligado. A alteração é registrada na auditoria. <span aria-live="polite">{isPending ? "Salvando…" : "Salvo."}</span>
+        </Note1a1>
+      ) : (
+        <Note1a1>Apenas o Diretor pode alterar esta configuração global.</Note1a1>
+      )}
+    </Panel1a1>
   );
 }
