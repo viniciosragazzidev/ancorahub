@@ -22,6 +22,7 @@ import { PasskeyToastHandler } from "@/components/passkey-toast-handler";
 import { RouteOnboardingLoader } from "@/features/onboarding/components/route-onboarding-loader";
 import { BrokerAvailabilityOnboardingLoader } from "@/features/broker-availability/components/broker-availability-onboarding-loader";
 import { CommandPalette } from "@/components/command-palette";
+import { DragScroll } from "@/components/lite/drag-scroll";
 import { SystemFeedbackDrawer } from "@/components/system-feedback-drawer";
 import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-provider";
 import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
@@ -389,6 +390,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           <NotificationCountProvider userId={context.userId}>
             <FeedbackToastHandler userId={context.userId} />
             <PasskeyToastHandler userId={context.userId} />
+            <DragScroll />
             <WhatsAppLinkHandler />
             {/* Aviso "WhatsApp para os leads do plantão a partir de 20/10" removido em 05/11: a conexão agora é pedida
                 só ao confirmar presença no plantão (presence-callout). */}

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { DragScroll } from "@/components/lite/drag-scroll";
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 import { buildEssential } from "@/app/dev/diretor-dashboard-preview/_components/essential-example";
 import type { UserDisplayInfo } from "@/shared/auth/actions";
@@ -309,6 +310,7 @@ export default async function DirectorShellRealPage({
       branding={{ brandColor: null, logoUrl: null, tenantName: "\u00c2ncora Sa\u00fade" }}
       viewAs={{ canViewAs: isSuperAdminViewingDirector, viewingAs: null }}
     >
+      <DragScroll />
       {papelScreen ?? (showConversations ? (
         isBrokerConversationPreview ? (
           <LightConversationsView

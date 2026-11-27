@@ -212,3 +212,7 @@ html[data-contrast="high"] .arc-venancor {
   min-height: 40px; height: 40px; border-radius: var(--space-3); padding-inline: var(--space-3);
 }
 .arc-venancor [data-form-density="compact"] [data-slot="card"] { padding: var(--space-3); gap: var(--space-3); }
+
+/* Arrastar para rolar (27/11/2026): enquanto puxa, a área mostra a mão fechada e não seleciona texto. */
+[data-drag-scrolling="true"] { cursor: grabbing !important; user-select: none; }
+[data-drag-scrolling="true"] * { cursor: grabbing !important; }
