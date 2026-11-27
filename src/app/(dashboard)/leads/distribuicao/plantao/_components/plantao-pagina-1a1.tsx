@@ -174,8 +174,41 @@ type DrawerProps = {
 export type PlantaoLeadRow = DutyLeadRecord & { whatsapp: boolean };
 
 /** Tabela de leads do artifact (grupos em cinza, devolvido em âmbar) e, no celular, a lista em pílulas. */
-export function PlantaoLeadsTable({ groups, empty, drawer, emptyGroup }: { groups: Array<{ key: string; label: string; leads: PlantaoLeadRow[] }>; empty: string | null; emptyGroup: string; drawer: DrawerProps }) {
+const LEADS_PER_PAGE = 20;
+
+/** Páginas numeradas no padrão das tabelas do Lite (anterior, até 5 números, próxima). */
+export function PlantaoPager({ page, totalPages, onPage, label }: { page: number; totalPages: number; onPage: (page: number) => void; label: string }) {
+  if (totalPages <= 1) return null;
+  const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+  const end = Math.min(totalPages, start + 4);
+  const numbers: number[] = [];
+  for (let n = start; n <= end; n += 1) numbers.push(n);
+  return (
+    <nav aria-label={label} className={pp.pager}>
+      <button type="button" className={pp.pagerBtn} disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Página anterior">‹</button>
+      {numbers.map((n) => <button key={n} type="button" className={pp.pagerBtn} aria-current={n === page ? "page" : undefined} aria-label={`Página ${n}`} onClick={() => onPage(n)}>{n}</button>)}
+      <button type="button" className={pp.pagerBtn} disabled={page >= totalPages} onClick={() => onPage(page + 1)} aria-label="Próxima página">›</button>
+    </nav>
+  );
+}
+
+export function PlantaoLeadsTable({ groups: allGroups, empty, drawer, emptyGroup }: { groups: Array<{ key: string; label: string; leads: PlantaoLeadRow[] }>; empty: string | null; emptyGroup: string; drawer: DrawerProps }) {
   const trigger = (row: PlantaoLeadRow) => <DutyLeadDetailsTrigger lead={row.lead} {...drawer} />;
+  // Paginação (27/11/2026): 20 por página na ordem dos grupos; o cabeçalho do grupo mostra o total dele.
+  const [page, setPage] = useState(1);
+  const total = allGroups.reduce((sum, group) => sum + group.leads.length, 0);
+  const totalPages = Math.max(1, Math.ceil(total / LEADS_PER_PAGE));
+  const current = Math.min(page, totalPages);
+  const from = (current - 1) * LEADS_PER_PAGE;
+  let cursor = 0;
+  const groups = allGroups.flatMap((group) => {
+    const start = cursor;
+    cursor += group.leads.length;
+    const slice = group.leads.slice(Math.max(0, from - start), Math.max(0, from + LEADS_PER_PAGE - start));
+    // Grupo vazio aparece só na primeira página, com o aviso de vazio.
+    if (!slice.length && !(group.leads.length === 0 && current === 1)) return [];
+    return [{ ...group, leads: slice, count: group.leads.length }];
+  });
   if (empty) return <p className={pp.emptyLeads}>{empty}</p>;
   return (
     <>
@@ -184,7 +217,7 @@ export function PlantaoLeadsTable({ groups, empty, drawer, emptyGroup }: { group
           <div className={cn(pp.lead, pp.leadh)} role="row"><span>Lead</span><span>Temperatura</span><span>Fila</span><span>Corretor</span><span>Distribuição</span><span>Etapa</span><span>Recebido</span><span>Distribuído</span></div>
           {groups.map((group) => (
             <div key={group.key} role="rowgroup" aria-label={group.label}>
-              <div className={pp.group}><span>{group.label}</span><span className={pl.num}>{group.leads.length}</span></div>
+              <div className={pp.group}><span>{group.label}</span><span className={pl.num}>{group.count}</span></div>
               {group.leads.length ? group.leads.map((row) => {
                 const temp = temperatureBadge(row.lead.qualificationStatus);
                 return (
@@ -193,7 +226,7 @@ export function PlantaoLeadsTable({ groups, empty, drawer, emptyGroup }: { group
                     <span className={pp.cellStack}><span className={cn(pl.badge, temp.cls)}>{temp.label}</span>{row.coldHeld ? <span className={cn(pp.cellWarn)} style={{ fontSize: 12 }}>Frio, retido pela fila</span> : null}</span>
                     <span className={pp.cellSecondary}>{row.queueName ?? "Sem fila"}</span>
                     <span className={row.returnedUnaccepted ? pp.cellWarn : row.brokerName ? undefined : pp.cellMuted}>{row.returnedUnaccepted ? "Devolvido, não aceito" : row.brokerName ?? "Sem corretor"}</span>
-                    <span><span className={cn(pl.badge, toneClass(row.distributionTone))}>{row.distributionLabel}</span></span>
+                    <span className={pp.badgeCell}><span className={cn(pl.badge, toneClass(row.distributionTone))} title={row.distributionLabel}>{row.distributionLabel}</span></span>
                     <span className={pp.cellSecondary}>{LEAD_STATUS_LABELS[row.lead.status] ?? row.lead.status}</span>
                     <span className={pp.cellMuted}>{formatShort(row.createdAt)}</span>
                     <span className={pp.cellMuted}>{row.assignedAt && row.lead.corretorId ? formatShort(row.assignedAt) : "Ainda não"}</span>
@@ -207,7 +240,7 @@ export function PlantaoLeadsTable({ groups, empty, drawer, emptyGroup }: { group
       <div className={pp.mList}>
         {groups.map((group) => (
           <div key={group.key} style={{ display: "contents" }}>
-            <p className={pp.mGroup}>{group.label} · {group.leads.length}</p>
+            <p className={pp.mGroup}>{group.label} · {group.count}</p>
             {group.leads.map((row) => {
               const meta = row.returnedUnaccepted ? "Devolvido, não aceito" : row.brokerName ? `${row.brokerName}${row.assignedAt ? ` · ${formatShort(row.assignedAt)}` : ""}` : `Recebido ${formatShort(row.createdAt)}`;
               return (
@@ -220,6 +253,12 @@ export function PlantaoLeadsTable({ groups, empty, drawer, emptyGroup }: { group
           </div>
         ))}
       </div>
+      {totalPages > 1 ? (
+        <div className={pp.tableFoot}>
+          <span className={pl.num}>{from + 1} a {Math.min(from + LEADS_PER_PAGE, total)} de {total} leads</span>
+          <PlantaoPager page={current} totalPages={totalPages} onPage={setPage} label="Páginas dos leads do plantão" />
+        </div>
+      ) : null}
     </>
   );
 }

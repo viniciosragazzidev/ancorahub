@@ -17,7 +17,7 @@
 .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; position: relative; z-index: 10; }
 .topText { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.h1 { margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1; }
+.h1 { margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1; }
 .detail { margin: 0; font-size: 16px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .detailShort { display: none; }
 .short { display: none; }
@@ -52,7 +52,7 @@
 .escala { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 .headRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .headText { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.h2 { margin: 0; font-size: 18px; font-weight: 500; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.h2 { margin: 0; font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sub { margin: 0; font-size: 14px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .note { margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 .turn { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -139,7 +139,7 @@
 .tabIcon { width: 14px; height: 14px; }
 .tableMin { min-width: 1120px; }
 .lead {
-  display: grid; grid-template-columns: minmax(200px, 1.6fr) 110px 120px minmax(150px, 1fr) 130px 120px 96px 96px; gap: 12px; align-items: center;
+  display: grid; grid-template-columns: minmax(200px, 1.6fr) 130px 150px minmax(150px, 1fr) 190px 130px 104px 104px; gap: 12px; align-items: center;
   padding: 10px 20px; border-top: 1px solid var(--d-border-subtle); font-size: 14px;
 }
 .lead:hover { background: #fafafc; }
@@ -173,7 +173,7 @@
 /* Celular (Celular.dc.html) */
 @media (max-width: 720px) {
   .page { padding: 12px 16px 40px !important; gap: 14px; }
-  .h1 { font-size: 28px; letter-spacing: -0.02em; }
+  .h1 { font-size: 22px; letter-spacing: -0.02em; }
   .detail { font-size: 14px; }
   .detailLong { display: none; }
   .detailShort { display: inline; }
@@ -205,3 +205,25 @@
   .input { font-size: 16px; }
   .textarea { font-size: 16px; }
 }
+
+/* Ajustes de 27/11/2026: células que não invadem a vizinha, paginação, atribuir com rolagem e o rodízio nos cartões. */
+.lead > * { min-width: 0; }
+.badgeCell > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; line-height: 24px; }
+.tableFoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 20px 16px; border-top: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-muted); }
+.pager { display: flex; align-items: center; gap: 4px; }
+.pagerBtn { display: inline-grid; place-items: center; min-width: 36px; height: 36px; padding: 0 10px; border: 1px solid transparent; border-radius: 9999px; background: transparent; font: inherit; font-size: 14px; color: var(--text-secondary); cursor: pointer; font-variant-numeric: tabular-nums; }
+.pagerBtn:hover:not(:disabled) { background: var(--surface-muted); }
+.pagerBtn[aria-current="page"] { background: var(--surface); color: var(--foreground); border-color: var(--border); box-shadow: var(--shadow-resting); }
+.pagerBtn:disabled { opacity: 0.4; cursor: default; }
+.assignList { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; }
+.assignFoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
+.bcNow { border-color: color-mix(in oklab, var(--d-action, var(--chat-action)) 55%, white) !important; background: color-mix(in oklab, var(--d-action, var(--chat-action)) 5%, var(--surface)) !important; }
+.bcNext { border-color: color-mix(in oklab, var(--d-action, var(--chat-action)) 30%, white) !important; }
+.turnTag { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; min-height: 24px; padding: 0 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; animation: turnTagIn 320ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.turnTagNow { background: var(--d-action, var(--chat-action)); color: #fff; }
+.turnTagNext { background: color-mix(in oklab, var(--d-action, var(--chat-action)) 12%, transparent); color: var(--d-action-text, var(--chat-action-text)); }
+.turnTagPrev { background: var(--surface-muted); color: var(--text-secondary); }
+.turnPulse { width: 8px; height: 8px; border-radius: 9999px; background: currentColor; animation: turnPulse 1.4s ease-in-out infinite; }
+@keyframes turnTagIn { from { opacity: 0; transform: translateY(-4px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes turnPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.7); } }
+@media (prefers-reduced-motion: reduce) { .turnTag, .turnPulse { animation: none; } }

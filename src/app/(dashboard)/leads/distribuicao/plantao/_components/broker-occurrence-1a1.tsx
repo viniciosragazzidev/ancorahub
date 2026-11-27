@@ -32,6 +32,7 @@ import type { BrokerLiveOfferStatus } from "@/features/lead-distribution/duty-ro
 
 import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { DotsIcon, PlConfirm, PlMenu, PlSection, PlSheet, initials, pl } from "./plantoes-1a1-kit";
+import { PlantaoPager } from "./plantao-pagina-1a1";
 import { BrokerDayHistoryTrigger } from "./broker-day-history-trigger";
 import { DutySwapDoneNotice, DutySwapPicker } from "./duty-swap-picker";
 import type { BrokerTurn } from "./broker-occurrence-card";
@@ -63,6 +64,9 @@ function LiveBadge({ status, nextEventAt, receiving }: { status: BrokerLiveOffer
   const ticking = !receiving && remaining !== null && remaining > 0 && (status === "cooldown" || status === "offer_pending");
   return <span className={cn(pl.badge, ui.cls)}><span className={pl.dot} style={{ background: ui.dot }} aria-hidden="true" />{ui.label}{ticking ? <span className={pl.num}>{countdown(remaining ?? 0)}</span> : null}</span>;
 }
+
+const ASSIGN_PER_PAGE = 8;
+const TEMPERATURE_PT: Record<string, string> = { hot: "quente", warm: "morno", cold: "frio" };
 
 export type BrokerOccurrence1a1Props = {
   scheduleId: string;
@@ -113,6 +117,7 @@ export function BrokerOccurrence1a1(props: BrokerOccurrence1a1Props) {
   const [leads, setLeads] = useState<LeadResult["leads"] | null>(null);
   const [leadsError, setLeadsError] = useState<string | null>(null);
   const [available, setAvailable] = useState<AvailableResult["leads"] | null>(null);
+  const [assignPage, setAssignPage] = useState(1);
   const [availableError, setAvailableError] = useState<string | null>(null);
   const [offers, setOffers] = useState<{ offered: number; accepted: number } | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
@@ -129,6 +134,7 @@ export function BrokerOccurrence1a1(props: BrokerOccurrence1a1Props) {
   const presencial = attendanceMode === "presencial";
   const pending = props.presenceStatus === "pending";
   const receiving = props.turn?.role === "current";
+  const turnRole = absent ? null : props.turn?.role ?? null;
   const position = receiving ? "Agora" : props.turn?.position ? `${props.turn.position}º` : null;
 
   function loadReceived() {
@@ -145,7 +151,7 @@ export function BrokerOccurrence1a1(props: BrokerOccurrence1a1Props) {
     setAvailableError(null);
     startAvailable(async () => {
       const result = await getDutyAvailableLeadsAction(scheduleId, leadsSince);
-      if (result.ok) setAvailable(result.leads);
+      if (result.ok) { setAvailable(result.leads); setAssignPage(1); }
       else setAvailableError(result.reason);
     });
   }
@@ -243,7 +249,11 @@ export function BrokerOccurrence1a1(props: BrokerOccurrence1a1Props) {
 
   return (
     <>
-      <button type="button" className={cn(pp.bc, (absent || paused || onSitePending) && pp.bcOff)} onClick={show} aria-label={`Abrir ${brokerName} neste plantão`}>
+      <button type="button" className={cn(pp.bc, (absent || paused || onSitePending) && pp.bcOff, turnRole === "current" && pp.bcNow, turnRole === "next" && pp.bcNext)} onClick={show} aria-label={`Abrir ${brokerName} neste plantão`}>
+        {turnRole === "current" ? <span key="now" className={cn(pp.turnTag, pp.turnTagNow)}><span className={pp.turnPulse} aria-hidden="true" />Recebendo agora</span>
+          : turnRole === "next" ? <span key="next" className={cn(pp.turnTag, pp.turnTagNext)}>Próximo a receber</span>
+          : turnRole === "previous" ? <span key="prev" className={cn(pp.turnTag, pp.turnTagPrev)}>{props.turn?.outcome === "skip" ? "Último a receber · pulou a vez" : props.turn?.outcome === "accepted" ? "Último a receber · aceitou" : "Último a receber"}</span>
+          : null}
         <span className={pp.bcRow}>
           <span className={pl.av} aria-hidden="true">{initials(brokerName)}</span>
           <span className={pp.bcBody}><span className={pp.bcName}>{brokerName}</span><span className={pp.bcMeta}>{meta}</span></span>
@@ -359,14 +369,22 @@ export function BrokerOccurrence1a1(props: BrokerOccurrence1a1Props) {
               {loadingAvailable && !available ? <p className={pl.small}>Carregando leads…</p> : null}
               {availableError ? <p role="alert" className={cn(pl.small, pl.dangerText)}>{availableError}</p> : null}
               {available?.length ? (
-                <ul className={pl.rows}>
-                  {available.map((lead) => (
+                <>
+                <ul className={cn(pl.rows, pp.assignList)}>
+                  {available.slice((assignPage - 1) * ASSIGN_PER_PAGE, assignPage * ASSIGN_PER_PAGE).map((lead) => (
                     <li key={lead.id} className={pp.pillRow}>
-                      <span className={pp.pillBody}><Link href={`/leads/${lead.id}`} className={pp.pillName} style={{ color: "var(--foreground)", textDecoration: "none" }}>{lead.name}</Link><span className={pp.pillMeta}>Entrou {fmt(lead.createdAt)} · {lead.queueName ?? "Sem fila"}{lead.temperature ? ` · ${lead.temperature}` : ""}</span></span>
+                      <span className={pp.pillBody}><Link href={`/leads/${lead.id}`} className={pp.pillName} style={{ color: "var(--foreground)", textDecoration: "none" }}>{lead.name}</Link><span className={pp.pillMeta}>Entrou {fmt(lead.createdAt)} · {lead.queueName ?? "Sem fila"}{lead.temperature ? ` · ${TEMPERATURE_PT[lead.temperature.toLowerCase()] ?? lead.temperature}` : ""}</span></span>
                       {!paused && !onSitePending ? <button type="button" className={cn(pl.pill, pl.pillQuiet, pl.pillSm)} disabled={assigningId !== null} onClick={() => { void assign(lead); }} aria-label={`Enviar ${lead.name} para ${brokerName}`}>{assigningId === lead.id ? "Enviando…" : "Atribuir"}</button> : null}
                     </li>
                   ))}
                 </ul>
+                {available.length > ASSIGN_PER_PAGE ? (
+                  <div className={pp.assignFoot}>
+                    <span className={pl.num}>{(assignPage - 1) * ASSIGN_PER_PAGE + 1} a {Math.min(assignPage * ASSIGN_PER_PAGE, available.length)} de {available.length}</span>
+                    <PlantaoPager page={assignPage} totalPages={Math.ceil(available.length / ASSIGN_PER_PAGE)} onPage={setAssignPage} label="Páginas dos leads para atribuir" />
+                  </div>
+                ) : null}
+                </>
               ) : available ? <p className={pl.emptyBox}>Nenhum lead aguardando corretor nas filas deste plantão.</p> : null}
             </>
           ) : null}

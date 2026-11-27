@@ -243,7 +243,7 @@
 .sheetWide { width: 720px; }
 .sheetHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 20px 16px; border-bottom: 1px solid var(--d-border-subtle); }
 .sheetHeadText { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.sheetTitle { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+.sheetTitle { margin: 0; font-size: 18px; font-weight: 500; letter-spacing: -0.02em; }
 .sheetDesc { margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.45; }
 .badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sheetBody { flex: 1; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; overscroll-behavior: contain; }
