@@ -55,6 +55,7 @@ export function DragScroll() {
         window.getSelection()?.removeAllRanges();
       }
       target.scrollLeft = startScroll - delta;
+      window.getSelection()?.removeAllRanges();
       event.preventDefault();
     };
 
@@ -75,12 +76,34 @@ export function DragScroll() {
       }
     };
 
+    // Começando em cima de um link, imagem ou texto, o navegador iniciava o "arrastar link" ou a seleção de texto, que
+    // cancelam os eventos do ponteiro: a área não rolava. Sobre uma área que rola de lado, os dois ficam desligados.
+    const onDragStart = (event: DragEvent) => {
+      if (target) event.preventDefault();
+    };
+    const onSelectStart = (event: Event) => {
+      if (target && dragging) event.preventDefault();
+    };
+    const onMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      const origin = event.target as Element | null;
+      if (!origin || origin.closest(SKIP) || !scrollableX(origin)) return;
+      // Sem isso o navegador começa a selecionar texto já no primeiro pixel; o clique e o foco seguem normais.
+      if (origin.closest("a, img")) event.preventDefault();
+    };
+
     document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("dragstart", onDragStart, true);
+    document.addEventListener("selectstart", onSelectStart, true);
+    document.addEventListener("mousedown", onMouseDown, true);
     document.addEventListener("pointermove", onMove, { capture: true, passive: false });
     document.addEventListener("pointerup", end, true);
     document.addEventListener("pointercancel", end, true);
     return () => {
       document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("dragstart", onDragStart, true);
+      document.removeEventListener("selectstart", onSelectStart, true);
+      document.removeEventListener("mousedown", onMouseDown, true);
       document.removeEventListener("pointermove", onMove, true);
       document.removeEventListener("pointerup", end, true);
       document.removeEventListener("pointercancel", end, true);
