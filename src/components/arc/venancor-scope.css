@@ -244,3 +244,13 @@ html[data-drag-scrolling="true"], html[data-drag-scrolling="true"] * { cursor: g
 .lite-mobile-bar-back:hover { background: var(--surface-muted); color: var(--foreground); }
 .lite-mobile-bar-back svg { width: 18px; height: 18px; flex: none; }
 .lite-mobile-bar-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Zoom de 80% no modo gestão, só no computador (27/11/2026). O zoom encolhe também as alturas de tela cheia:
+   elas são divididas por 0,8 para continuar ocupando a janela inteira. */
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  html[data-gestao-zoom] { zoom: 0.8; }
+  html[data-gestao-zoom] .h-app { height: calc(var(--app-dvh, 100dvh) / 0.8); }
+  html[data-gestao-zoom] .min-h-app { min-height: calc(var(--app-dvh, 100dvh) / 0.8); }
+  html[data-gestao-zoom] .max-h-app { max-height: calc(var(--app-dvh, 100dvh) / 0.8); }
+  html[data-gestao-zoom] [data-slot="app-scroll-frame"][data-skin="diretor"].arc-venancor { height: calc(var(--app-dvh, 100dvh) / 0.8 - 16px); }
+}
