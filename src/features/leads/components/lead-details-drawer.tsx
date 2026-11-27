@@ -26,6 +26,7 @@ import type { LeadWorkspaceItem } from "./lead-workspace-types";
 import { QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
 import { getLeadInvestigationObservationAction } from "@/features/leads/investigation-observation-action";
 import { LeadQuotesSection } from "@/features/leads/components/lead-quotes-section";
+import { LeadDrawer1a1 } from "@/app/(dashboard)/leads/_components/lead-drawer-1a1";
 
 type BrokerOption = { id: string; name: string; branchId: string | null };
 type BranchOption = { id: string; name: string; status?: string; acceptingLeads?: boolean; isDistributionHub?: boolean };
@@ -62,6 +63,8 @@ type LeadDetailsDrawerProps = {
   onLeadPatch: (patch: Partial<LeadWorkspaceItem>) => void;
   /** Bloco no topo da gaveta (ex.: ações do lead parado na visão Esfriando). */
   topSlot?: React.ReactNode;
+  /** /leads da gestão no Lite (27/11/2026): diretor e gestor veem a gaveta 1:1 ao artifact, com as mesmas ações. */
+  skin1a1?: boolean;
 };
 
 function DetailRow({ label, value }: { label: string; value: string | React.ReactNode }) {
@@ -91,6 +94,7 @@ export function LeadDetailsDrawer({
   onReassignRollback,
   onLeadPatch,
   topSlot,
+  skin1a1 = false,
 }: LeadDetailsDrawerProps) {
   const shouldMask = contextJobTitle === "marketing" && lead.branchId !== contextBranchId;
   const canCall = !(contextRole === "broker" && lead.status === "distributed");
@@ -121,6 +125,47 @@ export function LeadDetailsDrawer({
 
     return () => { current = false; };
   }, [lead.id, lead.isManagementInvestigation, managementRole]);
+
+  if (skin1a1 && managementRole) {
+    const investigationReason = investigationObservation?.leadId === lead.id
+      ? investigationObservation.status === "loading" ? "Carregando motivo registrado…"
+        : investigationObservation.status === "error" ? "Não foi possível carregar o motivo agora."
+          : investigationObservation.reason ?? "Motivo não localizado no histórico."
+      : null;
+    return (
+      <LeadDrawer1a1
+        lead={lead}
+        contextRole={contextRole}
+        displayName={shouldMask ? maskName(lead.nome) : lead.nome}
+        displayPhone={shouldMask ? "••••-••••" : lead.telefone}
+        masked={shouldMask}
+        slaFirstContactMinutes={slaFirstContactMinutes}
+        slaStagnantDays={slaStagnantDays}
+        onClose={() => onOpenChange(false)}
+        investigationReason={investigationReason}
+        markInService={canDirectorMarkLeadInService({ role: contextRole, corretorId: lead.corretorId, status: lead.status }) ? <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} onDone={() => onLeadPatch({ status: "in_contact" })} /> : null}
+        topSlot={topSlot}
+        management={<LeadDrawerManagementActions skin1a1 leadId={lead.id} leadName={lead.nome} brokers={brokers} branches={transferableBranches} leadBranchId={lead.branchId} manualAssignmentChoiceEnabled={manualAssignmentChoiceEnabled} contextRole={contextRole} currentStatus={lead.status} currentDistributionStatus={lead.distributionStatus} qualificationStatus={lead.qualificationStatus} qualificationState={lead.qualificationState} currentOwner={lead.corretorNome} distributionRemovalReason={lead.distributionRemovalReason} distributionRemovalNote={lead.distributionRemovalNote} onSuccess={onManagementCommitted} onReassignOptimistic={onReassignOptimistic} onReassignRollback={onReassignRollback} />}
+        quotes={commercialValuesEnabled && !shouldMask ? (
+          <LeadQuotesSection
+            key={lead.id}
+            leadId={lead.id}
+            leadName={lead.nome}
+            leadPhone={lead.telefone}
+            beneficiaryCount={lead.livesCount}
+            plans={quotePlans}
+            initialQuoteOpen={initialQuoteOpen}
+            monthlyValue={lead.monthlyValue == null ? null : String(lead.monthlyValue)}
+            livesCount={lead.livesCount}
+            commercialValueSource={lead.commercialValueSource}
+            canDeleteQuotes
+            onLeadPatch={onLeadPatch}
+          />
+        ) : null}
+        history={<LeadAssignmentHistory leadId={lead.id} assignedAt={lead.assignedAt} corretorNome={lead.corretorNome} />}
+      />
+    );
+  }
 
   return (
     <DetailDrawer

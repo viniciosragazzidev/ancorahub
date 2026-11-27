@@ -20,11 +20,12 @@ import { DEFAULT_PERIOD, PERIOD_OPTIONS, type PeriodValue } from "@/shared/perio
 import type { TenantRole } from "@/shared/db/schema";
 
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
-import { LiteMenu, type LiteMenuItem } from "@/components/lite/controls";
+import { Leads1a1Menu, type Leads1a1MenuItem as LiteMenuItem } from "./leads-1a1-menu";
+import { NewLeadDrawer1a1 } from "./new-lead-drawer-1a1";
+import a1 from "../leads-1a1.module.css";
 import { Plus as LitePlus, Zap } from "lucide-react";
 
 import { BulkLeadImportDialog } from "./bulk-lead-import-dialog";
-import liteStyles from "./leads-header-actions.module.css";
 import { ManualLeadSheet } from "./manual-lead-sheet";
 
 type PlanOption = { id: string; name: string; carrierName: string };
@@ -105,23 +106,38 @@ export function LeadsHeaderActions({
     const compactItems: LiteMenuItem[] = urgentLead
       ? [{ id: "next", label: "Próximo lead", href: `/leads/${urgentLead.id}` }, ...moreItems]
       : moreItems;
+    // Desenho 1:1 do artifact "Leads da gestão" (27/11/2026): "Próximo lead" em pílula clara, "Novo lead" em azul,
+    // que abre a gaveta lateral de cadastro, e "⋯" com arquivados e importar; no celular, "⋯" (com o Próximo lead)
+    // e o "+" redondo.
     return (
       <>
-        <div className={liteStyles.actions}>
+        <div className={a1.actions}>
           {urgentLead ? (
-            <Link className={`${liteStyles.secondary} ${liteStyles.wide}`} href={`/leads/${urgentLead.id}`} title={`${urgentLead.nome}: ${urgentLead.urgentReason}`}>
-              <Zap aria-hidden="true" size={16} />
+            <Link className={`${a1.pill} ${a1.pillQuiet} ${a1.wideOnly}`} href={`/leads/${urgentLead.id}`} title={`${urgentLead.nome}: ${urgentLead.urgentReason}`}>
+              <Zap aria-hidden="true" />
               Próximo lead
             </Link>
           ) : null}
-          <button type="button" className={liteStyles.primary} onClick={() => setLeadSheetOpen(true)}>
-            <LitePlus aria-hidden="true" size={16} />
+          <button type="button" className={`${a1.pill} ${a1.pillPrimary} ${a1.wideOnly}`} aria-haspopup="dialog" onClick={() => setLeadSheetOpen(true)}>
+            <LitePlus aria-hidden="true" />
             Novo lead
           </button>
-          {moreItems.length ? <span className={liteStyles.wide}><LiteMenu label="Mais ações" items={moreItems} /></span> : null}
-          {compactItems.length ? <span className={liteStyles.compact}><LiteMenu label="Mais ações" items={compactItems} /></span> : null}
+          <span className={a1.wideOnly}><Leads1a1Menu label="Mais ações" items={moreItems} /></span>
+          <span className={a1.narrowOnly}><Leads1a1Menu label="Mais ações (Próximo lead, arquivados, importar)" items={compactItems} /></span>
+          <button type="button" className={`${a1.roundPrimary} ${a1.narrowOnly}`} aria-label="Novo lead" aria-haspopup="dialog" onClick={() => setLeadSheetOpen(true)}>
+            <LitePlus aria-hidden="true" />
+          </button>
         </div>
-        {dialogs}
+        <BulkLeadImportDialog
+          branches={branches}
+          queues={queues}
+          role={role}
+          jobTitle={jobTitle}
+          branchId={branchId}
+          open={importOpen}
+          onOpenChange={setImportOpen}
+        />
+        <NewLeadDrawer1a1 plans={plans} open={leadSheetOpen} onOpenChange={setLeadSheetOpen} />
       </>
     );
   }

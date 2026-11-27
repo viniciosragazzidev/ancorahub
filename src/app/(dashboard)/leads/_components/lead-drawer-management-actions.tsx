@@ -17,6 +17,7 @@ import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
 import { LeadAttendanceFlowStarter } from "./lead-attendance-flow-starter";
 import { LeadDistributionRemoval, LeadDistributionRemovedTag } from "./lead-distribution-removal";
+import a1 from "../leads-1a1.module.css";
 
 type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null };
 type Branch = { id: string; name: string };
@@ -60,6 +61,7 @@ export function LeadDrawerManagementActions({
   onReassignOptimistic,
   onReassignRollback,
   manualAssignmentChoiceEnabled = true,
+  skin1a1 = false,
 }: {
   leadId: string;
   leadName?: string;
@@ -79,6 +81,8 @@ export function LeadDrawerManagementActions({
   onSuccess?: (result: ManagementCommit) => void;
   onReassignOptimistic?: (brokerId: string) => void;
   onReassignRollback?: () => void;
+  /** Lite da gestão (27/11/2026): marcação do artifact "Leads da gestão", com os mesmos estados e Server Actions. */
+  skin1a1?: boolean;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<ManagementMode>("reassign");
@@ -301,6 +305,179 @@ export function LeadDrawerManagementActions({
     onReassignOptimistic?.(brokerId);
     setManualAssignmentDialogOpen(false);
     reassign(data);
+  }
+
+  // Diálogos de confirmação e escolha do modo: os mesmos nas duas marcações.
+  const dialogs = (
+    <>
+      {canResend ? (
+        <ConfirmDialog
+          open={resendDialogOpen}
+          onOpenChange={setResendDialogOpen}
+          title={`Reenviar o lead para ${currentOwner}?`}
+          description="O lead sai da carteira e volta na mesma hora para a mesma pessoa, com um aviso novo e um novo prazo de aceite. A oferta anterior é cancelada."
+          confirmLabel="Reenviar"
+          loading={resendPending}
+          onConfirm={confirmResend}
+        />
+      ) : null}
+      {canRemoveAssignment ? (
+        <ConfirmDialog
+          open={removeAssignmentDialogOpen}
+          onOpenChange={setRemoveAssignmentDialogOpen}
+          title="Remover atribuição deste lead?"
+          description={`O lead deixará a carteira de ${currentOwner}. A etapa e o histórico serão preservados, e ele aguardará uma nova ação manual sem voltar à distribuição automática.`}
+          confirmLabel="Remover atribuição"
+          destructive
+          loading={removeAssignmentPending}
+          onConfirm={confirmRemoveAssignment}
+        />
+      ) : null}
+      <ManualQualificationDialog
+        open={openQualifyDialog}
+        onOpenChange={setOpenQualifyDialog}
+        leadId={leadId}
+        leadName={leadName || "Lead"}
+        brokers={brokers}
+      />
+      <Dialog open={manualAssignmentDialogOpen} onOpenChange={setManualAssignmentDialogOpen}>
+        <DialogPopup key={manualAssignmentDialogOpen ? "manual-assignment-open" : "manual-assignment-closed"} className="sm:max-w-md">
+          <DialogTitle>Como deseja atribuir este lead?</DialogTitle>
+          <DialogDescription>
+            Escolha se {brokerId ? assignmentBrokers.find((broker) => broker.id === brokerId)?.name ?? "o corretor selecionado" : "o corretor selecionado"} deve receber uma oferta para aceitar ou se a atribuição deve ser imediata.
+          </DialogDescription>
+          <div className="grid gap-2 pt-2">
+            <Button type="button" disabled={!canSubmitReassignment || (requiresBranchSelection && !assignBranchId)} onClick={() => submitManualAssignment("offer")}>
+              {reassignPending ? "Enviando oferta…" : "Sim, enviar oferta para aceite"}
+            </Button>
+            <Button type="button" variant="outline" disabled={!canSubmitReassignment || (requiresBranchSelection && !assignBranchId)} onClick={() => submitManualAssignment("direct")}>
+              Atribuir direto, sem mensagem de aceite
+            </Button>
+            <DialogClose render={<Button type="button" variant="ghost" disabled={reassignPending}>Cancelar</Button>} />
+          </div>
+        </DialogPopup>
+      </Dialog>
+    </>
+  );
+
+  if (skin1a1) {
+    const smallQuiet = `${a1.pill} ${a1.pillQuiet} ${a1.pillQuietFlat} ${a1.pillSmall}`;
+    const quiet = `${a1.pill} ${a1.pillQuiet} ${a1.pillQuietFlat}`;
+    const brokerPlaceholder = dutyLookup.status === "loading" ? "Consultando corretores…" : dutyLookup.status === "error" ? "Não foi possível consultar corretores" : hasActiveDuty ? "Selecione um corretor do plantão" : isPostSale || assignBranchId ? "Selecione um corretor" : "Selecione primeiro a unidade";
+    const branchOptions = isPostSale ? dutyLookup.postSaleBranches : branches ?? [];
+    const showBranch = !hasActiveDuty && (isPostSale || (dutyLookup.status === "ready" && requiresBranchSelection));
+    const chevron = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>;
+    return (
+      <div className={a1.formStack}>
+        {canRemoveAssignment ? (
+          <div className={a1.actionRow}>
+            <span title="Retira o responsável atual sem apagar a etapa nem os horários do atendimento. O lead aguardará uma nova ação manual.">Atribuição atual</span>
+            <span className={a1.actionRowButtons}>
+              {canResend ? (
+                <button type="button" className={smallQuiet} disabled={resendPending || removeAssignmentPending} onClick={() => setResendDialogOpen(true)} aria-label={`Reenviar para ${currentOwner}`}>Reenviar</button>
+              ) : null}
+              <button type="button" className={`${smallQuiet} ${a1.dangerText}`} disabled={removeAssignmentPending || resendPending} onClick={() => setRemoveAssignmentDialogOpen(true)}>Remover atribuição</button>
+            </span>
+          </div>
+        ) : null}
+
+        {!currentOwner && isDirectorOrManager && distributionRemovalReason ? (
+          <div className={a1.slot}>
+            <div className={a1.actionRow}>
+              <span>Fora da distribuição</span>
+              <LeadDistributionRemovedTag reason={distributionRemovalReason} note={distributionRemovalNote} />
+            </div>
+            {distributionRemovalNote ? <p className={a1.hint} style={{ whiteSpace: "pre-line" }}>{distributionRemovalNote}</p> : null}
+            <p className={a1.hint}>Não recebe ofertas automáticas. Para voltar, atribua manualmente a um corretor abaixo.</p>
+          </div>
+        ) : null}
+        {!currentOwner && isDirectorOrManager && !distributionRemovalReason ? <LeadAttendanceFlowStarter leadId={leadId} /> : null}
+        {!currentOwner && isDirectorOrManager && !distributionRemovalReason ? <LeadDistributionRemoval leadId={leadId} leadName={leadName} onSuccess={onSuccess} /> : null}
+
+        {activeStatus || !isQualifiedOrDistributed ? (
+          <div className={a1.grid2Actions}>
+            {activeStatus ? (
+              <button type="button" className={quiet} onClick={handleAssumeMessaging} disabled={isAssuming} title={`Atendimento ativo com ${currentOwner || "outro corretor"}. Você assume a conversa para si.`}>
+                {isAssuming ? "Assumindo…" : "Assumir atendimento"}
+              </button>
+            ) : null}
+            {!isQualifiedOrDistributed ? (
+              <>
+                <button type="button" className={quiet} disabled={isReverting} onClick={handleRevertToQualifying}>{isReverting ? "Movendo…" : "Mover p/ qualificação"}</button>
+                <button type="button" className={quiet} onClick={() => setOpenQualifyDialog(true)}>Qualificar lead</button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className={a1.seg} role="group" aria-label="Tipo de intervenção">
+          <button type="button" className={a1.segbtn} aria-pressed={mode === "reassign"} onClick={() => setMode("reassign")}>Reatribuir</button>
+          <button type="button" className={a1.segbtn} aria-pressed={mode === "investigate"} onClick={() => setMode("investigate")}>Investigar</button>
+        </div>
+        <p className={a1.hint}>{selectedModeDescription}</p>
+
+        {mode === "reassign" ? (
+          <form action={reassign} className={a1.formStack} onSubmit={handleReassignSubmit}>
+            <input name="leadId" type="hidden" value={leadId} />
+            <input name="brokerId" type="hidden" value={brokerId} />
+            {hasActiveDuty ? <input name="dutyScheduleId" type="hidden" value={selectedDutyScheduleId ?? ""} /> : null}
+            {showBranch ? (
+              <>
+                <input name="branchId" type="hidden" value={assignBranchId} />
+                <label className={a1.field}>
+                  Unidade de destino
+                  <span className={a1.selectWrap}>
+                    <select
+                      className={a1.input}
+                      value={assignBranchId}
+                      onChange={(event) => (isPostSale ? setBranchSelection({ leadId, branchId: event.target.value }) : setAssignBranchId(event.target.value))}
+                    >
+                      <option value="">{isPostSale ? "Manter a unidade atual" : "Selecione uma unidade ativa"}</option>
+                      {branchOptions.map((branch) => (
+                        <option key={branch.id} value={branch.id}>{isPostSale && branch.id === leadBranchId ? `${branch.name} (atual)` : branch.name}</option>
+                      ))}
+                    </select>
+                    {chevron}
+                  </span>
+                </label>
+              </>
+            ) : null}
+            <label className={a1.field}>
+              {hasActiveDuty ? "Corretor do plantão" : "Novo responsável"}
+              <span className={a1.selectWrap}>
+                <select className={a1.input} disabled={dutyLookup.status !== "ready"} value={brokerId} onChange={(event) => setBrokerId(event.target.value)}>
+                  <option value="">{brokerPlaceholder}</option>
+                  {assignmentBrokers.length === 0 ? (
+                    <option value="_none" disabled>{isPostSale ? "Nenhum corretor ativo disponível" : hasActiveDuty ? "Nenhum corretor elegível neste plantão" : "Nenhum corretor ativo nesta unidade"}</option>
+                  ) : (
+                    assignmentBrokers.map((broker) => <option key={broker.id} value={broker.id}>{broker.name}</option>)
+                  )}
+                </select>
+                {chevron}
+              </span>
+            </label>
+            {isPostSale ? <p className={a1.hint}>Lead da Pós Venda: escolha qualquer unidade e qualquer corretor ativo, sem restrições. Na mesma unidade ele continua na fila Pós Venda.</p> : null}
+            {dutyLookup.status === "error" ? <p role="alert" className={a1.errorText}>Não foi possível consultar os corretores desta fila. Atualize a gaveta e tente de novo.</p> : null}
+            {hasActiveDuty && assignmentBrokers.length === 0 ? <p className={a1.hint}>A fila está vinculada a um plantão ativo, mas não há corretores elegíveis agora.</p> : null}
+            <button type="submit" className={`${a1.pill} ${a1.pillPrimary} ${a1.fullWidth}`} disabled={!canSubmitReassignment || (requiresBranchSelection && !assignBranchId)}>
+              {reassignPending ? "Reatribuindo…" : "Confirmar reatribuição"}
+            </button>
+          </form>
+        ) : (
+          <form action={assume} className={a1.formStack}>
+            <input name="leadId" type="hidden" value={leadId} />
+            <label className={a1.field}>
+              Motivo da investigação
+              <input className={a1.input} name="reason" onChange={(event) => setReason(event.target.value)} placeholder="Ex.: divergência na distribuição" value={reason} />
+            </label>
+            <button type="submit" className={`${a1.pill} ${a1.pillPrimary} ${a1.fullWidth}`} disabled={reason.trim().length < 3 || assumePending || currentStatus === "lost"}>
+              {assumePending ? "Registrando…" : "Assumir investigação"}
+            </button>
+          </form>
+        )}
+        {dialogs}
+      </div>
+    );
   }
 
   return (

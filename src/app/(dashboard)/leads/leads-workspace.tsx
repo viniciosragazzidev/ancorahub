@@ -51,7 +51,8 @@ import { classifyCooling } from "@/features/leads/cooling-radar";
 import { coolingActionsFor, NUDGE_TASK_DUE_MS, type CoolingActionId } from "@/features/leads/cooling-lead-actions-rules";
 import type { BulkLeadTagMode, LeadTag } from "@/features/lead-tags/rules";
 import { stageActorFor } from "./lead-card-stage";
-import litePageStyles from "./leads-lite-page.module.css";
+import a1 from "./leads-1a1.module.css";
+import { LeadsColumnsMenu1a1 } from "./_components/leads-1a1-columns-menu";
 import { computeSlaInfo, type SlaInfo } from "./lead-sla";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -735,18 +736,31 @@ export function LeadsWorkspace({
   );
   // Visões no Lite: as mesmas abas, em sentence case e rótulos curtos, com as contagens de hoje.
   const lostCount = workspaceLeads.filter((l) => l.status === "lost").length;
+  // Visões no Lite (27/11/2026, artifact "Leads da gestão" 1:1): pílula cinza com a visão escolhida em branco.
+  const liteViews: { value: string; label: string; count?: number }[] = [
+    { value: "list", label: "Todos os leads", count: leadCount },
+    { value: "kanban", label: "Kanban" },
+    { value: "esfriando", label: "Esfriando", count: coolingLeads?.length },
+    { value: "qualificacoes", label: "Qualificação IA", count: qualifyingLeads.length },
+    { value: "radar", label: "Radar IA" },
+    { value: "perdidos", label: "Perdidos", count: lostCount },
+    ...(showUnassignedFilter ? [{ value: "sem-atribuicao", label: "Sem atribuição", count: unassignedCount }] : []),
+  ];
   const liteViewTabs = (
-    <TabsList aria-label="Visualização de leads" variant="segment" className="w-max">
-      <TabsTrigger value="list">Todos os leads{leadCount > 0 ? <span className={litePageStyles.tabCount}>{leadCount.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
-      <TabsTrigger value="kanban">Kanban</TabsTrigger>
-      <TabsTrigger value="esfriando">Esfriando{coolingLeads?.length ? <span className={litePageStyles.tabCount}>{coolingLeads.length.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
-      <TabsTrigger value="qualificacoes">Qualificação IA{qualifyingLeads.length > 0 ? <span className={litePageStyles.tabCount}>{qualifyingLeads.length.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
-      <TabsTrigger value="radar">Radar IA</TabsTrigger>
-      <TabsTrigger value="perdidos">Perdidos{lostCount > 0 ? <span className={litePageStyles.tabCount}>{lostCount.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
-      {showUnassignedFilter ? (
-        <TabsTrigger value="sem-atribuicao">Sem atribuição{unassignedCount > 0 ? <span className={litePageStyles.tabCount}>{unassignedCount.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
-      ) : null}
-    </TabsList>
+    <nav className={a1.views} aria-label="Visões dos leads">
+      {liteViews.map((view) => (
+        <button key={view.value} type="button" className={a1.viewbtn} aria-current={activeTab === view.value ? "page" : undefined} onClick={() => handleViewChange(view.value)}>
+          {view.label}
+          {view.count ? <span className={a1.count}>{view.count.toLocaleString("pt-BR")}</span> : null}
+        </button>
+      ))}
+    </nav>
+  );
+  const liteColumnsMenu = (
+    <LeadsColumnsMenu1a1
+      columns={kanbanStatuses.map((status) => ({ id: status, label: statusLabel(status), visible: !hiddenStatuses.includes(status) }))}
+      onToggle={toggleStatusVisibility}
+    />
   );
   const columnsMenu = (
     <DropdownMenu>
@@ -774,15 +788,15 @@ export function LeadsWorkspace({
   return (
     <HideLeadArrivalContext.Provider value={contextRole === "broker"}>
     <BrokerProfileViewerProvider viewerRole={contextRole}>
-    <div className={directorLite ? `operational-workspace ${litePageStyles.workspace}` : "operational-workspace flex min-h-0 flex-1 flex-col gap-4"}>
+    <div className={directorLite ? `operational-workspace ${a1.stack}` : "operational-workspace flex min-h-0 flex-1 flex-col gap-4"}>
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
-      <Tabs value={activeTab} onValueChange={handleViewChange} className={directorLite ? "flex min-h-0 flex-1 flex-col gap-0" : "flex min-h-0 flex-1 flex-col"}>
+      <Tabs value={activeTab} onValueChange={handleViewChange} className={directorLite ? a1.stack : "flex min-h-0 flex-1 flex-col"}>
         {directorLite ? (
-          <div className={litePageStyles.bar}>
+          <div className={a1.stack}>
             {/* Uma linha de visões (rola dentro dela) e, embaixo, a barra de busca, filtros, etapa, fila e período. */}
-            <div className={litePageStyles.viewsRow}>
-              <div className={litePageStyles.views}>{liteViewTabs}</div>
-              {columnsMenu}
+            <div className={a1.viewsRow}>
+              {liteViewTabs}
+              {activeTab === "kanban" && !forecast ? liteColumnsMenu : null}
             </div>
             {liteFilters ? <LeadsFilters {...liteFilters} /> : null}
             {queueTabs}
@@ -796,7 +810,7 @@ export function LeadsWorkspace({
         )}
 
         {/* ─── TAB 1: LISTA PRINCIPAL (TABELA) ─── */}
-        <TabsContent value="list" className={directorLite ? litePageStyles.region : "mt-4"}>
+        <TabsContent value="list" className={directorLite ? a1.region : "mt-4"}>
           <div className="space-y-4">
             {directorLite ? null : (
               <SelectionToolbar
@@ -842,7 +856,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 2: KANBAN DO FUNIL ─── */}
-        <TabsContent value="kanban" className={directorLite ? `relative ${litePageStyles.region}` : "relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]"}>
+        <TabsContent value="kanban" className={directorLite ? a1.region : "relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]"}>
           {directorLite ? (
             <LeadsLiteKanban
               statuses={visibleStatuses}
@@ -873,6 +887,7 @@ export function LeadsWorkspace({
               stageActor={(lead) => stageActorFor(contextRole, lead, { branchId: contextBranchId })}
               onStageCommitted={handleBulkStatusCommitted}
               forecast={forecast}
+              columnsMenu={liteColumnsMenu}
             />
           ) : (
           <>
@@ -946,7 +961,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── ESFRIANDO (radar de leads parados) ─── */}
-        <TabsContent value="esfriando" className={directorLite ? litePageStyles.region : "mt-4"}>
+        <TabsContent value="esfriando" className={directorLite ? a1.region : "mt-4"}>
           {coolingList ? (
             <>
               <LeadsLiteCooling
@@ -963,7 +978,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 3: QUALIFICAÇÃO IA ─── */}
-        <TabsContent value="qualificacoes" className={directorLite ? litePageStyles.region : "mt-4"}>
+        <TabsContent value="qualificacoes" className={directorLite ? a1.region : "mt-4"}>
           {qualifyingLeads.length === 0 ? (
             <EmptyState
               variant="ghost"
@@ -985,7 +1000,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 4: RADAR DE NEGOCIAÇÕES (IA) ─── */}
-        <TabsContent value="radar" className={directorLite ? litePageStyles.region : "mt-4"}>
+        <TabsContent value="radar" className={directorLite ? a1.region : "mt-4"}>
           <NegotiationsRadarTab
             leads={workspaceLeads}
             branches={branches}
@@ -995,7 +1010,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 5: PERDIDOS & INATIVOS ─── */}
-        <TabsContent value="perdidos" className={directorLite ? litePageStyles.region : "mt-4"}>
+        <TabsContent value="perdidos" className={directorLite ? a1.region : "mt-4"}>
           <div className="space-y-4">
             <div className="w-full">
               <LeadsListSwitch
@@ -1020,7 +1035,7 @@ export function LeadsWorkspace({
 
         {/* ─── TAB 6: SEM ATRIBUIÇÃO (DIREÇÃO) ─── */}
         {showUnassignedFilter ? (
-          <TabsContent value="sem-atribuicao" className={directorLite ? litePageStyles.region : "mt-4"}>
+          <TabsContent value="sem-atribuicao" className={directorLite ? a1.region : "mt-4"}>
             {unassignedLeads.length === 0 ? (
               <EmptyState
                 variant="ghost"
@@ -1029,8 +1044,22 @@ export function LeadsWorkspace({
                 description="Todos os leads operacionais possuem um corretor responsável no momento."
               />
             ) : (
-              <div className="space-y-4">
-                <div className={directorLite ? litePageStyles.notice : "flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"}>
+              <div className={directorLite ? a1.stack : "space-y-4"}>
+                {directorLite ? (
+                  // Cartão do artifact "Leads da gestão" (27/11/2026): título, quantos esperam e "Distribuir todos".
+                  <div className={`${a1.gx} ${a1.card} ${a1.recover}`}>
+                    <div>
+                      <p className={a1.recoverTitle}>Recuperar leads sem corretor</p>
+                      <p className={a1.recoverText}>
+                        {unassignedCount === 1 ? "1 lead esperando um corretor." : `${unassignedCount.toLocaleString("pt-BR")} leads esperando um corretor.`} Reenvia todos os elegíveis para as ofertas automáticas da fila.
+                      </p>
+                    </div>
+                    <button type="button" className={`${a1.pill} ${a1.pillPrimary}`} disabled={isDistributingAll} onClick={handleDistributeAll}>
+                      {isDistributingAll ? "Distribuindo…" : "Distribuir todos"}
+                    </button>
+                  </div>
+                ) : (
+                <div className={"flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"}>
                   <div>
                     <p className="text-sm font-medium text-foreground">Recuperar leads sem corretor</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -1048,6 +1077,7 @@ export function LeadsWorkspace({
                     {isDistributingAll ? "Distribuindo..." : "Distribuir todos"}
                   </Button>
                 </div>
+                )}
                 {directorLite ? null : (
                   <SelectionToolbar
                     selectedCount={multiSelect.count}
@@ -1095,6 +1125,7 @@ export function LeadsWorkspace({
       {/* ─── QUICK VIEW DETAIL DRAWER ─── */}
       {selectedLead ? <LeadDetailsDrawer
         lead={selectedLead}
+        skin1a1={directorLite}
         contextRole={contextRole}
         contextJobTitle={contextJobTitle}
         contextBranchId={contextBranchId}

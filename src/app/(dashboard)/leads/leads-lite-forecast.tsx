@@ -5,9 +5,8 @@
  * (quantidade, valor bruto, chance e valor ponderado). Só o diretor vê "Configurações", que abre a gaveta das chances.
  * Salvar é ocasional: LiteActionButton, sucesso só depois do servidor, erro com a causa e "Tentar de novo".
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown } from "lucide-react";
 
 import { Input } from "@/components/arc/input/input";
 import { LiteActionButton } from "@/components/lite/controls";
@@ -23,31 +22,39 @@ import {
 } from "@/features/leads/monthly-forecast";
 
 import styles from "./leads-lite-forecast.module.css";
+import a1 from "./leads-1a1.module.css";
 
 /** `canConfigure`: só o diretor ajusta as chances por etapa. */
 export type LeadsLiteForecastData = MonthlyForecast & { chances: ForecastChances; scopeLabel: string; canConfigure: boolean };
 
-export function LeadsLiteForecast({ forecast }: { forecast: LeadsLiteForecastData }) {
+export function LeadsLiteForecast({ forecast, columnsMenu }: { forecast: LeadsLiteForecastData; columnsMenu?: ReactNode }) {
   const canConfigure = forecast.canConfigure;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const total = formatForecastCents(forecast.totalWeightedCents);
   const missing = withoutValueLabel(forecast.withoutValue);
   const hover = [`${forecast.scopeLabel}, ponderados pela chance de cada etapa.`, missing].filter(Boolean).join(" ");
+  // Chance média = previsto sobre o bruto, a mesma conta da gaveta por etapa.
+  const averageChance = forecast.totalGrossCents > 0 ? Math.round((forecast.totalWeightedCents / forecast.totalGrossCents) * 100) : null;
 
+  // Cartão do artifact "Leads da gestão" (27/11/2026): previsão em 28px, bruto e chance média, "Ver por etapa" e "Colunas".
   return (
-    <div className={styles.bar}>
-      <button type="button" className={styles.trigger} onClick={() => setDetailsOpen(true)} title={hover} aria-haspopup="dialog">
-        <span className={styles.triggerLabel}>Previsão do mês</span>
-        <span className={styles.triggerValue}>{total}</span>
+    <div className={`${a1.card} ${a1.forecast}`}>
+      <button type="button" className={a1.forecastValueBtn} onClick={() => setDetailsOpen(true)} title={hover} aria-haspopup="dialog">
+        <p className={a1.forecastLabel}>Previsão do mês</p>
+        <p className={a1.forecastValue}>{total}</p>
       </button>
-      {missing ? <span className={styles.missing}>{missing}</span> : null}
+      <div className={a1.forecastFacts}>
+        <span>Bruto {formatForecastCents(forecast.totalGrossCents)}</span>
+        {averageChance !== null ? <span>Chance média {averageChance}%</span> : null}
+        {missing ? <span>{missing}</span> : null}
+      </div>
+      <span className={a1.spacer} />
+      <button type="button" className={`${a1.pill} ${a1.pillQuiet} ${a1.pillQuietFlat}`} onClick={() => setDetailsOpen(true)} aria-haspopup="dialog">Ver por etapa</button>
       {canConfigure ? (
-        <button type="button" className={styles.settings} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog">
-          Configurações
-          <ChevronDown aria-hidden="true" size={16} />
-        </button>
+        <button type="button" className={`${a1.pill} ${a1.pillQuiet} ${a1.pillQuietFlat}`} onClick={() => setSettingsOpen(true)} aria-haspopup="dialog">Configurações</button>
       ) : null}
+      {columnsMenu}
 
       <LiteSidePanel open={detailsOpen} onOpenChange={setDetailsOpen} title="Previsão do mês" description={`${forecast.scopeLabel}. Valor mensal vezes a chance da etapa.`}>
         <ForecastBreakdown forecast={forecast} />

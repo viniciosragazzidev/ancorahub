@@ -56,13 +56,11 @@ describe("filtros Lite de /leads (chave ligada)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Filtros/ }));
     const panel = screen.getByRole("dialog", { name: "Filtros da fila" });
 
-    fireEvent.click(within(panel).getByRole("button", { name: /^Filial/ }));
-    fireEvent.change(within(panel).getByRole("combobox", { name: "Buscar em filial" }), { target: { value: "niter" } });
-    fireEvent.keyDown(within(panel).getByRole("combobox"), { key: "Enter" });
-    fireEvent.click(within(panel).getByRole("button", { name: /^Corretor/ }));
-    fireEvent.click(within(panel).getByRole("option", { name: "Bruno Lima" }));
-    fireEvent.click(within(panel).getByRole("button", { name: "PJ" }));
-    fireEvent.click(within(panel).getByRole("button", { name: "50" }));
+    // Desenho 1:1 do artifact (27/11/2026): cada filtro do painel é um seletor em pílula com o rótulo em cima.
+    fireEvent.change(within(panel).getByRole("combobox", { name: /^Filial/ }), { target: { value: "b2" } });
+    fireEvent.change(within(panel).getByRole("combobox", { name: /^Corretor/ }), { target: { value: "c2" } });
+    fireEvent.change(within(panel).getByRole("combobox", { name: /^Tipo de lead/ }), { target: { value: "PJ" } });
+    fireEvent.change(within(panel).getByRole("combobox", { name: /^Itens por página/ }), { target: { value: "50" } });
     expect(replace).not.toHaveBeenCalled();
 
     fireEvent.click(within(panel).getByRole("button", { name: "Aplicar filtros" }));
@@ -81,10 +79,10 @@ describe("filtros Lite de /leads (chave ligada)", () => {
   it("etapa vira um seletor na barra que aplica na hora, com o mesmo ?status=", () => {
     renderLite();
     expect(screen.queryByRole("group", { name: "Etapas" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^Etapa/ }));
-    fireEvent.click(screen.getByRole("option", { name: "Convertidos" }));
+    const stage = screen.getByRole("combobox", { name: "Etapa" });
+    fireEvent.change(stage, { target: { value: "converted" } });
     expect(lastTarget()).toBe("/leads?status=converted");
-    expect(screen.getByRole("button", { name: /^Etapa/ })).toHaveTextContent("Convertidos");
+    expect(stage).toHaveDisplayValue("Convertidos");
   });
 
   it("fila e período viram seletores com contagem e os mesmos ?fila= e ?period=", () => {
@@ -92,13 +90,11 @@ describe("filtros Lite de /leads (chave ligada)", () => {
       queueTabs: { tabs: [{ value: "", label: "Todas", count: 3966 }, { value: "q1", label: "FILA TATIANA", count: 1774 }, { value: "q2", label: "FILA PF - RENAN", count: 912 }], current: "" },
       period: 30,
     });
-    fireEvent.click(screen.getByRole("button", { name: /^Fila/ }));
-    const option = screen.getByRole("option", { name: /FILA TATIANA/ });
-    expect(option).toHaveTextContent("1.774");
-    fireEvent.click(option);
+    const queue = screen.getByRole("combobox", { name: "Fila" });
+    expect(within(queue).getByRole("option", { name: /FILA TATIANA/ })).toHaveTextContent("1.774");
+    fireEvent.change(queue, { target: { value: "q1" } });
     expect(push).toHaveBeenLastCalledWith("/leads?fila=q1", { scroll: false });
-    fireEvent.click(screen.getByRole("button", { name: /^Período/ }));
-    fireEvent.click(screen.getByRole("option", { name: "7 dias" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Período" }), { target: { value: "7" } });
     expect(lastTarget()).toBe("/leads?period=7");
   });
 
@@ -141,8 +137,8 @@ describe("filtros Lite de /leads (chave ligada)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Filtros/ }));
     const panel = within(screen.getByRole("dialog", { name: "Filtros da fila" }));
     expect(panel.queryByText("Origem da oportunidade")).not.toBeInTheDocument();
-    expect(panel.queryByRole("button", { name: /Campanhas Meta/ })).not.toBeInTheDocument();
-    expect(panel.getByRole("button", { name: /^Etapa/ })).toBeInTheDocument();
+    expect(panel.queryByRole("combobox", { name: /Campanhas Meta/ })).not.toBeInTheDocument();
+    expect(panel.getByRole("combobox", { name: /^Etapa/ })).toBeInTheDocument();
   });
 
   it("Esc fecha o painel e devolve o foco ao botão Filtros", () => {

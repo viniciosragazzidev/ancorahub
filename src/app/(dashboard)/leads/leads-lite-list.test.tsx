@@ -91,7 +91,7 @@ describe("cabeçalho e ações da lista Lite", () => {
     expect(table).toHaveTextContent("Plantão ativo");
     expect(table).toHaveTextContent("Investigação da gestão");
     expect(table).toHaveTextContent("Devolvido, não aceito");
-    const rows = table.querySelectorAll("tbody tr");
+    const rows = table.querySelectorAll('[data-row="lead"]');
     expect(rows[0]).toHaveAttribute("data-tone", "muted");
     expect(rows[1]).toHaveAttribute("data-tone", "warning");
   });
@@ -230,11 +230,11 @@ describe("nome, telefone e a visão Qualificação IA", () => {
         <QualifyingLeadsListSwitch leads={many} onOpen={() => {}} />
       </ArcScopeProvider>,
     );
-    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(20);
+    expect(container.querySelectorAll('[data-lite="table"] [data-row="lead"]')).toHaveLength(20);
     expect(screen.getByText("1 a 20 de 45 leads")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
-    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(5);
+    expect(container.querySelectorAll('[data-lite="table"] [data-row="lead"]')).toHaveLength(5);
     expect(screen.getByText("41 a 45 de 45 leads")).toBeInTheDocument();
   });
 });
@@ -246,7 +246,7 @@ describe("lista Lite para papéis do modo normal que não são diretor", () => {
         <LeadsListSwitch {...props} contextRole="supervisor" selectedIds={new Set([lead.id])} onRowClick={() => {}} />
       </ArcScopeProvider>,
     );
-    const bulk = within(screen.getByRole("region", { name: "Ações em lote" }));
+    const bulk = within(screen.getByRole("toolbar", { name: "Ações em lote" }));
     expect(bulk.getByText("Exportar CSV")).toBeInTheDocument();
     expect(bulk.queryByText("Alterar status")).not.toBeInTheDocument();
     expect(bulk.queryByText("Trocar corretor")).not.toBeInTheDocument();
@@ -258,7 +258,7 @@ describe("lista Lite para papéis do modo normal que não são diretor", () => {
         <LeadsListSwitch {...props} contextRole="manager" selectedIds={new Set([lead.id])} onRowClick={() => {}} />
       </ArcScopeProvider>,
     );
-    expect(within(screen.getByRole("region", { name: "Ações em lote" })).getByText("Alterar status")).toBeInTheDocument();
+    expect(within(screen.getByRole("toolbar", { name: "Ações em lote" })).getByText("Alterar status")).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/diretor/i);
   });
 });

@@ -197,8 +197,9 @@ describe("filtros Lite na barra do workspace de /leads", () => {
     const filters = screen.getByTestId("lite-filters");
     expect(filters).toHaveAttribute("data-storage-key", "teste:filtros");
     // As visões ficam numa linha própria acima da barra (não mais no fim dela).
-    expect(within(filters).queryByRole("tablist", { name: "Visualização de leads" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tablist", { name: "Visualização de leads" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Todos os leads/ })).toBeInTheDocument();
+    // Artifact "Leads da gestão" (27/11/2026): pílula de visões com a escolhida marcada como página atual.
+    expect(within(filters).queryByRole("navigation", { name: "Visões dos leads" })).not.toBeInTheDocument();
+    const views = screen.getByRole("navigation", { name: "Visões dos leads" });
+    expect(within(views).getByRole("button", { name: /Todos os leads/ })).toHaveAttribute("aria-current", "page");
   });
 });

@@ -13,7 +13,7 @@ import { LeadsFilters } from "./_components/leads-filters";
 import type { LeadsFiltersProps } from "./_components/use-lead-filters";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
-import liteStyles from "./leads-lite-page.module.css";
+import leads1a1 from "./leads-1a1.module.css";
 import { LeadsQueueTabs } from "./_components/leads-queue-tabs";
 import { buildQueueTabs, readQueueTab } from "@/features/leads/queue-tabs";
 import { LeadsWorkspace } from "./leads-workspace";
@@ -873,16 +873,11 @@ async function LeadsPageContent({
     ? await getStaleStageState(context.tenantId).catch(() => null)
     : null;
 
-  return (
-    <>
-      <DashboardHeader
-        breadcrumb="Operação comercial"
-        title="Leads"
-        summary={[
-          `${totalItems.toLocaleString("pt-BR")} ${totalItems === 1 ? "lead" : "leads"}`,
-          context.role === "director" && unassignedTotalItems > 0 ? `${unassignedTotalItems.toLocaleString("pt-BR")} sem corretor` : null,
-        ].filter(Boolean).join(" · ")}
-        rightSlot={
+  const headerSummary = [
+    `${totalItems.toLocaleString("pt-BR")} ${totalItems === 1 ? "lead" : "leads"}`,
+    context.role === "director" && unassignedTotalItems > 0 ? `${unassignedTotalItems.toLocaleString("pt-BR")} sem corretor` : null,
+  ].filter(Boolean).join(" · ");
+  const headerActions = (
           <LeadsHeaderActions
             period={period}
             plans={plans}
@@ -896,15 +891,31 @@ async function LeadsPageContent({
           >
             <NextUrgentLeadButton lead={urgentLead} />
           </LeadsHeaderActions>
-        }
-      />
+  );
+
+  return (
+    <>
+      {/* Lite (27/11/2026, artifact "Leads da gestão" 1:1): sem a faixa de topo; título, resumo e ações na página. */}
+      {directorLitePage ? null : (
+        <DashboardHeader breadcrumb="Operação comercial" title="Leads" summary={headerSummary} rightSlot={headerActions} />
+      )}
       <LeadsLiveSync />
-      <main className={directorLitePage ? liteStyles.page : "mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-5 bg-background p-4 pb-28 sm:p-6 lg:gap-6 lg:p-8 lg:pb-8"}>
+      <main className={directorLitePage ? `arc-venancor ${leads1a1.gx} ${leads1a1.page}` : "mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-5 bg-background p-4 pb-28 sm:p-6 lg:gap-6 lg:p-8 lg:pb-8"} data-skin={directorLitePage ? "diretor" : undefined}>
+        {directorLitePage ? (
+          <header className={leads1a1.head}>
+            <div>
+              <h1 className={leads1a1.title}>Leads</h1>
+              <p className={leads1a1.summary}>{headerSummary}</p>
+            </div>
+            {headerActions}
+          </header>
+        ) : null}
         {/* Attention Note */}
         {attentionNote ? <ContextNote variant="warning">{attentionNote}</ContextNote> : null}
 
         {/* Paused Branch Alert */}
-        {isDirector && pausedBranchCount > 0 ? (
+        {/* Lite (27/11/2026): o aviso de filial pausada saiu do desenho da /leads; segue no modo antigo. */}
+        {isDirector && pausedBranchCount > 0 && !directorLitePage ? (
           // Faixa de uma linha (skill interface-enxuta): o problema contado e a ação ao lado.
           <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius-card)] border border-warning/25 bg-warning/5 px-3 py-2 text-sm text-foreground">
             <WifiHigh aria-hidden="true" className="size-4 shrink-0 text-warning" />

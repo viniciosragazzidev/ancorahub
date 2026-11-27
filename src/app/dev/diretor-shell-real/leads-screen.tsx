@@ -5,10 +5,9 @@
  * topo, os filtros Lite e dados de exemplo realistas: nomes longos, 12 filas com nomes em caixa alta e contagens
  * grandes, 1.774 leads no filtro, Qualificação IA e Sem atribuição com leads. Mesma composição da página /leads.
  */
-import { DashboardHeader } from "@/components/dashboard-header";
 import { LeadsHeaderActions } from "@/app/(dashboard)/leads/_components/leads-header-actions";
 import { LeadsWorkspace, type QualifyingLeadItem } from "@/app/(dashboard)/leads/leads-workspace";
-import liteStyles from "@/app/(dashboard)/leads/leads-lite-page.module.css";
+import leads1a1 from "@/app/(dashboard)/leads/leads-1a1.module.css";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { RADAR_FIXTURES } from "@/features/conversation-intelligence/components/radar-fixtures";
 
@@ -109,10 +108,12 @@ export function LeadsShellScreen({ view, role = "director", jobTitle = "director
   const isDirector = role === "director";
   return (
     <>
-      <DashboardHeader
-        breadcrumb="Operação comercial"
-        title="Leads"
-        rightSlot={(
+      <main className={`arc-venancor ${leads1a1.gx} ${leads1a1.page}`} data-skin="diretor">
+        <header className={leads1a1.head}>
+          <div>
+            <h1 className={leads1a1.title}>Leads</h1>
+            <p className={leads1a1.summary}>1.774 leads{isDirector ? " · 361 sem corretor" : ""}</p>
+          </div>
           <LeadsHeaderActions
             period={30}
             plans={[]}
@@ -123,9 +124,7 @@ export function LeadsShellScreen({ view, role = "director", jobTitle = "director
             branchId={branchId}
             urgentLead={{ id: "l1", nome: "Justiniano Albuquerque de Souza", status: "new", urgentReason: "Primeiro contato vence em 3 min" }}
           />
-        )}
-      />
-      <main className={liteStyles.page}>
+        </header>
         <LeadsWorkspace
           leads={LEADS}
           qualifyingLeads={QUALIFYING}
