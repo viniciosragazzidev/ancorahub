@@ -57,6 +57,8 @@ import { TtlCache } from "@/shared/cache/ttl-cache";
 import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 import { getLiveStatuses } from "@/features/live-status/service";
 import { AssignSection1a1, DistributionHead1a1, LiveStrip1a1 } from "./_components/resumo-1a1-shell";
+import { Tab1a1 } from "./_components/abas-1a1-kit";
+import { DistributionHealth1a1 } from "./_components/health-1a1";
 import { DirectorDailySummary1a1 } from "./_components/director-daily-summary-1a1";
 import resumo1a1 from "./_components/resumo-1a1.module.css";
 import plantoes1a1 from "./plantao/_components/plantoes-1a1.module.css";
@@ -925,6 +927,125 @@ export default async function LeadDistributionPage({
           branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
           canFilterBranch={context.role === "director"}
         />
+      </main>
+    );
+  }
+
+  // Entradas e regras, Filas e Saúde (27/11/2026): mesmo topo e abas do Resumo; cartões de estado (o que tem configuração
+  // abre a gaveta) e a lista principal de cada aba na linguagem do Lite. Mesmos dados, regras e ações de antes.
+  if (directorLite && (view === "roteamento" || view === "filas" || view === "saude_historico")) {
+    const canEditRules = context.role === "director" || context.role === "manager";
+    const queuesAllowed = canViewDistributionQueues(context.role) && (!allowedViews || allowedViews.includes("filas"));
+    const tab = view === "roteamento" ? (
+      <Tab1a1
+        title="Entradas e regras"
+        lead="O que acontece com cada lead antes da oferta: quem segura, para qual fila vai e em que ordem as regras valem."
+        stats={[
+          {
+            key: "disq", label: "Desqualificados", text: true, value: holdDisqualifiedLeads ? "Retidos" : "Seguem a distribuição",
+            hint: holdDisqualifiedLeads ? "ficam em espera antes da oferta" : "vão para o corretor como os outros", tone: holdDisqualifiedLeads ? "success" : "neutral",
+            panel: <DisqualifiedLeadsRoutingPanel initialHoldDisqualifiedLeads={holdDisqualifiedLeads} canEdit={context.role === "director"} />,
+          },
+          {
+            key: "ddd", label: "Regra de DDD", text: true, value: dddRoutingSettings.enabled ? "Ligada" : "Desligada",
+            hint: dddRoutingSettings.enabled ? `${dddRoutingSettings.validDdds.length} ${dddRoutingSettings.validDdds.length === 1 ? "DDD válido" : "DDDs válidos"}` : "nenhum lead é movido pelo DDD",
+            tone: dddRoutingSettings.enabled ? "success" : "neutral",
+            panel: <DddRoutingPanel initialSettings={dddRoutingSettings} queues={queues.map((queue) => ({ id: queue.id, name: queue.name }))} canEdit={context.role === "director"} />,
+          },
+          { key: "rules", label: "Regras de roteamento", value: routingRules.length, hint: routingRules.length ? "em ordem de prioridade, na lista abaixo" : "tudo segue a fila geral da unidade" },
+        ]}
+      >
+        <RoutingMatrixPanel
+          rules={routingRules}
+          queues={queues.map((queue) => ({ id: queue.id, name: queue.name }))}
+          branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+          brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+          canEdit={canEditRules}
+        />
+      </Tab1a1>
+    ) : view === "filas" ? (queuesAllowed ? (
+      <Tab1a1
+        title="Filas"
+        lead="Quem recebe cada lead, em que ordem e com quanto tempo para aceitar."
+        stats={[
+          { key: "queues", label: "Filas ativas", value: activeQueues.length, hint: waitingInQueues ? `${waitingInQueues} ${waitingInQueues === 1 ? "lead esperando" : "leads esperando"}` : `de ${queuesForControl.length} ${queuesForControl.length === 1 ? "fila" : "filas"}` },
+          {
+            key: "sla", label: "Prazo de aceite", value: `${slaMinutes} min`,
+            hint: tenantSlaSettings?.autoRedistributeOnFeedbackTimeout ?? true ? "depois disso, passa para o próximo" : "sem redistribuição automática",
+            panel: (
+              <BrokerAcceptanceSlaPanel
+                initialMinutes={slaMinutes}
+                initialAutoRedistribute={tenantSlaSettings?.autoRedistributeOnFeedbackTimeout ?? true}
+                canEdit={canEditRules}
+              />
+            ),
+          },
+          {
+            key: "ranking", label: "Distribuição inteligente", text: true, value: tenantPolicy.ranking.enabled ? "Ranking ligado" : "Ordem da fila",
+            hint: tenantPolicy.ranking.enabled ? `conversão ${tenantPolicy.ranking.conversionWeight} · SLA ${tenantPolicy.ranking.slaWeight} · manual ${tenantPolicy.ranking.manualPriorityWeight}` : "sem ranking depois do plantão",
+            tone: tenantPolicy.ranking.enabled ? "success" : "neutral",
+            panel: (
+              <DistributionPolicyPanel
+                canEdit={context.role === "director"}
+                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+                policy={globalPolicy.find((policy) => !policy.queueId)?.policy ?? {}}
+                plantaoPriority={plantaoPriority}
+              />
+            ),
+          },
+          ...(coldLeadReview ? [{
+            key: "cold", label: "Leads frios", text: true, value: "Requalificar",
+            hint: "revisar os frios recebidos hoje", tone: "neutral" as const,
+            panel: <ColdLeadRequalificationPanel {...coldLeadReview} />,
+          }] : []),
+        ]}
+      >
+        <QueueControlCenter
+          queues={queuesForControl}
+          branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+          brokers={brokers.map((broker) => ({
+            id: broker.id,
+            name: broker.name,
+            branchId: broker.branchId ?? "",
+            branchName: broker.branchName ?? "",
+          }))}
+          dutySchedules={dutySchedules}
+          campaigns={metaCampaigns}
+          ads={metaAds}
+          campaignRoutes={metaCampaignRoutes.map((route) => ({
+            ...route,
+            queueId: route.queueId ?? "",
+          }))}
+          adRoutes={metaAdRoutes.map((route) => ({ ...route, queueId: route.queueId ?? "" }))}
+          attendanceFlows={attendanceFlowOptions}
+          canEdit={context.role === "director"}
+        />
+      </Tab1a1>
+    ) : null) : (
+      <Tab1a1
+        title="Saúde"
+        lead="Se o motor de distribuição está rodando e o que ficou para revisão."
+        stats={[
+          { key: "engine", label: "Motor de distribuição", text: true, value: !jobHealth.available ? "Aguardando configuração" : !jobConfig.enabled ? "Pausado" : "Ativo", tone: !jobHealth.available || !jobConfig.enabled ? "neutral" : "success" },
+          { key: "pending", label: "Pendências", value: jobHealth.pending + jobHealth.retrying + effectHealth.pending + effectHealth.retrying, hint: "o motor tenta de novo sozinho" },
+          { key: "failed", label: "Exceções", value: jobExceptions, hint: jobExceptions ? "pedem revisão da gestão" : "nada para revisar", tone: jobExceptions ? "danger" : "success" },
+          { key: "events", label: "Decisões recentes", value: recentEvents.length, hint: "atribuições e redistribuições" },
+        ]}
+      >
+        <DistributionHealth1a1
+          events={recentEvents.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() }))}
+          jobs={jobHealth}
+          jobsAvailable={jobHealth.available}
+          jobsEnabled={jobConfig.enabled}
+          effects={effectHealth}
+          failedEffects={failedEffects}
+        />
+      </Tab1a1>
+    );
+    return (
+      <main className={`arc-venancor ${resumo1a1.gx} ${resumo1a1.page}`} data-skin="diretor">
+        <DistributionHead1a1 available={totalAvailable} waiting={totalNewLeads} />
+        <div className={plantoes1a1.gx} style={{ display: "contents" }}>{tab}</div>
       </main>
     );
   }

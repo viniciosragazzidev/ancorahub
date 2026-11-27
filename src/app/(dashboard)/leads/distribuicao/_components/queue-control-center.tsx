@@ -57,6 +57,8 @@ import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
 import { MetaEntries, countQueueEntries, type MetaAd, type MetaAdRoute, type MetaCampaign, type MetaCampaignRoute, type MetaEntriesData } from "./queues/meta-entries";
 import { PanelSheet, QueueDetailSheet } from "./queues/queue-detail-sheet";
 import { QueuesTable } from "./queues/queues-table";
+import { QueuesSection1a1 } from "./queues/queues-1a1";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import type { DutySchedule, Queue } from "./queues/types";
 
 const IGNORED_PANEL_ID = "__ignored_campaigns__";
@@ -202,6 +204,7 @@ export function QueueControlCenter({
   const brokerNames = useMemo(() => new Map(brokers.map((broker) => [broker.id, broker.name])), [brokers]);
   const detailQueue = queues.find((queue) => queue.id === detailQueueId) ?? null;
   const activePanel = settingsPanels.find((panel) => panel.id === panelId) ?? null;
+  const lite = useDirectorLitePage();
 
   async function handleDeleteQueue(queue: Queue) {
     setDeleteTarget(queue);
@@ -480,6 +483,23 @@ export function QueueControlCenter({
 
   return (
     <>
+      {lite ? (
+        <QueuesSection1a1
+          queues={queues}
+          dutySchedules={dutySchedules}
+          entriesByQueue={entriesByQueue}
+          canEdit={canEdit}
+          onOpen={(queue) => setDetailQueueId(queue.id)}
+          onEdit={openEdit}
+          onDelete={(queue) => void handleDeleteQueue(queue)}
+          onCreate={openCreate}
+          settings={[
+            { label: "Simular distribuição", onSelect: () => { setSimulation(null); setSimulatorOpen(true); } },
+            { label: "Campanhas não registradas", onSelect: () => setPanelId(IGNORED_PANEL_ID) },
+            ...settingsPanels.map((panel) => ({ label: panel.label, onSelect: () => setPanelId(panel.id) })),
+          ]}
+        />
+      ) : (
       <Card variant="overview">
         <SectionCardHeader
           icon={<UserList />}
@@ -543,6 +563,7 @@ export function QueueControlCenter({
           )}
         </div>
       </Card>
+      )}
 
       <QueueDetailSheet
         queue={detailQueue}

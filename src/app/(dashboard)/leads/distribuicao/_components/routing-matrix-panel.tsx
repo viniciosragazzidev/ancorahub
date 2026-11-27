@@ -43,6 +43,8 @@ import {
   type RoutingRuleInput,
 } from "@/features/lead-distribution/routing-actions";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { RoutingRules1a1 } from "./routing-rules-1a1";
 import type { RoutingRule } from "@/features/lead-distribution/routing-engine";
 import { ALL_BRANCHES_TARGET_ID, ALL_ROUTING_SOURCES_ID, getRoutingQualificationStatusLabel, getRoutingSourceLabel, ROUTING_QUALIFICATION_STATUS_OPTIONS, ROUTING_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
 
@@ -90,6 +92,7 @@ export function RoutingMatrixPanel({
   const [minLives, setMinLives] = useState<string>("");
   const [maxLives, setMaxLives] = useState<string>("");
   const [selectedIAStatuses, setSelectedIAStatuses] = useState<string[]>([]);
+  const lite = useDirectorLitePage();
 
   const handleOpenCreateModal = () => {
     setEditingRule(null);
@@ -221,6 +224,11 @@ export function RoutingMatrixPanel({
 
   const handleDeleteRule = async (ruleId: string) => {
     if (!confirm("Deseja realmente excluir esta regra de roteamento?")) return;
+    await deleteRuleNow(ruleId);
+  };
+
+  // A confirmação do Lite fica no próprio diálogo (PlConfirm); aqui só exclui.
+  const deleteRuleNow = async (ruleId: string) => {
     try {
       await deleteRoutingRuleAction(ruleId);
       toast.success("Regra removida");
@@ -290,194 +298,8 @@ export function RoutingMatrixPanel({
     }
   };
 
-  return (
-    <Card variant="overview">
-      <SectionCardHeader
-        icon={<Sliders />}
-        title="Matriz inteligente de roteamento de leads"
-        description="Defina, em ordem de prioridade, para onde cada tipo de lead deve ser encaminhado."
-        actions={
-          canEdit ? (
-            <Button onClick={handleOpenCreateModal} size="sm" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nova regra de roteamento
-            </Button>
-          ) : null
-        }
-      />
-
-      <CardContent className="space-y-4 p-4">
-        {rules.length === 0 ? (
-          <div className="rounded-[var(--radius-card)] border border-dashed p-8 text-center bg-muted/20">
-            <Zap className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />
-            <p className="text-sm font-semibold">Nenhuma regra de roteamento configurada</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-              Todos os novos leads seguirão o fluxo padrão da Fila Geral da Unidade. Crie a primeira
-              regra para direcionar por Tipo de Plano, Origem ou Localidade.
-            </p>
-            {canEdit && (
-              <Button
-                onClick={handleOpenCreateModal}
-                size="sm"
-                variant="outline"
-                className="mt-4 gap-2"
-              >
-                <Plus className="h-4 w-4" /> Criar Primeira Regra
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {rules.map((rule, idx) => {
-              const cond = rule.conditions;
-              const hasConditions =
-                (cond.planTypes?.length ?? 0) > 0 ||
-                (cond.sources?.length ?? 0) > 0 ||
-                (cond.cities?.length ?? 0) > 0 ||
-                typeof cond.minLives === "number" ||
-                typeof cond.maxLives === "number" ||
-                (cond.qualificationStatuses?.length ?? 0) > 0;
-
-              return (
-                <div
-                  key={rule.id}
-                  className={`flex flex-col gap-3 rounded-[var(--radius-card)] border p-4 transition-colors ${
-                    rule.enabled
-                      ? "bg-card border-border/80"
-                      : "bg-muted/30 border-dashed opacity-75"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/8 text-xs font-semibold text-primary">
-                        #{rule.priority}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-sm truncate">{rule.name}</h4>
-                          <Badge
-                            variant={rule.enabled ? "success" : "outline"}
-                            className="text-[10px]"
-                          >
-                            {rule.enabled ? "Ativa" : "Pausada"}
-                          </Badge>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {rule.distributionMode === "manual" ? "Ação manual" : "Oferta automática"}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
-                          <span>Destino:</span>
-                          <strong className="text-foreground">
-                            {resolveTargetName(rule.targetType, rule.targetId)}
-                          </strong>
-                          {rule.fallbackQueueId && (
-                            <span className="text-[11px] text-muted-foreground ml-1">
-                              (Fallback:{" "}
-                              {queues.find((q) => q.id === rule.fallbackQueueId)?.name ??
-                                "Fila Geral"}
-                              )
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    {canEdit && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => handleMoveRule(idx, "up")}
-                          disabled={idx === 0}
-                          title="Subir prioridade"
-                        >
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => handleMoveRule(idx, "down")}
-                          disabled={idx === rules.length - 1}
-                          title="Descer prioridade"
-                        >
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => handleOpenEditModal(rule)}
-                          title="Editar regra"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => toggleRuleEnabled(rule)}
-                          title={rule.enabled ? "Pausar regra" : "Ativar regra"}
-                        >
-                          <CheckCircle2
-                            className={`h-3.5 w-3.5 ${rule.enabled ? "text-emerald-500" : "text-muted-foreground"}`}
-                          />
-                        </Button>
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          onClick={() => handleDeleteRule(rule.id)}
-                          className="text-destructive hover:bg-destructive/10"
-                          title="Excluir regra"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Conditions Badges */}
-                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40 text-xs">
-                    <span className="text-[11px] text-muted-foreground mr-1">Condições:</span>
-                    {!hasConditions ? (
-                      <Badge variant="outline" className="text-[10px]">
-                        Qualquer Lead (Global Match)
-                      </Badge>
-                    ) : (
-                      <>
-                        {cond.planTypes?.map((pt) => (
-                          <Badge key={pt} variant="secondary" className="text-[10px]">
-                            Plano: {availablePlanTypes.find((p) => p.id === pt)?.label ?? pt}
-                          </Badge>
-                        ))}
-                        {cond.sources?.map((sc) => (
-                          <Badge key={sc} variant="secondary" className="text-[10px]">
-                            Origem: {getRoutingSourceLabel(sc)}
-                          </Badge>
-                        ))}
-                        {cond.cities?.map((ct) => (
-                          <Badge key={ct} variant="secondary" className="text-[10px]">
-                            Cidade: {ct}
-                          </Badge>
-                        ))}
-                        {(typeof cond.minLives === "number" ||
-                          typeof cond.maxLives === "number") && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            Vidas: {cond.minLives ?? 1} a {cond.maxLives ?? "∞"}
-                          </Badge>
-                        )}
-                        {cond.qualificationStatuses?.map((st) => (
-                          <Badge key={st} variant="secondary" className="text-[10px]">
-                            IA: {getRoutingQualificationStatusLabel(st)}
-                          </Badge>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-
+  const dialog = (
+    <>
       {/* CREATE / EDIT DIALOG */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogPopup className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -757,6 +579,227 @@ export function RoutingMatrixPanel({
           </DialogFooter>
         </DialogPopup>
       </Dialog>
+    </>
+  );
+
+  // Lite (27/11/2026): a tabela de regras no padrão /equipe; o formulário de criar e editar é o mesmo.
+  if (lite) {
+    const conditionTags = (rule: RoutingRule) => {
+      const cond = rule.conditions;
+      return [
+        ...(cond.planTypes ?? []).map((pt) => `Plano: ${availablePlanTypes.find((p) => p.id === pt)?.label ?? pt}`),
+        ...(cond.sources ?? []).map((sc) => `Origem: ${getRoutingSourceLabel(sc)}`),
+        ...(cond.cities ?? []).map((ct) => `Cidade: ${ct}`),
+        ...(typeof cond.minLives === "number" || typeof cond.maxLives === "number" ? [`Vidas: ${cond.minLives ?? 1} a ${cond.maxLives ?? "sem limite"}`] : []),
+        ...(cond.qualificationStatuses ?? []).map((st) => `IA: ${getRoutingQualificationStatusLabel(st)}`),
+      ];
+    };
+    return (
+      <RoutingRules1a1
+        rules={rules}
+        canEdit={canEdit}
+        targetName={(rule) => resolveTargetName(rule.targetType, rule.targetId)}
+        fallbackName={(rule) => (rule.fallbackQueueId ? queues.find((q) => q.id === rule.fallbackQueueId)?.name ?? "Fila geral" : null)}
+        conditionTags={conditionTags}
+        onCreate={handleOpenCreateModal}
+        onEdit={handleOpenEditModal}
+        onToggle={toggleRuleEnabled}
+        onDelete={deleteRuleNow}
+        onMove={handleMoveRule}
+        dialog={dialog}
+      />
+    );
+  }
+
+  return (
+    <Card variant="overview">
+      <SectionCardHeader
+        icon={<Sliders />}
+        title="Matriz inteligente de roteamento de leads"
+        description="Defina, em ordem de prioridade, para onde cada tipo de lead deve ser encaminhado."
+        actions={
+          canEdit ? (
+            <Button onClick={handleOpenCreateModal} size="sm" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nova regra de roteamento
+            </Button>
+          ) : null
+        }
+      />
+
+      <CardContent className="space-y-4 p-4">
+        {rules.length === 0 ? (
+          <div className="rounded-[var(--radius-card)] border border-dashed p-8 text-center bg-muted/20">
+            <Zap className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />
+            <p className="text-sm font-semibold">Nenhuma regra de roteamento configurada</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+              Todos os novos leads seguirão o fluxo padrão da Fila Geral da Unidade. Crie a primeira
+              regra para direcionar por Tipo de Plano, Origem ou Localidade.
+            </p>
+            {canEdit && (
+              <Button
+                onClick={handleOpenCreateModal}
+                size="sm"
+                variant="outline"
+                className="mt-4 gap-2"
+              >
+                <Plus className="h-4 w-4" /> Criar Primeira Regra
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {rules.map((rule, idx) => {
+              const cond = rule.conditions;
+              const hasConditions =
+                (cond.planTypes?.length ?? 0) > 0 ||
+                (cond.sources?.length ?? 0) > 0 ||
+                (cond.cities?.length ?? 0) > 0 ||
+                typeof cond.minLives === "number" ||
+                typeof cond.maxLives === "number" ||
+                (cond.qualificationStatuses?.length ?? 0) > 0;
+
+              return (
+                <div
+                  key={rule.id}
+                  className={`flex flex-col gap-3 rounded-[var(--radius-card)] border p-4 transition-colors ${
+                    rule.enabled
+                      ? "bg-card border-border/80"
+                      : "bg-muted/30 border-dashed opacity-75"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/8 text-xs font-semibold text-primary">
+                        #{rule.priority}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-sm truncate">{rule.name}</h4>
+                          <Badge
+                            variant={rule.enabled ? "success" : "outline"}
+                            className="text-[10px]"
+                          >
+                            {rule.enabled ? "Ativa" : "Pausada"}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {rule.distributionMode === "manual" ? "Ação manual" : "Oferta automática"}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
+                          <span>Destino:</span>
+                          <strong className="text-foreground">
+                            {resolveTargetName(rule.targetType, rule.targetId)}
+                          </strong>
+                          {rule.fallbackQueueId && (
+                            <span className="text-[11px] text-muted-foreground ml-1">
+                              (Fallback:{" "}
+                              {queues.find((q) => q.id === rule.fallbackQueueId)?.name ??
+                                "Fila Geral"}
+                              )
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {canEdit && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => handleMoveRule(idx, "up")}
+                          disabled={idx === 0}
+                          title="Subir prioridade"
+                        >
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => handleMoveRule(idx, "down")}
+                          disabled={idx === rules.length - 1}
+                          title="Descer prioridade"
+                        >
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => handleOpenEditModal(rule)}
+                          title="Editar regra"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => toggleRuleEnabled(rule)}
+                          title={rule.enabled ? "Pausar regra" : "Ativar regra"}
+                        >
+                          <CheckCircle2
+                            className={`h-3.5 w-3.5 ${rule.enabled ? "text-emerald-500" : "text-muted-foreground"}`}
+                          />
+                        </Button>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          onClick={() => handleDeleteRule(rule.id)}
+                          className="text-destructive hover:bg-destructive/10"
+                          title="Excluir regra"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Conditions Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/40 text-xs">
+                    <span className="text-[11px] text-muted-foreground mr-1">Condições:</span>
+                    {!hasConditions ? (
+                      <Badge variant="outline" className="text-[10px]">
+                        Qualquer Lead (Global Match)
+                      </Badge>
+                    ) : (
+                      <>
+                        {cond.planTypes?.map((pt) => (
+                          <Badge key={pt} variant="secondary" className="text-[10px]">
+                            Plano: {availablePlanTypes.find((p) => p.id === pt)?.label ?? pt}
+                          </Badge>
+                        ))}
+                        {cond.sources?.map((sc) => (
+                          <Badge key={sc} variant="secondary" className="text-[10px]">
+                            Origem: {getRoutingSourceLabel(sc)}
+                          </Badge>
+                        ))}
+                        {cond.cities?.map((ct) => (
+                          <Badge key={ct} variant="secondary" className="text-[10px]">
+                            Cidade: {ct}
+                          </Badge>
+                        ))}
+                        {(typeof cond.minLives === "number" ||
+                          typeof cond.maxLives === "number") && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Vidas: {cond.minLives ?? 1} a {cond.maxLives ?? "∞"}
+                          </Badge>
+                        )}
+                        {cond.qualificationStatuses?.map((st) => (
+                          <Badge key={st} variant="secondary" className="text-[10px]">
+                            IA: {getRoutingQualificationStatusLabel(st)}
+                          </Badge>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+
+      {dialog}
     </Card>
   );
 }
