@@ -10,6 +10,7 @@ import {
   useId,
 } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { toast } from "@/components/ui/sonner";
 import { Archive, Download } from "lucide-react";
 import { MessageCircle, UserRoundCheck } from "lucide-react";
@@ -58,13 +59,14 @@ import { cn } from "@/utils/core/cn";
 import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
 import { LeadTemperature } from "@/components/status-badges";
 import { sortByTemperaturePriority } from "@/features/lead-distribution/temperature-priority";
-import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
-import { LitePagination } from "@/components/lite/data/pagination";
-import { LiteBulkBar } from "@/components/lite/controls";
-import { formatLiteDate } from "@/components/lite/format/date";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import liteStyles from "./director-distribution-inbox.module.css";
 import { LeadNameHoverCard, type LeadPreviewData } from "@/features/leads/components/lead-hover-card";
+import Link from "next/link";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { LiteActionButton, type LiteActionOutcome } from "@/components/lite/controls/action-button";
+import { CheckIcon, MiniSelect, PageButtons, PillSelect } from "./resumo-1a1-parts";
+import s from "./resumo-1a1.module.css";
 
 type Lead = {
   id: string;
@@ -260,10 +262,13 @@ function ManualAssignmentChoiceDialog({
   lead,
   brokerId,
   onCommitted,
+  triggerClassName,
 }: {
   lead: Lead;
   brokerId: string;
   onCommitted: (state: DistributionActionState) => void;
+  /** Lite 1:1: o gatilho no desenho da pílula do artifact. */
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -274,9 +279,13 @@ function ManualAssignmentChoiceDialog({
   };
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
-        <UserList className="size-4" /> Atribuir
-      </Button>
+      {triggerClassName ? (
+        <button type="button" className={triggerClassName} onClick={() => setOpen(true)}>Atribuir</button>
+      ) : (
+        <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
+          <UserList className="size-4" /> Atribuir
+        </Button>
+      )}
       <DialogPopup className="sm:max-w-lg">
         <DialogPanel>
           <DialogHeader>
@@ -393,6 +402,7 @@ export function DistributionInbox({
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const managerBranchId = role === "manager" ? (branches[0]?.id ?? "") : "";
   const [brokerByLead, setBrokerByLead] = useState<Record<string, string>>({});
+  const [unitByLead, setUnitByLead] = useState<Record<string, string>>({});
   const [batchBrokerId, setBatchBrokerId] = useState("");
   const [unitFilter, setUnitFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
@@ -610,136 +620,6 @@ export function DistributionInbox({
     startTransition(() => router.refresh());
   }, [archiveState.mutationId, archiveState.processedLeadIds, archiveState.success, router]);
 
-  const liteColumns: LiteColumn<Lead>[] = [
-    {
-      id: "lead",
-      label: "Lead",
-      primary: true,
-      // Hover card do lead (20/11): no Lite também (era só na tabela antiga). No toque, só o nome.
-      render: (lead) => (
-        <LeadNameHoverCard lead={distributionLeadPreview(lead, branches)} href={`/leads/${lead.id}`}>
-          <span tabIndex={0} className={`${liteStyles.leadName} underline-offset-4 outline-none hover:underline focus-visible:underline`} title={lead.name || "Lead sem nome"}>{lead.name || "Lead sem nome"}</span>
-        </LeadNameHoverCard>
-      ),
-    },
-    { id: "phone", label: "Telefone", secondary: true, render: (lead) => lead.phone || "Sem telefone" },
-    {
-      id: "temperature",
-      label: "Qualificação",
-      render: (lead) => {
-        const status = lead.qualificationStatus;
-        if (status === "hot") return <Badge variant="destructive">Quente</Badge>;
-        if (status === "warm") return <Badge variant="warning">Morno</Badge>;
-        if (status === "cold") return <Badge variant="info">Frio</Badge>;
-        if (status === "disqualified") return <Badge variant="destructive">Desqualificado</Badge>;
-        if (status === "qualified") return <Badge variant="success">Qualificado</Badge>;
-        return <Badge variant="outline">Sem temperatura</Badge>;
-      },
-    },
-    {
-      id: "destination",
-      label: "Unidade",
-      render: (lead) => branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral",
-    },
-    {
-      id: "status",
-      label: "Status",
-      render: (lead) => {
-        if (lead.distributionStatus === "queued") return <Badge variant="warning">Aguardando corretor</Badge>;
-        if (lead.distributionStatus === "returned_to_queue") return <Badge variant="warning">Devolvido à fila</Badge>;
-        if (lead.distributionStatus === "manual_hold") return <Badge variant="secondary">Aguardando ação manual</Badge>;
-        return <Badge variant="outline">Aguardando unidade</Badge>;
-      },
-    },
-    {
-      id: "source",
-      label: "Origem",
-      render: (lead) => lead.sourceCampaign || lead.metaCampaignId || lead.sourceAd || lead.metaAdId || "Entrada manual",
-    },
-    {
-      id: "next-action",
-      label: "Próxima ação",
-      render: (lead) => {
-        const leadBrokers = brokers.filter((broker) => broker.branchId === lead.branchId && broker.availabilityStatus === "available");
-        if (!lead.branchId && role === "director") {
-          return (
-            <div className={liteStyles.rowActions}>
-              <AppSelect
-                aria-label={`Unidade para ${lead.name}`}
-                value={branchId}
-                onValueChange={setBranchId}
-                placeholder="Unidade"
-                options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
-              />
-              <ActionForm
-                action={routeLeadToBranchAction}
-                fields={{ leadId: lead.id, branchId }}
-                label={`enviar lead ${lead.name} para a unidade`}
-                onCampaignConflict={(conflict, fields) => {
-                  setCampaignConflictDialog(conflict);
-                  setPendingOverrideFields(fields);
-                }}
-                onCommitted={applySingleCommit}
-              >
-                <ArrowRight /> Enviar
-              </ActionForm>
-            </div>
-          );
-        }
-        if (!lead.branchId) return <span>Defina uma unidade</span>;
-        return (
-          <div className={liteStyles.rowActions}>
-            <AppSelect
-              aria-label={`Corretor para ${lead.name}`}
-              value={brokerByLead[lead.id] ?? ""}
-              onValueChange={(value) => setBrokerByLead((current) => ({ ...current, [lead.id]: value }))}
-              placeholder="Corretor"
-              options={[{ value: "", label: "Corretor" }, ...leadBrokers.map((broker) => ({ value: broker.id, label: broker.name }))]}
-            />
-            {brokerByLead[lead.id] ? (manualAssignmentChoiceEnabled ? (
-              <ManualAssignmentChoiceDialog lead={lead} brokerId={brokerByLead[lead.id]!} onCommitted={applySingleCommit} />
-            ) : (
-              <ActionForm
-                action={assignLeadToBrokerAction}
-                fields={{ leadId: lead.id, brokerId: brokerByLead[lead.id]! }}
-                label={`atribuir lead ${lead.name}`}
-                onCommitted={applySingleCommit}
-              >
-                <UserList /> Atribuir
-              </ActionForm>
-            )) : null}
-            {lead.distributionStatus !== "manual_hold" ? (
-              <ActionForm
-                action={distributeLeadAutomaticallyAction}
-                fields={{ leadId: lead.id }}
-                label={`distribuir lead ${lead.name}`}
-                onCommitted={applySingleCommit}
-              >
-                <MagicWand /> Auto
-              </ActionForm>
-            ) : null}
-          </div>
-        );
-      },
-    },
-  ];
-
-  const archivedLeadColumns: LiteColumn<Lead>[] = [
-    // Sem hover card aqui: esta lista desenha todos os leads sem corretor de uma vez (milhares), e uma prévia por
-    // linha pesaria a tela. A lista paginada de cima tem a prévia.
-    { id: "lead", label: "Lead", primary: true, render: (lead) => lead.name || "Lead sem nome" },
-    { id: "phone", label: "Telefone", secondary: true, render: (lead) => lead.phone || "Sem telefone" },
-    { id: "branch", label: "Unidade", render: (lead) => branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral" },
-    {
-      id: "reason",
-      label: "Motivo",
-      render: (lead) => lead.qualificationStatus === "disqualified"
-        ? "Desqualificado"
-        : lead.status === "lost" ? "Perdido" : "Fora da fila operacional",
-    },
-    { id: "received", label: "Entrada", numeric: true, render: (lead) => formatLiteDate(lead.createdAt, { dateStyle: "short" }) },
-  ];
-
   function selectVisible(checked: boolean) {
     const visibleIds = visible.map((lead) => lead.id);
     if (!checked) {
@@ -754,141 +634,215 @@ export function DistributionInbox({
     setSelected((current) => [...current, ...missing]);
   }
 
+  // Lite 1:1 (27/11/2026, artifact "Distribuição · Resumo"): ações das linhas e do lote chamam o servidor direto,
+  // com os estados do LiteActionButton; a linha só sai depois que o "feito" aparece.
+  async function runRowAction(
+    action: (previous: DistributionActionState, formData: FormData) => Promise<DistributionActionState>,
+    fields: Record<string, string>,
+    label: string,
+  ): Promise<LiteActionOutcome> {
+    const formData = new FormData();
+    for (const [name, value] of Object.entries(fields)) formData.set(name, value);
+    const state = await action({}, formData);
+    if (state.campaignConflict) {
+      setCampaignConflictDialog(state.campaignConflict);
+      setPendingOverrideFields(fields);
+      return { ok: false, message: "Este lead tem regra de campanha. Escolha na janela aberta." };
+    }
+    if (!state.success) return { ok: false, message: state.error ?? state.message ?? `Não deu para ${label}.` };
+    window.setTimeout(() => {
+      applySingleCommit(state);
+      startTransition(() => router.refresh());
+    }, 900);
+    return { ok: true };
+  }
+
+  async function runBatchAction(kind: "send" | "assign"): Promise<LiteActionOutcome> {
+    const ids = [...selected];
+    const formData = new FormData();
+    formData.set("leadIds", ids.join(","));
+    formData.set("branchId", role === "director" ? branchId : managerBranchId);
+    if (kind === "assign") formData.set("brokerId", batchBrokerId);
+    const state = await (kind === "send" ? distributeLeadBatchAction : assignLeadBatchToBrokerAction)({}, formData);
+    if (!state.success) return { ok: false, message: state.error ?? state.message ?? "Não deu para processar o lote." };
+    const processed = state.processedLeadIds ?? ids;
+    window.setTimeout(() => {
+      setInboxLeads((current) => kind === "send"
+        ? current.map((lead) => processed.includes(lead.id) ? { ...lead, branchId, distributionStatus: "queued" } : lead)
+        : current.filter((lead) => !processed.includes(lead.id)));
+      clearBatchUi();
+      startTransition(() => router.refresh());
+    }, 900);
+    return { ok: true };
+  }
+
   if (directorLite) {
+    const branchOptions = branches.map((branch) => ({ value: branch.id, label: branch.name }));
+    const allVisibleSelected = visible.length > 0 && visible.every((lead) => selected.includes(lead.id));
+    const qualification = (status: string | null | undefined) => {
+      if (status === "hot") return <span className={`${s.badge} ${s.bBad}`}>Quente</span>;
+      if (status === "warm") return <span className={`${s.badge} ${s.bWarn}`}>Morno</span>;
+      if (status === "cold") return <span className={`${s.badge} ${s.bInfo}`}>Frio</span>;
+      if (status === "disqualified") return <span className={`${s.badge} ${s.bBad}`}>Desqualificado</span>;
+      if (status === "qualified") return <span className={`${s.badge} ${s.bGood}`}>Qualificado</span>;
+      return <span className={s.badge}>Sem temperatura</span>;
+    };
+    const distribution = (status: string) => {
+      if (status === "queued") return <span className={`${s.badge} ${s.bInfo}`}>Aguardando corretor</span>;
+      if (status === "returned_to_queue") return <span className={`${s.badge} ${s.bWarn}`}>Devolvido à fila</span>;
+      if (status === "manual_hold") return <span className={`${s.badge} ${s.bBad}`}>Aguardando ação manual</span>;
+      return <span className={`${s.badge} ${s.bWarn}`}>Aguardando unidade</span>;
+    };
     return (
       <>
-        <section className={liteStyles.root} aria-labelledby="distribution-inbox-title">
-          <header className={liteStyles.header}>
-            <div className={liteStyles.heading}>
-              <h2 id="distribution-inbox-title">Leads para distribuir</h2>
-              <p>{filtered.length} na fila. Selecione até {MAX_BATCH} para enviar em lote.</p>
-            </div>
-            {/* Como no legado: PDF e arquivar sem corretor só para o diretor (as ações do servidor também exigem). */}
-            {role === "director" ? (
-            <div className={liteStyles.headerActions}>
-              <Button variant="outline" render={<a href="/api/reports/distribution-unassigned" download />}>
-                <Download aria-hidden="true" /> Baixar PDF
-              </Button>
-              <Button
-                variant="outline"
-                disabled={!totalUnassigned || archivePending}
+        <div className={s.inboxBar}>
+          <div className={s.inboxHeading}>
+            <p className={s.inboxTitle}>Leads para distribuir</p>
+            <p className={s.inboxHint}>{filtered.length.toLocaleString("pt-BR")} na fila. Selecione até {MAX_BATCH} para enviar em lote.</p>
+          </div>
+          <PillSelect flat label="Filtrar por unidade" value={unitFilter} onChange={changeUnitFilter}
+            options={[{ value: "all", label: "Todas as unidades" }, ...branchOptions]} />
+          <PillSelect flat label="Filtrar por status" value={statusFilter} onChange={changeStatusFilter}
+            options={[
+              { value: "all", label: "Todos os status" },
+              { value: "unassigned", label: "Aguardando unidade" },
+              { value: "queued", label: "Aguardando corretor" },
+              { value: "returned_to_queue", label: "Devolvido à fila" },
+              { value: "manual_hold", label: "Aguardando ação manual" },
+            ]} />
+          {/* Como no legado: PDF e arquivar sem corretor só para o diretor (as ações do servidor também exigem). */}
+          {role === "director" ? (
+            <>
+              <a className={`${s.pill} ${s.pillQuiet} ${s.pillFlat}`} href="/api/reports/distribution-unassigned" download>Baixar PDF</a>
+              <button type="button" className={`${s.pill} ${s.pillQuiet} ${s.pillFlat}`} disabled={!totalUnassigned || archivePending}
                 onClick={() => {
                   archiveCandidateIdsRef.current = inboxLeads.map((lead) => lead.id);
                   setArchiveDialogOpen(true);
-                }}
-              >
-                <Archive aria-hidden="true" /> Arquivar sem corretor
-              </Button>
-            </div>
-            ) : null}
-          </header>
-
-          <div className={liteStyles.filters}>
-            <AppSelect
-              aria-label="Filtrar por unidade"
-              value={unitFilter}
-              onValueChange={changeUnitFilter}
-              options={[{ value: "all", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))]}
-            />
-            <AppSelect
-              aria-label="Filtrar por status"
-              value={statusFilter}
-              onValueChange={changeStatusFilter}
-              options={[
-                { value: "all", label: "Todos os status" },
-                { value: "unassigned", label: "Aguardando unidade" },
-                { value: "queued", label: "Aguardando corretor" },
-                { value: "returned_to_queue", label: "Devolvido à fila" },
-                { value: "manual_hold", label: "Aguardando ação manual" },
-              ]}
-            />
-          </div>
-
-          <LiteBulkBar count={selected.length} actions={[]} onClear={clearBatchUi} />
-          {selected.length ? (
-            <div className={liteStyles.bulkForms}>
-              <form action={batchAction} onSubmit={submitBatch}>
-                <input name="leadIds" type="hidden" value={selected.join(",")} />
-                {role === "director" ? (
-                  <AppSelect
-                    aria-label="Unidade de destino"
-                    name="branchId"
-                    value={branchId}
-                    onValueChange={changeBatchUnit}
-                    options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
-                  />
-                ) : <input name="branchId" type="hidden" value={managerBranchId} />}
-                <ActionButton pending={batchPending} success={batchSuccess} variant="default" lite>
-                  <ArrowRight /> Enviar {selected.length}/{MAX_BATCH}
-                </ActionButton>
-              </form>
-              <form action={assignAction} onSubmit={submitBatch}>
-                <input name="leadIds" type="hidden" value={selected.join(",")} />
-                <input name="branchId" type="hidden" value={role === "director" ? branchId : managerBranchId} />
-                <AppSelect
-                  aria-label="Corretor em massa"
-                  value={batchBrokerId}
-                  onValueChange={setBatchBrokerId}
-                  placeholder="Corretor"
-                  options={[{ value: "", label: "Corretor" }, ...unitBrokers.map((broker) => ({ value: broker.id, label: broker.name }))]}
-                />
-                <ActionButton pending={assignPending} success={assignSuccess} variant="outline" disabled={!batchBrokerId} lite>
-                  <UserList /> Atribuir {selected.length}
-                </ActionButton>
-              </form>
-            </div>
-          ) : null}
-
-          {!selectable.length ? (
-            <p className={liteStyles.empty}>Inbox em dia. Não há leads aguardando unidade ou corretor.</p>
-          ) : !filtered.length ? (
-            <p className={liteStyles.empty}>Nenhum lead com os filtros atuais.</p>
-          ) : (
-            <>
-              <LiteResponsiveData
-                caption="Leads aguardando distribuição"
-                columns={liteColumns}
-                rows={visible}
-                rowKey={(lead) => lead.id}
-                empty={<p>Nenhum lead nesta página.</p>}
-                selection={{
-                  isSelected: (lead) => selected.includes(lead.id),
-                  onToggle: (lead) => toggle(lead.id),
-                  allSelected: visible.length > 0 && visible.every((lead) => selected.includes(lead.id)),
-                  onToggleAll: selectVisible,
-                  rowLabel: (lead) => `Selecionar ${lead.name || "lead sem nome"}`,
-                }}
-                rowTone={(lead) => lead.distributionStatus === "manual_hold" ? "warning" : undefined}
-              />
-              <LitePagination
-                page={currentPage}
-                totalPages={totalPages}
-                totalItems={filtered.length}
-                pageSize={PAGE_SIZE}
-                onPageChange={setPage}
-                pending={batchPending || assignPending}
-                label="Páginas de leads para distribuir"
-              />
+                }}>Arquivar sem corretor</button>
             </>
-          )}
-        </section>
+          ) : null}
+        </div>
 
-        {inboxLeads.length ? (
-          <section className={liteStyles.root} aria-labelledby="distribution-archive-title">
-            <header className={liteStyles.header}>
-              <div className={liteStyles.heading}>
-                <h2 id="distribution-archive-title">Todos os leads sem corretor</h2>
-                <p>{inboxLeads.length} carregados de {totalUnassigned}. Inclui leads fora da fila operacional.</p>
+        {!selectable.length ? (
+          <p className={s.empty}>Inbox em dia. Não há leads aguardando unidade ou corretor.</p>
+        ) : !filtered.length ? (
+          <p className={s.empty}>Nenhum lead com os filtros atuais.</p>
+        ) : (
+          <ScrollArea orientation="horizontal" className={s.sa}>
+            <div role="table" aria-label="Leads aguardando distribuição">
+              <div role="row" className={`${s.lrow} ${s.lth}`}>
+                <span role="columnheader">
+                  <button type="button" role="checkbox" className={s.check} aria-checked={allVisibleSelected}
+                    aria-label="Selecionar os leads desta página" onClick={() => selectVisible(!allVisibleSelected)}>
+                    {allVisibleSelected ? <CheckIcon /> : null}
+                  </button>
+                </span>
+                <span role="columnheader">Lead</span><span role="columnheader">Telefone</span><span role="columnheader">Qualificação</span>
+                <span role="columnheader">Unidade</span><span role="columnheader">Status</span><span role="columnheader">Origem</span>
+                <span role="columnheader">Próxima ação</span>
               </div>
-            </header>
-            <LiteResponsiveData
-              caption="Todos os leads sem corretor"
-              columns={archivedLeadColumns}
-              rows={inboxLeads}
-              rowKey={(lead) => lead.id}
-              empty={<p>Nenhum lead sem corretor.</p>}
-            />
-          </section>
+              {visible.map((lead) => {
+                const checked = selected.includes(lead.id);
+                const leadBrokers = brokers.filter((broker) => broker.branchId === lead.branchId && broker.availabilityStatus === "available");
+                const chosenBroker = brokerByLead[lead.id] ?? "";
+                const chosenUnit = unitByLead[lead.id] ?? "";
+                return (
+                  <div key={lead.id} role="row" className={s.lrow} data-tone={lead.distributionStatus === "manual_hold" ? "hold" : undefined}
+                    data-checked={checked ? "true" : undefined}>
+                    <span role="cell">
+                      <button type="button" role="checkbox" className={s.check} aria-checked={checked}
+                        aria-label={`Selecionar ${lead.name || "lead sem nome"}`} onClick={() => toggle(lead.id)}>
+                        {checked ? <CheckIcon /> : null}
+                      </button>
+                    </span>
+                    <span role="cell" style={{ minWidth: 0 }}>
+                      <LeadNameHoverCard lead={distributionLeadPreview(lead, branches)} href={`/leads/${lead.id}`}>
+                        <Link href={`/leads/${lead.id}`} className={s.leadName} title={lead.name || "Lead sem nome"}>{lead.name || "Lead sem nome"}</Link>
+                      </LeadNameHoverCard>
+                    </span>
+                    <span role="cell" className={s.phone}>{lead.phone || "Sem telefone"}</span>
+                    <span role="cell">{qualification(lead.qualificationStatus)}</span>
+                    <span role="cell">{branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral"}</span>
+                    <span role="cell">{distribution(lead.distributionStatus)}</span>
+                    <span role="cell" className={s.origin}>{lead.sourceCampaign || lead.metaCampaignId || lead.sourceAd || lead.metaAdId || "Entrada manual"}</span>
+                    <span role="cell" className={s.rowActions}>
+                      {!lead.branchId && role === "director" ? (
+                        <>
+                          <MiniSelect label={`Unidade para ${lead.name}`} placeholder="Unidade" value={chosenUnit} options={branchOptions}
+                            onChange={(value) => setUnitByLead((current) => ({ ...current, [lead.id]: value }))} />
+                          <LiteActionButton className={s.actWrap} buttonClassName={s.act} busyLabel="Enviando…" doneLabel="Enviado"
+                            disabled={!chosenUnit} errorFallback="O lead não foi enviado." keeps="O lead continua aqui, sem unidade."
+                            onAction={() => runRowAction(routeLeadToBranchAction, { leadId: lead.id, branchId: chosenUnit }, "enviar o lead para a unidade")}>
+                            Enviar
+                          </LiteActionButton>
+                        </>
+                      ) : !lead.branchId ? (
+                        <span className={s.muted}>Defina uma unidade</span>
+                      ) : (
+                        <>
+                          <MiniSelect label={`Corretor para ${lead.name}`} placeholder="Corretor" value={chosenBroker}
+                            options={leadBrokers.map((broker) => ({ value: broker.id, label: broker.name }))}
+                            onChange={(value) => setBrokerByLead((current) => ({ ...current, [lead.id]: value }))} />
+                          {chosenBroker && manualAssignmentChoiceEnabled ? (
+                            <ManualAssignmentChoiceDialog lead={lead} brokerId={chosenBroker} onCommitted={applySingleCommit}
+                              triggerClassName={`${s.pill} ${s.pillQuiet} ${s.pillSm}`} />
+                          ) : (
+                            <LiteActionButton className={s.actWrap} buttonClassName={s.act} busyLabel="Atribuindo…" doneLabel="Atribuído"
+                              disabled={!chosenBroker} errorFallback="O lead não foi atribuído." keeps="O lead continua esperando corretor."
+                              onAction={() => runRowAction(assignLeadToBrokerAction, { leadId: lead.id, brokerId: chosenBroker }, "atribuir o lead")}>
+                              Atribuir
+                            </LiteActionButton>
+                          )}
+                          {lead.distributionStatus !== "manual_hold" ? (
+                            <LiteActionButton className={s.actWrap} buttonClassName={s.act} busyLabel="Distribuindo…" doneLabel="Distribuído"
+                              errorFallback="A distribuição automática não rodou." keeps="O lead continua esperando corretor."
+                              onAction={() => runRowAction(distributeLeadAutomaticallyAction, { leadId: lead.id }, "distribuir o lead")}>
+                              Auto
+                            </LiteActionButton>
+                          ) : null}
+                        </>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        )}
+
+        <div className={s.tableFoot}>
+          {role === "director" ? (
+            <Link href="/leads?view=sem-atribuicao" className={s.footLink}>Ver todos os leads sem corretor ({totalUnassigned.toLocaleString("pt-BR")})</Link>
+          ) : <span className={s.footNote}>{totalUnassigned.toLocaleString("pt-BR")} leads sem corretor</span>}
+          <PageButtons page={currentPage} totalPages={totalPages} onPageChange={setPage} label="Páginas de leads para distribuir" />
+        </div>
+
+        {/* A barra do lote vai para o body: dentro da página rolável, o "fixed" acompanhava a rolagem. */}
+        {selected.length > 0 && typeof document !== "undefined" ? createPortal(
+          <div className={`arc-venancor ${s.gx}`} data-skin="diretor">
+          <div className={`${s.bulk} ${s.bulkBar}`} role="toolbar" aria-label="Ações em lote">
+            <span className={s.bulkLabel}>{selected.length} {selected.length === 1 ? "selecionado" : "selecionados"}</span>
+            {role === "director" ? (
+              <MiniSelect className={s.bulkSelect} label="Unidade de destino" placeholder="Unidade" value={branchId} options={branchOptions} onChange={changeBatchUnit} />
+            ) : null}
+            <LiteActionButton key={`send-${selected.join(",")}`} className={s.bulkWrap} buttonClassName={s.bulkSend} busyLabel="Enviando…" doneLabel="Enviados"
+              disabled={role === "director" && !branchId} errorFallback="O lote não foi enviado." keeps="Os leads continuam selecionados."
+              onAction={() => runBatchAction("send")}>
+              Enviar {selected.length}/{MAX_BATCH}
+            </LiteActionButton>
+            <MiniSelect className={s.bulkSelect} label="Corretor em massa" placeholder="Corretor" value={batchBrokerId}
+              options={unitBrokers.map((broker) => ({ value: broker.id, label: broker.name }))} onChange={setBatchBrokerId} />
+            <LiteActionButton key={`assign-${selected.join(",")}`} className={s.bulkWrap} buttonClassName={s.bulkGhost} busyLabel="Atribuindo…" doneLabel="Atribuídos"
+              disabled={!batchBrokerId} errorFallback="O lote não foi atribuído." keeps="Os leads continuam selecionados."
+              onAction={() => runBatchAction("assign")}>
+              Atribuir {selected.length}
+            </LiteActionButton>
+            <button type="button" className={s.bulkClear} aria-label="Limpar seleção" onClick={clearBatchUi}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
+          </div>,
+          document.body,
         ) : null}
 
         <CampaignConflictDialog

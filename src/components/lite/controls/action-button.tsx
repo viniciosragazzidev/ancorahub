@@ -48,6 +48,8 @@ export interface LiteActionButtonProps {
   icon?: ReactNode;
   disabled?: boolean;
   className?: string;
+  /** Classe extra do próprio botão (desenho 1:1 de um artifact), mantendo os estados e o feedback. */
+  buttonClassName?: string;
   "aria-label"?: string;
 }
 
@@ -112,6 +114,7 @@ export function LiteActionButton({
   icon,
   disabled,
   className,
+  buttonClassName,
   "aria-label": ariaLabel,
 }: LiteActionButtonProps) {
   const fire = useFeedback();
@@ -181,7 +184,7 @@ export function LiteActionButton({
       <motion.button
         ref={buttonRef}
         type="button"
-        className={cn(styles.button, size === "sm" && styles.sm, tone === "secondary" && styles.secondary)}
+        className={cn(styles.button, size === "sm" && styles.sm, tone === "secondary" && styles.secondary, buttonClassName)}
         data-state={state}
         aria-busy={state === "busy" || undefined}
         aria-label={state === "idle" && !retry ? ariaLabel : undefined}

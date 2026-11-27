@@ -1,4 +1,4 @@
-import { count, desc, eq, and, inArray, isNull, or } from "drizzle-orm";
+import { count, desc, eq, and, inArray, isNull, max, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -55,6 +55,10 @@ import { DirectorDistributionHealth } from "./_components/director-distribution-
 import directorDistributionStyles from "./_components/director-distribution-page.module.css";
 import { TtlCache } from "@/shared/cache/ttl-cache";
 import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
+import { getLiveStatuses } from "@/features/live-status/service";
+import { AssignSection1a1, DistributionHead1a1, LiveStrip1a1 } from "./_components/resumo-1a1-shell";
+import { DirectorDailySummary1a1 } from "./_components/director-daily-summary-1a1";
+import resumo1a1 from "./_components/resumo-1a1.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +110,15 @@ function DistributionStages() {
       ))}
     </ol>
   );
+}
+
+/** "há 40 s", "há 12 min", "há 3 h" ou a data, para a faixa ao vivo do Resumo. */
+function distributedAgo(at: Date, now = new Date()) {
+  const seconds = Math.max(0, Math.round((now.getTime() - at.getTime()) / 1000));
+  if (seconds < 60) return `há ${seconds} s`;
+  if (seconds < 3600) return `há ${Math.round(seconds / 60)} min`;
+  if (seconds < 86_400) return `há ${Math.round(seconds / 3600)} h`;
+  return `em ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(at)}`;
 }
 
 const LITE_TAB_VIEWS: readonly DistributionView[] = ["resumo_dia", "roteamento", "filas", "plantao", "saude_historico"];
@@ -860,6 +873,61 @@ export default async function LeadDistributionPage({
 
   // Resumo da barra do topo no Lite (anatomia de página): os mesmos dois números que o modo normal mostra no topo.
   const liteSummary = `${totalAvailable.toLocaleString("pt-BR")} ${totalAvailable === 1 ? "disponível" : "disponíveis"} · ${totalNewLeads.toLocaleString("pt-BR")} aguardando`;
+  // Resumo 1:1 (27/11/2026, artifact "Distribuição · Resumo"): topo, abas, faixa ao vivo, leads aguardando e corretores
+  // na marcação do artifact. As outras abas seguem no desenho anterior até o refino de cada uma.
+  if (directorLite && view === "resumo_dia") {
+    const [liveStatuses, lastDistribution] = await Promise.all([
+      (await shouldShowLiveStatusStrip(context)) ? getLiveStatuses(context).catch(() => null) : Promise.resolve(null),
+      db.select({ at: max(schema.leadDistributionEvents.createdAt) })
+        .from(schema.leadDistributionEvents)
+        .where(eq(schema.leadDistributionEvents.tenantId, context.tenantId))
+        .then((rows) => rows[0]?.at ?? null)
+        .catch(() => null),
+    ]);
+    const duty = liveStatuses?.statuses.find((status) => status.id === "plantao");
+    const onlineBrokers = brokerStatsByBranch
+      .filter((row) => row.availabilityStatus && row.availabilityStatus !== "offline")
+      .reduce((sum, row) => sum + Number(row.count), 0);
+    const liveParts = [
+      duty?.valueText ? `${duty.valueText} no plantão agora` : null,
+      `${onlineBrokers.toLocaleString("pt-BR")} ${onlineBrokers === 1 ? "corretor conectado" : "corretores conectados"}`,
+      lastDistribution ? `última distribuição ${distributedAgo(new Date(lastDistribution))}` : null,
+    ].filter(Boolean).join(" · ");
+    const inbox = canAssign ? (
+      <AssignSection1a1 count={totalUnassignedForArchive}>
+        <DistributionInbox
+          key={queueFilter}
+          role={context.role}
+          manualAssignmentChoiceEnabled={(await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"}
+          totalUnassigned={totalUnassignedForArchive}
+          initialStatusFilter={queueFilter}
+          branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+          brokers={brokers.map((broker) => ({
+            id: broker.id,
+            name: broker.name,
+            branchId: broker.branchId,
+            availabilityStatus: broker.availabilityStatus,
+            activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
+          }))}
+          leads={unassignedLeads.map((lead) => ({ ...lead, createdAt: lead.createdAt.toISOString() }))}
+        />
+      </AssignSection1a1>
+    ) : null;
+    return (
+      <main className={`arc-venancor ${resumo1a1.gx} ${resumo1a1.page}`} data-skin="diretor">
+        <DistributionHead1a1 available={totalAvailable} waiting={totalNewLeads} />
+        <LiveStrip1a1 text={liveParts} canAssign={canAssign}
+          showQueue={canViewDistributionQueues(context.role) && (!allowedViews || allowedViews.includes("filas"))} />
+        {inbox}
+        <DirectorDailySummary1a1
+          initialData={brokerSummary}
+          branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+          canFilterBranch={context.role === "director"}
+        />
+      </main>
+    );
+  }
+
   if (directorLite && LITE_TAB_VIEWS.includes(view)) {
     return (
       <>
