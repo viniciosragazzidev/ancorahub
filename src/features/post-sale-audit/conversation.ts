@@ -558,6 +558,14 @@ export async function runPostSaleReminderJob(now = new Date()) {
         enqueued += 1;
       }
     } catch (error) {
+      // The survey's number can no longer send it (reserved for the team or gone, 27/11/2026): close it once
+      // instead of failing again every run (224 failures in 10 minutes on 27/11).
+      if ((error as { code?: string } | null)?.code === "POST_SALE_SOURCE_UNAVAILABLE") {
+        const reason = error instanceof Error ? error.message.slice(0, 120) : "número de origem indisponível";
+        await db.update(schema.postSaleSurveys).set({ status: "no_reply", completedAt: now, skipReason: reason }).where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, survey.tenantId), inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES])));
+        completed += 1;
+        continue;
+      }
       console.error("[post-sale-audit] reminder_enqueue_failed", { surveyId: survey.id, error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
     }
   }

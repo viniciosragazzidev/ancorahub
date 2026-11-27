@@ -778,7 +778,10 @@ export async function processQueuedLead(
   stepMemoInput?: DistributionStepMemo,
 ): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Você não pode executar a distribuição automática.");
-  if (fallbackDepth > 3) return { status: "queued", leadId, reason: "O encadeamento de filas de contingência excedeu o limite seguro." };
+  // Every re-evaluation inside one pass (contingency queue, a new offer cycle, a broker with no offer created)
+  // counts here (27/11/2026). Before, the last two started again at 0 and excluded only the latest broker,
+  // so two brokers without a created offer alternated for up to 6 minutes per lead, holding the job queue.
+  if (fallbackDepth > 3) return { status: "queued", leadId, reason: "A distribuição reavaliou este lead várias vezes nesta rodada; tenta de novo em instantes.", retryAt: new Date(Date.now() + 60_000) };
   const stepMemo = stepMemoInput ?? createDistributionStepMemo<RosterResolution>();
   traceLeadStep(leadId, `start:${fallbackDepth}`);
   const db = getDatabase();
@@ -1504,7 +1507,7 @@ export async function processQueuedLead(
 
     if (!restartedCycle) return { status: "conflict", leadId, reason: "O estado do lead mudou durante a redistribuição." };
     // The offer cycle state changed; start a new step without the prior memo.
-    return processQueuedLead(context, leadId, excludeBrokerId ?? lead.corretorId);
+    return processQueuedLead(context, leadId, excludeBrokerId ?? lead.corretorId, fallbackDepth + 1);
   }
 
   const ids = remainingBrokers.map((broker) => broker.id);
@@ -1752,7 +1755,7 @@ export async function processQueuedLead(
     // offer (CANCELLED). Re-evaluate immediately so the lead advances to the
     // next eligible broker instead of consuming a scheduler retry.
     // The broker has no usable channel: the lead state did not change, so reuse this step's roster snapshot.
-    return processQueuedLead(context, leadId, chosen.id, 0, stepMemo);
+    return processQueuedLead(context, leadId, chosen.id, fallbackDepth + 1, stepMemo);
   }
 
   return {
