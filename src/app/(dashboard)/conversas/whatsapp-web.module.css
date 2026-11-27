@@ -179,7 +179,7 @@
 .avatarXl { width: 72px; height: 72px; font-size: 22px; }
 .idCardName { margin: 0; font-size: 18px; font-weight: 500; }
 .idCardPhone { margin: 0; font-size: 14px; color: var(--text-muted); }
-.pillQuiet { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 4px; padding: 0 16px; border-radius: 9999px; background: var(--surface-muted); color: var(--foreground); font-size: 14px; font-weight: 500; text-decoration: none; }
+.pillQuiet { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 4px; padding: 0 16px; border-radius: 9999px; background: var(--surface-muted); color: var(--foreground); font-size: 14px; font-weight: 500; text-decoration: none; border: 0; font-family: inherit; cursor: pointer; }
 .pillQuiet:hover { background: color-mix(in oklab, var(--surface-muted) 80%, var(--foreground) 6%); color: var(--foreground); }
 .cardBody { padding: 14px 18px; display: grid; gap: 0; }
 .cardTitle { margin: 0 0 6px; font-size: 14px; font-weight: 500; }
