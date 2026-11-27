@@ -1,193 +1,221 @@
 "use client";
 
 /**
- * Topo do painel da gestão no visual Lite. Desde 27/11/2026, o desenho aprovado no artifact "Painel da gestão no
- * estilo do corretor": abas com ícone em cima; a saudação com uma frase da situação; à direita, a ação do momento
- * ("Precisa de você"), o período, o calendário do intervalo personalizado e a unidade ou fila.
+ * Topo do painel da gestão, cópia 1:1 do artifact "Painel da gestão no estilo do corretor" (27/11/2026): abas com
+ * ícone; saudação com a frase da situação; logo abaixo, à esquerda, "Precisa de você", o período (Hoje, 7 dias,
+ * 30 dias), o calendário do intervalo personalizado e a unidade ou fila. No celular: topo com menu, saudação e
+ * avisos; abas; "Precisa de você" e o calendário, que abre o período e a unidade ou fila.
  */
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { CalendarDays, Filter, LayoutGrid, Star } from "lucide-react";
-import { useLitePhone } from "@/components/lite/controls/select";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import styles from "./director-lite.module.css";
+import { NotificationPopover } from "@/components/notification-popover";
+import { useSidebar } from "@/components/ui/sidebar";
+
+import styles from "./painel.module.css";
 import { customRangeLabel, type CustomRange } from "./custom-range";
 import { dateTitle } from "./format";
 
-function PeriodHelp() {
-  return (
-    <details className={styles.help}>
-      <summary className={styles.helpButton} aria-label="Sobre o período" title="Sobre o período">?</summary>
-      <ul className={styles.helpPanel}>
-        <li>O dia da operação começa às 19h.</li>
-        <li>O período altera apenas os leads por fila.</li>
-        <li>Plantões e WhatsApp mostram o momento atual.</li>
-      </ul>
-    </details>
-  );
-}
-
-
-/**
- * Calendário do período. No computador abre o intervalo personalizado com data e hora (como na tela antiga, 20/11/2026;
- * sem hora, "de" começa às 19h do dia anterior e "até" termina às 19h, a regra de `leadQualityRange`). No celular
- * (27/11/2026) é a única porta do período: abre também os atalhos Hoje, 7 dias e 30 dias e a unidade ou fila, que
- * saem da tela para ficarem visíveis só as abas.
- */
-function PeriodCalendar({ active, onApply, periods, activePeriod, onPeriod, unitPicker, phone }: {
-  phone: boolean;
-  active: CustomRange | null;
-  onApply?: (range: CustomRange) => void;
-  periods: HeaderOption[];
-  activePeriod: string;
-  onPeriod?: (value: string) => void;
-  unitPicker: ReactNode;
-}) {
-  return (
-    <details className={styles.help} data-desktop={onApply ? undefined : "hidden"}>
-      <summary className={styles.calendarButton} data-active={active ? "true" : undefined} aria-label={active ? `Período: ${customRangeLabel(active)}` : "Escolher o período"} title={active ? customRangeLabel(active) : "Período"}>
-        <CalendarDays aria-hidden="true" size={18} />
-      </summary>
-      <div className={`${styles.helpPanel} ${styles.calendarPanel}`}>
-        {phone ? (
-          <div className={styles.phoneOnly}>
-            <p className={styles.rangeTitle}>Período</p>
-            <Segmented label="Período" items={periods} active={activePeriod} onSelect={onPeriod} kind="period" />
-            {unitPicker}
-          </div>
-        ) : null}
-        {onApply ? (
-          <form
-            className={styles.rangeForm}
-            onSubmit={(event) => {
-              event.preventDefault();
-              const data = new FormData(event.currentTarget);
-              const read = (name: string) => String(data.get(name) ?? "").trim();
-              if (!read("from") || !read("to")) return;
-              onApply({ from: read("from"), fromTime: read("fromTime") || null, to: read("to"), toTime: read("toTime") || null });
-            }}
-          >
-            <p className={styles.rangeTitle}>Intervalo personalizado</p>
-            <label className={styles.rangeField}>De<input type="date" name="from" required defaultValue={active?.from} /></label>
-            <label className={styles.rangeField}>Hora<input type="time" name="fromTime" defaultValue={active?.fromTime ?? ""} /></label>
-            <label className={styles.rangeField}>Até<input type="date" name="to" required defaultValue={active?.to} /></label>
-            <label className={styles.rangeField}>Hora<input type="time" name="toTime" defaultValue={active?.toTime ?? ""} /></label>
-            <p className={styles.rangeHint}>Sem hora, o dia começa às 19h do dia anterior e termina às 19h.</p>
-            <button type="submit" className={styles.rangeApply}>Aplicar</button>
-          </form>
-        ) : null}
-      </div>
-    </details>
-  );
-}
-
-/** `short` é o rótulo do celular (abaixo de 640px); o `label` completo segue no aria-label e no computador. */
+/** `short` é o rótulo do celular; o `label` completo segue no aria-label e no computador. */
 export type HeaderOption = { value: string; label: string; href: string; short?: string };
+export type HeaderUnit = { value: string; label: string };
 
-const TAB_ICONS: Record<string, typeof LayoutGrid> = { overview: LayoutGrid, quality: Star, funnel: Filter };
+const TAB_ICON_PATH: Record<string, string> = {
+  overview: "M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z",
+  quality: "M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7z",
+  funnel: "M3 4h18l-7 8v6l-4 2v-8z",
+};
 
 function greeting(now: Date) {
   const hour = Number(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(now));
   return hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
 }
-export type HeaderUnit = { value: string; label: string };
 
-function Segmented({ label, items, active, onSelect, kind }: { label: string; items: HeaderOption[]; active: string; onSelect?: (value: string) => void; kind: "period" | "tab" }) {
+function Segment({ label, items, active, onSelect, className }: { label: string; items: HeaderOption[]; active: string; onSelect?: (value: string) => void; className?: string }) {
   return (
-    <nav aria-label={label} className={styles.pills}>
+    <div role="group" aria-label={label} className={`${styles.segment} ${className ?? ""}`}>
       {items.map((item) => {
         const current = item.value === active;
-        // Dois rótulos no DOM: o completo (computador) e o curto (celular), trocados por CSS; o nome acessível é o completo.
-        const Icon = kind === "tab" ? TAB_ICONS[item.value] : null;
-        const text = (
-          <>
-            {Icon ? <Icon aria-hidden="true" size={16} className={styles.tabIcon} /> : null}
-            <span className={styles.labelFull}>{item.label}</span>
-            <span className={styles.labelShort} aria-hidden="true">{item.short ?? item.label}</span>
-          </>
-        );
-        if (onSelect) {
-          return (
-            <button key={item.value} type="button" className={styles.pill} data-active={current ? "true" : undefined} aria-pressed={current} aria-label={item.label} onClick={() => onSelect(item.value)}>
-              {text}
-            </button>
-          );
-        }
-        return (
-          <Link
-            key={item.value}
-            href={item.href}
-            className={styles.pill}
-            data-active={current ? "true" : undefined}
-            aria-current={current ? (kind === "tab" ? "page" : "true") : undefined}
-            aria-label={item.label}
-          >
-            {text}
-          </Link>
+        const cls = `${styles.segbtn} ${current ? styles.segbtnOn : ""}`;
+        return onSelect ? (
+          <button key={item.value} type="button" className={cls} aria-pressed={current} onClick={() => onSelect(item.value)}>{item.label}</button>
+        ) : (
+          <Link key={item.value} href={item.href} className={cls} aria-current={current ? "true" : undefined}>{item.label}</Link>
         );
       })}
-    </nav>
+    </div>
   );
 }
 
-export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, periods, activePeriod, onPeriod, units, activeUnit, onUnit, unitLabel = "Unidade", customRange, onCustomRange, headline, action }: {
+function CalendarIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
+  );
+}
+
+/** Calendário: intervalo personalizado (sem hora, o dia vai das 19h às 19h); no celular, também o período e a unidade. */
+function PeriodCalendar({ active, onApply, phoneExtras }: { active: CustomRange | null; onApply?: (range: CustomRange) => void; phoneExtras: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent ? event.key === "Escape" : !ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  if (!onApply && !phoneExtras) return null;
+  return (
+    <div className={styles.calendar} ref={ref} data-desktop={onApply ? undefined : "hidden"}>
+      <button
+        type="button"
+        className={`${styles.iconbtn} ${open || active ? styles.iconbtnOn : ""}`}
+        aria-label={active ? `Período: ${customRangeLabel(active)}` : "Escolher um período personalizado"}
+        title={active ? customRangeLabel(active) : "Período"}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <CalendarIcon />
+      </button>
+      {open ? (
+        <div role="dialog" aria-label="Período personalizado" className={`${styles.calendarPanel} ${styles.popover}`}>
+          {phoneExtras ? <div className={styles.phoneOnly}>{phoneExtras}</div> : null}
+          {onApply ? (
+            <form
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const data = new FormData(event.currentTarget);
+                const read = (name: string) => String(data.get(name) ?? "").trim();
+                if (!read("from") || !read("to")) return;
+                onApply({ from: read("from"), fromTime: null, to: read("to"), toTime: null });
+                setOpen(false);
+              }}
+            >
+              <span className={styles.calendarTitle}>Período personalizado</span>
+              <div className={styles.rangeGrid}>
+                <label className={styles.rangeField}>De<input className={styles.num} type="date" name="from" required defaultValue={active?.from} /></label>
+                <label className={styles.rangeField}>Até<input className={styles.num} type="date" name="to" required defaultValue={active?.to} /></label>
+              </div>
+              <p className={styles.rangeHint}>O dia vai das 19h do dia anterior às 19h.</p>
+              <div className={styles.rangeActions}>
+                <button type="button" className={`${styles.pill} ${styles.pillQuiet}`} onClick={() => setOpen(false)}>Cancelar</button>
+                <button type="submit" className={`${styles.pill} ${styles.pillPrimary}`}>Aplicar</button>
+              </div>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PhoneMenuButton({ initials }: { initials: string }) {
+  let sidebar: ReturnType<typeof useSidebar> | null = null;
+  try {
+    sidebar = useSidebar();
+  } catch {
+    sidebar = null;
+  }
+  return (
+    <button type="button" className={styles.iconbtn} aria-label="Abrir menu principal" style={{ fontSize: 13, fontWeight: 500 }} onClick={() => sidebar?.setOpenMobile(true)}>
+      {initials}
+    </button>
+  );
+}
+
+export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, periods, activePeriod, onPeriod, units, activeUnit, onUnit, unitLabel = "Unidade", customRange, onCustomRange, headline, action, summary, userName }: {
   firstName: string | null;
   /** Uma frase com a situação, logo abaixo da saudação ("Hoje entraram 86 leads."). */
   headline?: string | null;
   /** A ação do momento, antes do período (o botão "Precisa de você" da visão geral). */
   action?: ReactNode;
+  /** Resumo do recorte no topo do celular ("Hoje · Todas as filas"). */
+  summary?: string;
+  /** Nome de quem olha, para as iniciais do botão de menu do celular. */
+  userName?: string | null;
   now: Date;
   tabs: HeaderOption[];
   activeTab: string;
-  /** Na prévia, troca a seção com estado; no painel real, os links fazem a navegação. */
   onTab?: (value: string) => void;
   periods: HeaderOption[];
   activePeriod: string;
   onPeriod?: (value: string) => void;
-  /** Sem `units` (ou vazio) o seletor some: sem permissão de comparar unidades. */
+  /** Sem `units` (ou vazio) o seletor some. */
   units?: HeaderUnit[];
   activeUnit: string;
   onUnit?: (value: string) => void;
-  /** Nome acessível do seletor ("Unidade" ou "Fila"). */
   unitLabel?: string;
-  /** Intervalo personalizado ativo (nenhum atalho fica marcado) e a ação de aplicar um novo. Sem `onCustomRange`, some. */
   customRange?: CustomRange | null;
   onCustomRange?: (range: CustomRange) => void;
 }) {
-  // Celular (27/11/2026): período e unidade saem do topo e abrem no calendário; ficam à vista só as abas.
-  const phone = useLitePhone();
-  const unitPicker = units && units.length > 0 ? (
-    <label className={styles.unitPick}>
+  const hello = `${greeting(now)}${firstName ? `, ${firstName}` : ""}`;
+  const initials = (userName || firstName || "Eu").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "Eu";
+  const unitPicker = (className?: string) => units && units.length > 0 ? (
+    <label className={`${styles.unit} ${className ?? ""}`}>
       <span className={styles.srOnly}>{unitLabel}</span>
-      <select className={styles.unitSelect} value={activeUnit} onChange={(event) => onUnit?.(event.target.value)} disabled={!onUnit}>
-        {units.map((unit) => (
-          <option key={unit.value} value={unit.value}>{unit.label}</option>
-        ))}
+      <select value={activeUnit} onChange={(event) => onUnit?.(event.target.value)} disabled={!onUnit}>
+        {units.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
       </select>
     </label>
   ) : null;
+  const phoneExtras = (
+    <>
+      <span className={styles.calendarTitle}>Período</span>
+      <Segment label="Período" items={periods} active={activePeriod} onSelect={onPeriod} />
+      {unitPicker()}
+    </>
+  );
   return (
-    <header className={`${styles.headerBlock} ${styles.headerV2}`}>
+    <>
+      <header className={styles.phoneHead}>
+        <PhoneMenuButton initials={initials} />
+        <div className={styles.phoneTitle}>
+          <h1>{`Olá${firstName ? `, ${firstName}` : ""}`}</h1>
+          {summary ? <p className={styles.num}>{summary}</p> : null}
+        </div>
+        <NotificationPopover />
+      </header>
+
       {tabs.length ? (
-        <div className={styles.viewTabs} title={`${dateTitle(now)}. O dia da operação começa às 19h.`}>
-          <Segmented label="Seções do painel" items={tabs} active={activeTab} onSelect={onTab} kind="tab" />
-        </div>
+        <nav aria-label="Seções do painel" className={`${styles.views} ${styles.in}`} title={`${dateTitle(now)}. O dia da operação começa às 19h.`}>
+          {tabs.map((tab) => {
+            const current = tab.value === activeTab;
+            const cls = `${styles.viewbtn} ${current ? styles.viewbtnOn : ""}`;
+            const content = (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={TAB_ICON_PATH[tab.value] ?? TAB_ICON_PATH.overview} /></svg>
+                <span className={styles.viewLabelFull}>{tab.label}</span>
+                <span className={styles.viewLabelShort} aria-hidden="true">{tab.short ?? tab.label}</span>
+              </>
+            );
+            return onTab ? (
+              <button key={tab.value} type="button" className={cls} aria-current={current ? "page" : undefined} aria-label={tab.label} onClick={() => onTab(tab.value)}>{content}</button>
+            ) : (
+              <Link key={tab.value} href={tab.href} className={cls} aria-current={current ? "page" : undefined} aria-label={tab.label}>{content}</Link>
+            );
+          })}
+        </nav>
       ) : null}
-      <div className={styles.pageHead}>
-        <div className={styles.greetingBlock}>
-          <h1 className={styles.greetingTitle}>{greeting(now)}{firstName ? `, ${firstName}` : ""}</h1>
-          {headline ? <p className={styles.greetingText}>{headline}</p> : null}
+
+      <header className={`${styles.head} ${styles.in}`}>
+        <div className={styles.greeting}>
+          <h1>{hello}</h1>
+          {headline ? <p>{headline}</p> : null}
         </div>
-        <div className={styles.filters}>
+        <div className={styles.controls}>
           {action}
-          <div className={styles.periodGroup}>
-            {phone ? null : <Segmented label="Período" items={periods} active={activePeriod} onSelect={onPeriod} kind="period" />}
-            {phone && !onCustomRange && !unitPicker && periods.length === 0 ? null : <PeriodCalendar phone={phone} active={customRange ?? null} onApply={onCustomRange} periods={periods} activePeriod={activePeriod} onPeriod={onPeriod} unitPicker={unitPicker} />}
-            {phone ? null : <PeriodHelp />}
-          </div>
-          {phone ? null : unitPicker}
+          <Segment label="Período" items={periods} active={activePeriod} onSelect={onPeriod} className={styles.desktopOnly} />
+          <PeriodCalendar active={customRange ?? null} onApply={onCustomRange} phoneExtras={phoneExtras} />
+          {unitPicker(styles.desktopOnly)}
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }

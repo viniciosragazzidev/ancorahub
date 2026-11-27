@@ -15,7 +15,7 @@ const PERIOD_DAYS: Record<OverviewPeriod, number> = { today: 1, "7d": 7, "30d": 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Canal de entrada em SQL: WhatsApp (canal próprio ou anúncio que entrou pelo WhatsApp), formulário, ou outros (manual e importação). */
-const channelSql = sql<EntryChannel>`case
+export const channelSql = sql<EntryChannel>`case
   when ${schema.leads.sourceChannel} in ('whatsapp', 'whatsapp_ctwa')
     or (${schema.leads.sourceChannel} = 'meta_lead_ads' and ${schema.leads.sourceMetadata}->>'entry' = 'whatsapp') then 'whatsapp'
   when ${schema.leads.sourceChannel} = 'bulk_import' or ${schema.leads.origem} = 'manual' then 'other'

@@ -23,6 +23,8 @@ import {
   type ColdLeadRow,
   type EssentialQueue,
 } from "./essential-summary";
+import { channelSql } from "../entries/entries-by-turn";
+import { PULSE_BUCKETS, PULSE_FIRST_HOUR, PULSE_LAST_HOUR, toBuckets, toHours, type DashboardPulse } from "./pulse-core";
 
 /** Distribution states of a lead that is waiting for a broker (same as the command center). */
 const WAITING_STATES = ["queued", "unassigned", "returned_to_queue"] as const;
@@ -39,6 +41,8 @@ export type EssentialDashboard = {
   duties: { running: EssentialDuty[]; next: DashboardDuty | null };
   queues: { since: string; label: string; rows: EssentialQueue[]; totals: ReturnType<typeof summarizeQueues>["totals"] };
   whatsapp: EssentialWhatsApp & { since: string; label: string };
+  /** Números do período com mini barras e entradas por hora (27/11/2026); ausente em dados de exemplo antigos. */
+  pulse?: DashboardPulse;
 };
 
 /**
@@ -71,7 +75,7 @@ export async function getEssentialDashboard(
   const today = getSaoPauloDateKey(now);
 
   // Velocidade (25/11/2026): os três blocos não dependem um do outro; antes rodavam em fila (~1 s).
-  const [{ welcome, duties }, queues, whatsapp] = await Promise.all([(async () => {
+  const [{ welcome, duties }, queues, whatsapp, pulse] = await Promise.all([(async () => {
   // Bloco 1: plantões rodando agora, com leads da fila de cada plantão e corretores confirmados hoje.
   const welcome = await getDashboardWelcome(context, now, { branchId: unit });
   const running = welcome.runningDuties ?? [];
@@ -197,7 +201,10 @@ export async function getEssentialDashboard(
     active: whatsappRows?.active.get(broker.id) ?? 0,
   })));
   return whatsapp;
-  })()]);
+  })(), loadPulse(alive, queueSince, filter.window?.until ?? now, filter.period, Boolean(filter.window), now).catch((error) => {
+    console.error("[essential-dashboard] pulse_failed", { message: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+    return undefined;
+  })]);
 
   return {
     generatedAt: now.toISOString(),
@@ -205,6 +212,78 @@ export async function getEssentialDashboard(
     duties: { running: duties, next: welcome.nextDuty },
     queues: { since: queueSince.toISOString(), label: filter.window?.label ?? windowLabel(queueSince), rows: queues.queues, totals: queues.totals },
     whatsapp: { ...whatsapp, since: todayTurn.toISOString(), label: windowLabel(todayTurn) },
+    pulse,
+  };
+}
+
+/**
+ * Pulso do período (27/11/2026): entraram, qualificados, distribuídos e vendas em 12 faixas da janela, o tempo médio
+ * até o corretor, o valor vendido, os que entraram na janela anterior e as entradas por hora (06h a 19h) por canal.
+ * Cinco consultas agregadas em paralelo, no mesmo escopo (`alive`: tenant, escopo, unidade e fila).
+ */
+async function loadPulse(alive: ReturnType<typeof and>, since: Date, until: Date, period: OverviewPeriod, custom: boolean, now: Date): Promise<DashboardPulse> {
+  const db = getDatabase();
+  const span = Math.max(60_000, until.getTime() - since.getTime());
+  const step = span / PULSE_BUCKETS / 1000;
+  const sinceIso = since.toISOString();
+  const bucketOf = (column: unknown) => sql<number>`floor(extract(epoch from (${column} - ${sinceIso}::timestamptz)) / ${step})::int`;
+  const arrivedBucket = bucketOf(schema.leads.createdAt);
+  const assignedBucket = bucketOf(schema.leads.assignedAt);
+  const saleBucket = bucketOf(schema.sales.saleDate);
+  const localHour = sql<number>`extract(hour from (${schema.leads.createdAt} at time zone 'America/Sao_Paulo'))::int`;
+  const previousSince = new Date(since.getTime() - span);
+  const [arrivedRows, assignedRows, saleRows, previousRows, hourRows] = await Promise.all([
+    db.select({
+      bucket: arrivedBucket,
+      arrived: sql<number>`count(*)::int`,
+      qualified: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} in ('hot', 'warm'))::int`,
+    })
+      .from(schema.leads)
+      .where(and(alive, gte(schema.leads.createdAt, since), lt(schema.leads.createdAt, until)))
+      .groupBy(arrivedBucket),
+    db.select({
+      bucket: assignedBucket,
+      value: sql<number>`count(*)::int`,
+      minutes: sql<number>`coalesce(sum(extract(epoch from (${schema.leads.assignedAt} - ${schema.leads.createdAt})) / 60), 0)::float`,
+    })
+      .from(schema.leads)
+      .where(and(alive, sql`${schema.leads.corretorId} is not null`, gte(schema.leads.assignedAt, since), lt(schema.leads.assignedAt, until)))
+      .groupBy(assignedBucket),
+    db.select({
+      bucket: saleBucket,
+      value: sql<number>`count(*)::int`,
+      amount: sql<number>`coalesce(sum(${schema.sales.saleValue}), 0)::float`,
+    })
+      .from(schema.sales)
+      .innerJoin(schema.leads, eq(schema.leads.id, schema.sales.leadId))
+      .where(and(alive, eq(schema.sales.status, "active"), gte(schema.sales.saleDate, since), lt(schema.sales.saleDate, until)))
+      .groupBy(saleBucket),
+    custom ? Promise.resolve([]) : db.select({ value: count() })
+      .from(schema.leads)
+      .where(and(alive, gte(schema.leads.createdAt, previousSince), lt(schema.leads.createdAt, since))),
+    db.select({ hour: localHour, channel: channelSql, total: sql<number>`count(*)::int` })
+      .from(schema.leads)
+      .where(and(
+        alive,
+        gte(schema.leads.createdAt, period === "today" && !custom ? businessTurnStart(now, 0) : since),
+        lt(schema.leads.createdAt, until),
+        sql`${localHour} between ${PULSE_FIRST_HOUR} and ${PULSE_LAST_HOUR}`,
+      ))
+      .groupBy(localHour, channelSql),
+  ]);
+  const distributedTotal = assignedRows.reduce((sum, row) => sum + Number(row.value), 0);
+  const assignMinutes = assignedRows.reduce((sum, row) => sum + Number(row.minutes), 0);
+  return {
+    arrived: toBuckets(arrivedRows.map((row) => ({ bucket: row.bucket, value: row.arrived }))),
+    qualified: toBuckets(arrivedRows.map((row) => ({ bucket: row.bucket, value: row.qualified }))),
+    distributed: toBuckets(assignedRows.map((row) => ({ bucket: row.bucket, value: row.value }))),
+    sales: toBuckets(saleRows.map((row) => ({ bucket: row.bucket, value: row.value }))),
+    distributedTotal,
+    avgAssignMinutes: distributedTotal ? Math.round(assignMinutes / distributedTotal) : null,
+    salesTotal: saleRows.reduce((sum, row) => sum + Number(row.value), 0),
+    salesValue: saleRows.reduce((sum, row) => sum + Number(row.amount), 0),
+    previousArrived: custom ? null : Number(previousRows[0]?.value ?? 0),
+    hours: toHours(hourRows.map((row) => ({ hour: Number(row.hour), channel: String(row.channel), total: Number(row.total) }))),
   };
 }
 

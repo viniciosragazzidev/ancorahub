@@ -3,6 +3,7 @@ import type { EssentialDashboard } from "@/features/dashboard/essential/essentia
 import { summarizeDuties, summarizeQueues, summarizeWhatsApp } from "@/features/dashboard/essential/essential-summary";
 import { businessDaysBack, businessTurnStart, windowLabel } from "@/features/dashboard/essential/business-window";
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
+import { toHours } from "@/features/dashboard/essential/pulse-core";
 
 const PERIOD_DAYS: Record<OverviewPeriod, number> = { today: 1, "7d": 7, "30d": 30 };
 
@@ -61,6 +62,22 @@ export function buildEssential(period: OverviewPeriod, unit: string, now: Date):
     duties: { running, next: null },
     queues: { since: queueSince.toISOString(), label: windowLabel(queueSince), rows: queues.queues, totals: queues.totals },
     whatsapp: { ...whatsapp, since: whatsappSince.toISOString(), label: windowLabel(whatsappSince) },
+    pulse: {
+      arrived: [2, 3, 5, 8, 6, 9, 11, 7, 10, 12, 9, 6].map(k),
+      qualified: [1, 2, 3, 5, 4, 6, 7, 4, 6, 8, 5, 4].map(k),
+      distributed: [1, 2, 4, 6, 5, 7, 9, 5, 8, 9, 7, 5].map(k),
+      sales: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0].map(k),
+      distributedTotal: k(68),
+      avgAssignMinutes: 4,
+      salesTotal: k(4),
+      salesValue: 3980 * scale * unitFactor,
+      previousArrived: k(29),
+      hours: toHours([[6, 1, 0], [7, 0, 0], [8, 3, 1], [9, 6, 2], [10, 9, 3], [11, 11, 4], [12, 8, 3], [13, 7, 2], [14, 10, 3], [15, 12, 4], [16, 9, 2], [17, 6, 2], [18, 4, 1], [19, 2, 1]]
+        .flatMap(([hour, whatsappCount, formCount]) => [
+          { hour, channel: "whatsapp", total: k(whatsappCount) },
+          { hour, channel: "form", total: k(formCount) },
+        ])),
+    },
   };
 }
 

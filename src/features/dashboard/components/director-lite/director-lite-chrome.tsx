@@ -2,14 +2,13 @@
 
 /** Topo do painel do diretor no visual Lite nas abas Visão, Qualidade e Funil: o cabeçalho compartilhado com os links reais. */
 import { useRouter } from "next/navigation";
-import { DashboardHeader } from "@/components/dashboard-header";
 import type { ReactNode } from "react";
 
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
 import { DirectorLiteHeader } from "./director-lite-header";
 import { customRangeLabel, rangeParam, type CustomRange } from "./custom-range";
-import styles from "./director-lite.module.css";
+import styles from "./painel.module.css";
 
 export type DashboardBranch = { id: string; name: string };
 export type DirectorLiteTab = "overview" | "quality" | "funnel";
@@ -76,11 +75,12 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
     : branches.length ? [{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))] : undefined;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <DashboardHeader breadcrumb="Início" title="Painel" summary={summary} />
-      <main className={styles.pageContainer} aria-label="Painel">
-        <div className={styles.dashboard}>
+    // Cópia 1:1 do artifact (27/11/2026): sem a faixa de topo do app nem as abas da área; a página começa nas abas.
+    <div className={`${styles.gx} flex min-h-0 min-w-0 flex-1 flex-col`} data-painel="lite">
+      <main className={styles.main} aria-label="Painel">
+        <div className={styles.column}>
           <DirectorLiteHeader
+            summary={summary}
             firstName={firstName}
             now={now}
             tabs={tabs.length > 1 ? tabs : []}
