@@ -204,7 +204,7 @@ export function LeadsLiteList({
                 <span className={a1.muted}>·</span>
                 {qualification ? <span className={a1.badge} data-tone={qualification.tone}>{qualification.label}</span> : <span className={a1.muted}>Sem qualificação</span>}
               </span>
-              <span className={a1.mFoot}>{lead.corretorNome ?? "Sem atribuição"} · {lead.branchName ?? "Sem unidade"}</span>
+              <span className={a1.mFoot}>{lead.corretorNome ? `${lead.corretorNome} · ${lead.branchName ?? "Sem unidade"}` : "-"}</span>
             </article>
           );
         })}
@@ -333,6 +333,21 @@ function LeadName({ lead, hideEntry, onOpen }: { lead: LeadWorkspaceItem; hideEn
 /** Corretor e unidade (numa coluna só, para a tabela caber), com os sinais da tabela atual: plantão ativo,
  * investigação da gestão e devolvido sem aceite. */
 function BrokerCell({ lead }: { lead: LeadWorkspaceItem }) {
+  // Sem corretor (27/11/2026): só um traço; o aviso de devolvido continua, porque pede ação.
+  if (!lead.corretorNome) {
+    return (
+      <span className={a1.brokerCell} role="cell">
+        <span className={a1.brokerText}>
+          <span className={`${a1.ellipsis} ${a1.muted}`}>-</span>
+          {lead.returnedUnaccepted ? (
+            <span className={a1.brokerFlags}>
+              <span className={`${a1.badge} ${a1.badgeSmall}`} data-tone="warning" title="Já passou por um corretor que não aceitou ou não atendeu a tempo; aguardando novo corretor">Devolvido, não aceito</span>
+            </span>
+          ) : null}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className={a1.brokerCell} role="cell">
       {lead.corretorNome ? <span className={a1.av} aria-hidden="true">{initialsOf(lead.corretorNome)}</span> : null}
