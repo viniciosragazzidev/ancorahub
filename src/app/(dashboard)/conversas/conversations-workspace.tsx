@@ -3263,6 +3263,8 @@ function WwProfile({ client, viewerRole, tagsSlot }: { client: ConversationItem;
   const broker = brokerDisplayName(client.corretorNome);
   const temperature = WW_TEMPERATURE[client.status];
   const ai = client.aiConversation;
+  // Qualificação manual de volta ao perfil (27/11/2026): qualifica, classifica ou desqualifica sem esperar a IA.
+  const [qualifyOpen, setQualifyOpen] = useState(false);
   return (
     <div className={cn(ww.ww, ww.profile)}>
       <div className={cn(ww.card, ww.idCard)}>
@@ -3295,6 +3297,8 @@ function WwProfile({ client, viewerRole, tagsSlot }: { client: ConversationItem;
         <div className={ww.kv}><span>Atendente Virtual</span><span>{ai ? WW_AI_STATUS[ai.status] ?? "Conversando agora" : "Ainda não falou"}</span></div>
         {ai?.transferReason ? <div className={ww.kv}><span>Motivo</span><span>{ai.transferReason}</span></div> : null}
         {ai?.qualificationSummary ? <p className={ww.cardText}>{ai.qualificationSummary}</p> : null}
+        <button type="button" className={ww.pillQuiet} onClick={() => setQualifyOpen(true)}>Qualificar manualmente</button>
+        <ManualQualificationDialog open={qualifyOpen} onOpenChange={setQualifyOpen} leadId={client.id} leadName={client.nome} />
       </div>
       <div className={cn(ww.card, ww.cardBody)}>
         <p className={ww.cardTitle}>Próxima ação</p>
