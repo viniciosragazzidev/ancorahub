@@ -14,7 +14,7 @@ import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history";
-import { dutyAttendanceOverrideProblem, dutyLeadsCutSettingKey, getRelevantDutyWindow, parseDutyLeadsSince, parseUnitPresencePhotoDefault, presencePhotoChoiceToStore, presencePhotoRequiredToStore } from "./duty-presence-domain";
+import { dutyAttendanceOverrideProblem, dutyLeadsCutSettingKey, getRelevantDutyWindow, parseDutyLeadsCustomSince, parseDutyLeadsSince, parseUnitPresencePhotoDefault, presencePhotoChoiceToStore, presencePhotoRequiredToStore } from "./duty-presence-domain";
 import { loadSchedulePhotoRequirement, saveSchedulePhotoRequirement, saveUnitPhotoDefault } from "./duty-photo-setting";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
@@ -820,12 +820,16 @@ export async function getDutyAvailableLeadsAction(scheduleId: string, leadsSince
     if (!parsedScheduleId.success) return { ok: false, reason: "Plantão inválido." };
     const { context, db, schedule } = await findScheduleForMutation(parsedScheduleId.data);
     if (schedule.status !== "active") return { ok: false, reason: "Plantão inativo." };
+    // "custom:2026-11-26T18:00" (27/11/2026): o início personalizado da página vale também para atribuir à mão.
+    const custom = leadsSince?.startsWith("custom:") ? parseDutyLeadsCustomSince(leadsSince.slice("custom:".length), new Date()) : null;
+    if (custom && !custom.ok) return { ok: false, reason: custom.reason };
     const leadsSinceOption = parseDutyLeadsSince(leadsSince);
-    const profile = await getDutyScheduleProfile(context, parsedScheduleId.data, { leadsSince: leadsSinceOption });
+    const leadsSinceAt = custom?.ok ? custom.at : null;
+    const profile = await getDutyScheduleProfile(context, parsedScheduleId.data, { leadsSince: leadsSinceOption, leadsSinceAt });
     const queueIds = profile.linkedQueues.map((queue) => queue.id);
     if (!queueIds.length) return { ok: true, leads: [] };
     // A date chosen on the page limits the list too, by arrival like the page; the default keeps every waiting lead.
-    const sinceCondition = leadsSinceOption === "plantao" ? undefined : sql`coalesce(${schema.leads.assignedAt}, ${schema.leads.createdAt}) >= ${profile.leadsSince.toISOString()}`;
+    const sinceCondition = leadsSinceOption === "plantao" && !leadsSinceAt ? undefined : sql`coalesce(${schema.leads.assignedAt}, ${schema.leads.createdAt}) >= ${profile.leadsSince.toISOString()}`;
     const rows = await db.select({
       id: schema.leads.id,
       name: schema.leads.nome,

@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getDutyScheduleProfile } from "@/features/lead-distribution/duty-schedule-profile-queries";
 import { getDutyOccurrenceHistory } from "@/features/lead-distribution/duty-occurrence-history";
 import { firstValidShift, isSingleOccurrencePlantao } from "@/features/lead-distribution/monthly-duty-plan";
-import { formatDutyLeadsCut, getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows, parseDutyLeadsSince, type DutyLeadsSinceOption } from "@/features/lead-distribution/duty-presence-domain";
+import { formatDutyLeadsCut, getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows, parseDutyLeadsCustomSince, parseDutyLeadsSince, type DutyLeadsSinceOption } from "@/features/lead-distribution/duty-presence-domain";
 import { DutyLeadsCutControl } from "../_components/duty-leads-cut-control";
 import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDutyCoverage, isHeldByRunningQualification } from "@/features/lead-distribution/domain";
@@ -59,6 +59,7 @@ import { DirectorDutyLeads, type DutyLeadRecord } from "../_components/director-
 import directorDutyStyles from "../_components/director-duty-schedule.module.css";
 import { DirectorDutyHeaderActions } from "../_components/director-duty-header-actions";
 import { DirectorDutyHistoryDistributions } from "../_components/director-duty-history-distributions";
+import { PlantaoPagina1a1 } from "../_components/plantao-pagina-1a1-view";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,7 @@ const timeOnly = new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone
 const dayMonth = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
 const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
 const historyDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: "America/Sao_Paulo" });
+const liteDayMonth = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
 function historyDateLabel(value: string) { return historyDate.format(new Date(`${value}T12:00:00-03:00`)); }
 
 function DutyProfileHeader({
@@ -104,17 +106,20 @@ function leadsSinceChoices(cutAt: string): Array<{ value: DutyLeadsSinceOption; 
   ];
 }
 
-export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string; canal?: string; fila?: string; desde?: string }> }) {
+export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string; canal?: string; fila?: string; desde?: string; desdeEm?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { scheduleId } = await params;
   const directorLite = await isDirectorLitePageOnServer(context, `/leads/distribuicao/plantao/${scheduleId}`);
-  const { situacao, data, canal, fila, desde } = await searchParams;
+  const { situacao, data, canal, fila, desde, desdeEm } = await searchParams;
   const leadsSinceOption = parseDutyLeadsSince(desde);
+  // "Personalizado" (27/11/2026): `desde=custom&desdeEm=2026-11-26T18:00`, até 31 dias atrás; inválido mostra o motivo.
+  const customSince = desde === "custom" ? parseDutyLeadsCustomSince(desdeEm ?? "", new Date()) ?? { ok: false as const, reason: "Escolha o dia e a hora." } : null;
+  const customSinceAt = customSince?.ok ? customSince : null;
 
   let profile: Awaited<ReturnType<typeof getDutyScheduleProfile>>;
   try {
-    profile = await getDutyScheduleProfile(context, scheduleId, { leadsSince: leadsSinceOption });
+    profile = await getDutyScheduleProfile(context, scheduleId, { leadsSince: leadsSinceOption, leadsSinceAt: customSinceAt?.at ?? null });
   } catch {
     redirect("/leads/distribuicao?view=plantao");
   }
@@ -145,6 +150,47 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     : null;
   if (historicalWindow && occurrenceHistory) {
     const canExportHistory = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
+    if (directorLite) {
+      return (
+        <PlantaoPagina1a1
+          backHref="/distribuicao?view=plantao"
+          header={{
+            state: { label: "Terminado", tone: "neutral", live: false },
+            typeName: schedule.typeName ?? null,
+            typeHue: schedule.typeHue ?? null,
+            recurrence: singleDay ? "Dia único" : `↻ Toda ${DAYS_FULL[schedule.dayOfWeek].toLocaleLowerCase("pt-BR")}`,
+            modality: schedule.attendanceMode === "presencial" ? "Presencial" : "Online",
+            title: schedule.name,
+            dayLabel: `${historyDateLabel(historicalWindow.dutyDate)} · ${timeOnly.format(historicalWindow.startsAt)} às ${timeOnly.format(historicalWindow.endsAt)}`,
+            branchLabel: schedule.branchName ?? "Todas as unidades",
+            queueLabel: schedule.queueName,
+          }}
+          actions={{ scheduleId: schedule.id, canExport: canExportHistory, reportDate: historicalWindow.dutyDate, escalar: null }}
+          invalidDateMessage={invalidHistoryDate ? "A data informada não corresponde a um plantão encerrado desta regra. Exibindo o último turno terminado." : null}
+          occurrences={singleDay ? null : {
+            dateDefault: historicalWindow.dutyDate,
+            items: [
+              ...(liveOrUpcoming ? [{ key: "agora", label: isDutyWindowActive(liveWindow, now) ? `Hoje, ${liteDayMonth.format(now)}` : "Próximo turno", href: `/leads/distribuicao/plantao/${schedule.id}`, current: false }] : []),
+              ...completedWindows.map((window) => ({ key: window.dutyDate, label: liteDayMonth.format(new Date(`${window.dutyDate}T12:00:00-03:00`)), href: `/leads/distribuicao/plantao/${schedule.id}?data=${window.dutyDate}`, current: window.dutyDate === historicalWindow.dutyDate })),
+            ],
+          }}
+          stats={[
+            { label: "Leads atribuídos", value: occurrenceHistory.distributions.length, detail: "Aceites e atribuições registradas" },
+            { label: "Ofertas enviadas", value: occurrenceHistory.offers.total, detail: `${occurrenceHistory.offers.accepted} aceitas · ${occurrenceHistory.offers.declined} recusadas · ${occurrenceHistory.offers.expired} expiradas` },
+            { label: "Presenças confirmadas", value: `${occurrenceHistory.confirmations.confirmed}/${occurrenceHistory.confirmations.total}`, detail: occurrenceHistory.confirmations.total ? "Confirmações registradas na data" : "Sem confirmações registradas" },
+          ]}
+          history={{
+            scheduleId: schedule.id,
+            dutyDate: historicalWindow.dutyDate,
+            rosterCount: occurrenceHistory.roster.length,
+            brokers: occurrenceHistory.brokers.map((entry) => ({ brokerId: entry.brokerId, brokerName: entry.brokerName, branchName: entry.branchName ?? null, onRoster: entry.onRoster, leads: entry.leads })),
+            distributions: occurrenceHistory.distributions.map((entry) => ({ id: entry.id, leadName: entry.leadName, brokerName: entry.brokerName, assignedAt: entry.assignedAt.toISOString(), kind: entry.kind, exact: entry.exact })),
+            truncated: occurrenceHistory.truncated,
+          }}
+          managerNote={context.role === "manager"}
+        />
+      );
+    }
     return <>
       <DashboardHeader breadcrumb="Distribuição · Plantões" title={schedule.name} summary={pageSummary} rightSlot={directorLite ? undefined : <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>} />
       <main className={cn(directorLite ? "flex min-h-full w-full flex-col bg-background" : "mx-auto flex w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6", directorLite && directorDutyStyles.page)}>
@@ -335,8 +381,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     if (nextCanal !== "todos") query.set("canal", nextCanal);
     const nextQueueId = next.fila ?? selectedQueueId;
     if (nextQueueId) query.set("fila", nextQueueId);
-    const nextDesde = next.desde ?? leadsSinceOption;
+    const nextDesde = next.desde ?? (customSinceAt ? "custom" : leadsSinceOption);
     if (nextDesde !== "plantao") query.set("desde", nextDesde);
+    if (nextDesde === "custom" && customSinceAt) query.set("desdeEm", customSinceAt.value);
     const search = query.toString();
     return `/leads/distribuicao/plantao/${schedule.id}${search ? `?${search}` : ""}`;
   };
@@ -423,7 +470,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const totalWaitingCount = allWaitingLeads.length;
   const sinceLabel = coldQueueWithoutWindow
     ? "sem janela de horário (fila de leads frios: aparecem todos os que aguardam)"
-    : leadsSinceOption !== "plantao"
+    : leadsSinceOption !== "plantao" || customSinceAt
     ? `desde ${dateTime.format(leadsSince)} (escolhido acima)`
     : leadsSince.getTime() === 0
     ? "desde a criação deste plantão"
@@ -432,6 +479,153 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
       : leadsUntil
       ? `nesta ocorrência (${dateTime.format(leadsSince)} – ${dateTime.format(leadsUntil)})`
       : `desde o início desta ocorrência (${dateTime.format(leadsSince)})`;
+
+  if (directorLite) {
+    const liveNow = isDutyWindowActive(liveWindow, now);
+    const whatsappIds = new Set(allLeads.filter((lead) => whatsappEntryOf(lead)).map((lead) => lead.id));
+    const nameOf = (brokerId: string | null | undefined) => roster.find((entry) => entry.brokerId === brokerId)?.brokerName ?? "Corretor";
+    const brokerLeadsSince = customSinceAt ? `custom:${customSinceAt.value}` : leadsSinceOption;
+    const cardOf = (entry: (typeof roster)[number]) => ({
+      scheduleId: schedule.id,
+      leadsSince: brokerLeadsSince,
+      assignmentId: entry.id,
+      brokerId: entry.brokerId,
+      brokerName: entry.brokerName,
+      phone: entry.phone,
+      internalCode: entry.internalCode,
+      branchName: entry.branchName ?? null,
+      availabilityStatus: entry.availabilityStatus ?? null,
+      presenceEnabled,
+      presenceStatus: entry.presenceStatus,
+      confirmedAt: entry.confirmedAt?.toISOString() ?? null,
+      releasedByName: presenceEnabled ? entry.releasedByName ?? null : null,
+      presenceReleaseNote: entry.presenceReleaseNote ?? null,
+      notificationErrorCode: entry.notificationErrorCode ?? null,
+      paused: Boolean(entry.pausedAt),
+      absent: entry.absent,
+      attendanceMode: entry.attendanceMode,
+      scheduleAttendanceMode: schedule.attendanceMode,
+      onlineOverride: entry.onlineOverride,
+      canSetAttendanceMode: context.role === "director",
+      onSitePending: entry.onSitePending,
+      onSiteReleaseOpen: entry.onSiteReleaseOpen,
+      presencePhotoId: entry.presencePhotoId ?? null,
+      photoMinutesAgo: entry.photoTakenAt ? Math.max(0, Math.round((now.getTime() - entry.photoTakenAt.getTime()) / 60_000)) : null,
+      canAssignLeads: managementActionsSetting !== "false",
+      canSwap: entry.publishedDutyDate !== null,
+      swapNotice: swapNotices.get(entry.id) ?? null,
+      liveStatus: entry.liveStatus,
+      nextEventAt: entry.nextEventAt?.toISOString() ?? null,
+      activeLeads: entry.activeLeads,
+      capacity: entry.capacity,
+      crossesCut,
+      leadsMorning: brokerShiftCounts(entry.brokerId).manha,
+      leadsAfternoon: brokerShiftCounts(entry.brokerId).tarde,
+      blockedReason: entry.blockedReason ?? null,
+      wholeDay: Boolean(shiftSections) && entry.shift === "dia",
+      turn: entry.absent ? null : turnOf(entry.brokerId),
+      preconfirm: preconfirmTargets.get(entry.id) ? { targetAssignmentId: preconfirmTargets.get(entry.id)!.assignmentId, targetScheduleName: preconfirmTargets.get(entry.id)!.scheduleName } : null,
+    });
+    const sortable = turnState && liveWindow && context.role === "director" ? { scheduleId: schedule.id, dutyDate: liveWindow.dutyDate, order: turnState.order, queue: turnState.queue } : null;
+    return (
+      <PlantaoPagina1a1
+        backHref="/distribuicao?view=plantao"
+        header={{
+          state: liveNow ? { label: "Em andamento", tone: "good", live: true }
+            : leadsUpcomingStartsAt ? { label: "Próximo turno", tone: "info", live: false }
+              : schedule.status === "active" ? { label: "Regra ativa", tone: "good", live: false }
+                : { label: schedule.status === "archived" ? "Arquivado" : "Inativo", tone: "neutral", live: false },
+          typeName: schedule.typeName ?? null,
+          typeHue: schedule.typeHue ?? null,
+          recurrence: singleDay ? "Dia único" : `↻ Toda ${DAYS_FULL[schedule.dayOfWeek].toLocaleLowerCase("pt-BR")}`,
+          modality: schedule.attendanceMode === "presencial" ? "Presencial" : "Online",
+          title: schedule.name,
+          dayLabel: `${DAYS_FULL[schedule.dayOfWeek]}${singleDayDate ? `, ${dayMonth.format(singleDayDate)}` : ""} · ${schedule.startsAt.slice(0, 5)} às ${schedule.endsAt.slice(0, 5)}`,
+          branchLabel: schedule.branchName ?? "Todas as unidades",
+          queueLabel: schedule.queueName,
+        }}
+        actions={{
+          scheduleId: schedule.id,
+          canExport: canExportReport,
+          escalar: context.role === "director" && escalarDate
+            ? { scheduleId: schedule.id, scheduleName: schedule.name, date: escalarDate, brokers: brokers.map((broker) => ({ id: broker.id, name: broker.name, internalCode: null, branchId: broker.branchId ?? null })) }
+            : null,
+        }}
+        invalidDateMessage={invalidHistoryDate ? "A data informada não corresponde a um plantão encerrado desta regra." : null}
+        occurrences={historyEnabled && !singleDay && completedWindows.length ? {
+          items: [
+            ...(liveOrUpcoming ? [{ key: "agora", label: liveNow ? `Hoje, ${liteDayMonth.format(now)}` : "Próximo turno", href: `/leads/distribuicao/plantao/${schedule.id}`, current: true }] : []),
+            ...completedWindows.map((window) => ({ key: window.dutyDate, label: liteDayMonth.format(new Date(`${window.dutyDate}T12:00:00-03:00`)), href: `/leads/distribuicao/plantao/${schedule.id}?data=${window.dutyDate}`, current: false })),
+          ],
+        } : null}
+        stats={[
+          { label: "Cobertura", value: `${coverage.assigned}/${coverage.minimum}`, detail: coverage.covered ? "Escala completa" : `Faltam ${coverage.missing} ${coverage.missing === 1 ? "corretor" : "corretores"}`, shortDetail: coverage.covered ? "completa" : `faltam ${coverage.missing}`, warn: !coverage.covered },
+          { label: "Filas vinculadas", shortLabel: "Filas", value: linkedQueues.length, detail: linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada" },
+          { label: "Leads no plantão", shortLabel: "Leads", shortDetail: `${totalWaitingCount} aguardando`, value: plantaoLeads.length, detail: channel === "todos" ? `${distributedCount} distribuídos · ${totalWaitingCount} aguardando` : `${whatsappLeadCount} pelo WhatsApp · ${plantaoLeads.length - whatsappLeadCount} por formulário` },
+        ]}
+        escala={{
+          title: presenceEnabled ? "Confirmação da escala" : "Corretores escalados",
+          shortTitle: "Escala",
+          badge: presenceEnabled && roster.length ? `${confirmedCount}/${roster.length} confirmados` : `${roster.length} escalados`,
+          badgeGood: Boolean(presenceEnabled && roster.length && confirmedCount === roster.length),
+          sub: liveStatusEnabled && roster.length ? `${readyNowCount} de ${roster.length} prontos para receber o próximo lead agora.` : presenceEnabled ? "Acompanhe quem confirmou presença neste turno." : "Quem está na escala ativa deste plantão agora.",
+          turn: turnState ? {
+            scheduleName: schedule.name,
+            previous: turnState.previous ? { id: turnState.previous.brokerId, name: nameOf(turnState.previous.brokerId), offeredAt: new Date(turnState.previous.offeredAt).toISOString(), outcome: turnState.previous.outcome } : null,
+            current: turnState.current ? { id: turnState.current.brokerId, name: nameOf(turnState.current.brokerId), offeredAt: new Date(turnState.current.offeredAt).toISOString() } : null,
+            nextName: turnState.nextBrokerId ? nameOf(turnState.nextBrokerId) : null,
+          } : null,
+          autoRefresh: Boolean(turnState),
+          startIntervalText: startInterval ? `Começo do plantão: 1 lead a cada 8 min por corretor, no máximo 3, até todos confirmarem (${startInterval.confirmed} de ${startInterval.confirmed + startInterval.pending} confirmados, até ${timeOnly.format(startInterval.endsAt)}).` : null,
+          rotationText: turnState ? `Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim; lead expirado ou recusado gasta a vez e conta como pulo.${context.role === "director" ? " Para passar alguém na frente, arraste o cartão pela alça." : ""}` : null,
+          noneEligible: roster.length > 0 && roster.every((entry) => entry.blockedReason),
+          sections: roster.length ? (shiftSections ?? [{ key: "todos", label: null as string | null, entries: roster }]).map((section) => ({
+            key: section.key,
+            label: section.label,
+            count: section.entries.length,
+            groups: section.entries.length ? [
+              { key: "active", label: "Ativos", cards: byTurn(section.entries.filter((entry) => !entry.absent)).map(cardOf), sortable },
+              { key: "absent", label: "Faltaram", cards: section.entries.filter((entry) => entry.absent).map(cardOf), sortable: null },
+            ].filter((group) => group.key === "active" || group.cards.length) : [],
+          })) : [],
+          emptyText: roster.length ? null : "Nenhum corretor escalado neste plantão.",
+          pending: {
+            scheduleId: schedule.id,
+            entries: pendingRoster.map((entry) => ({ entryId: entry.id, id: entry.brokerProfileId, name: entry.name, internalCode: entry.internalCode, branchName: entry.branchName })),
+            candidates: invitedBrokers,
+          },
+        }}
+        leads={{
+          count: waitingCount + distributedCount,
+          sub: `Leads das filas vinculadas ${sinceLabel}.`,
+          filters: filters.map((item) => ({ key: item.key, label: item.label, count: item.count, href: leadsHref({ situacao: item.key }), active: filter === item.key })),
+          since: coldQueueWithoutWindow ? null : {
+            choices: leadsSinceChoices(leadsCutAt).map((choice) => ({ value: choice.value, label: choice.label, href: leadsHref({ desde: choice.value }), active: !customSinceAt && leadsSinceOption === choice.value })),
+            customActive: Boolean(customSinceAt),
+            customValue: customSinceAt?.value ?? (desde === "custom" ? desdeEm ?? null : null),
+            customError: customSince && !customSince.ok ? customSince.reason : null,
+            customBaseHref: leadsHref({ desde: "plantao" }),
+            cut: { scheduleId: schedule.id, cutAt: leadsCutAt },
+          },
+          queueTabs: filter === "aguardando" && queueTabs.length > 1 ? queueTabs.map((tab) => ({ key: tab.id, label: tab.name, count: tab.count, href: leadsHref({ fila: tab.id }), active: selectedQueueId === tab.id })) : [],
+          channelTabs: channelTabs.map((tab) => ({ key: tab.key, label: tab.label, count: tab.count, href: leadsHref({ canal: tab.key }), active: channel === tab.key })),
+          groups: directorLeadGroups.map((group) => ({ ...group, leads: group.leads.map((row) => ({ ...row, whatsapp: whatsappIds.has(row.lead.id) })) })),
+          empty: visibleLeads.length ? null : `Nenhum lead ${channel === "whatsapp" ? "do WhatsApp " : channel === "formulario" ? "de formulário " : ""}nesta situação para este plantão ${sinceLabel}.`,
+          drawer: {
+            brokers,
+            branches,
+            contextRole: drawerContextRole,
+            contextJobTitle: context.jobTitle ?? null,
+            contextBranchId: context.branchId ?? null,
+            manualAssignmentChoiceEnabled: assignmentChoiceSetting !== "false",
+            slaFirstContactMinutes: Number.parseInt(slaSettings.slaFirstContactMinutes ?? "15", 10) || 15,
+            slaStagnantDays: Number.parseInt(slaSettings.slaStagnantDays ?? "3", 10) || 3,
+          },
+        }}
+        managerNote={context.role === "manager"}
+      />
+    );
+  }
 
   return <>
     <DashboardHeader

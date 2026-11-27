@@ -22,11 +22,16 @@ function previousMonth(monthKey: string) {
  * escala only) for the day of this plantão (the running turn, or the next one), without leaving the
  * page. No day field (29/10): it showed today even on a plantão days ahead.
  */
-export function ScheduleEscalarButton({ scheduleId, scheduleName, date, brokers }: {
+export function ScheduleEscalarButton({ scheduleId, scheduleName, date, brokers, buttonClassName, icon, wide, wrapperStyle }: {
   scheduleId: string;
   scheduleName: string;
   date: string;
   brokers: Broker[];
+  /** Página do plantão no Lite (27/11/2026): o botão vira a ação primária do topo, no desenho do artifact. */
+  buttonClassName?: string;
+  icon?: React.ReactNode;
+  wide?: boolean;
+  wrapperStyle?: React.CSSProperties;
 }) {
   const router = useRouter();
   const [found, setFound] = useState<{ occurrence: PlanOccurrence } | null>(null);
@@ -50,8 +55,12 @@ export function ScheduleEscalarButton({ scheduleId, scheduleName, date, brokers 
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <Button type="button" size="sm" onClick={open} disabled={pending}>{pending ? "Abrindo..." : "Escalar corretor"}</Button>
+    <div className={buttonClassName ? undefined : "flex flex-wrap items-end gap-2"} style={wrapperStyle}>
+      {buttonClassName ? (
+        <button type="button" className={buttonClassName} style={wide ? { flex: 1 } : undefined} onClick={open} disabled={pending}>{icon}{pending ? "Abrindo…" : "Escalar corretor"}</button>
+      ) : (
+        <Button type="button" size="sm" onClick={open} disabled={pending}>{pending ? "Abrindo..." : "Escalar corretor"}</Button>
+      )}
       {found ? (
         <PlantaoOccurrenceSheet
           open

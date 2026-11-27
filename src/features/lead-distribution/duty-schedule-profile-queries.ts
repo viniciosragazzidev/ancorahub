@@ -36,7 +36,7 @@ export type DutyScheduleProfile = Awaited<ReturnType<typeof getDutyScheduleProfi
  * can be wired to a queue through any of the three), and the leads that
  * actually landed with one of its rostered brokers recently.
  */
-export async function getDutyScheduleProfile(context: TenantContext, scheduleId: string, options: { leadsSince?: DutyLeadsSinceOption; branchScopeId?: string | null } = {}) {
+export async function getDutyScheduleProfile(context: TenantContext, scheduleId: string, options: { leadsSince?: DutyLeadsSinceOption; /** "Personalizado": início escolhido à mão (vence a opção). */ leadsSinceAt?: Date | null; branchScopeId?: string | null } = {}) {
   const db = getDatabase();
 
   const [schedule] = await db
@@ -60,10 +60,14 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       timezone: schema.unitDutySchedules.timezone,
       validFrom: schema.unitDutySchedules.validFrom,
       validUntil: schema.unitDutySchedules.validUntil,
+      // Página do plantão no Lite (27/11/2026): o selo do tipo com o ponto na cor dele.
+      typeName: schema.dutyScheduleTypes.name,
+      typeHue: schema.dutyScheduleTypes.colorHue,
     })
     .from(schema.unitDutySchedules)
     .leftJoin(schema.branches, eq(schema.unitDutySchedules.branchId, schema.branches.id))
     .leftJoin(schema.leadQueues, eq(schema.unitDutySchedules.queueId, schema.leadQueues.id))
+    .leftJoin(schema.dutyScheduleTypes, eq(schema.unitDutySchedules.typeId, schema.dutyScheduleTypes.id))
     .where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .limit(1);
   if (!schedule) throw new Error("Plantão não encontrado.");
@@ -204,7 +208,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     : getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, referenceNow, leadsCutAt);
   // The manager may widen or narrow it ("considerar leads a partir de"): then
   // every lead since that moment counts, with no end.
-  const leadsSinceOverride = dutyLeadsSinceStart(options.leadsSince ?? "plantao", now, schedule.timezone ?? undefined, leadsCutAt);
+  const leadsSinceOverride = options.leadsSinceAt ?? dutyLeadsSinceStart(options.leadsSince ?? "plantao", now, schedule.timezone ?? undefined, leadsCutAt);
   const windowBounds = leadsSinceOverride ? { since: leadsSinceOverride, until: null } : resolveDutyLeadWindowBounds(occurrenceWindow, now);
   // A plantão fed only by queues with "Liberação dos leads frios" switched on has no time
   // window (23/10): those leads go out at 2 days old, always before the occurrence, so the

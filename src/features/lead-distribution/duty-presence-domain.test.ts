@@ -11,6 +11,7 @@ import {
   getSelfDutyConfirmationWindowState,
   isDutyBrokerEligible,
   parseDutyLeadsSince,
+  parseDutyLeadsCustomSince,
   formatDutyStartHour,
   extendedShiftHourLabel,
   formatDutyPresenceHourLabel,
@@ -307,6 +308,16 @@ describe("lead window after weekends and holidays", () => {
 describe("considerar leads a partir de", () => {
   // Tuesday 13/10/2026, 12:00 in São Paulo.
   const now = new Date("2026-10-13T15:00:00.000Z");
+
+  it("reads a custom start in the plantão timezone, past and at most 31 days back", () => {
+    expect(parseDutyLeadsCustomSince(undefined, now)).toBeNull();
+    const ok = parseDutyLeadsCustomSince("2026-10-12T18:00", now);
+    expect(ok && ok.ok ? ok.at.toISOString() : null).toBe("2026-10-12T21:00:00.000Z");
+    expect(parseDutyLeadsCustomSince("2026-10-13T18:00", now)).toEqual({ ok: false, reason: "Escolha um momento que já passou." });
+    expect(parseDutyLeadsCustomSince("2026-09-01T08:00", now)).toEqual({ ok: false, reason: "Escolha no máximo 31 dias atrás." });
+    expect(parseDutyLeadsCustomSince("2026-02-30T08:00", now)?.ok).toBe(false);
+    expect(parseDutyLeadsCustomSince("ontem", now)?.ok).toBe(false);
+  });
 
   it("keeps the plantão window by default and for unknown values", () => {
     expect(parseDutyLeadsSince(undefined)).toBe("plantao");
