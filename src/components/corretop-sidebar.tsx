@@ -91,7 +91,7 @@ const areaPresentation: Record<NavAreaId, Pick<NavItemConfig, "icon" | "iconTone
 export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false, postSaleAuditEnabled = false, callAncoraEnabled = false, erpPaths = [] }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; callAncoraEnabled?: boolean; erpPaths?: readonly string[] }) {
   const currentPathname = usePathname();
   const pathname = initialPathname ?? currentPathname;
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, state: sidebarState, toggleSidebar } = useSidebar();
   const directorLite = useArcScopeEnabled();
   const chrome = useDirectorChrome();
   const user = useNavUser(initialUser);
@@ -421,6 +421,20 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
       {/* Footer: AI Agent & User Profile */}
       <SidebarFooter className={cn("gap-1 border-t border-sidebar-border/70 p-2 pb-3", isMobile && "gap-2 px-3 pb-[max(0.75rem,var(--mobile-safe-bottom))]")}>
         <TooltipProvider delay={150}>
+          {/* Recolher e abrir a barra (27/11/2026): a faixa de topo, que tinha o botão, saiu do painel e da Conversas. */}
+          {!isMobile ? (
+            <button
+              type="button"
+              data-slot="sidebar-collapse-toggle"
+              onClick={toggleSidebar}
+              aria-label={sidebarState === "collapsed" ? "Abrir o menu completo" : "Recolher o menu"}
+              title={sidebarState === "collapsed" ? "Abrir o menu completo (Ctrl+B)" : "Recolher o menu (Ctrl+B)"}
+              className="flex h-10 w-full items-center gap-3 rounded-full px-3 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true" className="shrink-0"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" /></svg>
+              <span className="truncate group-data-[collapsible=icon]:hidden">Recolher o menu</span>
+            </button>
+          ) : null}
           {/* AI Agent Trigger (o gestor ficou sem o Agente IA em 10/11, versão antiga só com a gestão da unidade) */}
           {/* 24/11: só quem pode usar o agente (diretor, cargo com "Agente IA" e ligado na ficha) vê o atalho. */}
           {!isOutsideManagerScope(roleKey ?? "", user?.jobTitle) && user?.permissions?.includes("usar_agente_ia") ? <Tooltip>
