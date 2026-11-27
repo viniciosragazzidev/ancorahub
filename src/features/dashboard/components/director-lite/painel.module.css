@@ -265,3 +265,10 @@
 
 /* Barra lateral recolhida (27/11/2026): o conteúdo ganha 200px; com ela aberta segue 1040px. */
 :global([data-slot="sidebar-wrapper"]:has([data-collapsible="icon"])) .column { max-width: 1240px; }
+/* Fim da linha de controles (Exportar na aba Qualidade, artifact de 27/11/2026): a linha ocupa a largura toda e o
+   Exportar vai para a ponta direita. */
+.controls:has(> .trailing) { flex: 1 1 100%; }
+.trailing { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+@media (max-width: 767px) { .trailing { display: none; } }
+/* Controles sempre na linha de baixo da saudação, à esquerda (artifacts do painel e de Qualidade e Funil). */
+.head > .controls { flex: 1 1 100%; }

@@ -47,13 +47,13 @@ describe("funil de qualificação Lite", () => {
     expect(container.textContent).toContain("Últimos 7 dias, Centro");
     expect(container.textContent).toContain("500 leads");
     expect(screen.getByRole("table", { name: "Resultados das variantes da primeira mensagem" })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Situação atual dos leads do período" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Situação atual dos leads do período")).toBeInTheDocument();
   });
 
   it("mostra Hoje como período operacional, sem rótulo de sete dias", () => {
     const { container } = render(<QualificationFunnelView data={{ ...fixture, period: "today" }} unitName="Centro" />);
     expect(container.textContent).toContain("Hoje, Centro");
-    expect(container.textContent).toContain("chegaram hoje, etapa por etapa");
+    expect(container.textContent).toContain("25 vendas de 1.234 leads");
     expect(container.textContent).not.toContain("Últimos today dias");
   });
 
@@ -70,7 +70,7 @@ describe("funil de qualificação Lite", () => {
     };
     render(<QualificationFunnelView data={empty} unitName={null} />);
     expect(screen.getByRole("status")).toHaveTextContent("Nenhum lead chegou neste período");
-    expect(screen.getByText("Tente ampliar o período ou escolher outra unidade.")).toBeInTheDocument();
+    expect(screen.getByText("Tente ampliar o período ou escolher outra fila.")).toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Resultados das variantes da primeira mensagem" })).not.toBeInTheDocument();
   });
 

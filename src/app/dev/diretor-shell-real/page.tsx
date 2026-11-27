@@ -14,6 +14,9 @@ import { LightConversationsView, type BrokerConversationInsight } from "@/featur
 import { DirectorLiteChrome } from "@/features/dashboard/components/director-lite/director-lite-chrome";
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
 import { QualityToolbar, QualityView } from "@/features/dashboard/components/director-lite/quality-view";
+import { qualityHeadline } from "@/features/dashboard/components/director-lite/qualidade-funil-text";
+import { AttentionDrawerButton } from "@/features/dashboard/components/director-lite/attention-drawer";
+import { attentionItems } from "@/features/dashboard/components/director-lite/attention";
 
 import { CASE_NOW, DASHBOARD_CASES, essentialCase, funnelCase, qualityCase, type DashboardCase } from "./dashboard-cases";
 import { LeadsShellScreen } from "./leads-screen";
@@ -246,12 +249,21 @@ export default async function DirectorShellRealPage({
   const firstName = name.split(" ")[0] ?? name;
   const caseNow = dashboardCase ? CASE_NOW[dashboardCase] : demoNow;
   const dashboard = tab === "qualidade" ? (
-    <DirectorLiteChrome now={caseNow} tab="quality" period="today" branchId={null} branches={demoBranches} firstName={firstName}>
-      <QualityToolbar legacyHref="/dashboard?tab=quality&period=today&legado=1" detailedHref="/dashboard?tab=quality&period=today&vista=detalhada&legado=1" />
+    <DirectorLiteChrome
+      now={caseNow}
+      tab="quality"
+      period="today"
+      branchId={null}
+      branches={demoBranches}
+      firstName={firstName}
+      headline={qualityHeadline(qualityCase(dashboardCase ?? "cheio"), "Hoje")}
+      action={<AttentionDrawerButton items={attentionItems(dashboardCase ? essentialCase(dashboardCase) : buildEssential("today", "all", demoNow))} />}
+      trailing={<QualityToolbar legacyHref="/dashboard?tab=quality&period=today&legado=1" />}
+    >
       <QualityView report={qualityCase(dashboardCase ?? "cheio")} unitName={null} now={caseNow} widerHref="/dashboard?tab=quality&periodo=7" />
     </DirectorLiteChrome>
   ) : tab === "funil" ? (
-    <DirectorLiteQualificationFunnelPage data={funnelCase(dashboardCase ?? "cheio")} branchId={null} branches={demoBranches} firstName={firstName} now={caseNow} />
+    <DirectorLiteQualificationFunnelPage data={funnelCase(dashboardCase ?? "cheio")} branchId={null} branches={demoBranches} firstName={firstName} now={caseNow} attention={attentionItems(dashboardCase ? essentialCase(dashboardCase) : buildEssential("today", "all", demoNow))} />
   ) : (
     <DirectorLiteDashboard
       data={{ ...(dashboardCase ? essentialCase(dashboardCase) : buildEssential("today", "all", demoNow)), firstName }}

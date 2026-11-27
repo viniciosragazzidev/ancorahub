@@ -43,7 +43,7 @@ describe("rótulos de borda", () => {
   it("resposta sem mediana nem respostas não vira \"resposta em sem respostas ainda\"", () => {
     expect(repliedDetail(0, null)).toBe("Ninguém respondeu ainda");
     expect(repliedDetail(3, null)).toBe("3 leads");
-    expect(repliedDetail(3, 6)).toBe("3 leads, resposta em 6 min (mediana)");
+    expect(repliedDetail(3, 6)).toBe("3 leads, metade em até 6 min");
   });
 });
 
@@ -102,7 +102,8 @@ describe("Qualidade nas bordas", () => {
     const noBrokers = { ...report, distributed: { ...report.distributed, total: 5 }, withoutWeak: { ...report.withoutWeak, perBrokerNow: null, perBrokerWithout: null } };
     const { container } = render(<QualityView report={noBrokers} unitName={null} now={CASE_NOW["uma-fila"]} />);
     expect(container.textContent).not.toMatch(FORBIDDEN);
-    expect(screen.getByText("Sem dados hoje")).toBeInTheDocument();
+    // Computador e celular trazem a mesma média (artifact 27/11/2026): as duas dizem "Sem dados hoje".
+    expect(screen.getAllByText("Sem dados hoje").length).toBeGreaterThan(0);
   });
 
   it("dia zerado: uma linha que explica e o próximo passo", () => {
