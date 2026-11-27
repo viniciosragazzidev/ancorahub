@@ -18,6 +18,7 @@ import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/c
 import { mergeEligibleOrderKeepingBlockedSlots } from "@/features/lead-distribution/duty-queue-order";
 import { resetDutyManualQueueAction, saveDutyManualQueueAction } from "@/features/lead-distribution/duty-queue-order-actions";
 import type { DutyBrokerTurnStats, DutyQueueOrderPreview } from "@/features/lead-distribution/duty-queue-order-queries";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 import styles from "./duty-queue-order-board.module.css";
@@ -379,6 +380,8 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
                   {orderedRows.length ? (
                     <DndContext id={`duty-queue-${preview.scheduleId}`} sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={(event) => { void onDragEnd(event, preview); }}>
                       <SortableContext items={orderedRows.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+                        {/* Até uns 5 corretores à vista; o resto rola dentro do cartão (27/11/2026). */}
+                        <ScrollArea className={pl.qlistScroll}>
                         <ol className={pl.qlist} aria-label={`Fila de ${preview.scheduleName}`}>
                           {orderedRows.map((item, index) => (
                             <SortableBrokerRow1a1
@@ -392,6 +395,7 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
                             />
                           ))}
                         </ol>
+                        </ScrollArea>
                       </SortableContext>
                     </DndContext>
                   ) : <p className={pl.empty}>Ninguém está disponível para receber agora.</p>}
