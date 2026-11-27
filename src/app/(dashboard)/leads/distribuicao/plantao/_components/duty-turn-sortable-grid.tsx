@@ -15,8 +15,23 @@ import { cn } from "@/lib/utils";
 /** `key` is the roster row (a broker can be on the weekly and the dated roster); `id` is the broker. */
 type Item = { key: string; id: string; name: string; node: ReactNode };
 
-function SortableCard({ item, movable, disabled, isOver }: { item: Item; movable: boolean; disabled: boolean; isOver: boolean }) {
+/** Página do plantão no Lite (27/11/2026): a alça fica à esquerda do cartão, no desenho do artifact. */
+type LiteClasses = { wrap: string; over: string; drag: string; grip: string; overlay: string; withGrip: string };
+
+function SortableCard({ item, movable, disabled, isOver, lite }: { item: Item; movable: boolean; disabled: boolean; isOver: boolean; lite?: LiteClasses }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: item.key, disabled: !movable || disabled });
+  if (lite) {
+    return (
+      <div ref={setNodeRef} className={cn(lite.wrap, movable && lite.withGrip, isDragging && lite.drag, isOver && lite.over)}>
+        {item.node}
+        {movable ? (
+          <button type="button" className={lite.grip} data-drag-scroll="off" aria-label={`Arrastar ${item.name} para outra posição na vez`} title="Arraste para mudar a vez" disabled={disabled} {...attributes} {...listeners}>
+            <GripVertical aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
+    );
+  }
   return (
     <div ref={setNodeRef} className={cn("relative rounded-[var(--radius-card)]", isDragging && "opacity-40", isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background")}>
       {item.node}
@@ -26,6 +41,7 @@ function SortableCard({ item, movable, disabled, isOver }: { item: Item; movable
           variant="ghost"
           size="icon-sm"
           className="absolute top-1.5 right-1.5 z-20 cursor-grab touch-none active:cursor-grabbing"
+          data-drag-scroll="off"
           aria-label={`Arrastar ${item.name} para outra posição na vez`}
           title="Arraste para mudar a vez"
           disabled={disabled}
@@ -44,7 +60,8 @@ function SortableCard({ item, movable, disabled, isOver }: { item: Item; movable
  * drop a card on another and it takes that place. Siblings do not shift while dragging (the cards
  * already slide on their own when the order changes), the target card just gets a ring.
  */
-export function DutyTurnSortableGrid({ scheduleId, dutyDate, order, queue, items, className }: {
+export function DutyTurnSortableGrid({ scheduleId, dutyDate, order, queue, items, className, lite }: {
+  lite?: LiteClasses;
   scheduleId: string;
   dutyDate: string;
   order: string[];
@@ -108,11 +125,11 @@ export function DutyTurnSortableGrid({ scheduleId, dutyDate, order, queue, items
     >
       <SortableContext items={queueItems.map((item) => item.key)} strategy={() => null}>
         <div className={className}>
-          {sorted.map((item) => <SortableCard key={item.key} item={item} movable={movable.has(item.id)} disabled={saving} isOver={overId === item.key} />)}
+          {sorted.map((item) => <SortableCard key={item.key} item={item} movable={movable.has(item.id)} disabled={saving} isOver={overId === item.key} lite={lite} />)}
         </div>
       </SortableContext>
       <DragOverlay dropAnimation={null}>
-        {active ? (
+        {active && lite ? <div className={lite.overlay}><GripVertical className="size-4" aria-hidden="true" />{active.name}</div> : active ? (
           <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-primary bg-card px-3 py-2.5 text-sm font-medium">
             <GripVertical className="size-4 text-primary" aria-hidden="true" />
             {active.name}

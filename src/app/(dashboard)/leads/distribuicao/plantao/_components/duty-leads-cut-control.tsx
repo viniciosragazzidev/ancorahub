@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { saveDutyLeadsCutAction } from "@/features/lead-distribution/duty-actions";
 import { DUTY_LEADS_FROM_PREVIOUS_DAY_AT, formatDutyLeadsCut as formatDutyCut } from "@/features/lead-distribution/duty-presence-domain";
 
-export function DutyLeadsCutControl({ scheduleId, cutAt }: { scheduleId: string; cutAt: string }) {
+/** `lite` (27/11/2026): página do plantão 1:1, o corte vira um link em pílula e o formulário fica no mesmo desenho. */
+export function DutyLeadsCutControl({ scheduleId, cutAt, lite }: { scheduleId: string; cutAt: string; lite?: { link: string; input: string; primary: string; ghost: string } }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(cutAt);
@@ -32,6 +33,31 @@ export function DutyLeadsCutControl({ scheduleId, cutAt }: { scheduleId: string;
       setNote({ text: `Corte salvo: leads a partir das ${formatDutyCut(result.cutAt)} do dia útil anterior.`, error: false });
       router.refresh();
     });
+  }
+
+  if (lite) {
+    if (!editing) {
+      return (
+        <>
+          <button type="button" className={lite.link} onClick={() => { setValue(cutAt); setEditing(true); setNote(null); }} title="Horário do dia útil anterior em que começa a janela de leads deste plantão">
+            Corte {formatDutyCut(cutAt)} do dia útil anterior
+          </button>
+          {note ? <span role={note.error ? "alert" : "status"}>{note.text}</span> : null}
+        </>
+      );
+    }
+    return (
+      <form style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }} aria-label="Horário de corte dos leads" onSubmit={(event) => { event.preventDefault(); save(value); }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Leads a partir das
+          <input type="time" required value={value} onChange={(event) => setValue(event.target.value)} className={lite.input} aria-label="Horário de corte" />
+          do dia útil anterior
+        </label>
+        <button type="submit" className={lite.primary} disabled={pending || !value}>{pending ? "Salvando…" : "Salvar"}</button>
+        {cutAt !== DUTY_LEADS_FROM_PREVIOUS_DAY_AT ? <button type="button" className={lite.ghost} disabled={pending} onClick={() => save(DUTY_LEADS_FROM_PREVIOUS_DAY_AT)}>Voltar para {formatDutyCut(DUTY_LEADS_FROM_PREVIOUS_DAY_AT)}</button> : null}
+        <button type="button" className={lite.ghost} disabled={pending} onClick={() => { setEditing(false); setNote(null); }}>Cancelar</button>
+        {note ? <span role="alert" style={{ flexBasis: "100%" }}>{note.text}</span> : null}
+      </form>
+    );
   }
 
   if (!editing) {

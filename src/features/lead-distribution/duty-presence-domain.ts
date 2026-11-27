@@ -405,6 +405,32 @@ export function dutyLeadsSinceStart(option: DutyLeadsSinceOption, now: Date, tim
   return localTimeToUtc(addCalendarDays(todayKey, -back), cutAt, timezone);
 }
 
+/** "Personalizado" (27/11/2026): até 31 dias atrás, nunca no futuro. */
+export const DUTY_LEADS_CUSTOM_SINCE_MAX_DAYS = 31;
+
+/**
+ * Início escolhido à mão em "Considerar leads a partir de" (`desde=custom&desdeEm=2026-11-26T18:00`), lido no fuso do
+ * plantão. Sem valor: null (a página segue a janela do plantão). Valor inválido: o motivo, para a tela mostrar.
+ */
+export function parseDutyLeadsCustomSince(value: string | null | undefined, now: Date, timezone = "America/Sao_Paulo"): { ok: true; at: Date; value: string } | { ok: false; reason: string } | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/.exec(raw);
+  if (!match) return { ok: false, reason: "Data ou hora inválida. Use dia e hora, por exemplo 26/11 às 18:00." };
+  const [, day, hour, minute] = match;
+  const [year, month, date] = day.split("-").map(Number);
+  const check = new Date(Date.UTC(year, month - 1, date));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== date || Number(hour) > 23 || Number(minute) > 59) {
+    return { ok: false, reason: "Data ou hora inválida. Use dia e hora, por exemplo 26/11 às 18:00." };
+  }
+  const at = localTimeToUtc(day, `${hour}:${minute}`, timezone);
+  if (at.getTime() > now.getTime()) return { ok: false, reason: "Escolha um momento que já passou." };
+  if (now.getTime() - at.getTime() > DUTY_LEADS_CUSTOM_SINCE_MAX_DAYS * 86_400_000) {
+    return { ok: false, reason: `Escolha no máximo ${DUTY_LEADS_CUSTOM_SINCE_MAX_DAYS} dias atrás.` };
+  }
+  return { ok: true, at, value: raw };
+}
+
 export function isDutyWindowActive(window: DutyWindow | null, now: Date) {
   return Boolean(window && window.startsAt <= now && window.endsAt > now);
 }

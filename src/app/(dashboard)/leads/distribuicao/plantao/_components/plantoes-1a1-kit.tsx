@@ -53,8 +53,12 @@ export function initials(name: string) {
 
 /** A gaveta do artifact. `footer` é o rodapé fixo; `badges` fica abaixo do título. */
 export function PlSheet({
-  open, onOpenChange, title, description, badges, children, footer, wide, closeLabel = "Fechar",
+  open, onOpenChange, title, description, badges, children, footer, wide, closeLabel = "Fechar", width, lead,
 }: {
+  /** Largura própria (a gaveta do corretor da página do plantão tem 520px). */
+  width?: number;
+  /** Antes do título (o avatar do corretor). */
+  lead?: ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
@@ -71,9 +75,10 @@ export function PlSheet({
       <DialogPrimitive.Portal container={container ?? undefined}>
         <div className={cn("arc-venancor", s.gx)} data-skin="diretor" style={{ display: "contents" }}>
           <DialogPrimitive.Backdrop className={s.scrim} />
-          <DialogPrimitive.Popup className={cn(s.sheet, wide && s.sheetWide)}>
+          <DialogPrimitive.Popup className={cn(s.sheet, wide && s.sheetWide)} style={width ? { width: `min(${width}px, 100vw)` } : undefined}>
             <div className={s.sheetHead}>
-              <div className={s.sheetHeadText}>
+              {lead}
+              <div className={s.sheetHeadText} style={lead ? { flex: 1 } : undefined}>
                 <DialogPrimitive.Title className={s.sheetTitle}>{title}</DialogPrimitive.Title>
                 {description ? <DialogPrimitive.Description className={s.sheetDesc}>{description}</DialogPrimitive.Description> : null}
                 {badges ? <span className={s.badges}>{badges}</span> : null}
