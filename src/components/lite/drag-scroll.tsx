@@ -31,6 +31,8 @@ export function DragScroll() {
     let startScroll = 0;
     let dragging = false;
     let pointerId = -1;
+    let savedSnap = "";
+    let savedBehavior = "";
 
     const onDown = (event: PointerEvent) => {
       if (event.pointerType !== "mouse" || event.button !== 0) return;
@@ -52,6 +54,12 @@ export function DragScroll() {
         if (Math.abs(delta) < THRESHOLD) return;
         dragging = true;
         target.dataset.dragScrolling = "true";
+        // Encaixe (scroll-snap) e rolagem suave brigam com o arraste: puxavam de volta para o item mais perto a cada
+        // movimento. Ficam desligados enquanto se puxa e voltam ao soltar.
+        savedSnap = target.style.scrollSnapType;
+        savedBehavior = target.style.scrollBehavior;
+        target.style.scrollSnapType = "none";
+        target.style.scrollBehavior = "auto";
         window.getSelection()?.removeAllRanges();
       }
       target.scrollLeft = startScroll - delta;
@@ -63,6 +71,10 @@ export function DragScroll() {
       if (!target) return;
       const was = dragging;
       delete target.dataset.dragScrolling;
+      if (was) {
+        target.style.scrollSnapType = savedSnap;
+        target.style.scrollBehavior = savedBehavior;
+      }
       target = null;
       dragging = false;
       if (was) {
