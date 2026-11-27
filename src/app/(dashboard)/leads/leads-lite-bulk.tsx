@@ -8,7 +8,8 @@
  */
 import { useCallback, useState, useTransition } from "react";
 
-import { LiteBulkBar, LiteConfirmDialog, type BulkAction } from "@/components/lite/controls";
+import { LiteConfirmDialog, type BulkAction } from "@/components/lite/controls";
+import a1 from "./leads-1a1.module.css";
 import { BulkStatusDialog } from "@/components/ui/bulk-status-dialog";
 import { BulkReassignDialog, type BulkMode } from "@/components/ui/bulk-reassign-dialog";
 import { toast } from "@/components/ui/sonner";
@@ -103,7 +104,18 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
 
   return (
     <>
-      <LiteBulkBar count={count} actions={actions} onClear={onClear} />
+      {/* Barra flutuante escura, 1:1 ao artifact "Leads da gestão" (27/11/2026): contagem, ações e limpar. */}
+      {count > 0 ? (
+        <div className={`arc-venancor ${a1.gx} ${a1.bulk}`} data-skin="diretor" role="toolbar" aria-label="Ações em lote">
+          <span className={a1.bulkCount}>{count} {count === 1 ? "selecionado" : "selecionados"}</span>
+          {actions.map((action) => (
+            <button key={action.id} type="button" className={a1.bulkBtn} data-tone={action.tone} disabled={action.disabled} onClick={action.onRun}>{action.label}</button>
+          ))}
+          <button type="button" className={a1.bulkClose} aria-label="Limpar seleção" onClick={onClear}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+      ) : null}
       {config.tags?.length ? (
         <LeadsLiteBulkTagPanel
           open={tagging}

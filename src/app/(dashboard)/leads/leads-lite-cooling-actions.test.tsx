@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
@@ -34,13 +34,15 @@ describe("ações do radar Esfriando", () => {
     expect(screen.queryByRole("button", { name: "Ações do lead Maria Parada" })).toBeNull();
   });
 
-  it("gestor abre o ⋯ com Assumir, Cobrar corretor e Redistribuir", () => {
+  it("gestor vê Assumir, Cobrar corretor e Redistribuir à vista na linha (artifact 27/11/2026)", () => {
     const onAction = vi.fn();
-    render(<LeadsLiteCooling leads={[lead]} onOpen={vi.fn()} now={now} actor={{ role: "manager", userId: "g1" }} onAction={onAction} />);
-    fireEvent.click(screen.getAllByRole("button", { name: "Ações do lead Maria Parada" })[0]!);
-    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Assumir", "Cobrar corretor", "Redistribuir"]);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Cobrar corretor" }));
+    const onOpen = vi.fn();
+    render(<LeadsLiteCooling leads={[lead]} onOpen={onOpen} now={now} actor={{ role: "manager", userId: "g1" }} onAction={onAction} />);
+    const row = screen.getAllByRole("row")[1]!;
+    expect(within(row).getAllByRole("button").slice(1).map((item) => item.textContent)).toEqual(["Assumir", "Cobrar corretor", "Redistribuir"]);
+    fireEvent.click(within(row).getByRole("button", { name: "Cobrar corretor: Maria Parada" }));
     expect(onAction).toHaveBeenCalledWith(lead, "nudge", expect.any(Number));
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it("cobrar só confirma depois do servidor e avisa o workspace", async () => {

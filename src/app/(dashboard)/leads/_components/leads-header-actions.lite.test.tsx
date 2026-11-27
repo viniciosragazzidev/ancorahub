@@ -42,7 +42,8 @@ describe("ações do topo de /leads com a chave do diretor", () => {
     expect(screen.queryByRole("combobox", { name: "Período" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Próximo lead" })).toHaveAttribute("href", "/leads/l1");
     expect(screen.getByRole("link", { name: "Próximo lead" })).toHaveAttribute("title", "Maria Nova: SLA estourando");
-    fireEvent.click(screen.getByRole("button", { name: "Novo lead" }));
+    // Botão em pílula no computador e o "+" redondo no celular: os dois abrem a gaveta "Novo lead".
+    fireEvent.click(screen.getAllByRole("button", { name: "Novo lead" })[0]!);
     expect(screen.getByRole("dialog", { name: "Novo lead" })).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: "Mais ações" })[0]!);
     expect(screen.getByRole("menuitem", { name: "Leads arquivados" })).toHaveAttribute("href", "/leads/arquivados");
@@ -52,7 +53,7 @@ describe("ações do topo de /leads com a chave do diretor", () => {
 
   it("o menu compacto (abaixo de 1024px) também leva o Próximo lead", () => {
     renderLite();
-    fireEvent.click(screen.getAllByRole("button", { name: "Mais ações" })[1]!);
+    fireEvent.click(screen.getByRole("button", { name: "Mais ações (Próximo lead, arquivados, importar)" }));
     expect(screen.getByRole("menuitem", { name: "Próximo lead" })).toHaveAttribute("href", "/leads/l1");
   });
 });

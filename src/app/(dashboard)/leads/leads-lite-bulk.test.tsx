@@ -75,12 +75,12 @@ describe("seleção em massa na lista Lite", () => {
     expect(onToggleRow).toHaveBeenCalledWith("l2");
     fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar todos" }));
     expect(onSelectAll).toHaveBeenCalledWith(true);
-    expect(screen.queryByRole("region", { name: "Ações em lote" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "Ações em lote" })).not.toBeInTheDocument();
   });
 
   it("diretor vê as mesmas ações de hoje; Limpar seleção limpa", () => {
     const { onSelectAll } = renderList({ selectedIds: ["l1", "l2"] });
-    const bar = within(screen.getByRole("region", { name: "Ações em lote" }));
+    const bar = within(screen.getByRole("toolbar", { name: "Ações em lote" }));
     expect(bar.getByText("2 selecionados")).toBeInTheDocument();
     expect(bar.getAllByRole("button").map((button) => button.getAttribute("aria-label") ?? button.textContent)).toEqual([
       "Alterar status",
@@ -96,7 +96,7 @@ describe("seleção em massa na lista Lite", () => {
 
   it("corretor só tem a exportação, como na tabela atual", () => {
     renderList({ selectedIds: ["l1"], role: "broker" });
-    const bar = within(screen.getByRole("region", { name: "Ações em lote" }));
+    const bar = within(screen.getByRole("toolbar", { name: "Ações em lote" }));
     expect(bar.queryByRole("button", { name: "Alterar status" })).not.toBeInTheDocument();
     expect(bar.getByRole("button", { name: "Exportar CSV" })).toBeInTheDocument();
   });

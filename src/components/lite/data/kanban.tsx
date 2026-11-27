@@ -31,13 +31,20 @@ export type LiteKanbanProps<T> = {
   onMoveColumn: (activeId: string, overId: string) => void;
   /** Texto da coluna vazia. */
   emptyText?: ReactNode;
+  /**
+   * Marcação de uma tela desenhada 1:1 (ex.: /leads da gestão, 27/11/2026): as classes vêm da tela e o cabeçalho vira
+   * "Etapa 412" à esquerda e o resumo à direita. Mesmo arrastar, teclado e anúncios.
+   */
+  skin?: LiteKanbanSkin;
 };
+
+export type LiteKanbanSkin = Partial<Record<"board" | "column" | "head" | "handle" | "title" | "count" | "summary" | "cards" | "empty", string>>;
 
 type Picked = { id: string; from: number; to: number };
 
 const countLabel = (count: number) => (count === 1 ? "1 lead" : `${count} leads`);
 
-export function LiteKanban<T>({ label, columns, itemKey, renderCard, onMoveColumn, renderFooter, renderSummary, emptyText = "Nenhum lead nesta etapa" }: LiteKanbanProps<T>) {
+export function LiteKanban<T>({ label, columns, itemKey, renderCard, onMoveColumn, renderFooter, renderSummary, emptyText = "Nenhum lead nesta etapa", skin }: LiteKanbanProps<T>) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [dragging, setDragging] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
@@ -121,7 +128,7 @@ export function LiteKanban<T>({ label, columns, itemKey, renderCard, onMoveColum
     <div className={styles.root}>
       <p id={hintId} className={styles.srOnly}>Para mover uma coluna pelo teclado, foque a alça, aperte espaço, use as setas e aperte espaço de novo para soltar.</p>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)} modifiers={[restrictToHorizontalAxis]} accessibility={{ announcements: silentAnnouncements, screenReaderInstructions: { draggable: "" } }}>
-        <div ref={boardRef} role="region" aria-label={label} className={styles.board} data-lite="kanban">
+        <div ref={boardRef} role="region" aria-label={label} className={skin?.board ?? styles.board} data-lite="kanban">
           <SortableContext items={ordered.map((column) => column.id)} strategy={horizontalListSortingStrategy}>
             {ordered.map((column, position) => (
               <SortableColumn
@@ -139,6 +146,7 @@ export function LiteKanban<T>({ label, columns, itemKey, renderCard, onMoveColum
                 onHandleKey={onHandleKey(column.id)}
                 footer={renderFooter?.(column)}
                 summary={renderSummary?.(column)}
+                skin={skin}
                 onHandleBlur={() => {
                   if (picked?.id === column.id) {
                     // O foco saiu da alça durante o movimento: cancela, como o Esc.
@@ -149,13 +157,13 @@ export function LiteKanban<T>({ label, columns, itemKey, renderCard, onMoveColum
                 }}
               >
                 {column.items.length ? (
-                  <ul className={styles.cards}>
+                  <ul className={skin?.cards ?? styles.cards}>
                     {column.items.map((item) => (
                       <li key={itemKey(item)}>{renderCard(item)}</li>
                     ))}
                   </ul>
                 ) : (
-                  <p className={styles.empty}>{emptyText}</p>
+                  <p className={skin?.empty ?? styles.empty}>{emptyText}</p>
                 )}
               </SortableColumn>
             ))}
@@ -189,7 +197,7 @@ function previewOrder<T>(columns: LiteKanbanColumn<T>[], picked: Picked) {
   return next;
 }
 
-function SortableColumn<T>({ column, position, total, hintId, picked, dragging, handleRef, onHandleKey, onHandleBlur, footer, summary, children }: {
+function SortableColumn<T>({ column, position, total, hintId, picked, dragging, handleRef, onHandleKey, onHandleBlur, footer, summary, skin, children }: {
   column: LiteKanbanColumn<T>;
   position: number;
   total: number;
@@ -201,6 +209,7 @@ function SortableColumn<T>({ column, position, total, hintId, picked, dragging, 
   onHandleBlur: () => void;
   footer?: ReactNode;
   summary?: ReactNode;
+  skin?: LiteKanbanSkin;
   children: ReactNode;
 }) {
   const { listeners, setNodeRef, transform, transition } = useSortable({ id: column.id });
@@ -209,11 +218,33 @@ function SortableColumn<T>({ column, position, total, hintId, picked, dragging, 
     <section
       ref={setNodeRef}
       aria-labelledby={titleId}
-      className={styles.column}
+      className={skin?.column ?? styles.column}
       data-lifted={picked || dragging ? "true" : undefined}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...listeners}
     >
+      {skin ? (
+        <header className={skin.head}>
+          <button
+            ref={handleRef}
+            type="button"
+            className={skin.handle}
+            aria-label={`Mover coluna ${column.title}, posição ${position + 1} de ${total}`}
+            aria-describedby={hintId}
+            aria-pressed={picked}
+            onKeyDown={onHandleKey}
+            onBlur={onHandleBlur}
+          >
+            <GripVertical aria-hidden="true" size={14} />
+          </button>
+          <h2 id={titleId} className={skin.title}>{column.title}</h2>
+          <span className={skin.count}>
+            <span aria-hidden="true">{column.items.length.toLocaleString("pt-BR")}</span>
+            <span className={styles.srOnly}>{countLabel(column.items.length)}</span>
+          </span>
+          {summary ? <span className={skin.summary}>{summary}</span> : null}
+        </header>
+      ) : (
       <header className={styles.head}>
         <button
           ref={handleRef}
@@ -233,6 +264,7 @@ function SortableColumn<T>({ column, position, total, hintId, picked, dragging, 
         </div>
         <span className={styles.count} aria-label={countLabel(column.items.length)}>{column.items.length}</span>
       </header>
+      )}
       {children}
       {footer ? <div className={styles.footer}>{footer}</div> : null}
     </section>

@@ -71,7 +71,9 @@ describe("kanban Lite de /leads", () => {
     expect(screen.getByText("Ana Souza")).toBeInTheDocument();
     expect(screen.getByText("Sem corretor")).toBeInTheDocument();
     expect(screen.getAllByText(/restantes|atrasado/).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "Abrir WhatsApp de Maria Nova" })).toHaveAttribute("href", "https://wa.me/5521900000101");
+    // Cartão do artifact (27/11/2026): o WhatsApp de hoje fica no ⋯ do cartão.
+    fireEvent.click(screen.getByRole("button", { name: "Ações de Maria Nova" }));
+    expect(screen.getByRole("menuitem", { name: "Abrir WhatsApp" })).toHaveAttribute("href", "https://wa.me/5521900000101");
   });
 
   it("mostra totais da coluna e abre a cotação a partir do cartão", () => {
@@ -89,25 +91,27 @@ describe("kanban Lite de /leads", () => {
     expect(onQuote).toHaveBeenCalledWith(lead);
   });
 
-  it("cartão abre o drawer e a caixa seleciona para o lote", () => {
+  it("cartão abre o drawer e o ⋯ seleciona para o lote", () => {
     const props = renderKanban();
-    fireEvent.click(screen.getByRole("button", { name: "Maria Nova" }));
-    expect(props.onOpen).toHaveBeenCalledWith(maria);
     fireEvent.click(screen.getByRole("button", { name: "Abrir Maria Nova" }));
     expect(props.onOpen).toHaveBeenCalledWith(maria);
-    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Maria Nova" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ações de Maria Nova" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Selecionar para o lote" }));
     expect(props.onToggle).toHaveBeenCalledWith("l1");
-    expect(screen.getByRole("checkbox", { name: "Selecionar Carlos Mendes" })).toBeChecked();
-    const bar = within(screen.getByRole("region", { name: "Ações em lote" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ações de Carlos Mendes" }));
+    expect(screen.getByRole("menuitem", { name: "Tirar da seleção" })).toBeInTheDocument();
+    const bar = within(screen.getByRole("toolbar", { name: "Ações em lote" }));
     expect(bar.getByText("1 selecionado")).toBeInTheDocument();
   });
 
-  it("a caixa de seleção fica no cabeçalho do cartão, junto da conversa", () => {
-    renderKanban();
-    const box = screen.getByRole("checkbox", { name: "Selecionar Maria Nova" });
-    const whatsapp = screen.getByRole("link", { name: "Abrir WhatsApp de Maria Nova" });
-    expect(box.closest("[class*='cardActions']")).toBe(whatsapp.closest("[class*='cardActions']"));
-    expect(box.closest("[class*='cardHead']")).toContainElement(screen.getByRole("button", { name: "Maria Nova" }));
+  it("cartão do artifact: ponto da fila, nome e o ⋯ na mesma linha; o ⋯ não abre o lead", () => {
+    const props = renderKanban({ groupedLeads: { new: [{ ...maria, queueName: "Fila Tatiana", queueColorHue: 320 }], in_contact: [], quote_sent: [] } });
+    const menu = screen.getByRole("button", { name: "Ações de Maria Nova" });
+    const line = menu.closest("[class*='kline']")!;
+    expect(line).toHaveTextContent("Maria Nova");
+    expect(line).toHaveTextContent("Fila Fila Tatiana");
+    fireEvent.click(menu);
+    expect(props.onOpen).not.toHaveBeenCalled();
   });
 
   it("reordenar pelo teclado usa a mesma regra do arrastar", () => {

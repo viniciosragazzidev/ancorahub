@@ -7,14 +7,12 @@
  * Área de funil (25/11/2026, do quadro "Funis" do DeskComm): cabeçalho com quantidade, soma do valor e vidas; cartão
  * enxuto (interesse, corretor, último contato, faixa "Sem resposta há X"); ⋯ com Abrir, Próxima etapa e Marcar perdido.
  */
-import { useCallback, useId, useMemo, useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { useCallback, useId, useMemo, useState, type ReactNode } from "react";
 
 import { BrokerProfileLink } from "@/components/broker-profile-link";
-import { LiteMenu, type LiteMenuItem } from "@/components/lite/controls";
-import { LiteKanban } from "@/components/lite/data/kanban";
+import { LiteKanban, type LiteKanbanSkin } from "@/components/lite/data/kanban";
 import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
-import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
+import { queueHueToDotColor } from "@/features/lead-distribution/queue-color";
 import { lastContactLabel, noReplyStripe } from "@/features/leads/cooling-radar";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
@@ -24,7 +22,8 @@ import { canMarkLost, nextStageFor, type StageActor } from "./lead-card-stage";
 import { LeadStageDialog, submitStageChange, type StageDialogState } from "./lead-card-stage-dialog";
 import { computeSlaInfo, type SlaInfo } from "./lead-sla";
 import { LeadsLiteBulk, type LeadsLiteBulkConfig } from "./leads-lite-bulk";
-import styles from "./leads-lite-kanban.module.css";
+import { Leads1a1Menu, type Leads1a1MenuItem } from "./_components/leads-1a1-menu";
+import a1 from "./leads-1a1.module.css";
 import { liteStageLabel } from "./lite-stage-labels";
 import { LeadsLiteForecast, type LeadsLiteForecastData } from "./leads-lite-forecast";
 
@@ -50,13 +49,28 @@ export type LeadsLiteKanbanProps = {
   onStageCommitted?: (input: { leadIds: string[]; newStatus: string }) => void;
   /** Previsão do mês no topo do funil, já no escopo de quem vê. Sem ela, a linha não aparece. */
   forecast?: LeadsLiteForecastData | null;
+  /** Menu "Colunas" do artifact: fica no cartão da previsão; sem previsão, quem usa o mostra na linha das visões. */
+  columnsMenu?: ReactNode;
+};
+
+// Marcação do artifact "Leads da gestão" (27/11/2026) no kanban compartilhado: mesmas colunas, arrastar e teclado.
+const KANBAN_SKIN: LiteKanbanSkin = {
+  board: a1.kboard,
+  column: a1.kcol,
+  head: a1.khead,
+  handle: a1.khandle,
+  title: a1.ktitle,
+  count: a1.kcount,
+  summary: a1.ksum,
+  cards: a1.kcards,
+  empty: a1.kempty,
 };
 
 const noActor = () => "none" as const;
 
 export function LeadsLiteKanban({
   statuses, groupedLeads, onMoveColumn, onOpen, onQuote, commercialValuesEnabled = false, isSelected, onToggle, selectedIds, onClearSelection, bulk,
-  slaFirstContactMinutes = 15, slaStagnantDays = 3, stageActor = noActor, onStageCommitted, forecast = null,
+  slaFirstContactMinutes = 15, slaStagnantDays = 3, stageActor = noActor, onStageCommitted, forecast = null, columnsMenu,
 }: LeadsLiteKanbanProps) {
   const columns = useMemo(
     () => statuses.map((status) => ({ id: status, title: liteStageLabel(status), items: groupedLeads[status] ?? [] })),
@@ -94,21 +108,22 @@ export function LeadsLiteKanban({
   }, [committed, notice, stageActor]);
 
   return (
-    <div className={`arc-venancor ${styles.root}`} data-skin="diretor">
-      <div aria-live="polite" className={styles.notice}>
+    <div className={`arc-venancor ${a1.gx} ${a1.kanban}`} data-skin="diretor">
+      <div aria-live="polite">
         <ActionNoticeLine notice={notice.notice} />
       </div>
-      {forecast ? <LeadsLiteForecast forecast={forecast} /> : null}
+      {forecast ? <LeadsLiteForecast forecast={forecast} columnsMenu={columnsMenu} /> : null}
       <LiteKanban
         label="Funil de leads em Kanban"
         columns={columns}
         itemKey={(lead) => lead.id}
         onMoveColumn={onMoveColumn}
+        skin={KANBAN_SKIN}
         renderSummary={(column) => kanbanColumnSummary(column.items, { showValue: commercialValuesEnabled })}
         renderCard={(lead) => {
           const actor = stageActor(lead);
           const next = nextStageFor(lead.status, actor);
-          const items: LiteMenuItem[] = [{ id: "open", label: "Abrir", onSelect: () => onOpen(lead) }];
+          const items: Leads1a1MenuItem[] = [{ id: "open", label: "Abrir", onSelect: () => onOpen(lead) }];
           if (commercialValuesEnabled && onQuote) items.push({ id: "quote", label: "Fazer cotação", onSelect: () => onQuote(lead) });
           if (next) {
             const label = `Próxima etapa: ${liteStageLabel(next.status)}`;
@@ -134,7 +149,7 @@ export function LeadsLiteKanban({
           );
         }}
       />
-      <p className={styles.hint}>Arraste as colunas para reordenar, ou use a alça com espaço e setas. Use o botão &quot;Colunas&quot; para exibir ou ocultar etapas.</p>
+      <p className={a1.khint}>Arraste as colunas para reordenar, ou use a alça com espaço e setas. Use o botão &quot;Colunas&quot; para exibir ou ocultar etapas.</p>
       <LeadsLiteBulk selectedIds={selectedIds} onClear={onClearSelection} config={bulk} />
       <LeadStageDialog state={dialog} actor={dialog ? stageActor(dialog.lead) : "none"} onClose={closeDialog} onCommitted={committed} />
     </div>
@@ -168,7 +183,7 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, menuItems, slaFirstC
   selected: boolean;
   onToggle: (id: string) => void;
   onOpen: (lead: LeadWorkspaceItem) => void;
-  menuItems: LiteMenuItem[];
+  menuItems: Leads1a1MenuItem[];
   slaFirstContactMinutes: number;
   slaStagnantDays: number;
 }) {
@@ -180,52 +195,41 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, menuItems, slaFirstC
   const owner = leadOwnerLabel(lead);
   const phoneDigits = lead.telefone ? lead.telefone.replace(/\D/g, "") : "";
   const detailsId = useId();
+  // Cartão do artifact: ponto da fila, nome, interesse, dono e último contato, barra do prazo. WhatsApp e seleção para
+  // o lote, que hoje ficam no cartão, entram no ⋯ junto de Abrir, Próxima etapa e Marcar perdido.
+  const items: Leads1a1MenuItem[] = [
+    ...menuItems,
+    ...(phoneDigits ? [{ id: "whatsapp", label: "Abrir WhatsApp", href: `https://wa.me/55${phoneDigits}` }] : []),
+    { id: "select", label: selected ? "Tirar da seleção" : "Selecionar para o lote", onSelect: () => onToggle(lead.id) },
+  ];
   return (
     // Como hoje, puxar o cartão por mais de 8px arrasta a coluna inteira; clique abre o drawer.
-    <article className={styles.card} data-selected={selected ? "true" : undefined} data-investigation={lead.isManagementInvestigation ? "true" : undefined}>
-      <div className={styles.cardHead}>
-        <button type="button" className={styles.nameButton} onClick={() => onOpen(lead)}>
-          <span className={styles.name}>{lead.nome}</span>
-          {lead.queueName ? (
-            <span title={`Fila: ${lead.queueName}`} className={styles.queue}>
-              <QueueColorDot hue={lead.queueColorHue} />
-              <span className={styles.srOnly}>Fila {lead.queueName}</span>
-            </span>
-          ) : null}
-        </button>
-        <span className={styles.cardActions}>
-          {phoneDigits ? (
-            <a href={`https://wa.me/55${phoneDigits}`} target="_blank" rel="noreferrer" className={styles.iconTarget} aria-label={`Abrir WhatsApp de ${lead.nome}`} title="Abrir WhatsApp">
-              <MessageCircle aria-hidden="true" size={16} />
-            </a>
-          ) : null}
-          <label className={styles.iconTarget}>
-            <input type="checkbox" className={styles.checkbox} checked={selected} aria-label={`Selecionar ${lead.nome}`} onChange={() => onToggle(lead.id)} />
-          </label>
-          <LiteMenu label={`Ações de ${lead.nome}`} items={menuItems} />
-        </span>
-      </div>
-      {/* Corpo em "botão esticado": o <button> cobre o corpo e o link do corretor fica irmão dele, por cima (ownerLink).
-          Nunca dentro de role="button": o leitor de tela trata os filhos de botão como texto e perde o link. */}
-      <div className={styles.body}>
-        <button type="button" className={styles.bodyOpen} onClick={() => onOpen(lead)} aria-label={`Abrir ${lead.nome}`} aria-describedby={`${detailsId}-interest ${detailsId}-owner ${detailsId}-meta`} />
-        {interest ? <span className={styles.interest} id={`${detailsId}-interest`}>{interest}</span> : null}
-        <span className={styles.ownerRow} id={`${detailsId}-owner`}>
-          <span className={styles.avatar} aria-hidden="true">{lead.corretorNome ? lead.corretorNome.trim().charAt(0).toUpperCase() : "·"}</span>
-          <span className={styles.owner}>
-            {lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} className={styles.ownerLink} /> : owner}
-          </span>
-          <span className={styles.lastContact} title="Último contato">{lastContactLabel(lead.lastContactAt)}</span>
-        </span>
-        {sla ? <SlaRow sla={sla} /> : null}
-        {stripe ? <span className={styles.stripe} data-tone="warning">{stripe}</span> : null}
-        {lead.isManagementInvestigation || lead.isTeamList ? (
-          <span className={styles.meta} id={`${detailsId}-meta`}>
-            {lead.isManagementInvestigation ? <span className={styles.badge} data-tone="neutral">Investigação da gestão</span> : null}
-            {lead.isTeamList ? <span className={styles.badge} data-tone="neutral">Lead de equipe</span> : null}
+    <article className={a1.kcard} data-selected={selected ? "true" : undefined}>
+      {/* Botão esticado cobre o cartão; o link do corretor e o ⋯ ficam por cima dele. */}
+      <button type="button" className={a1.kopen} onClick={() => onOpen(lead)} aria-label={`Abrir ${lead.nome}`} aria-describedby={`${detailsId}-interest ${detailsId}-owner ${detailsId}-meta`} />
+      <span className={a1.kline}>
+        {lead.queueName ? (
+          <span className={a1.dot} title={`Fila: ${lead.queueName}`} style={{ background: queueHueToDotColor(lead.queueColorHue) }}>
+            <span className={a1.srOnly}>Fila {lead.queueName}</span>
           </span>
         ) : null}
-      </div>
+        <span className={a1.kname}>{lead.nome}</span>
+        {selected ? <span className={a1.srOnly}>Selecionado</span> : null}
+        <Leads1a1Menu label={`Ações de ${lead.nome}`} items={items} variant="row" />
+      </span>
+      {interest ? <span className={a1.kinterest} id={`${detailsId}-interest`}>{interest}</span> : null}
+      <span className={a1.kmeta} id={`${detailsId}-owner`}>
+        <span>{lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} /> : owner}</span>
+        <span title="Último contato">{lastContactLabel(lead.lastContactAt)}</span>
+      </span>
+      {sla ? <SlaRow sla={sla} /> : null}
+      {stripe ? <span className={a1.kstripe}>{stripe}</span> : null}
+      {lead.isManagementInvestigation || lead.isTeamList ? (
+        <span className={a1.kflags} id={`${detailsId}-meta`}>
+          {lead.isManagementInvestigation ? <span className={`${a1.badge} ${a1.badgeSmall}`}>Investigação da gestão</span> : null}
+          {lead.isTeamList ? <span className={`${a1.badge} ${a1.badgeSmall}`}>Lead de equipe</span> : null}
+        </span>
+      ) : null}
     </article>
   );
 }
@@ -234,12 +238,11 @@ function SlaRow({ sla }: { sla: NonNullable<SlaInfo> }) {
   const pct = Math.min(100, Math.max(0, sla.ratio * 100));
   const tone = slaTone(sla.ratio);
   return (
-    <span className={styles.sla} title={`${sla.title}. ${sla.deadline}`}>
-      <span className={styles.slaTrack} aria-hidden="true">
-        <span className={styles.slaFill} data-tone={tone} style={{ width: `${pct}%` }} />
+    <>
+      <span className={a1.ksla} title={`${sla.title}. ${sla.deadline}`} aria-hidden="true">
+        <span className={a1.kslaFill} data-tone={tone === "success" ? undefined : tone} style={{ width: `${pct}%` }} />
       </span>
-      <span className={styles.slaLabel} data-tone={tone}>{sla.label}</span>
-      <span className={styles.srOnly}>{sla.title}. {sla.deadline}</span>
-    </span>
+      <span className={a1.kstripe}>{sla.label}<span className={a1.srOnly}>. {sla.title}. {sla.deadline}</span></span>
+    </>
   );
 }
