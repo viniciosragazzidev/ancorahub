@@ -50,6 +50,11 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 
+/** A barra lateral, ou null fora do SidebarProvider (27/11/2026): para quem só ajusta a barra quando ela existe. */
+function useOptionalSidebar() {
+  return React.useContext(SidebarContext)
+}
+
 function useSidebar() {
   const context = React.useContext(SidebarContext)
   if (!context) {
@@ -761,4 +766,5 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
+  useOptionalSidebar,
 }

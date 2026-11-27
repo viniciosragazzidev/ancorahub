@@ -34,7 +34,9 @@ import {
   ShieldCheck,
   WhatsappLogo,
 } from "@/components/huge-icons";
-import { ExternalLink, FileText, Send, Sparkles, Users, Check, Zap } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Send, Sparkles, Users, Check, Zap } from "lucide-react";
+import Link from "next/link";
+import ww from "./whatsapp-web.module.css";
 import type { TemplateMessagePreview } from "@/features/communication-channels/template-preview";
 import { cn } from "@/lib/utils";
 import {
@@ -116,8 +118,11 @@ export function OfficialBrokerConversations({
   enabled,
   deliveryChannel,
   conversations,
+  coexLabel = null,
 }: {
   enabled: boolean;
+  /** "WhatsApp coex · 7276" quando há número em coexistência: a quarta visão do topo da lista. */
+  coexLabel?: string | null;
   /** The outbound transport for internal system-to-broker notices. */
   deliveryChannel: "meta" | "waha_direct";
   conversations: OfficialBrokerConversation[];
@@ -338,6 +343,374 @@ export function OfficialBrokerConversations({
       </section>
     );
   }
+
+  const dialogs = (
+    <>
+      {/* MODAL 1: Envio Individual de Template */}
+      <Dialog open={showSingleTemplateModal} onOpenChange={setShowSingleTemplateModal}>
+        <DialogPopup className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FileText className="size-5 text-blue-500" />
+              Enviar Modelo para {selected?.name}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Escolha um modelo de mensagem Meta ou Modelo Livre (janela 24h) para enviar diretamente a este corretor.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">Selecione o Modelo de Mensagem</label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Selecione um modelo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((tpl) => (
+                    <SelectItem key={tpl.id} value={tpl.id} className="text-xs">
+                      {tpl.name} ({tpl.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {activeTemplate && (
+              <div className="space-y-1.5 rounded-[var(--radius-card)] border p-3 bg-muted/20">
+                <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                  <span>Prévia com dados de {selected?.name}:</span>
+                  <Badge variant={activeTemplate.type === "meta" ? "default" : "success"} className="text-[10px]">
+                    {activeTemplate.type === "meta" ? "Modelo Meta (Aprovado)" : "Modelo Livre (Janela 24h)"}
+                  </Badge>
+                </div>
+                <div className="rounded border bg-background p-3 text-xs font-mono whitespace-pre-wrap">
+                  {activeTemplate.content
+                    .replace(/\{\{\s*nome\s*\}\}/gi, selected?.name || "Corretor")
+                    .replace(/\{\{\s*empresa\s*\}\}/gi, "Âncora Corretora")
+                    .replace(/\{\{\s*telefone\s*\}\}/gi, selected?.phoneMasked || "")}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setShowSingleTemplateModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSendSingleTemplate}
+              disabled={isSendingDirect || !activeTemplate}
+              size="sm"
+              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Send className="size-3.5" />
+              {isSendingDirect ? "Enviando..." : "Confirmar e Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+
+      {/* MODAL 2: Disparo em Massa de Templates */}
+      <Dialog open={showBulkModal} onOpenChange={setShowBulkModal}>
+        <DialogPopup className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Zap className="size-5 text-emerald-500 fill-current" />
+              Disparo de Mensagens em Massa para Corretores
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Envie um modelo pré-aprovado ou de envio livre para múltiplos corretores da equipe de uma só vez.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Seleção de Template */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">1. Modelo de Mensagem a Disparar</label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Selecione um modelo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((tpl) => (
+                    <SelectItem key={tpl.id} value={tpl.id} className="text-xs">
+                      {tpl.name} ({tpl.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Prévia do Template */}
+            {activeTemplate && (
+              <div className="rounded-[var(--radius-card)] border p-3 bg-muted/20 space-y-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Prévia da Mensagem (exemplo com variáveisl):</span>
+                  <Badge variant={activeTemplate.type === "meta" ? "default" : "success"} className="text-[10px]">
+                    {activeTemplate.type === "meta" ? "Meta Aprovado" : "Livre 24h"}
+                  </Badge>
+                </div>
+                <div className="rounded border bg-background p-2.5 text-xs font-mono whitespace-pre-wrap max-h-28 overflow-y-auto">
+                  {activeTemplate.content
+                    .replace(/\{\{\s*nome\s*\}\}/gi, "Nome do Corretor")
+                    .replace(/\{\{\s*empresa\s*\}\}/gi, "Âncora Corretora")}
+                </div>
+              </div>
+            )}
+
+            {/* Seleção de Corretores Destinatários */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-foreground">
+                  2. Selecione os Corretores ({selectedBrokerIds.length} selecionados)
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] px-2"
+                    onClick={() => setSelectedBrokerIds(filtered.map((c) => c.brokerProfileId))}
+                  >
+                    Selecionar Todos ({filtered.length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] px-2 text-muted-foreground"
+                    onClick={() => setSelectedBrokerIds([])}
+                  >
+                    Limpar Seleção
+                  </Button>
+                </div>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto rounded-[var(--radius-card)] border p-2 space-y-1 bg-background">
+                {filtered.map((b) => {
+                  const isChecked = selectedBrokerIds.includes(b.brokerProfileId);
+                  return (
+                    <label
+                      key={b.brokerProfileId}
+                      className="flex items-center justify-between rounded p-2 text-xs hover:bg-muted/40 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedBrokerIds((prev) => [...prev, b.brokerProfileId]);
+                            } else {
+                              setSelectedBrokerIds((prev) => prev.filter((id) => id !== b.brokerProfileId));
+                            }
+                          }}
+                        />
+                        <div>
+                          <span className="font-semibold text-foreground">{b.name}</span>
+                          <span className="text-[11px] text-muted-foreground ml-2">({b.branchName ?? "Sem unidade"})</span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        {b.phoneMasked}
+                      </Badge>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setShowBulkModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSendBulkTemplate}
+              disabled={isSendingBulk || !selectedBrokerIds.length || !activeTemplate}
+              size="sm"
+              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Zap className="size-3.5 fill-current" />
+              {isSendingBulk
+                ? "Disparando..."
+                : `Disparar para ${selectedBrokerIds.length} Corretor(es)`}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+    </>
+  );
+
+  if (directorSkinEnabled) {
+    // Aba Corretores no desenho "WhatsApp Web" (27/11/2026), copiada 1:1 do artifact "Conversas da gestão no estilo
+    // WhatsApp Web": a mesma lista, topo, conversa e campo das outras abas. Envio, modelos e disparo em massa seguem.
+    const counts: Record<string, number> = {
+      ALL: conversations.length,
+      ACCEPTED: conversations.filter((c) => c.invitationStatus === "ACCEPTED").length,
+      PENDING: conversations.filter((c) => c.invitationStatus === "PENDING").length,
+    };
+    const chips = [{ value: "ALL", label: "Todos" }, { value: "ACCEPTED", label: "Aceitos" }, { value: "PENDING", label: "Pendentes" }];
+    const channelName = deliveryChannel === "waha_direct" ? "número da empresa" : "número oficial";
+    const inviteLabel = (status: string | null) => (status ? invitationLabels[status]?.label ?? status : "Sem convite");
+    return (
+      <section aria-label="Central de mensagens com corretores" className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <section aria-label="Corretores" className={cn("flex min-h-0 flex-col border-r border-border bg-card", threadOpen && "max-lg:hidden")}>
+            <div className={ww.ww}>
+              <div className={ww.head}>
+                <h1 className={ww.title}>Conversas</h1>
+                <button type="button" className={ww.iconbtn} aria-label="Disparo em massa para os corretores" title="Disparo em massa" onClick={handleOpenBulkModal}>
+                  <Zap aria-hidden="true" />
+                </button>
+              </div>
+              <div className={ww.views}>
+                <nav className={ww.seg} aria-label="Ver conversas de">
+                  <Link className={ww.segbtn} href="/conversas">Leads</Link>
+                  <Link className={ww.segbtn} href="/conversas?tab=distribuidos">Distribuídos</Link>
+                  <Link className={ww.segbtn} href="/conversas?tab=corretores" aria-current="page">Corretores</Link>
+                  {coexLabel ? <Link className={ww.segbtn} href="/conversas?tab=coex" aria-label={coexLabel} title={coexLabel}>Coex</Link> : null}
+                </nav>
+              </div>
+              <div className={ww.searchWrap}>
+                <label className={ww.search}>
+                  <MagnifyingGlass aria-hidden="true" />
+                  <span className="sr-only">Buscar corretor ou unidade</span>
+                  <input type="search" placeholder="Buscar corretor ou unidade" value={query} onChange={(event) => setQuery(event.target.value)} />
+                </label>
+              </div>
+              <div className={ww.chips} role="group" aria-label="Filtrar a lista">
+                {chips.map((chip) => (
+                  <button key={chip.value} type="button" className={ww.chip} aria-pressed={statusFilter === chip.value} onClick={() => setStatusFilter(chip.value)}>
+                    {chip.label} <span className={ww.chipcount}>{counts[chip.value]}</span>
+                  </button>
+                ))}
+              </div>
+              <p className={ww.searchNote}>Conversas com os corretores pelo {channelName}: avisos, plantões e ofertas de lead.</p>
+            </div>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className={cn(ww.ww, ww.list)}>
+                {filtered.map((item) => {
+                  const last = item.messages.at(-1);
+                  return (
+                    <button key={item.brokerProfileId} type="button" className={ww.row} aria-current={selected?.brokerProfileId === item.brokerProfileId ? "true" : undefined} onClick={() => setSelectedId(item.brokerProfileId)} aria-label={`Abrir conversa com ${item.name}`}>
+                      <span className={ww.avatar}>
+                        <UserAvatar name={item.name} seed={item.name} />
+                        <span className={cn(ww.chan, "bg-emerald-600 text-white")} data-conversations-brand="whatsapp" title="WhatsApp" aria-hidden="true"><WhatsappLogo /></span>
+                      </span>
+                      <span className={ww.rowText}>
+                        <span className={ww.rowLine}>
+                          <span className={ww.rowName}>{item.name}</span>
+                          {last ? <span className={ww.rowTime}>{formatTime(last.sentAt)}</span> : null}
+                        </span>
+                        <span className={ww.rowLine}>
+                          <span className={ww.rowPreview}>{last ? `${last.direction === "outgoing" ? "Você: " : ""}${last.body}` : "Nenhuma mensagem registrada"}</span>
+                        </span>
+                        <span className={ww.rowMeta}>
+                          <span className={ww.stage}>{inviteLabel(item.invitationStatus)}</span>
+                          <span className={ww.owner}>{item.branchName ?? "Sem unidade"}</span>
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+                {!filtered.length ? <p className={ww.daylabel}>Nenhum corretor encontrado.</p> : null}
+              </div>
+            </ScrollArea>
+          </section>
+
+          <section aria-live="polite" className={cn("flex min-h-0 flex-col", !threadOpen && "max-lg:hidden")}>
+            {selected ? (
+              <>
+                <header className={cn(ww.ww, ww.chatHead, "shrink-0")}>
+                  <button type="button" className={cn(ww.iconbtn, ww.back)} aria-label="Voltar para a lista" onClick={() => setSelectedId(null)}><ArrowLeft aria-hidden="true" /></button>
+                  <span className={ww.identity}>
+                    <span className={ww.avatar}><UserAvatar name={selected.name} seed={selected.name} /></span>
+                    <span className={ww.idText}>
+                      <span className={ww.idLine}>
+                        <span className={ww.idName}>{selected.name}</span>
+                        <span className={cn(ww.stage, ww.wideOnly)}>{inviteLabel(selected.invitationStatus)}</span>
+                      </span>
+                      <span className={ww.idSub}>{[selected.phoneMasked, selected.branchName ?? "Sem unidade", deliveryChannel === "waha_direct" ? "WAHA" : "Meta"].join(" · ")}</span>
+                    </span>
+                  </span>
+                  <button type="button" className={ww.iconbtn} aria-label="Enviar modelo" title="Enviar modelo" onClick={() => setShowSingleTemplateModal(true)}><FileText aria-hidden="true" /></button>
+                </header>
+                <div className={cn(ww.ww, ww.wall, "min-h-0 flex-1 overflow-y-auto")}>
+                  <div className={ww.thread}>
+                    <span className={ww.sysnote}>{deliveryChannel === "waha_direct" ? "Avisos internos pelo número da empresa" : "Canal oficial com os corretores"}</span>
+                    {selected.messages.map((message, index) => {
+                      const previous = selected.messages[index - 1];
+                      const day = formatDateDivider(message.sentAt);
+                      const out = message.direction === "outgoing";
+                      const showAuthor = out && (!previous || previous.direction !== "outgoing");
+                      const hasMedia = Boolean(message.media && isMediaKindSupported(message.media?.kind));
+                      return (
+                        <Fragment key={message.id}>
+                          {!previous || formatDateDivider(previous.sentAt) !== day ? <span className={ww.sysnote}>{day}</span> : null}
+                          <div className={ww.msg}>
+                            <div className={cn(ww.bubble, out ? ww.bOut : ww.bIn)}>
+                              {showAuthor ? <p className={ww.author}>Âncora · {channelName}</p> : null}
+                              {hasMedia && message.media?.url ? (
+                                <MediaBubble media={{ kind: message.media.kind, mimeType: message.media.mimeType, filename: message.media.filename, sizeBytes: message.media.sizeBytes, url: message.media.url, caption: message.body?.startsWith("[") && message.body?.endsWith("]") ? null : message.body }} isOutbound={false} />
+                              ) : hasMedia ? (
+                                <MediaUnavailable isOutbound={false} />
+                              ) : message.template ? (
+                                <TemplateMessageContent template={message.template} />
+                              ) : (
+                                <p className={ww.body}><WhatsAppFormattedText text={message.body} /></p>
+                              )}
+                              <span className={ww.meta}>
+                                <time dateTime={message.sentAt} className={ww.num}>{formatTime(message.sentAt)}</time>
+                                {out ? <span>· {deliveryLabels[message.status] ?? message.status}</span> : null}
+                              </span>
+                            </div>
+                            {message.error ? <p className={ww.fail} role="status">{message.error}</p> : null}
+                          </div>
+                        </Fragment>
+                      );
+                    })}
+                    <div ref={threadEndRef} aria-hidden="true" />
+                    {!selected.messages.length ? <span className={ww.sysnote}>Nenhuma mensagem no histórico ainda.</span> : null}
+                  </div>
+                </div>
+                <div className={cn(ww.ww, ww.wall, ww.composerWrap)}>
+                  <form onSubmit={handleSendDirectMessage}>
+                    <button type="button" aria-label="Escolher modelo" title="Modelos" onClick={() => setShowSingleTemplateModal(true)}><FileText aria-hidden="true" className="size-5" /></button>
+                    <div>
+                      <textarea
+                        ref={directMessageInputRef}
+                        className={ww.composerInput}
+                        rows={1}
+                        value={directMessageText}
+                        onChange={(event) => setDirectMessageText(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.metaKey && !event.nativeEvent.isComposing) {
+                            event.preventDefault();
+                            event.currentTarget.form?.requestSubmit();
+                          }
+                        }}
+                        placeholder="Mensagem"
+                        aria-label="Mensagem"
+                        disabled={isSendingDirect}
+                      />
+                    </div>
+                    <button type="submit" aria-label="Enviar mensagem" disabled={isSendingDirect || !directMessageText.trim()}><Send aria-hidden="true" className="size-5" /></button>
+                  </form>
+                </div>
+              </>
+            ) : (
+              <div className={cn(ww.ww, ww.wall, "flex h-full items-center justify-center p-6")}>
+                <span className={ww.sysnote}>Escolha um corretor para ver a conversa.</span>
+              </div>
+            )}
+          </section>
+        </div>
+        {dialogs}
+      </section>
+    );
+  }
+
 
   return (
     <section
@@ -695,199 +1068,7 @@ export function OfficialBrokerConversations({
         </section>
       </div>
 
-      {/* MODAL 1: Envio Individual de Template */}
-      <Dialog open={showSingleTemplateModal} onOpenChange={setShowSingleTemplateModal}>
-        <DialogPopup className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <FileText className="size-5 text-blue-500" />
-              Enviar Modelo para {selected?.name}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Escolha um modelo de mensagem Meta ou Modelo Livre (janela 24h) para enviar diretamente a este corretor.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">Selecione o Modelo de Mensagem</label>
-              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                <SelectTrigger className="w-full text-xs">
-                  <SelectValue placeholder="Selecione um modelo..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((tpl) => (
-                    <SelectItem key={tpl.id} value={tpl.id} className="text-xs">
-                      {tpl.name} ({tpl.category})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {activeTemplate && (
-              <div className="space-y-1.5 rounded-[var(--radius-card)] border p-3 bg-muted/20">
-                <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                  <span>Prévia com dados de {selected?.name}:</span>
-                  <Badge variant={activeTemplate.type === "meta" ? "default" : "success"} className="text-[10px]">
-                    {activeTemplate.type === "meta" ? "Modelo Meta (Aprovado)" : "Modelo Livre (Janela 24h)"}
-                  </Badge>
-                </div>
-                <div className="rounded border bg-background p-3 text-xs font-mono whitespace-pre-wrap">
-                  {activeTemplate.content
-                    .replace(/\{\{\s*nome\s*\}\}/gi, selected?.name || "Corretor")
-                    .replace(/\{\{\s*empresa\s*\}\}/gi, "Âncora Corretora")
-                    .replace(/\{\{\s*telefone\s*\}\}/gi, selected?.phoneMasked || "")}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setShowSingleTemplateModal(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSendSingleTemplate}
-              disabled={isSendingDirect || !activeTemplate}
-              size="sm"
-              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <Send className="size-3.5" />
-              {isSendingDirect ? "Enviando..." : "Confirmar e Enviar"}
-            </Button>
-          </DialogFooter>
-        </DialogPopup>
-      </Dialog>
-
-      {/* MODAL 2: Disparo em Massa de Templates */}
-      <Dialog open={showBulkModal} onOpenChange={setShowBulkModal}>
-        <DialogPopup className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Zap className="size-5 text-emerald-500 fill-current" />
-              Disparo de Mensagens em Massa para Corretores
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Envie um modelo pré-aprovado ou de envio livre para múltiplos corretores da equipe de uma só vez.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            {/* Seleção de Template */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">1. Modelo de Mensagem a Disparar</label>
-              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                <SelectTrigger className="w-full text-xs">
-                  <SelectValue placeholder="Selecione um modelo..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((tpl) => (
-                    <SelectItem key={tpl.id} value={tpl.id} className="text-xs">
-                      {tpl.name} ({tpl.category})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Prévia do Template */}
-            {activeTemplate && (
-              <div className="rounded-[var(--radius-card)] border p-3 bg-muted/20 space-y-1">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Prévia da Mensagem (exemplo com variáveisl):</span>
-                  <Badge variant={activeTemplate.type === "meta" ? "default" : "success"} className="text-[10px]">
-                    {activeTemplate.type === "meta" ? "Meta Aprovado" : "Livre 24h"}
-                  </Badge>
-                </div>
-                <div className="rounded border bg-background p-2.5 text-xs font-mono whitespace-pre-wrap max-h-28 overflow-y-auto">
-                  {activeTemplate.content
-                    .replace(/\{\{\s*nome\s*\}\}/gi, "Nome do Corretor")
-                    .replace(/\{\{\s*empresa\s*\}\}/gi, "Âncora Corretora")}
-                </div>
-              </div>
-            )}
-
-            {/* Seleção de Corretores Destinatários */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-foreground">
-                  2. Selecione os Corretores ({selectedBrokerIds.length} selecionados)
-                </label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-[11px] px-2"
-                    onClick={() => setSelectedBrokerIds(filtered.map((c) => c.brokerProfileId))}
-                  >
-                    Selecionar Todos ({filtered.length})
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-[11px] px-2 text-muted-foreground"
-                    onClick={() => setSelectedBrokerIds([])}
-                  >
-                    Limpar Seleção
-                  </Button>
-                </div>
-              </div>
-
-              <div className="max-h-48 overflow-y-auto rounded-[var(--radius-card)] border p-2 space-y-1 bg-background">
-                {filtered.map((b) => {
-                  const isChecked = selectedBrokerIds.includes(b.brokerProfileId);
-                  return (
-                    <label
-                      key={b.brokerProfileId}
-                      className="flex items-center justify-between rounded p-2 text-xs hover:bg-muted/40 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Checkbox
-                          checked={isChecked}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedBrokerIds((prev) => [...prev, b.brokerProfileId]);
-                            } else {
-                              setSelectedBrokerIds((prev) => prev.filter((id) => id !== b.brokerProfileId));
-                            }
-                          }}
-                        />
-                        <div>
-                          <span className="font-semibold text-foreground">{b.name}</span>
-                          <span className="text-[11px] text-muted-foreground ml-2">({b.branchName ?? "Sem unidade"})</span>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-[10px]">
-                        {b.phoneMasked}
-                      </Badge>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setShowBulkModal(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSendBulkTemplate}
-              disabled={isSendingBulk || !selectedBrokerIds.length || !activeTemplate}
-              size="sm"
-              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <Zap className="size-3.5 fill-current" />
-              {isSendingBulk
-                ? "Disparando..."
-                : `Disparar para ${selectedBrokerIds.length} Corretor(es)`}
-            </Button>
-          </DialogFooter>
-        </DialogPopup>
-      </Dialog>
+      {dialogs}
     </section>
   );
 }

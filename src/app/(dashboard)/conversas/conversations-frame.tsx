@@ -3,7 +3,7 @@
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { useEffect, useRef } from "react";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useOptionalSidebar } from "@/components/ui/sidebar";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 import { ConversationsWorkspace, type ConversationItem } from "./conversations-workspace";
 import { OfficialBrokerConversations, type OfficialBrokerConversation } from "./official-broker-conversations";
@@ -73,6 +73,7 @@ export function ConversationsFrame({
       enabled={officialBrokerEnabled}
       deliveryChannel={officialBrokerDeliveryChannel}
       conversations={officialBrokerConversations}
+      coexLabel={coexLabel}
     />
   ) : (
     <ConversationsWorkspace
@@ -97,16 +98,11 @@ export function ConversationsFrame({
       data-skin={directorSkinEnabled ? "diretor" : undefined}
     >
       {/* Desenho "WhatsApp Web" (27/11/2026): no Lite o título fica dentro da lista; o topo só aparece na aba Corretores. */}
-      {directorSkinEnabled && !officialBrokerTab ? null : header}
+      {directorSkinEnabled ? null : header}
       <main
         className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background p-0"
         data-conversations-part={directorSkinEnabled ? "content" : undefined}
       >
-        {directorSkinEnabled && officialBrokerTab && pageActions ? (
-          <div data-conversations-part="page-actions" className="shrink-0">
-            {pageActions}
-          </div>
-        ) : null}
         <div
           data-lite={directorSkinEnabled ? undefined : "frame"}
           data-conversations-part={directorSkinEnabled ? "frame" : undefined}
@@ -124,12 +120,7 @@ export function ConversationsFrame({
  * ganha a largura. Ao sair da tela, a barra volta como estava.
  */
 function useRailWhileOpen(enabled: boolean) {
-  let sidebar: ReturnType<typeof useSidebar> | null = null;
-  try {
-    sidebar = useSidebar();
-  } catch {
-    sidebar = null;
-  }
+  const sidebar = useOptionalSidebar();
   const setOpen = sidebar?.setOpen;
   const isMobile = sidebar?.isMobile ?? true;
   const wasOpen = useRef<boolean | null>(null);

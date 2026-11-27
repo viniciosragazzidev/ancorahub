@@ -228,6 +228,7 @@ export default async function DirectorShellRealPage({
   const papel = params.papel === "marketing" || params.papel === "personalizado" ? PAPEIS[params.papel] : null;
   const showConversations = params.view === "conversas";
   const showDistributedConversations = showConversations && params.tab === "distribuidos";
+  const showBrokerConversations = showConversations && params.tab === "corretores";
   const previewConversations = showDistributedConversations
     ? conversationFixtures.filter((conversation) => Boolean(conversation.corretorId && conversation.corretorNome))
     : conversationFixtures;
@@ -314,14 +315,14 @@ export default async function DirectorShellRealPage({
           tenantId="fixture-tenant"
           leadTags={[]}
           canManageTags
-          officialBrokerEnabled={false}
-          officialBrokerDeliveryChannel="meta"
-          officialBrokerConversations={[]}
+          officialBrokerEnabled={showBrokerConversations}
+          officialBrokerDeliveryChannel="waha_direct"
+          officialBrokerConversations={showBrokerConversations ? PREVIEW_BROKER_CONVERSATIONS : []}
           canSeeBrokerTab
-          currentTab={showDistributedConversations ? "distribuidos" : "leads"}
+          currentTab={showBrokerConversations ? "corretores" : showDistributedConversations ? "distribuidos" : "leads"}
           leadsCount={showDistributedConversations ? undefined : previewConversations.length}
           distributedCount={showDistributedConversations ? previewConversations.length : undefined}
-          officialBrokerTab={false}
+          officialBrokerTab={showBrokerConversations}
         />
       ) : onda5 ? onda5.render({ role: previewUser.roleKey ?? "director", jobTitle: previewUser.jobTitle, branchId: null }) : onda3 ? onda3.render() : leadsView ? (
         <LeadsShellScreen view={leadsView} />
@@ -336,3 +337,31 @@ export default async function DirectorShellRealPage({
     </AppShell>
   );
 }
+
+/** Aba Corretores na pré-visualização (27/11/2026): dois corretores e o aviso de plantão pelo número da empresa. */
+const PREVIEW_BROKER_CONVERSATIONS = [
+  {
+    brokerProfileId: "fixture-broker-raiana",
+    name: "Raiana Nunes",
+    phoneMasked: "(21) 9****-2034",
+    branchName: "Centro",
+    invitationStatus: "ACCEPTED",
+    invitationDeliveryStatus: "delivered",
+    messages: [
+      { id: "b-1", direction: "outgoing" as const, body: "Oi, Raiana! Você está escalada no plantão PME de amanhã, 08h às 13h. Confirma?", sentAt: "2026-11-27T16:40:00.000Z", status: "read" as const },
+      { id: "b-2", direction: "incoming" as const, body: "Confirmado, estarei no plantão da manhã", sentAt: "2026-11-27T17:02:00.000Z", status: "received" as const },
+    ],
+  },
+  {
+    brokerProfileId: "fixture-broker-bruno",
+    name: "Bruno Tavares",
+    phoneMasked: "(21) 9****-5567",
+    branchName: "Niterói",
+    invitationStatus: "PENDING",
+    invitationDeliveryStatus: "sent",
+    messages: [
+      { id: "b-3", direction: "outgoing" as const, body: "Confirma o plantão presencial de hoje?", sentAt: "2026-11-27T11:39:00.000Z", status: "delivered" as const },
+    ],
+  },
+];
+

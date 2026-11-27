@@ -16,7 +16,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { useIncrementalRows } from "./use-incremental-rows";
 import styles from "./conversas-lite.module.css";
 import ww from "./whatsapp-web.module.css";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useOptionalSidebar } from "@/components/ui/sidebar";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
@@ -3314,12 +3314,7 @@ function WwOrClientProfile({ lite, ...props }: { lite: boolean } & React.Compone
 
 /** Celular: sem a faixa de topo, o menu principal abre por aqui (27/11/2026). */
 function WwMenuButton() {
-  let sidebar: ReturnType<typeof useSidebar> | null = null;
-  try {
-    sidebar = useSidebar();
-  } catch {
-    sidebar = null;
-  }
+  const sidebar = useOptionalSidebar();
   if (!sidebar) return null;
   const open = sidebar.setOpenMobile;
   return (
