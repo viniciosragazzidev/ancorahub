@@ -262,3 +262,6 @@
 /* Segmentado em pílula como no artifact (27/11/2026): regras antigas do Lite para [role="group"] deixavam o
    contorno com canto de 6px em produção. */
 .segment, .segment .segbtn { border-radius: 9999px !important; }
+
+/* Barra lateral recolhida (27/11/2026): o conteúdo ganha 200px; com ela aberta segue 1040px. */
+:global([data-slot="sidebar-wrapper"]:has([data-collapsible="icon"])) .column { max-width: 1240px; }

@@ -221,6 +221,8 @@ export async function getEssentialDashboard(
  * até o corretor, o valor vendido, os que entraram na janela anterior e as entradas por hora (06h a 19h) por canal.
  * Cinco consultas agregadas em paralelo, no mesmo escopo (`alive`: tenant, escopo, unidade e fila).
  */
+// Agrupa pela posição da coluna (27/11/2026): a faixa leva parâmetro (\$1 no SELECT, \$5 no GROUP BY) e o Postgres
+// não reconhece como a mesma expressão; a consulta falhava e o painel mostrava Distribuídos e Vendas zerados.
 async function loadPulse(alive: ReturnType<typeof and>, since: Date, until: Date, period: OverviewPeriod, custom: boolean, now: Date): Promise<DashboardPulse> {
   const db = getDatabase();
   const span = Math.max(60_000, until.getTime() - since.getTime());
@@ -240,7 +242,7 @@ async function loadPulse(alive: ReturnType<typeof and>, since: Date, until: Date
     })
       .from(schema.leads)
       .where(and(alive, gte(schema.leads.createdAt, since), lt(schema.leads.createdAt, until)))
-      .groupBy(arrivedBucket),
+      .groupBy(sql`1`),
     db.select({
       bucket: assignedBucket,
       value: sql<number>`count(*)::int`,
@@ -248,7 +250,7 @@ async function loadPulse(alive: ReturnType<typeof and>, since: Date, until: Date
     })
       .from(schema.leads)
       .where(and(alive, sql`${schema.leads.corretorId} is not null`, gte(schema.leads.assignedAt, since), lt(schema.leads.assignedAt, until)))
-      .groupBy(assignedBucket),
+      .groupBy(sql`1`),
     db.select({
       bucket: saleBucket,
       value: sql<number>`count(*)::int`,
@@ -257,7 +259,7 @@ async function loadPulse(alive: ReturnType<typeof and>, since: Date, until: Date
       .from(schema.sales)
       .innerJoin(schema.leads, eq(schema.leads.id, schema.sales.leadId))
       .where(and(alive, eq(schema.sales.status, "active"), gte(schema.sales.saleDate, since), lt(schema.sales.saleDate, until)))
-      .groupBy(saleBucket),
+      .groupBy(sql`1`),
     custom ? Promise.resolve([]) : db.select({ value: count() })
       .from(schema.leads)
       .where(and(alive, gte(schema.leads.createdAt, previousSince), lt(schema.leads.createdAt, since))),
@@ -269,7 +271,7 @@ async function loadPulse(alive: ReturnType<typeof and>, since: Date, until: Date
         lt(schema.leads.createdAt, until),
         sql`${localHour} between ${PULSE_FIRST_HOUR} and ${PULSE_LAST_HOUR}`,
       ))
-      .groupBy(localHour, channelSql),
+      .groupBy(sql`1`, sql`2`),
   ]);
   const distributedTotal = assignedRows.reduce((sum, row) => sum + Number(row.value), 0);
   const assignMinutes = assignedRows.reduce((sum, row) => sum + Number(row.minutes), 0);

@@ -414,5 +414,16 @@
   width: 40px !important; max-width: 40px; height: 40px !important; margin-inline: auto; justify-content: flex-start;
 }
 .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child img:not([src="/icon.png"]) {
-  width: 96px; max-width: none; height: 28px; object-fit: contain; object-position: left center; clip-path: inset(0 calc(100% - 32px) 0 0);
+  width: 96px; max-width: none; height: 28px; object-fit: contain; object-position: left center; clip-path: inset(0 calc(100% - 26px) 0 0);
+}
+
+/* Barra recolhida (27/11/2026): os atalhos do topo (Ver como, Área de Plantão) ficavam à esquerda, tortos em relação aos
+   ícones do menu. Todos no mesmo quadrado de 40px centrado. */
+@media (hover: hover) and (pointer: fine) {
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar .director-shortcuts { align-items: center; }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar .director-shortcuts :is(button, a, [data-slot="dropdown-menu-trigger"]) {
+    width: 40px !important; min-width: 40px; height: 40px !important; margin-inline: auto !important; padding: 0 !important; gap: 0 !important; justify-content: center !important;
+  }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar .director-shortcuts :is(button, a) > :not(:first-child) { display: none; }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-footer"] :is(button, a) { margin-inline: auto; justify-content: center; }
 }
