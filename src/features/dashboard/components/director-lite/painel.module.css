@@ -262,3 +262,11 @@
 /* Segmentado em pílula como no artifact (27/11/2026): regras antigas do Lite para [role="group"] deixavam o
    contorno com canto de 6px em produção. */
 .segment, .segment .segbtn { border-radius: 9999px !important; }
+
+/* Fim da linha de controles (Exportar na aba Qualidade, artifact de 27/11/2026): a linha ocupa a largura toda e o
+   Exportar vai para a ponta direita. */
+.controls:has(> .trailing) { flex: 1 1 100%; }
+.trailing { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+@media (max-width: 767px) { .trailing { display: none; } }
+/* Controles sempre na linha de baixo da saudação, à esquerda (artifacts do painel e de Qualidade e Funil). */
+.head > .controls { flex: 1 1 100%; }

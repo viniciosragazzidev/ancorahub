@@ -30,11 +30,13 @@ export function dashboardHref(tab: DirectorLiteTab, periodValue: string, branchI
   return `${TAB_BASE[tab]}${TAB_BASE[tab].includes("?") ? "&" : "?"}${params.toString()}`;
 }
 
-export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, availableTabs, queues, queueId = null, customRange = null, allowCustomRange = false, headline = null, action = null, children }: {
+export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, availableTabs, queues, queueId = null, customRange = null, allowCustomRange = false, headline = null, action = null, trailing = null, children }: {
   /** Frase da situação abaixo da saudação (27/11/2026). */
   headline?: string | null;
   /** Ação do momento no topo (o botão "Precisa de você" da visão geral). */
   action?: ReactNode;
+  /** Fim da linha de controles (Exportar na Qualidade). */
+  trailing?: ReactNode;
   now: Date;
   tab: DirectorLiteTab;
   period: OverviewPeriod;
@@ -95,6 +97,7 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
             onCustomRange={allowCustomRange ? (range) => router.push(dashboardHref(tab, rangeParam(range), branchId, queueId)) : undefined}
             headline={headline}
             action={action}
+            trailing={trailing}
           />
           {children}
         </div>

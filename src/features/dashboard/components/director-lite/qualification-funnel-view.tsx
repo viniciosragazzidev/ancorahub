@@ -1,78 +1,31 @@
 "use client";
 
+/**
+ * Aba "Funil" no visual Lite, cópia 1:1 do artifact "Qualidade dos leads e Funil da gestão" (27/11/2026): resumo,
+ * Do anúncio à venda, Onde os leads estão agora, Por que foram perdidos, Testes da primeira mensagem, Qual mensagem
+ * trouxe a resposta e Custo na Meta, com os dados reais de `getQualificationFunnel`. No celular segue o Celular.dc.html.
+ */
 import Link from "next/link";
-import { motion, type Transition } from "motion/react";
-import { Funnel, Info } from "lucide-react";
 
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import { motionTokens as m } from "@/components/arc/motion-tokens";
 import type { QualificationFunnel } from "@/features/qualification-turbo/funnel";
 
-import styles from "./director-lite.module.css";
-import { LiteBar, LiteItem, LiteNumber, LiteReveal, useReduce } from "./motion";
-import { minutesLabel, n, noLeadsSince, pct, periodWords, plural } from "./format";
-
-const enterT: Transition = { duration: m.duration.standard, ease: [...m.ease.enter] };
-const fadeT: Transition = { duration: m.duration.instant };
+import q from "./qualidade-funil.module.css";
+import { minutesLabel, money, n, noLeadsSince, pct, periodWords, plural } from "./format";
 
 const ratio = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
-
-function Stat({ label, value, kind = "int", detail, index }: { label: string; value: number; kind?: "int" | "pct"; detail?: string; index: number }) {
-  return (
-    <LiteItem index={index} className={styles.stat}>
-      <span className={styles.statLabel}>{label}</span>
-      <LiteNumber value={value} kind={kind} className={styles.statValue} />
-      {detail ? <span className={styles.statDetail}>{detail}</span> : null}
-    </LiteItem>
-  );
-}
-
-function FunnelBars({ stages }: { stages: QualificationFunnel["stages"] }) {
-  const first = stages[0]?.count ?? 0;
-  return (
-    <ol className={styles.funnel}>
-      {stages.map((stage, index) => {
-        const previous = index > 0 ? stages[index - 1].count : null;
-        return (
-          <LiteItem as="li" key={stage.key} index={index} className={styles.funnelRow}>
-            <span className={styles.funnelLabel}>{stage.label}</span>
-            <LiteBar value={first ? stage.count / first : 0} delay={index * 0.03} className={styles.funnelTrack} />
-            <span className={styles.funnelValue}>
-              <LiteNumber value={stage.count} className={styles.rowNumber} />
-              {previous !== null ? <span className={styles.muted}>{pct(stage.count, previous)} da etapa</span> : <span className={styles.muted}>base</span>}
-            </span>
-          </LiteItem>
-        );
-      })}
-    </ol>
-  );
-}
-
-function Interval({ rate, low, high }: { rate: number; low: number; high: number }) {
-  const reduce = useReduce();
-  return (
-    <span className={styles.interval} aria-label={`${Math.round(rate * 100)}%, entre ${Math.round(low * 100)} e ${Math.round(high * 100)}%`}>
-      <span className={styles.intervalLine} aria-hidden="true">
-        <motion.span
-          className={styles.intervalRange}
-          style={{ left: `${low * 100}%`, width: `${Math.max(0, high - low) * 100}%` }}
-          initial={reduce ? { opacity: 0 } : { opacity: 0, scaleX: 0 }}
-          whileInView={{ opacity: 1, scaleX: 1 }}
-          viewport={{ once: true }}
-          transition={reduce ? fadeT : enterT}
-        />
-        <span className={styles.intervalDot} style={{ left: `${rate * 100}%` }} />
-      </span>
-      <span className={styles.intervalText}><strong>{Math.round(rate * 100)}%</strong> <span className={styles.muted}>({Math.round(low * 100)} a {Math.round(high * 100)}%)</span></span>
-    </span>
-  );
-}
+const enter = (index: number, base = 40) => ({ animationDelay: `${base + index * 40}ms` });
+const width = (part: number, whole: number) => `${whole ? Math.min(100, Math.max(0, (part / whole) * 100)) : 0}%`;
+const NOW_TONE: Record<string, "action" | "warning" | "success" | "muted"> = { qualifying: "action", waiting: "warning", ready: "warning", broker: "action", cold: "muted", no_reply: "muted", noReply: "muted", out: "muted", unreachable: "muted", lost: "muted", converted: "success", sold: "success" };
 
 /** Linha de detalhe de "Responderam": sem "resposta em sem respostas ainda" quando ninguém respondeu. */
 export function repliedDetail(replied: number, medianMinutes: number | null) {
   if (!replied) return "Ninguém respondeu ainda";
   const leads = plural(replied, "lead", "leads");
-  return medianMinutes === null ? leads : `${leads}, resposta em ${minutesLabel(medianMinutes)} (mediana)`;
+  return medianMinutes === null ? leads : `${leads}, metade em até ${minutesLabel(medianMinutes)}`;
+}
+
+function money0(value: number | null) {
+  return value === null ? null : money(value);
 }
 
 /** `widerHref` é o próximo passo do dia sem leads (a mesma aba nos últimos 7 dias). */
@@ -84,179 +37,205 @@ export function QualificationFunnelView({ data, unitName, widerHref, now }: { da
   const converted = byKey.get("converted") ?? 0;
   const delivered = byKey.get("delivered") ?? 0;
   const sent = byKey.get("sent") ?? 0;
-  const maxTouch = Math.max(1, ...data.touches.map((touch) => touch.repliesAfter));
-  const maxLoss = Math.max(1, ...data.lossReasons.map((row) => row.count));
-  const periodDescription = data.period === "today" ? "hoje" : `nos últimos ${data.period} dias`;
   const periodLabel = data.period === "today" ? "Hoje" : `Últimos ${data.period} dias`;
   const when = periodWords(data.period);
   const anyTouch = data.touches.some((touch) => touch.sent > 0);
+  const maxTouch = Math.max(1, ...data.touches.map((touch) => touch.repliesAfter));
+  const maxLoss = Math.max(1, ...data.lossReasons.map((row) => row.count));
 
   if (arrived === 0) {
     return (
-      <section aria-label="Funil vazio" className={`${styles.card} ${styles.cardEmpty}`} role="status">
-        <EmptyState
-          icon={<Funnel aria-hidden="true" />}
-          title={data.period === "today" ? "Nenhum lead chegou hoje" : "Nenhum lead chegou neste período"}
-          description={data.period === "today" ? `${noLeadsSince(data.since, now)} O funil aparece quando o primeiro lead chegar.` : "Tente ampliar o período ou escolher outra unidade."}
-          action={data.period === "today" && widerHref ? <Link href={widerHref} className={styles.secondaryButton}>Ver os últimos 7 dias</Link> : undefined}
-        />
+      <section aria-label="Funil vazio" className={`${q.card} ${q.pad20}`} role="status">
+        <h2 className={q.ttl}>{data.period === "today" ? "Nenhum lead chegou hoje" : "Nenhum lead chegou neste período"}</h2>
+        <p className={q.help}>{data.period === "today" ? `${noLeadsSince(data.since, now)} O funil aparece quando o primeiro lead chegar.` : "Tente ampliar o período ou escolher outra fila."}</p>
+        {data.period === "today" && widerHref ? <p className={q.zero} style={{ marginTop: 12 }}><Link href={widerHref} className={q.ghost}>Ver os últimos 7 dias</Link></p> : null}
       </section>
     );
   }
 
+  const stats = [
+    { label: "Leads que chegaram", short: "Chegaram", value: n(arrived), detail: `${periodLabel}, ${unitName ?? "todas as unidades"}` },
+    { label: "Responderam à primeira mensagem", short: "Responderam", value: `${ratio(replied, arrived)}%`, detail: repliedDetail(replied, data.medianMinutesToReply) },
+    { label: "Qualificados", short: "Qualificados", value: `${ratio(qualified, arrived)}%`, detail: qualified ? `${plural(qualified, "lead pronto", "leads prontos")} para o corretor` : "Nenhum lead pronto ainda" },
+    { label: "Vendas", short: "Vendas", value: n(converted), detail: converted ? `${pct(converted, arrived)} dos leads que chegaram` : `Nenhuma venda ${when}` },
+  ];
+  const undelivered = sent && delivered < sent ? ` · ${plural(sent - delivered, "primeira mensagem não entregue", "primeiras mensagens não entregues")}` : "";
+  const summary = `${plural(converted, "venda", "vendas")} de ${plural(arrived, "lead", "leads")} · ${pct(converted, arrived).replace("%", "")}%${undelivered}`;
+  const stages = data.stages;
+  const lastIndex = stages.length - 1;
+  const cost = data.cost;
+  const costs = cost ? [
+    { label: cost.source === "estimate" ? "Investido (estimado)" : "Investido", value: money(cost.total) },
+    { label: "Por lead", value: money0(arrived ? cost.total / arrived : null) ?? "Sem leads" },
+    { label: "Por lead qualificado", value: money0(cost.perQualified) ?? `Sem qualificados ${when}` },
+    { label: "Por venda", value: money0(converted ? cost.total / converted : null) ?? `Sem venda ${when}` },
+  ] : [];
+
   return (
-    <div className={styles.stack}>
-      <section aria-label="Resumo do período" className={styles.stats4}>
-        <Stat index={0} label="Leads que chegaram" value={arrived} detail={`${periodLabel}${unitName ? `, ${unitName}` : ""}`} />
-        <Stat index={1} label="Responderam à primeira mensagem" value={ratio(replied, arrived)} kind="pct" detail={repliedDetail(replied, data.medianMinutesToReply)} />
-        <Stat index={2} label="Qualificados" value={ratio(qualified, arrived)} kind="pct" detail={qualified ? `${plural(qualified, "lead pronto", "leads prontos")} para o corretor` : "Nenhum lead pronto ainda"} />
-        <Stat index={3} label="Vendas" value={converted} detail={converted ? `${pct(converted, arrived)} dos leads que chegaram` : `Nenhuma venda ${when}`} />
+    <div className={q.stack}>
+      <section aria-label="Resumo do período" className={q.grid4}>
+        {stats.map((stat, index) => (
+          <article key={stat.label} className={`${q.card} ${q.stat} ${q.in}`} style={enter(index)}>
+            <h3 className={q.statLabel}><span className={q.desktopOnly}>{stat.label}</span><span className={q.phoneOnly}>{stat.short}</span></h3>
+            <p className={`${q.statValue} ${q.num}`}>{stat.value}</p>
+            <p className={q.statDetail}>{stat.detail}</p>
+          </article>
+        ))}
       </section>
 
-      <>
-          <div className={styles.split32}>
-            <LiteReveal as="section" className={styles.card} label="Do anúncio à venda">
-              <header className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>Do anúncio à venda</h2>
-                  <p className={styles.cardDescription}>
-                    Os mesmos leads que chegaram {periodDescription}, etapa por etapa.
-                    {sent && delivered < sent ? ` ${plural(sent - delivered, "primeira mensagem não foi entregue", "primeiras mensagens não foram entregues")} pela Meta.` : ""}
-                  </p>
-                </div>
-              </header>
-              <div className={styles.cardBody}><FunnelBars stages={data.stages} /></div>
-            </LiteReveal>
-
-            <LiteReveal as="section" className={styles.card} label="Onde os leads estão agora" delay={m.stagger.item}>
-              <header className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>Onde os leads estão agora</h2>
-                  <p className={styles.cardDescription}>Situação atual dos leads do período.</p>
-                </div>
-              </header>
-              <ul className={styles.rows} aria-label="Situação atual dos leads do período">
-                {data.now.map((row, index) => (
-                  <LiteItem as="li" key={row.key} index={index} className={styles.plainRow}>
-                    <span className={styles.dutyText}>
-                      <span className={styles.rowTitle}>{row.label}</span>
-                      <span className={styles.muted}>{row.hint}</span>
-                    </span>
-                    <LiteNumber value={row.count} className={styles.rowNumber} />
-                  </LiteItem>
-                ))}
-              </ul>
-            </LiteReveal>
-          </div>
-
-          <div className={styles.split11}>
-            <LiteReveal as="section" className={styles.card} label="Testes da primeira mensagem">
-              <header className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>Testes da primeira mensagem</h2>
-                  <p className={styles.cardDescription}>Cada lead recebe uma variante e sempre a mesma. Com 50 envios por variante, o sistema passa a usar mais a que tem mais respostas.</p>
-                </div>
-              </header>
-              {data.variants.length ? (
-                <table className={styles.table} aria-label="Resultados das variantes da primeira mensagem">
-                  <thead>
-                    <tr>
-                      <th scope="col">Mensagem</th>
-                      <th scope="col" className={styles.numCol}>Enviadas</th>
-                      <th scope="col">Responderam</th>
-                      <th scope="col" className={styles.numCol}>Qualificados</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.variants.map((row) => (
-                      <tr key={`${row.approach}-${row.variant}`}>
-                        <td data-label="Mensagem"><span className={styles.cellMain}>{row.label}</span><span className={styles.muted}>{row.approach}</span></td>
-                        <td data-label="Enviadas" className={styles.numCol}><LiteNumber value={row.sent} /></td>
-                        <td data-label="Responderam"><Interval rate={row.rate} low={row.low} high={row.high} /></td>
-                        <td data-label="Qualificados" className={styles.numCol}>{pct(row.qualified, row.sent)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className={styles.cardEmptyText}>Os resultados aparecem depois das primeiras mensagens enviadas pela qualificação turbo.</p>
-              )}
-            </LiteReveal>
-
-            <LiteReveal as="section" className={styles.card} label="Qual mensagem trouxe a resposta" delay={m.stagger.item}>
-              <header className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>Qual mensagem trouxe a resposta</h2>
-                  <p className={styles.cardDescription}>Último toque enviado antes da primeira resposta do lead.</p>
-                </div>
-              </header>
-              {anyTouch ? <ul className={styles.barList} aria-label="Respostas por mensagem enviada">
-                {data.touches.map((row, index) => (
-                  <li key={row.touch} className={styles.barRow}>
-                    <span className={styles.barHead}>
-                      <span>{row.label}</span>
-                      <span className={styles.tabular}><span className={styles.muted}>{n(row.sent)} enviadas,</span> <strong className={styles.strong}>{plural(row.repliesAfter, "resposta", "respostas")}</strong></span>
-                    </span>
-                    <LiteBar value={row.repliesAfter / maxTouch} delay={index * 0.03} />
-                  </li>
-                ))}
-              </ul> : <p className={styles.cardEmptyText}>Nenhuma mensagem enviada {when}.</p>}
-            </LiteReveal>
-          </div>
-
-          <div className={styles.split11}>
-            <LiteReveal as="section" className={styles.card} label="Por que os leads foram perdidos">
-              <header className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>Por que os leads foram perdidos</h2>
-                  <p className={styles.cardDescription}>Motivo informado pelo corretor ou confirmado na sugestão da IA.</p>
-                </div>
-              </header>
-              {data.lossReasons.length ? (
-                <ul className={styles.barList} aria-label="Motivos de perda">
-                  {data.lossReasons.map((row, index) => (
-                    <li key={row.label} className={styles.barRow}>
-                      <span className={styles.barHead}><span>{row.label}</span><LiteNumber value={row.count} className={styles.rowNumber} /></span>
-                      <LiteBar value={row.count / maxLoss} delay={index * 0.03} tone="neutral" />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={styles.cardEmptyText}>Nenhum lead do período foi marcado como perdido.</p>
-              )}
-            </LiteReveal>
-
-            <LiteReveal as="section" className={styles.card} label="Custo na Meta" delay={m.stagger.item}>
-              <header className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>{data.cost?.source === "estimate" ? "Custo estimado na Meta" : "Custo na Meta"}</h2>
-                  <p className={styles.cardDescription}>
-                    {data.cost?.source === "estimate"
-                      ? "Templates entregues a leads no período, pela tabela da Meta de 1/10/2026: marketing R$ 0,32 e utilidade R$ 0,035 por mensagem."
-                      : "Mensagens cobradas pela Meta no período (dado de cada envio), na tabela de 1/10/2026: marketing R$ 0,32 e utilidade ou atendimento R$ 0,035."}
-                  </p>
-                </div>
-              </header>
-              {data.cost ? (
-                <div className={styles.costGrid}>
-                  <span className={`${styles.stat} ${styles.costMain}`}>
-                    <span className={styles.statLabel}>Total {data.cost.source === "estimate" ? "estimado" : "no período"}</span>
-                    <LiteNumber value={data.cost.total} kind="brl" className={styles.statValue} />
-                    <span className={styles.statDetail}>{plural(data.cost.templatesDelivered, "mensagem cobrada", "mensagens cobradas")}</span>
+      <section className={`${q.card} ${q.funnelCard} ${q.in}`} aria-labelledby="f-funil" style={enter(0, 160)}>
+        <div className={q.funnelHead}>
+          <h2 id="f-funil" className={q.ttl}>Do anúncio à venda</h2>
+          <span className={`${q.funnelSummary} ${q.num} ${q.desktopOnly}`}>{summary}</span>
+        </div>
+        <ol className={`${q.funnelList} ${q.desktopOnly}`}>
+          {stages.map((stage, index) => {
+            const share = arrived ? (stage.count / arrived) * 100 : 0;
+            const previous = index ? stages[index - 1].count : null;
+            const drop = previous ? Math.round((stage.count / previous) * 100) : null;
+            const wide = share > 18;
+            return (
+              <li key={stage.key} className={`${q.funnelRow} ${q.in}`} style={enter(index, 200)}>
+                <span className={q.funnelLabel}>{stage.label}</span>
+                <span className={q.funnelTrack}>
+                  <span
+                    className={`${q.funnelFill} ${q.segFill}`}
+                    style={{ width: `${Math.max(share, 6)}%`, background: index === lastIndex ? "var(--p-action)" : `color-mix(in oklab, var(--p-action) ${Math.max(30, 90 - index * 9)}%, white)`, animationDelay: `${200 + index * 40}ms` }}
+                  >
+                    <span className={`${q.funnelCount} ${q.num}`} style={{ color: wide ? "#fff" : "var(--p-foreground)" }}>{n(stage.count)}</span>
                   </span>
-                  <span className={styles.stat}><span className={styles.statLabel}>Marketing</span><LiteNumber value={data.cost.marketing} kind="brl" className={styles.miniValue} /></span>
-                  <span className={styles.stat}><span className={styles.statLabel}>Utilidade</span><LiteNumber value={data.cost.utility} kind="brl" className={styles.miniValue} /></span>
-                  <span className={styles.stat}>
-                    <span className={styles.statLabel}>Por lead qualificado</span>
-                    {data.cost.perQualified === null ? <span className={styles.statEmpty}>Sem qualificados {when}</span> : <LiteNumber value={data.cost.perQualified} kind="brl" className={styles.miniValue} />}
-                  </span>
-                </div>
-              ) : (
-                <p className={styles.note}><Info aria-hidden="true" size={16} /> O custo da Meta é da empresa toda. Com uma unidade escolhida ele fica escondido, porque o número da unidade não bateria com a conta da Meta.</p>
-              )}
-            </LiteReveal>
+                </span>
+                <span className={`${q.funnelRate} ${q.num}`} data-low={drop !== null && drop < 50 ? "true" : undefined}>{drop === null ? "100%" : `${drop}% da etapa anterior`}</span>
+              </li>
+            );
+          })}
+        </ol>
+        <ol className={`${q.phoneOnly} ${q.phoneFunnel}`}>
+          {stages.map((stage, index) => {
+            const previous = index ? stages[index - 1].count : null;
+            const drop = previous ? Math.round((stage.count / previous) * 100) : null;
+            return (
+              <li key={stage.key}>
+                <span className={q.barHead}><span className={q.strong}>{stage.label}</span><span className={q.num}>{n(stage.count)} {drop !== null ? <span className={q.funnelRate} data-low={drop < 50 ? "true" : undefined}>· {drop}%</span> : null}</span></span>
+                <span className={q.phoneFunnelTrack}><span className={`${q.fill} ${q.fillAction} ${q.segFill}`} style={{ width: `${Math.max(arrived ? (stage.count / arrived) * 100 : 0, 4)}%` }} /></span>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      <div className={q.grid2}>
+        <section className={`${q.card} ${q.pad20} ${q.in}`} aria-labelledby="f-agora" style={enter(0, 200)}>
+          <h2 id="f-agora" className={q.ttl}>Onde os leads estão agora</h2>
+          <p className={`${q.help} ${q.desktopOnly}`} style={{ marginBottom: 8 }}>Situação atual dos leads do período.</p>
+          <div aria-label="Situação atual dos leads do período">
+            {data.now.map((row) => (
+              <div key={row.key} className={q.kv} title={row.hint}>
+                <span className={q.kvLabel}><span className={q.dot} data-tone={NOW_TONE[row.key] === "action" ? undefined : NOW_TONE[row.key]} aria-hidden="true" />{row.label}</span>
+                <span className={`${q.num} ${q.kvValue}`}>{n(row.count)} <span className={`${q.kvPct} ${q.desktopOnly}`}>{pct(row.count, arrived)}</span></span>
+              </div>
+            ))}
           </div>
-      </>
+        </section>
+        <section className={`${q.card} ${q.pad20} ${q.in}`} aria-labelledby="f-perda" style={enter(0, 240)}>
+          <h2 id="f-perda" className={q.ttl}><span className={q.desktopOnly}>Por que os leads foram perdidos</span><span className={q.phoneOnly}>Por que foram perdidos</span></h2>
+          {data.lossReasons.length ? (
+            <ul className={q.barList} aria-label="Motivos de perda">
+              {data.lossReasons.map((row) => (
+                <li key={row.label} className={q.barItem}>
+                  <span className={q.barHead}><span>{row.label}</span><span className={`${q.num} ${q.barCount}`}>{n(row.count)}</span></span>
+                  <span className={q.barTrack}><span className={`${q.fill} ${q.fillGrey} ${q.segFill}`} style={{ width: width(row.count, maxLoss) }} /></span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={q.emptyText}>Nenhum lead do período foi marcado como perdido.</p>
+          )}
+        </section>
+      </div>
+
+      <div className={q.grid2wide}>
+        <section className={`${q.card} ${q.tableCard} ${q.in}`} aria-labelledby="f-testes" style={enter(0, 280)}>
+          <div className={q.tableHead}>
+            <h2 id="f-testes" className={q.ttl}>Testes da primeira mensagem</h2>
+            <p className={`${q.help} ${q.desktopOnly}`}>A faixa mostra a margem de erro da taxa de resposta.</p>
+          </div>
+          {data.variants.length ? (
+            <>
+              <div className={`${q.testHead} ${q.desktopOnly}`}><span>Mensagem</span><span className={q.r}>Enviadas</span><span>Responderam</span><span className={q.r}>Qualificados</span></div>
+              <div className={q.desktopOnly} role="table" aria-label="Resultados das variantes da primeira mensagem">
+                {data.variants.map((row) => (
+                  <div key={`${row.approach}-${row.variant}`} className={q.testRow} role="row">
+                    <span className={q.testName} role="cell"><span>{row.label}</span><span>{row.approach}</span></span>
+                    <span className={`${q.num} ${q.r}`} role="cell">{n(row.sent)}</span>
+                    <span className={q.rangeCell} role="cell" aria-label={`${Math.round(row.rate * 100)}%, entre ${Math.round(row.low * 100)} e ${Math.round(row.high * 100)}%`}>
+                      <span className={q.rangeTrack} aria-hidden="true">
+                        <span className={q.rangeBand} style={{ left: `${row.low * 100}%`, width: `${Math.max(0, row.high - row.low) * 100}%` }} />
+                        <span className={q.rangeDot} style={{ left: `${row.rate * 100}%` }} />
+                      </span>
+                      <span className={`${q.num} ${q.rangeValue}`}>{Math.round(row.rate * 100)}%</span>
+                    </span>
+                    <span className={`${q.num} ${q.r}`} role="cell">{pct(row.qualified, row.sent)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className={q.phoneOnly} style={{ padding: "0 16px" }}>
+                {data.variants.map((row) => (
+                  <div key={`${row.approach}-${row.variant}`} className={q.phoneTest}>
+                    <span className={q.strong} style={{ fontSize: 14 }}>{row.label}</span>
+                    <span className={q.statDetail}>{row.approach}</span>
+                    <span className={q.num} style={{ fontSize: 14, color: "var(--p-text-secondary)" }}>{n(row.sent)} enviadas · {Math.round(row.rate * 100)}% responderam · {pct(row.qualified, row.sent)} qualificados</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className={q.emptyText} style={{ padding: "0 20px 12px" }}>Os resultados aparecem depois das primeiras mensagens enviadas pela qualificação turbo.</p>
+          )}
+        </section>
+        <section className={`${q.card} ${q.pad20} ${q.in}`} aria-labelledby="f-toque" style={enter(0, 320)}>
+          <h2 id="f-toque" className={q.ttl}>Qual mensagem trouxe a resposta</h2>
+          <p className={`${q.help} ${q.desktopOnly}`}>Último toque enviado antes da primeira resposta do lead.</p>
+          {anyTouch ? (
+            <ul className={q.barList} aria-label="Respostas por mensagem enviada">
+              {data.touches.map((row) => (
+                <li key={row.touch} className={q.barItem}>
+                  <span className={q.barHead}><span>{row.label} <span className={q.muted}>· {plural(row.sent, "enviada", "enviadas")}</span></span><span className={`${q.num} ${q.barCount}`}>{n(row.repliesAfter)}</span></span>
+                  <span className={q.barTrack}><span className={`${q.fill} ${q.fillAction} ${q.segFill}`} style={{ width: width(row.repliesAfter, maxTouch) }} /></span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={q.emptyText}>Nenhuma mensagem enviada {when}.</p>
+          )}
+        </section>
+      </div>
+
+      <section className={`${q.card} ${q.pad20} ${q.in}`} aria-labelledby="f-custo" style={enter(0, 360)}>
+        <div className={q.costHead}>
+          <h2 id="f-custo" className={q.ttl}>{cost?.source === "estimate" ? "Custo estimado na Meta" : "Custo na Meta"}</h2>
+          {cost ? <span className={`${q.sectionAside} ${q.desktopOnly}`}>Da empresa toda, do período escolhido · marketing {money(cost.marketing)}, utilidade {money(cost.utility)}</span> : null}
+        </div>
+        {cost ? (
+          <>
+            <div className={`${q.grid4} ${q.desktopOnly}`}>
+              {costs.map((row) => (
+                <div key={row.label} className={q.mutedBox}>
+                  <p className={q.statLabel}>{row.label}</p>
+                  <p className={`${q.statValue} ${q.costValue} ${q.num}`}>{row.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className={q.phoneOnly}>
+              <div className={q.kvList}>
+                {costs.map((row) => <div key={row.label} className={q.kv}><span>{row.label}</span><span className={`${q.num} ${q.kvValue}`}>{row.value}</span></div>)}
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className={q.emptyText} style={{ marginTop: 0 }}>O custo da Meta é da empresa toda. Com uma unidade escolhida ele fica escondido, porque o número da unidade não bateria com a conta da Meta.</p>
+        )}
+      </section>
     </div>
   );
 }

@@ -28,7 +28,9 @@ vi.mock("motion/react", async (importOriginal) => {
 // Fixtures tipadas: o construtor de exemplo da prévia devolve o relatório simples no mesmo tipo do servidor.
 import { buildSimpleQuality } from "@/app/dev/diretor-dashboard-preview/_components/data";
 import type { SimpleLeadQualityReportData } from "@/features/reports/metrics/lead-quality-service";
-import { displacementOf, readMotion } from "@/components/lite/motion/capture-motion";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import q from "./qualidade-funil.module.css";
 
 import { DirectorLiteChrome, dashboardHref } from "./director-lite-chrome";
 import { QualityDisabled, QualityToolbar, QualityView } from "./quality-view";
@@ -61,7 +63,7 @@ describe("Qualidade dos leads, vista Simples (dados reais)", () => {
     const report = buildSimpleQuality(7, "all", null, NOW);
     render(<QualityView report={report} unitName={null} />);
     // O número do passo entra no nome do título: a busca é pelo trecho.
-    expect(screen.getByRole("heading", { name: /Quantos leads entraram e quantos são bons/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Quantos entraram e quantos são bons/ })).toBeInTheDocument();
     expect(screen.getByText("Bons (quentes e mornos)")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /E se não mandasse os frios/ })).toBeInTheDocument();
     expect(screen.getByText("Todas as unidades", { exact: false })).toBeInTheDocument();
@@ -99,14 +101,12 @@ describe("Qualidade dos leads, vista Simples (dados reais)", () => {
     expect(screen.getByRole("link", { name: "Voltar ao painel" })).toHaveAttribute("href", "/dashboard");
   });
 
-  it("com movimento reduzido, nenhum bloco entra deslocado", () => {
-    motionState.reduce = true;
+  it("com movimento reduzido, nenhum bloco entra deslocado (a animação é CSS e desliga pelas duas preferências)", () => {
     const { container } = render(<QualityView report={buildSimpleQuality(7, "all", null, NOW)} unitName={null} />);
-    const animated = Array.from(container.querySelectorAll("[data-initial]"));
-    expect(animated.length).toBeGreaterThan(0);
-    for (const element of animated) {
-      expect(displacementOf(readMotion(element).initial)).toEqual([]);
-    }
+    expect(container.querySelectorAll(`.${q.in}`).length).toBeGreaterThan(0);
+    const css = readFileSync(resolve(__dirname, "qualidade-funil.module.css"), "utf8");
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.in, \.segFill, \.bar \{ animation: none; \} \}/);
+    expect(css).toContain(':global(html[data-reduce-motion="1"]) .in');
   });
 });
 
@@ -147,13 +147,9 @@ describe("filtros do topo na aba Qualidade", () => {
     expect(screen.queryByRole("combobox", { name: "Unidade" })).not.toBeInTheDocument();
   });
 
-  it("Detalhada, fila, intervalo e exportar levam à tela antiga com o mesmo período", () => {
+  it("Exportar (e a Detalhada, quando pedida) levam à tela completa com o mesmo período", () => {
     render(<QualityToolbar legacyHref="/dashboard?tab=quality&period=7&legado=1" detailedHref="/dashboard?tab=quality&period=7&vista=detalhada&legado=1" />);
-    const tools = within(screen.getByRole("navigation", { name: "Vista e ferramentas da qualidade" }));
-    expect(tools.getByRole("link", { name: "Detalhada" })).toHaveAttribute("href", "/dashboard?tab=quality&period=7&vista=detalhada&legado=1");
-    for (const name of ["Fila: todas", "Intervalo", "Exportar"]) {
-      expect(tools.getByRole("link", { name })).toHaveAttribute("href", "/dashboard?tab=quality&period=7&legado=1");
-    }
-    expect(tools.getByText("Simples")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("link", { name: "Exportar na tela completa" })).toHaveAttribute("href", "/dashboard?tab=quality&period=7&legado=1");
+    expect(screen.getByRole("link", { name: "Detalhada" })).toHaveAttribute("href", "/dashboard?tab=quality&period=7&vista=detalhada&legado=1");
   });
 });

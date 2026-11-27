@@ -23,6 +23,7 @@ import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag"
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
 import { getEssentialDashboard } from "@/features/dashboard/essential/essential-data";
+import { attentionItems } from "@/features/dashboard/components/director-lite/attention";
 import { parseCustomRange, renderDirectorLiteQuality } from "@/features/dashboard/director-lite-quality-page";
 import { customRangeLabel } from "@/features/dashboard/components/director-lite/custom-range";
 import { leadQualityWindow } from "@/features/reports/metrics/lead-quality-period";
@@ -96,13 +97,15 @@ export default async function DashboardPage({
         const range = customRange ? parseLeadQualityPeriod(singleParam(resolvedSearchParams.periodo)) : null;
         const bounds = range ? leadQualityWindow(range) : null;
         const window = bounds ? { since: bounds.since, until: bounds.until ?? new Date() } : null;
-        const [funnel, firstName, insights, entries] = await Promise.all([
+        // 27/11/2026 (artifact 1:1): "Precisa de você" no topo, como na visão geral; as entradas por turno ficam lá.
+        const essentialWindow = window && customRange ? { ...window, label: `entre ${customRangeLabel(customRange)}` } : null;
+        const [funnel, firstName, insights, essential] = await Promise.all([
           getQualificationFunnel(context, funnelPeriod, null, queueId, window),
           getDirectorLiteViewerFirstName(context.userId),
           queueId || window ? Promise.resolve(null) : getFunnelInsights(context, funnelPeriodStart(funnelPeriod), null).catch(() => null),
-          getEntriesByTurn(context, range ? { range, queueId } : { period: overviewPeriod, queueId }).catch(() => null),
+          getEssentialDashboard(context, { period: overviewPeriod, branchId: null, queueId, window: essentialWindow }).catch(() => null),
         ]);
-        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={null} branches={[]} queues={queues} queueId={queueId} entries={entries} customRange={customRange} firstName={firstName} now={new Date()} insights={insights ? <FunnelInsightsPanel insights={insights} steps={funnel.stages} /> : null} />;
+        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={null} branches={[]} queues={queues} queueId={queueId} attention={essential ? attentionItems(essential) : null} customRange={customRange} firstName={firstName} now={new Date()} insights={insights ? <FunnelInsightsPanel insights={insights} steps={funnel.stages} /> : null} />;
       }
       const funnelPeriod = parseFunnelPeriod(singleParam(resolvedSearchParams.period));
       const [funnel, insights] = await Promise.all([

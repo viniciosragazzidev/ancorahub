@@ -129,12 +129,14 @@ function PhoneMenuButton({ initials }: { initials: string }) {
   );
 }
 
-export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, periods, activePeriod, onPeriod, units, activeUnit, onUnit, unitLabel = "Unidade", customRange, onCustomRange, headline, action, summary, userName }: {
+export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, periods, activePeriod, onPeriod, units, activeUnit, onUnit, unitLabel = "Unidade", customRange, onCustomRange, headline, action, trailing, summary, userName }: {
   firstName: string | null;
   /** Uma frase com a situação, logo abaixo da saudação ("Hoje entraram 86 leads."). */
   headline?: string | null;
   /** A ação do momento, antes do período (o botão "Precisa de você" da visão geral). */
   action?: ReactNode;
+  /** Fim da linha de controles (Exportar na aba Qualidade, 27/11/2026). */
+  trailing?: ReactNode;
   /** Resumo do recorte no topo do celular ("Hoje · Todas as filas"). */
   summary?: string;
   /** Nome de quem olha, para as iniciais do botão de menu do celular. */
@@ -213,6 +215,7 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
           <Segment label="Período" items={periods} active={activePeriod} onSelect={onPeriod} className={styles.desktopOnly} />
           <PeriodCalendar active={customRange ?? null} onApply={onCustomRange} phoneExtras={phoneExtras} />
           {unitPicker(styles.desktopOnly)}
+          {trailing ? <span className={styles.trailing}>{trailing}</span> : null}
         </div>
       </header>
     </>
