@@ -10,22 +10,15 @@ import { motion } from "motion/react";
 import { toast } from "@/components/ui/sonner";
 
 import {
-  SquaresFour,
-  ChatCircleDots,
-  Lightbulb,
-  PresentationChart,
-  CurrencyCircleDollar,
-  UsersThree,
   Sparkle,
   CaretDown,
   SignOut,
   SlidersHorizontal,
   UserCircle,
   ShieldCheck,
-  Wallet,
-  Megaphone,
   PhoneCall,
 } from "@phosphor-icons/react";
+import { AreaIconInicio, AreaIconConversas, AreaIconLeads, AreaIconDistribuicao, AreaIconComercial, AreaIconEquipe, AreaIconIa, AreaIconMarketing, AreaIconConfig, AreaIconFinanceiro, AreaIconErp } from "@/components/nav-area-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,7 +66,7 @@ type NavItemConfig = {
   fullLabel: string;
   url: string;
   section: string;
-  icon: typeof SquaresFour;
+  icon: React.ComponentType<{ className?: string; weight?: "fill" | "regular" }>;
   iconTone: string;
   isWhatsApp?: boolean;
   beta?: boolean;
@@ -82,17 +75,17 @@ type NavItemConfig = {
 
 /** Ícone e cor de cada área; quais áreas e abas existem vem de nav-registry. */
 const areaPresentation: Record<NavAreaId, Pick<NavItemConfig, "icon" | "iconTone">> = {
-  inicio: { icon: SquaresFour, iconTone: "text-sky-600 dark:text-sky-300" },
-  conversas: { icon: ChatCircleDots, iconTone: "text-violet-600 dark:text-violet-300" },
-  leads: { icon: Lightbulb, iconTone: "text-amber-600 dark:text-amber-300" },
-  distribuicao: { icon: PresentationChart, iconTone: "text-emerald-600 dark:text-emerald-300" },
-  comercial: { icon: CurrencyCircleDollar, iconTone: "text-orange-600 dark:text-orange-300" },
-  equipe: { icon: UsersThree, iconTone: "text-cyan-600 dark:text-cyan-300" },
-  "atendimento-ia": { icon: Sparkle, iconTone: "text-fuchsia-600 dark:text-fuchsia-300" },
-  marketing: { icon: Megaphone, iconTone: "text-blue-600 dark:text-blue-300" },
-  configuracoes: { icon: SlidersHorizontal, iconTone: "text-slate-600 dark:text-slate-300" },
-  financeiro: { icon: Wallet, iconTone: "text-teal-600 dark:text-teal-300" },
-  erp: { icon: ShieldCheck, iconTone: "text-primary" },
+  inicio: { icon: AreaIconInicio, iconTone: "text-sky-600 dark:text-sky-300" },
+  conversas: { icon: AreaIconConversas, iconTone: "text-violet-600 dark:text-violet-300" },
+  leads: { icon: AreaIconLeads, iconTone: "text-amber-600 dark:text-amber-300" },
+  distribuicao: { icon: AreaIconDistribuicao, iconTone: "text-emerald-600 dark:text-emerald-300" },
+  comercial: { icon: AreaIconComercial, iconTone: "text-orange-600 dark:text-orange-300" },
+  equipe: { icon: AreaIconEquipe, iconTone: "text-cyan-600 dark:text-cyan-300" },
+  "atendimento-ia": { icon: AreaIconIa, iconTone: "text-fuchsia-600 dark:text-fuchsia-300" },
+  marketing: { icon: AreaIconMarketing, iconTone: "text-blue-600 dark:text-blue-300" },
+  configuracoes: { icon: AreaIconConfig, iconTone: "text-slate-600 dark:text-slate-300" },
+  financeiro: { icon: AreaIconFinanceiro, iconTone: "text-teal-600 dark:text-teal-300" },
+  erp: { icon: AreaIconErp, iconTone: "text-primary" },
 };
 
 export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false, postSaleAuditEnabled = false, callAncoraEnabled = false, erpPaths = [] }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; callAncoraEnabled?: boolean; erpPaths?: readonly string[] }) {
