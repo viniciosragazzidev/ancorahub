@@ -2,16 +2,16 @@
 
 /**
  * Arrastar para rolar (27/11/2026): com o mouse, qualquer tabela ou faixa de abas que role de lado pode ser puxada com
- * o botão esquerdo, como no celular. Nas tabelas, puxar para cima ou para baixo também rola (a própria área, ou a
- * página quando a tabela não tem rolagem dela): numa tela larga a tabela cabe inteira e só sobra rolar na vertical.
+ * o botão esquerdo, como no celular, nos dois sentidos: lista, tabela, conversa ou página.
  * O arraste só começa depois de 6px; quando acontece, o clique seguinte é cancelado (não abre a linha nem troca de
  * aba sem querer). Campos de texto e o toque ficam como estão; uma área pode recusar com `data-drag-scroll="off"`.
  */
 import { useEffect } from "react";
 
 const THRESHOLD = 6;
-const SKIP = "input, textarea, select, [contenteditable=''], [contenteditable='true'], [data-drag-scroll='off']";
-const TABLE = "table, [role='table'], [role='grid'], [data-drag-scroll='y']";
+// Fora do arraste: campos, o que já se arrasta de propósito (cartão do Kanban, controles deslizantes, alças de gaveta)
+// e quem recusar com data-drag-scroll="off".
+const SKIP = "input, textarea, select, [contenteditable=''], [contenteditable='true'], [data-drag-scroll='off'], [draggable='true'], [aria-roledescription], [role='slider'], [data-vaul-drawer], [data-dnd-kit], [data-rbd-draggable-id]";
 
 function scrollable(start: Element | null, axis: "x" | "y"): HTMLElement | null {
   let node: Element | null = start;
@@ -56,9 +56,10 @@ export function DragScroll() {
       if (event.pointerType !== "mouse" || event.button !== 0) return;
       const origin = event.target as Element | null;
       if (!origin || origin.closest(SKIP)) return;
+      // Qualquer área que role, nos dois sentidos (28/11/2026): as listas do visual novo não são <table> e cabem na
+      // largura, então só a rolagem vertical tinha para onde ir.
       const sx = scrollable(origin, "x");
-      const inTable = Boolean(origin.closest(TABLE));
-      const sy = inTable ? scrollable(origin, "y") : null;
+      const sy = scrollable(origin, "y");
       if (!sx && !sy) return;
       x = sx ? { el: sx, start: sx.scrollLeft, snap: "", behavior: "" } : null;
       y = sy ? { el: sy, start: sy.scrollTop, snap: "", behavior: "" } : null;
@@ -130,7 +131,7 @@ export function DragScroll() {
       if (event.button !== 0) return;
       const origin = event.target as Element | null;
       if (!origin || origin.closest(SKIP)) return;
-      if (!scrollable(origin, "x") && !origin.closest(TABLE)) return;
+      if (!scrollable(origin, "x") && !scrollable(origin, "y")) return;
       if (origin.closest("a, img")) event.preventDefault();
     };
 
