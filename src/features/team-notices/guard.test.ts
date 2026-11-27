@@ -41,7 +41,7 @@ describe("delivery guard", () => {
 
   it("keeps only a few seconds between two company-number messages for critical notices", () => {
     const result = evaluateDeliveryGuard(input({ noticeClass: "critical", number: { lastSentAt: new Date(wednesdayMorning.getTime() - 1_000), sentLastHour: 0, sentToday: 0, connectedAt: null } }));
-    expect(result).toEqual({ kind: "hold", until: new Date(wednesdayMorning.getTime() + 2_000), reason: "number_spacing" });
+    expect(result).toEqual({ kind: "hold", until: new Date(wednesdayMorning.getTime() + 200), reason: "number_spacing" });
   });
 
   it("does not space Meta sends by the company number", () => {

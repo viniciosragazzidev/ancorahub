@@ -27,7 +27,7 @@ import { COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX, isEligibleColdLeadForManualR
 import { dutyShiftReminderFailureCode, dutyShiftReminderWahaFailure, isDutyShiftReminderStale } from "@/features/lead-distribution/duty-shift-reminder-domain";
 import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
-import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
+import { BROKER_CHAT_NOTICE, TEAM_NOTICES, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
 import { resolvePostSaleOutboundInsert } from "./post-sale-outbound-idempotency";
 import { companyNumberUsable, decideTeamNotice } from "@/features/team-notices/decision";
 import { DELIVERY_LIMITS } from "@/features/team-notices/guard";
@@ -1301,6 +1301,12 @@ async function takeCompanySlot(wahaNumberId: string, noticeKey: string, exact: b
   return false;
 }
 
+/** Team notices that cannot wait (presence link, lead offer and lead data): no typing pause, first in line. */
+const CRITICAL_NOTICE_KEYS = TEAM_NOTICES.filter((notice) => notice.class === "critical").map((notice) => notice.key);
+function isCriticalNoticeRow(row: { noticeKey: string | null }) {
+  return Boolean(row.noticeKey) && teamNoticeByKey(row.noticeKey!)?.class === "critical";
+}
+
 /** How long a critical notice waits for the company number's turn within one outbox run. */
 const CRITICAL_SLOT_WAIT_MS = 40_000;
 
@@ -1361,7 +1367,7 @@ async function sendNoticeByCompanyNumber(row: OutboundRow, metaError: unknown, e
   }
   if (!await takeCompanySlot(number.id, notice.key, exact)) return false;
   try {
-    const sentByWaha = await sendWahaRelayMessage({ idempotencyKey: `${row.idempotencyKey}:company`, sessionId: number.relaySessionId, destination: row.destinationPhone.replace(/\D/g, ""), body: text, humanize: true });
+    const sentByWaha = await sendWahaRelayMessage({ idempotencyKey: `${row.idempotencyKey}:company`, sessionId: number.relaySessionId, destination: row.destinationPhone.replace(/\D/g, ""), body: text, humanize: !isCriticalNoticeRow(row) });
     const reason = metaError instanceof Error ? metaError.message.slice(0, 120) : "Meta indisponível";
     await db.update(schema.whatsappOutboundMessages).set({
       status: "sent", deliveryRoute: "waha_direct", renderedBody: text, textVariant: rendered.variant, providerMessageId: sentByWaha.messageId,
@@ -1392,7 +1398,8 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
     or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")),
     or(lte(schema.whatsappOutboundMessages.scheduledAt, now), isNull(schema.whatsappOutboundMessages.scheduledAt)),
     or(lte(schema.whatsappOutboundMessages.nextAttemptAt, now), isNull(schema.whatsappOutboundMessages.nextAttemptAt)),
-  )).orderBy(asc(schema.whatsappOutboundMessages.createdAt)).limit(safeLimit);
+    // Avisos críticos da equipe primeiro (27/11/2026): a confirmação do plantão não espera atrás de outros avisos.
+  )).orderBy(sql`case when ${inArray(schema.whatsappOutboundMessages.noticeKey, CRITICAL_NOTICE_KEYS)} then 0 else 1 end`, asc(schema.whatsappOutboundMessages.createdAt)).limit(safeLimit);
   let sent = 0;
   let failed = 0;
   let retried = 0;
@@ -1574,7 +1581,8 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
             sessionId: tenantNumber.relaySessionId,
             destination: row.destinationPhone.replace(/\D/g, ""),
             body,
-            humanize: true,
+            // Aviso crítico (confirmação de plantão, oferta de lead) sai sem o "digitando…" de até 7 s.
+            humanize: !isCriticalNoticeRow(row),
           });
           await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId: sentByWaha.messageId, providerErrorCode: null, providerErrorMessage: null, holdReason: null, sentAt: new Date(), updatedAt: new Date() })
             .where(eq(schema.whatsappOutboundMessages.id, row.id));

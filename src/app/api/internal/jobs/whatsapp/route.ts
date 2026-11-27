@@ -17,7 +17,8 @@ async function handleGET(request: NextRequest) {
     const postSale = await runPostSaleReminderJob();
     // Up to 12 per run: a burst of presence calls by the company number goes
     // out a few seconds apart (it waits for its turn) instead of 3 a minute.
-    const result = await processMetaOutboundBatch(12);
+    // 20 per run since 27/11/2026: critical notices leave without the typing pause, ~2 s apart.
+    const result = await processMetaOutboundBatch(20);
     return NextResponse.json({ success: true, result, postSale });
   } catch (error) {
     console.error("[WhatsApp outbound job] failed", error instanceof Error ? error.message : "unknown_error");

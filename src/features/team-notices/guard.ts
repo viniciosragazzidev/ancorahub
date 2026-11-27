@@ -13,8 +13,9 @@ export const DELIVERY_LIMITS = {
   companyNumber: {
     gapMs: 8_000,
     jitterMs: 7_000,
-    criticalGapMs: 3_000,
-    criticalJitterMs: 2_000,
+    // 27/11/2026: 23 confirmações de plantão levavam até 7,5 min pelo número da empresa; 1,2 a 2 s entre elas.
+    criticalGapMs: 1_200,
+    criticalJitterMs: 800,
     perHour: 40,
     perDay: 250,
     warmupDays: 7,
