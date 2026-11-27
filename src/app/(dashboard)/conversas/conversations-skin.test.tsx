@@ -163,38 +163,36 @@ describe("pele da central de conversas", () => {
     expect(html).not.toContain('data-slot="filter-toolbar"');
   });
 
-  it("mantém rótulos e controles do Diretor em português e sem linha de tags vazia", () => {
+  it("mantém rótulos e controles do Diretor em português, no desenho WhatsApp Web (27/11/2026)", () => {
     const html = renderSelectedConversation();
-    expect(html).toContain('placeholder="Buscar conversa  ( / )"');
-    expect(html).toContain('placeholder="Mensagem"');
-    expect(html).toContain('data-conversations-part="message-history"');
-    expect(html).toContain('data-conversations-part="composer-input"');
-    expect(html).toContain('<textarea');
+    expect(html).toContain(">Conversas</h1>");
+    expect(html).toContain('placeholder="Buscar conversa"');
+    expect(html).toContain('aria-keyshortcuts="/"');
+    expect(html).toContain('placeholder="Mensagem   ( / para respostas rápidas )"');
+    expect(html).toContain('aria-label="Escreva uma mensagem"');
+    expect(html).toContain("<textarea");
     expect(html).toContain(">Qualificado</span>");
     expect(html).not.toMatch(/>qualified<\/span>/i);
     expect(html).not.toContain("Sem tags");
     expect(html).toContain('aria-label="Ações do atendimento"');
-    expect(html).toContain('data-variant="outline"');
-    expect(html).toContain('data-conversations-part="row-owner-name"');
-    expect(html).toContain('data-conversations-part="header-owner-name"');
-    expect(html).toContain("Marina Exemplo");
+    expect(html).toContain('aria-label="Ligar para cliente"');
+    expect(html).toContain("com Marina Exemplo");
   });
 
-  it("linha da lista: botão esticado abre a conversa e o link do corretor fica fora dele", () => {
+  it("linha da lista: um botão só, com nome, prévia, etapa e com quem está", () => {
     const html = renderSelectedConversation();
-    const row = html.match(/<div data-active="true" data-conversations-part="row"[\s\S]*?data-conversations-part="row-message-count"/)?.[0] ?? "";
+    const row = html.match(/<button type="button"[^>]*aria-current="true"[^>]*aria-label="Abrir conversa com Ana Ribeiro de Almeida Nogueira"[\s\S]*?<\/button>/)?.[0]
+      ?? html.match(/<button type="button"[^>]*aria-label="Abrir conversa com Ana Ribeiro de Almeida Nogueira"[\s\S]*?<\/button>/)?.[0] ?? "";
     expect(row).not.toBe("");
     expect(row).not.toContain('role="button"');
-    // O botão não tem filhos: o conteúdo e o link são irmãos dele.
-    expect(row).toMatch(/<button type="button" aria-label="Abrir conversa com Ana Ribeiro de Almeida Nogueira" aria-describedby="[^"]+" aria-current="page" data-conversations-part="row-open"[^>]*><\/button>/);
-    expect(row).toContain('href="/equipe/fixture-director"');
-    expect(row).toMatch(/<a[^>]*class="[^"]*relative z-10[^"]*"[^>]*>Marina Exemplo<\/a>/);
+    expect(row).toContain('title="WhatsApp"');
+    expect(row).toContain("com Marina Exemplo");
   });
 
   it("omite o nome do corretor quando o lead nao esta atribuido", () => {
     const html = renderSelectedConversation(null);
-    expect(html).not.toContain('data-conversations-part="row-owner-name"');
-    expect(html).not.toContain('data-conversations-part="header-owner-name"');
+    expect(html).not.toContain("com Marina Exemplo");
+    expect(html).toContain("Sem dono");
   });
 
   it("mostra a aba Distribuídos e sua contagem da lista ativa", () => {

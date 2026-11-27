@@ -15,6 +15,8 @@ import { formatNoReplyReminderDue, noReplyReminderOptions, type NoReplyReminderI
 import { Kbd } from "@/components/ui/kbd";
 import { useIncrementalRows } from "./use-incremental-rows";
 import styles from "./conversas-lite.module.css";
+import ww from "./whatsapp-web.module.css";
+import { useSidebar } from "@/components/ui/sidebar";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
@@ -95,7 +97,7 @@ import {
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
-import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot, MoreHorizontal } from "lucide-react";
+import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot, MoreHorizontal, Keyboard as KeyboardIcon, Menu } from "lucide-react";
 import { startAutoSaleFromConversationAction } from "@/features/auto-sale/actions";
 import { isAutoSaleTemperature } from "@/features/auto-sale/eligibility";
 import {
@@ -682,20 +684,6 @@ export function ConversationsWorkspace({
       }}
     />
   ) : null;
-  const directorViews = canSeeBrokerTab ? (
-    <ConversasHeaderNav
-      currentTab={currentTab}
-      leadsCount={currentTab === "corretores" || currentTab === "distribuidos" ? undefined : conversations.length}
-      distributedCount={currentTab === "distribuidos" ? conversations.length : undefined}
-      coexLabel={coexLabel}
-      orientation="vertical"
-    />
-  ) : null;
-  const currentViewLabel = currentTab === "distribuidos"
-    ? "Distribuídos"
-    : currentTab === "coex" && coexLabel
-      ? coexLabel.split(" · ")[0]
-      : "Leads";
   const activeFilterCount = [filter !== "all", branchFilter !== "all", tagFilter !== "all"].filter(Boolean).length;
   function clearListFilters() {
     setFilter("all");
@@ -717,7 +705,7 @@ export function ConversationsWorkspace({
       <PopoverTrigger
         render={(
           <Button
-            aria-label={`Visão e filtros: ${currentViewLabel}${activeFilterCount ? `, ${activeFilterCount} filtro(s) ativo(s)` : ""}`}
+            aria-label={`Filtros${activeFilterCount ? `, ${activeFilterCount} filtro(s) ativo(s)` : ""}`}
             className="h-10 shrink-0 gap-1.5 px-3"
             data-conversations-part="filters-trigger"
             size="sm"
@@ -726,16 +714,10 @@ export function ConversationsWorkspace({
         )}
       >
         <SlidersHorizontal aria-hidden="true" className="size-4" />
-        <span className="max-w-24 truncate text-xs">{currentViewLabel}</span>
+        <span className={directorSkinEnabled ? "sr-only" : "max-w-24 truncate text-xs"}>Filtros</span>
         {activeFilterCount ? <Badge className="px-1.5 py-0 text-[10px]" variant="secondary">{activeFilterCount}</Badge> : null}
       </PopoverTrigger>
       <PopoverContent align="end" className="grid w-80 gap-4" data-conversations-part="filters-menu">
-        {directorViews ? (
-          <div className="grid gap-2">
-            <p className="text-xs font-medium text-muted-foreground">Ver conversas de</p>
-            {directorViews}
-          </div>
-        ) : null}
         <div className="grid gap-2">
           <p className="text-xs font-medium text-muted-foreground">Filtrar</p>
           <div data-conversations-part="filter-controls" className="grid gap-2 [&_[data-slot=select-trigger]]:w-full">
@@ -789,46 +771,69 @@ export function ConversationsWorkspace({
           data-conversations-part={directorSkinEnabled ? "pane" : undefined}
           className={cn("flex min-h-0 flex-col border-r border-border bg-card", mobileView === "chat" && selected && "max-lg:hidden")}
         >
-          <div
-            data-conversations-part={directorSkinEnabled ? "search-header" : undefined}
-            className={cn("border-b border-border px-3 py-2.5", directorSkinEnabled && "flex items-center gap-2")}
-          >
-            <div className={cn("relative", directorSkinEnabled && "min-w-0 flex-1")} data-lite={directorSkinEnabled ? undefined : "search"} data-conversations-part={directorSkinEnabled ? "search" : undefined}>
-              <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                ref={searchRef}
-                aria-keyshortcuts={directorSkinEnabled ? "/" : undefined}
-                aria-label="Buscar atendimento por nome, telefone ou e-mail"
-                className="h-10 pl-8 text-xs"
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={directorSkinEnabled ? "Buscar conversa  ( / )" : "Buscar por nome, telefone ou e-mail"}
-                value={query}
-              />
-            </div>
-            {directorSkinEnabled ? directorFiltersMenu : null}
-            {directorSkinEnabled && canSeeBrokerTab ? <ConversationsBulkQualificationAction compact /> : null}
-          </div>
-
           {directorSkinEnabled ? (
-            <div data-conversations-part="quick-tabs" role="group" aria-label="Ver conversas" className={styles.quickTabs}>
-              {(role === "broker" ? (["all", "awaiting", "unowned"] as const) : (["all", "awaiting", "unowned", "acquisition"] as const)).map((value) => {
-                const option = statusFilters.find((item) => item.value === value)!;
-                return (
-                  <button key={value} type="button" className={styles.quickTab} data-active={filter === value ? "true" : undefined} aria-pressed={filter === value} onClick={() => setFilter(value)}>
-                    {option.label}<span className={styles.quickCount}>{option.count}</span>
-                  </button>
-                );
-              })}
+            // Topo da lista copiado do artifact (27/11/2026): título, visões, busca e abas que rolam.
+            <div className={ww.ww}>
+              <div className={ww.head}>
+                <WwMenuButton />
+                <h1 className={ww.title}>Conversas</h1>
+                <span className={ww.headSlot}>{directorFiltersMenu}</span>
+                {canSeeBrokerTab ? <span className={ww.headSlot}><ConversationsBulkQualificationAction compact /></span> : null}
+                <button type="button" className={ww.iconbtn} aria-label="Atalhos do teclado" title="Atalhos (?)" onClick={() => setShortcutsOpen(true)}>
+                  <KeyboardIcon aria-hidden="true" />
+                </button>
+              </div>
+              {canSeeBrokerTab ? (
+                <div className={ww.views}>
+                  <nav className={ww.seg} aria-label="Ver conversas de">
+                    <Link className={ww.segbtn} href="/conversas" aria-current={currentTab === "leads" ? "page" : undefined}>Leads</Link>
+                    <Link className={ww.segbtn} href="/conversas?tab=distribuidos" aria-current={currentTab === "distribuidos" ? "page" : undefined}>Distribuídos</Link>
+                    <Link className={ww.segbtn} href="/conversas?tab=corretores" aria-label="Corretores: conversas pelo número da empresa">Corretores</Link>
+                    {coexLabel ? <Link className={ww.segbtn} href="/conversas?tab=coex" aria-current={currentTab === "coex" ? "page" : undefined}>{coexLabel.split(" · ")[0]}</Link> : null}
+                  </nav>
+                </div>
+              ) : null}
+              <div className={ww.searchWrap}>
+                <label className={ww.search}>
+                  <MagnifyingGlass aria-hidden="true" />
+                  <span className="sr-only">Buscar atendimento por nome, telefone ou e-mail</span>
+                  <input ref={searchRef} type="search" aria-keyshortcuts="/" placeholder="Buscar conversa" value={query} onChange={(event) => setQuery(event.target.value)} />
+                  <kbd className={ww.kbd} aria-hidden="true">/</kbd>
+                </label>
+              </div>
+              <div className={ww.chips} role="group" aria-label="Filtrar a lista">
+                {(role === "broker" ? (["all", "awaiting", "unowned"] as const) : (["all", "awaiting", "unowned", "acquisition"] as const)).map((value) => {
+                  const option = statusFilters.find((item) => item.value === value)!;
+                  return (
+                    <button key={value} type="button" className={ww.chip} aria-pressed={filter === value} onClick={() => setFilter(value)}>
+                      {option.label} <span className={ww.chipcount}>{option.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {query.trim() ? (
+                <p className={ww.searchNote} role="status">
+                  {filtered.length} {filtered.length === 1 ? "conversa" : "conversas"} para “{query.trim()}” · <button type="button" onClick={() => setQuery("")}>Limpar busca</button>
+                </p>
+              ) : null}
             </div>
-          ) : null}
-          {directorSkinEnabled && query.trim() ? (
-            <p className={styles.searchResult} role="status">
-              {filtered.length} {filtered.length === 1 ? "conversa" : "conversas"} para “{query.trim()}” ·{" "}
-              <button type="button" className={styles.clearSearch} onClick={() => setQuery("")}>Limpar busca</button>
-            </p>
-          ) : null}
+          ) : (
+            <div className="border-b border-border px-3 py-2.5">
+              <div className="relative" data-lite="search">
+                <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={searchRef}
+                  aria-label="Buscar atendimento por nome, telefone ou e-mail"
+                  className="h-10 pl-8 text-xs"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Buscar por nome, telefone ou e-mail"
+                  value={query}
+                />
+              </div>
+            </div>
+          )}
           <ScrollArea className="min-h-0 flex-1">
-            <div className="p-2">
+            <div className={directorSkinEnabled ? cn(ww.ww, ww.list) : "p-2"}>
               {visibleRows.map((conversation, index) => (
                 <Fragment key={conversation.id}>
                 {directorSkinEnabled ? (() => {
@@ -836,7 +841,7 @@ export function ConversationsWorkspace({
                   const label = conversationDayGroup(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt);
                   const previous = index > 0 ? filtered[index - 1] : null;
                   const previousLabel = previous ? conversationDayGroup(previous.latestMessage?.sentAt ?? previous.stageEnteredAt) : null;
-                  return label && label !== previousLabel ? <p data-conversations-part="day-group" className={styles.dayGroup}>{label}</p> : null;
+                  return label && label !== previousLabel ? <p className={ww.daylabel}>{label}</p> : null;
                 })() : null}
                 <motion.div
                   // The first rows come in one after the other; the rest just appear.
@@ -844,13 +849,15 @@ export function ConversationsWorkspace({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.24, delay: index * 0.02, ease: LITE_EASE }}
                 >
-                  <ConversationRow
+                  {directorSkinEnabled ? (
+                    <WwRow active={conversation.id === selected?.id} conversation={conversation} onClick={() => selectConversation(conversation.id)} />
+                  ) : <ConversationRow
                     viewerRole={role}
                     directorSkinEnabled={directorSkinEnabled}
                     active={conversation.id === selected?.id}
                     conversation={conversation}
                     onClick={() => selectConversation(conversation.id)}
-                  />
+                  />}
                 </motion.div>
                 </Fragment>
               ))}
@@ -879,12 +886,7 @@ export function ConversationsWorkspace({
                 userId={userId}
                 tenantId={tenantId}
                 role={role}
-                tagControl={directorSkinEnabled && selectedTagPicker ? (
-                  <div data-conversations-part="header-tags" className="flex min-w-0 items-center gap-2 px-4 pb-2 sm:px-5">
-                    <LeadTagChips tags={selected.tags} max={4} className="min-w-0 flex-1" />
-                    {selectedTagPicker}
-                  </div>
-                ) : undefined}
+                tagControl={undefined}
               />
               {!directorSkinEnabled && !selected.id.startsWith("unassigned-") ? (
                 <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-1.5 sm:px-5">
@@ -896,10 +898,11 @@ export function ConversationsWorkspace({
               {/* O servidor só manda o histórico completo da conversa da URL (?leadId=). Até ele
                   chegar, a lista tem só a prévia: mostra o carregamento em vez de meia conversa. */}
               {selected.id === initialLeadId ? (
-                <ConversationHistory client={selected} directorSkinEnabled={directorSkinEnabled} />
+                directorSkinEnabled ? <WwHistory client={selected} /> : <ConversationHistory client={selected} directorSkinEnabled={directorSkinEnabled} />
               ) : (
                 <ConversationHistoryLoading key={selected.id} onRetry={() => updateSelectedLeadInUrl(selected.id)} />
               )}
+              <div className={directorSkinEnabled ? cn(ww.ww, ww.wall, ww.composerWrap) : "contents"}>
               <ChatInput
                 leadId={selected.id}
                 leadName={selected.nome}
@@ -932,6 +935,7 @@ export function ConversationsWorkspace({
                     ),
                   );                    }}
                   />
+              </div>
                 </>
               ) : (
                 <EmptyConversation />
@@ -955,7 +959,12 @@ export function ConversationsWorkspace({
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.28, ease: LITE_EASE }}
             >
-              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} viewerRole={role} />
+              <WwOrClientProfile lite={directorSkinEnabled} client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} viewerRole={role} tagsSlot={directorSkinEnabled && selectedTagPicker ? (
+                <div data-conversations-part="profile-tags" className="flex min-w-0 flex-wrap items-center gap-2">
+                  <LeadTagChips tags={selected.tags} max={8} className="min-w-0 flex-1" />
+                  {selectedTagPicker}
+                </div>
+              ) : undefined} />
             </motion.div>
           ) : null}
         </aside>
@@ -969,7 +978,12 @@ export function ConversationsWorkspace({
                 <SheetTitle>Perfil do atendimento</SheetTitle>
                 <SheetDescription>Contexto e ações disponíveis para {selected.nome}.</SheetDescription>
               </SheetHeader>
-              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} viewerRole={role} />
+              <WwOrClientProfile lite={directorSkinEnabled} client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} viewerRole={role} tagsSlot={directorSkinEnabled && selectedTagPicker ? (
+                <div data-conversations-part="profile-tags" className="flex min-w-0 flex-wrap items-center gap-2">
+                  <LeadTagChips tags={selected.tags} max={8} className="min-w-0 flex-1" />
+                  {selectedTagPicker}
+                </div>
+              ) : undefined} />
             </>
           ) : null}
         </SheetContent>
@@ -1243,6 +1257,264 @@ function ConversationHeader({
     }
   }
 
+  const actionsMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            aria-label="Ações do atendimento"
+            size="sm"
+            data-conversations-part={directorSkinEnabled ? "chat-more" : undefined}
+            className={directorSkinEnabled
+              ? "size-11 shrink-0 rounded-full border-0 bg-transparent p-0 text-foreground shadow-none hover:bg-muted"
+              : "h-10 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"}
+            disabled={isPending}
+            variant={directorSkinEnabled ? "outline" : "default"}
+          >
+            {directorSkinEnabled ? (
+              <MoreHorizontal className="size-5 rotate-90" />
+            ) : (
+              <>
+                <Sparkles className="size-3.5 text-amber-300" />
+                <span className="hidden sm:inline">Ações do Atendimento</span>
+                <span className="sm:hidden">Ações</span>
+                <ChevronDown className="size-3.5 opacity-70 ml-0.5 hidden sm:inline-block" />
+              </>
+            )}
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end" className="w-64 p-1.5 space-y-0.5">
+        <DropdownMenuLabel className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase px-2 py-1">
+          Ações & Automações por IA
+        </DropdownMenuLabel>
+
+        {/* CONTINUAR ATENDIMENTO IA */}
+        <DropdownMenuItem
+          onClick={handleResumeAi}
+          disabled={isPending}
+          className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-emerald-700 dark:text-emerald-300 focus:bg-emerald-500/10"
+        >
+          <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex flex-col">
+            <span className="font-semibold text-emerald-800 dark:text-emerald-200">Continuar Atendimento IA</span>
+            <span className="text-[10px] text-muted-foreground">Retoma a qualificação automática por IA</span>
+          </div>
+        </DropdownMenuItem>
+
+        {/* VENDA AUTOMATIZADA */}
+        {canStartAutoSale ? (
+          <DropdownMenuItem
+            onClick={() => void handleStartAutoSale()}
+            disabled={isPending}
+            className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] focus:bg-muted"
+          >
+            <Flame className="size-4 shrink-0 text-primary mt-0.5" />
+            <div className="flex flex-col">
+              <span className="font-semibold text-foreground">Passar para a Venda Automatizada</span>
+              <span className="text-[10px] text-muted-foreground">A assistente de vendas assume e responde já</span>
+            </div>
+          </DropdownMenuItem>
+        ) : null}
+
+        {/* ASSUMIR E PAUSAR AUTOMAÇÃO */}
+        {client.aiConversation?.id && (
+          <DropdownMenuItem
+            onClick={handleTakeover}
+            disabled={isPending}
+            className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-blue-700 dark:text-blue-300 focus:bg-blue-500/10"
+          >
+            <UserCheck className="size-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <div className="flex flex-col">
+              <span className="font-semibold text-blue-800 dark:text-blue-200">Assumir e Pausar Automação</span>
+              <span className="text-[10px] text-muted-foreground">Pausa o robô e assume para atendimento humano</span>
+            </div>
+          </DropdownMenuItem>
+        )}
+
+        {/* SINCRONIZAR HISTÓRICO CHAT */}
+        <DropdownMenuItem
+          onClick={handleSyncChat}
+          disabled={isPending}
+          className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] focus:bg-muted"
+        >
+          <RefreshCw className={cn("size-4 shrink-0 text-muted-foreground mt-0.5", isPending && "animate-spin")} />
+          <div className="flex flex-col">
+            <span className="font-medium text-foreground">Sincronizar Histórico Chat</span>
+            <span className="text-[10px] text-muted-foreground">Atualiza mensagens recentes do WhatsApp</span>
+          </div>
+        </DropdownMenuItem>
+
+        {directorSkinEnabled ? (
+          <>
+            <DropdownMenuItem
+              render={<Link href={`/leads/${client.id}`} />}
+              className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+            >
+              <ArrowSquareOut className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span>Abrir lead completo</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" />}
+              className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+            >
+              <WhatsappLogo data-conversations-brand="whatsapp" className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+              <span>Abrir no WhatsApp</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => void handleCopyLeadLink()}
+              className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+            >
+              <LinkSimple className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span>Copiar link da conversa</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleCallClient}
+              className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+            >
+              <Phone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span>Ligar para cliente</span>
+            </DropdownMenuItem>
+          </>
+        ) : null}
+
+        {canRemindNoReply ? (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger
+              data-conversations-part="no-reply-reminder"
+              disabled={isReminding}
+              className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+            >
+              <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span className="flex flex-col gap-0.5">
+                <span>Lembrar se não responder</span>
+                <span className="text-[10px] text-muted-foreground">Cria uma tarefa para você</span>
+              </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-56 p-1.5">
+              {noReplyReminderOptions().map((option) => (
+                <DropdownMenuItem
+                  key={option.id}
+                  onClick={() => void handleNoReplyReminder(option.id)}
+                  disabled={isReminding}
+                  className="flex flex-col items-start gap-0.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+                >
+                  <span>{option.label}</span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground">{option.hint}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ) : null}
+
+        {canExportThisConversation ? (
+          <DropdownMenuItem
+            onClick={() => void handleExportConversation()}
+            disabled={isExporting}
+            className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+          >
+            <FileArrowDown className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span className="flex flex-col gap-0.5">
+              <span>Exportar conversa</span>
+              <span className="text-[10px] text-muted-foreground">PDF com mensagens, lead e corretor</span>
+            </span>
+          </DropdownMenuItem>
+        ) : null}
+
+        {/* RESETAR CHAT IA (DIRETORES) */}
+        {role === "director" && client.aiConversation?.id && (
+          <>
+            <DropdownMenuSeparator className="my-1" />
+            <DropdownMenuItem
+              onClick={handleResetChat}
+              disabled={isPending}
+              className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-destructive focus:bg-destructive/10"
+            >
+              <RotateCcw className="size-4 text-destructive shrink-0 mt-0.5" />
+              <div className="flex flex-col">
+                <span className="font-semibold text-destructive">Resetar Chat IA</span>
+                <span className="text-[10px] text-muted-foreground">Limpa a memória para retestar a qualificação</span>
+              </div>
+            </DropdownMenuItem>
+          </>
+        )}
+        {canDeleteHistory ? (
+          <>
+            <DropdownMenuSeparator className="my-1" />
+            <DropdownMenuItem
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={isPending}
+              className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium text-destructive focus:bg-destructive/10"
+            >
+              <Trash className="mt-0.5 size-4 shrink-0 text-destructive" />
+              <div className="flex flex-col">
+                <span className="font-semibold text-destructive">Excluir conversa</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {role === "director" ? "Remove o histórico deste contato no CRM" : "Remove apenas este contato avulso do CRM"}
+                </span>
+              </div>
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+  const deleteDialog = (
+    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <DialogPopup>
+        <DialogPanel>
+          <DialogHeader>
+            <DialogTitle>Excluir o histórico desta conversa?</DialogTitle>
+            <DialogDescription>
+              {role === "director"
+                ? "Todas as mensagens desta conversa serão removidas do CRM. O cadastro do lead, cliente ou membro da equipe será preservado. Esta ação não pode ser desfeita."
+                : "As mensagens serão removidas da caixa de entrada do CRM. Conversas vinculadas a leads, clientes ou integrantes da equipe continuam protegidas para Gestores."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void handleDeleteConversationHistory()} disabled={isPending}>
+              {isPending ? "Excluindo..." : "Excluir conversa"}
+            </Button>
+          </DialogFooter>
+        </DialogPanel>
+      </DialogPopup>
+    </Dialog>
+  );
+  if (directorSkinEnabled) {
+    const toggleProfile = () => {
+      if (typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches) onToggleProfile();
+      else onOpenProfile();
+    };
+    return (
+      <header className={cn(ww.ww, ww.chatHead, "shrink-0")}>
+        <button type="button" className={cn(ww.iconbtn, ww.back)} aria-label="Voltar para lista de atendimentos" onClick={onBack}><ArrowLeft /></button>
+        <button type="button" className={ww.identity} onClick={toggleProfile} aria-label={`Abrir o perfil de ${client.nome}`}>
+          <span className={ww.avatar}><ContactAvatar name={client.nome} photoUrl={contactPhotoUrl(client)} /></span>
+          <span className={ww.idText}>
+            <span className={ww.idLine}>
+              <span className={ww.idName}>{client.nome}</span>
+              <span className={cn(ww.stage, ww.wideOnly)}>{getConversationStatusLabel(client.status, client.qualificationStatus)}</span>
+            </span>
+            <span className={cn(ww.idSub, ww.narrowOnly)}>
+              {getConversationStatusLabel(client.status, client.qualificationStatus)} · {client.corretorId ? `com ${displayBrokerName ?? "corretor"}` : "Sem dono"}
+            </span>
+            <span className={cn(ww.idSub, ww.wideOnly)}>
+              {[client.telefone, client.corretorId ? `com ${displayBrokerName ?? "corretor"}` : "Sem dono", client.queueName].filter(Boolean).join(" · ")}
+            </span>
+          </span>
+        </button>
+        <a className={ww.iconbtn} href={`tel:${client.telefone.replace(/\D/g, "")}`} aria-label="Ligar para cliente" title="Ligar"><Phone /></a>
+        <button type="button" className={cn(ww.iconbtn, ww.wideOnly)} aria-label="Perfil do atendimento" aria-pressed={profileOpen} onClick={toggleProfile} title="Perfil do atendimento">
+          {profileOpen ? <PanelRightClose /> : <PanelRightOpen />}
+        </button>
+        <span className={ww.menuSlot}>{actionsMenu}</span>
+        {deleteDialog}
+      </header>
+    );
+  }
   return (
     <header data-conversations-part={directorSkinEnabled ? "chat-header" : undefined} className="shrink-0 border-b border-border bg-card px-4 py-3 sm:px-5">
       <div data-conversations-part={directorSkinEnabled ? "chat-header-layout" : undefined} className="flex items-center justify-between gap-3">
@@ -1288,202 +1560,28 @@ function ConversationHeader({
                 </Badge>
               ) : null}
             </div>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{client.telefone}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {directorSkinEnabled
+                ? [client.telefone, client.corretorId ? `com ${displayBrokerName ?? "corretor"}` : "Sem dono", client.queueName].filter(Boolean).join(" · ")
+                : client.telefone}
+            </p>
           </div>
         </div>
 
         <div data-conversations-part={directorSkinEnabled ? "chat-header-actions" : undefined} className="flex items-center gap-1.5 shrink-0 sm:gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  aria-label="Ações do atendimento"
-                  size="sm"
-                  className={directorSkinEnabled
-                    ? "h-11 border-border bg-transparent px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 text-foreground hover:bg-muted shadow-none shrink-0"
-                    : "h-10 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"}
-                  disabled={isPending}
-                  variant={directorSkinEnabled ? "outline" : "default"}
-                >
-                  <Sparkles className="size-3.5 text-amber-300" />
-                  <span className="hidden sm:inline">Ações do Atendimento</span>
-                  <span className="sm:hidden">Ações</span>
-                  <ChevronDown className="size-3.5 opacity-70 ml-0.5 hidden sm:inline-block" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end" className="w-64 p-1.5 space-y-0.5">
-              <DropdownMenuLabel className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase px-2 py-1">
-                Ações & Automações por IA
-              </DropdownMenuLabel>
-
-              {/* CONTINUAR ATENDIMENTO IA */}
-              <DropdownMenuItem
-                onClick={handleResumeAi}
-                disabled={isPending}
-                className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-emerald-700 dark:text-emerald-300 focus:bg-emerald-500/10"
-              >
-                <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                <div className="flex flex-col">
-                  <span className="font-semibold text-emerald-800 dark:text-emerald-200">Continuar Atendimento IA</span>
-                  <span className="text-[10px] text-muted-foreground">Retoma a qualificação automática por IA</span>
-                </div>
-              </DropdownMenuItem>
-
-              {/* VENDA AUTOMATIZADA */}
-              {canStartAutoSale ? (
-                <DropdownMenuItem
-                  onClick={() => void handleStartAutoSale()}
-                  disabled={isPending}
-                  className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] focus:bg-muted"
-                >
-                  <Flame className="size-4 shrink-0 text-primary mt-0.5" />
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-foreground">Passar para a Venda Automatizada</span>
-                    <span className="text-[10px] text-muted-foreground">A assistente de vendas assume e responde já</span>
-                  </div>
-                </DropdownMenuItem>
-              ) : null}
-
-              {/* ASSUMIR E PAUSAR AUTOMAÇÃO */}
-              {client.aiConversation?.id && (
-                <DropdownMenuItem
-                  onClick={handleTakeover}
-                  disabled={isPending}
-                  className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-blue-700 dark:text-blue-300 focus:bg-blue-500/10"
-                >
-                  <UserCheck className="size-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-blue-800 dark:text-blue-200">Assumir e Pausar Automação</span>
-                    <span className="text-[10px] text-muted-foreground">Pausa o robô e assume para atendimento humano</span>
-                  </div>
-                </DropdownMenuItem>
-              )}
-
-              {/* SINCRONIZAR HISTÓRICO CHAT */}
-              <DropdownMenuItem
-                onClick={handleSyncChat}
-                disabled={isPending}
-                className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] focus:bg-muted"
-              >
-                <RefreshCw className={cn("size-4 shrink-0 text-muted-foreground mt-0.5", isPending && "animate-spin")} />
-                <div className="flex flex-col">
-                  <span className="font-medium text-foreground">Sincronizar Histórico Chat</span>
-                  <span className="text-[10px] text-muted-foreground">Atualiza mensagens recentes do WhatsApp</span>
-                </div>
-              </DropdownMenuItem>
-
-              {directorSkinEnabled ? (
-                <>
-                  <DropdownMenuItem
-                    onClick={() => void handleCopyLeadLink()}
-                    className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
-                  >
-                    <LinkSimple className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <span>Copiar link da conversa</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleCallClient}
-                    className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
-                  >
-                    <Phone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <span>Ligar para cliente</span>
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-
-              {canRemindNoReply ? (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger
-                    data-conversations-part="no-reply-reminder"
-                    disabled={isReminding}
-                    className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
-                  >
-                    <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <span className="flex flex-col gap-0.5">
-                      <span>Lembrar se não responder</span>
-                      <span className="text-[10px] text-muted-foreground">Cria uma tarefa para você</span>
-                    </span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-56 p-1.5">
-                    {noReplyReminderOptions().map((option) => (
-                      <DropdownMenuItem
-                        key={option.id}
-                        onClick={() => void handleNoReplyReminder(option.id)}
-                        disabled={isReminding}
-                        className="flex flex-col items-start gap-0.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
-                      >
-                        <span>{option.label}</span>
-                        <span className="text-[10px] tabular-nums text-muted-foreground">{option.hint}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              ) : null}
-
-              {canExportThisConversation ? (
-                <DropdownMenuItem
-                  onClick={() => void handleExportConversation()}
-                  disabled={isExporting}
-                  className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
-                >
-                  <FileArrowDown className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <span className="flex flex-col gap-0.5">
-                    <span>Exportar conversa</span>
-                    <span className="text-[10px] text-muted-foreground">PDF com mensagens, lead e corretor</span>
-                  </span>
-                </DropdownMenuItem>
-              ) : null}
-
-              {/* RESETAR CHAT IA (DIRETORES) */}
-              {role === "director" && client.aiConversation?.id && (
-                <>
-                  <DropdownMenuSeparator className="my-1" />
-                  <DropdownMenuItem
-                    onClick={handleResetChat}
-                    disabled={isPending}
-                    className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-destructive focus:bg-destructive/10"
-                  >
-                    <RotateCcw className="size-4 text-destructive shrink-0 mt-0.5" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-destructive">Resetar Chat IA</span>
-                      <span className="text-[10px] text-muted-foreground">Limpa a memória para retestar a qualificação</span>
-                    </div>
-                  </DropdownMenuItem>
-                </>
-              )}
-              {canDeleteHistory ? (
-                <>
-                  <DropdownMenuSeparator className="my-1" />
-                  <DropdownMenuItem
-                    onClick={() => setDeleteDialogOpen(true)}
-                    disabled={isPending}
-                    className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium text-destructive focus:bg-destructive/10"
-                  >
-                    <Trash className="mt-0.5 size-4 shrink-0 text-destructive" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-destructive">Excluir conversa</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {role === "director" ? "Remove o histórico deste contato no CRM" : "Remove apenas este contato avulso do CRM"}
-                      </span>
-                    </div>
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {actionsMenu}
 
           <div className="flex items-center gap-1 border-l border-border/60 pl-1.5 sm:pl-2">
             <Tooltip>
-              <TooltipTrigger render={<Button aria-label="Copiar link direto da conversa" onClick={() => void handleCopyLeadLink()} className={directorSkinEnabled ? "max-[559px]:hidden" : undefined} size="icon-sm" type="button" variant="ghost"><LinkSimple className="size-3.5" /></Button>} />
+              <TooltipTrigger render={<Button aria-label="Copiar link direto da conversa" onClick={() => void handleCopyLeadLink()} className={directorSkinEnabled ? "hidden" : undefined} size="icon-sm" type="button" variant="ghost"><LinkSimple className="size-3.5" /></Button>} />
               <TooltipContent>Copiar link da conversa</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} aria-label="Ligar para cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), directorSkinEnabled && "max-[559px]:hidden" )} />} />
+              <TooltipTrigger render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} aria-label="Ligar para cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}><Phone className="size-3.5" /></a>} />
               <TooltipContent>Ligar</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" aria-label="Abrir WhatsApp do cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}><WhatsappLogo data-conversations-brand={directorSkinEnabled ? "whatsapp" : undefined} className="size-3.5" /></a>} />
+              <TooltipTrigger render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" aria-label="Abrir WhatsApp do cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), directorSkinEnabled && "hidden")}><WhatsappLogo data-conversations-brand={directorSkinEnabled ? "whatsapp" : undefined} className="size-3.5" /></a>} />
               <TooltipContent>Abrir WhatsApp</TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -1491,7 +1589,7 @@ function ConversationHeader({
               <TooltipContent>Ver perfil</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger render={<Link href={`/leads/${client.id}`} aria-label="Abrir lead completo" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), "max-[559px]:hidden")}><ArrowSquareOut className="size-3.5" /></Link>} />
+              <TooltipTrigger render={<Link href={`/leads/${client.id}`} aria-label="Abrir lead completo" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), directorSkinEnabled ? "hidden" : "max-[559px]:hidden")}><ArrowSquareOut className="size-3.5" /></Link>} />
               <TooltipContent>Abrir lead</TooltipContent>
             </Tooltip>
             <div className="hidden border-l border-border/60 pl-1 lg:block">
@@ -1520,28 +1618,7 @@ function ConversationHeader({
         </div>
       </div>
       {tagControl}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogPopup>
-          <DialogPanel>
-            <DialogHeader>
-              <DialogTitle>Excluir o histórico desta conversa?</DialogTitle>
-              <DialogDescription>
-                {role === "director"
-                  ? "Todas as mensagens desta conversa serão removidas do CRM. O cadastro do lead, cliente ou membro da equipe será preservado. Esta ação não pode ser desfeita."
-                  : "As mensagens serão removidas da caixa de entrada do CRM. Conversas vinculadas a leads, clientes ou integrantes da equipe continuam protegidas para Gestores."}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>
-                Cancelar
-              </Button>
-              <Button type="button" variant="destructive" onClick={() => void handleDeleteConversationHistory()} disabled={isPending}>
-                {isPending ? "Excluindo..." : "Excluir conversa"}
-              </Button>
-            </DialogFooter>
-          </DialogPanel>
-        </DialogPopup>
-      </Dialog>
+      {deleteDialog}
     </header>
   );
 }
@@ -1727,6 +1804,15 @@ function ChatInput({
   const [contactName, setContactName] = useState("");
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const quickReplies = useTeamQuickReplies();
+  // Celular (27/11/2026, artifact): só "Mensagem", o atalho "/" não cabe numa linha.
+  const [narrowComposer, setNarrowComposer] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 1023px)");
+    const update = () => setNarrowComposer(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const [slashDismissedFor, setSlashDismissedFor] = useState<string | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
   const slashText = slashQuery(text);
@@ -1839,9 +1925,9 @@ function ChatInput({
   }
 
   return (
-    <div data-conversations-part={directorSkinEnabled ? "chat-input" : undefined} className="border-t border-border bg-card px-4 py-3 sm:px-5">
+    <div className={directorSkinEnabled ? undefined : "border-t border-border bg-card px-4 py-3 sm:px-5"}>
       {replyBlockedMessage ? <p role="alert" className="mb-2 text-sm text-destructive">{replyBlockedMessage}</p> : null}
-      {phone ? (
+      {phone && !directorSkinEnabled ? (
         <a
           href={getWhatsAppUrl(phone)}
           rel="noreferrer"
@@ -1874,7 +1960,6 @@ function ChatInput({
           {directorSkinEnabled ? (
             <Textarea
               ref={messageInputRef}
-              data-conversations-part="composer-input"
               rows={1}
               value={text}
               onChange={(e) => { setText(e.target.value); setSlashIndex(0); }}
@@ -1887,10 +1972,10 @@ function ChatInput({
                   event.currentTarget.form?.requestSubmit();
                 }
               }}
-              placeholder="Mensagem"
+              placeholder={narrowComposer ? "Mensagem" : "Mensagem   ( / para respostas rápidas )"}
               aria-label="Escreva uma mensagem"
               disabled={isPending || replyBlocked}
-              className="min-h-11 max-h-28 min-w-0 flex-1 resize-none overflow-y-auto text-sm leading-5"
+              className={ww.composerInput}
             />
           ) : (
             <Input
@@ -2510,7 +2595,17 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled, v
         className="absolute inset-0 z-[1] cursor-pointer rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         onClick={onClick}
       />
-      <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} photoUrl={contactPhotoUrl(conversation)} photoWhenVisible />
+      {directorSkinEnabled ? (
+        // Selo do canal no avatar (27/11/2026, desenho "WhatsApp Web"): toda conversa daqui é WhatsApp.
+        <span data-conversations-part="row-avatar" className="relative mt-0.5 shrink-0">
+          <ContactAvatar name={conversation.nome} photoUrl={contactPhotoUrl(conversation)} photoWhenVisible />
+          <span data-conversations-part="row-channel" data-conversations-brand="whatsapp" className="bg-emerald-600 text-white" title="WhatsApp" aria-hidden="true">
+            <WhatsappLogo className="size-3" />
+          </span>
+        </span>
+      ) : (
+        <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} photoUrl={contactPhotoUrl(conversation)} photoWhenVisible />
+      )}
       <span id={detailsId} className="grid min-w-0 flex-1 gap-1">
         <span className="flex min-w-0 items-center justify-between gap-3" title={title}>
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -2533,17 +2628,17 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled, v
         {conversation.tags?.length ? <LeadTagChips tags={conversation.tags} className="pt-0.5" /> : null}
         <span className="flex items-center gap-2 pt-0.5">
           {renderRowQualificationBadge(conversation)}
-          {directorSkinEnabled && conversation.corretorId ? (
-            <span data-conversations-part="row-broker-chip" title={displayBrokerName ? `Com ${displayBrokerName}` : "Com corretor"}>
-              <UserCheck aria-hidden="true" className="size-3" />Corretor
+          {directorSkinEnabled ? (
+            // Desenho "WhatsApp Web" (27/11/2026): etapa e com quem está, numa linha só.
+            <span data-conversations-part="row-owner-line" className="min-w-0 truncate text-xs text-muted-foreground">
+              {conversation.corretorId ? `com ${displayBrokerName ?? "corretor"}` : hasHistory ? "Sem dono" : "Aguardando histórico"}
             </span>
-          ) : null}
-          <span data-conversations-part={directorSkinEnabled ? "row-message-count" : undefined} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-            <Clock aria-hidden="true" className="size-3" />
-            {hasHistory
-              ? `${visibleMessageCount} ${directorSkinEnabled && visibleMessageCount === 1 ? "mensagem" : "mensagens"}`
-              : "Aguardando histórico"}
-          </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Clock aria-hidden="true" className="size-3" />
+              {hasHistory ? `${visibleMessageCount} mensagens` : "Aguardando histórico"}
+            </span>
+          )}
         </span>
       </span>
     </div>
@@ -2678,8 +2773,11 @@ function ClientProfile({
   onUpdateConversation,
   hideOrigin = false,
   viewerRole,
+  tagsSlot,
 }: {
   client: ConversationItem;
+  /** Tags do lead (27/11/2026): no Lite saem do topo da conversa e ficam aqui, num cartão próprio. */
+  tagsSlot?: ReactNode;
   onUpdateConversation?: (leadId: string, updates: Partial<ConversationItem>) => void;
   /** Brokers do not see where the lead came from. */
   hideOrigin?: boolean;
@@ -2751,6 +2849,7 @@ function ClientProfile({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-5 p-4">
+          {tagsSlot ? <ProfileSection title="Tags">{tagsSlot}</ProfileSection> : null}
           <ProfileSection title="Etapa do lead">
             <LeadJourneyView journey={conversationJourney(client)} />
           </ProfileSection>
@@ -3039,5 +3138,193 @@ function LeadNotesSection({ leadId, initialNote }: { leadId: string; initialNote
         className="w-full min-h-[70px] text-xs p-2 rounded-full border border-border bg-card text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
       />
     </ProfileSection>
+  );
+}
+
+/* ------------------------------------------------------------------ desenho "WhatsApp Web" (27/11/2026)
+ * Marcação copiada 1:1 do artifact "Conversas da gestão no estilo WhatsApp Web" para o Lite: linha da lista e
+ * conversa. Os dados e as ações são os mesmos da tela antiga.
+ */
+function WwRow({ active, conversation, onClick }: { active: boolean; conversation: ConversationItem; onClick: () => void }) {
+  const outgoing = conversation.latestMessage?.direction === "outgoing" || conversation.latestMessage?.direction === "outbound";
+  const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
+  const broker = brokerDisplayName(conversation.corretorNome);
+  const hasHistory = (conversation.messageCount ?? conversation.messages.length) > 0;
+  const owner = conversation.corretorId ? `com ${broker ?? "corretor"}` : hasHistory ? "Sem dono" : "Aguardando histórico";
+  return (
+    <button type="button" className={ww.row} aria-current={active ? "true" : undefined} onClick={onClick} aria-label={`Abrir conversa com ${conversation.nome}`}>
+      <span className={ww.avatar}>
+        <ContactAvatar name={conversation.nome} photoUrl={contactPhotoUrl(conversation)} photoWhenVisible />
+        <span className={cn(ww.chan, "bg-emerald-600 text-white")} data-conversations-brand="whatsapp" title="WhatsApp" aria-hidden="true">
+          <WhatsappLogo />
+        </span>
+      </span>
+      <span className={ww.rowText}>
+        <span className={ww.rowLine}>
+          <span className={ww.rowName}>{conversation.nome}</span>
+          <span className={ww.rowTime}>{formatRelative(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt)}</span>
+        </span>
+        <span className={ww.rowLine}>
+          <span className={ww.rowPreview}>{outgoing ? "Você: " : ""}{preview}</span>
+        </span>
+        <span className={ww.rowMeta}>
+          <span className={ww.stage}>{getConversationStatusLabel(conversation.status, conversation.qualificationStatus)}</span>
+          <span className={ww.owner}>{owner}</span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function wwAuthor(message: ConversationMessage, client: ConversationItem) {
+  if (message.senderRole === "assistant" || message.direction === "outbound") return "Atendente Virtual";
+  return brokerDisplayName(client.corretorNome) ?? "Equipe";
+}
+
+function WwHistory({ client }: { client: ConversationItem }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [fullscreenMedia, setFullscreenMedia] = useState<MediaBubbleData | null>(null);
+  const sorted = useMemo(() => [...client.messages].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()), [client.messages]);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+  }, [sorted.length, client.id]);
+  if (!sorted.some((message) => !message.transition)) return <HistoryEmptyState client={client} />;
+
+  let lastDay = "";
+  let lastSide = "";
+  return (
+    <div ref={viewportRef} className={cn(ww.ww, ww.wall, "min-h-0 flex-1 overflow-y-auto")}>
+      <div className={ww.thread}>
+        {sorted.map((message) => {
+          const day = formatDateDivider(message.sentAt);
+          const dayNode = day !== lastDay ? <span key={`d-${message.id}`} className={ww.sysnote}>{day}</span> : null;
+          lastDay = day;
+          if (message.transition) {
+            lastSide = "";
+            return (
+              <Fragment key={message.id}>
+                {dayNode}
+                <span className={ww.sysnote} role="note">
+                  <Clock aria-hidden="true" />
+                  {message.transition} · {formatTime(message.sentAt)}
+                </span>
+              </Fragment>
+            );
+          }
+          const out = message.direction === "outgoing" || message.direction === "outbound";
+          const side = out ? `out:${wwAuthor(message, client)}` : "in";
+          const showAuthor = out && side !== lastSide;
+          lastSide = side;
+          const media = message.media ?? null;
+          return (
+            <Fragment key={message.id}>
+              {dayNode}
+              <div className={ww.msg}>
+                <div className={cn(ww.bubble, out ? ww.bOut : ww.bIn)}>
+                  {showAuthor ? <p className={ww.author}>{wwAuthor(message, client)}</p> : null}
+                  {media && media.url ? (
+                    <MediaBubble
+                      media={{ kind: media.kind, mimeType: media.mimeType, filename: media.filename, sizeBytes: media.sizeBytes, url: media.url, caption: message.body?.startsWith("[") && message.body?.endsWith("]") ? null : message.body }}
+                      isOutbound={false}
+                      onOpenFullscreen={setFullscreenMedia}
+                    />
+                  ) : media && !media.url ? (
+                    <MediaUnavailable isOutbound={false} />
+                  ) : mediaPlaceholderLabel(message.body) ? (
+                    <p className={cn(ww.body, "italic opacity-80")}>{mediaPlaceholderLabel(message.body)}</p>
+                  ) : (
+                    <p className={ww.body}>{linkifiedBody(message.body)}</p>
+                  )}
+                  <span className={ww.meta}>
+                    {message.channelLabel ? <span>via {message.channelLabel} ·</span> : null}
+                    <time dateTime={message.sentAt} className={ww.num}>{formatTime(message.sentAt)}</time>
+                    {out ? <MessageStatusIndicator status={message.providerStatus} direction={message.direction} failure={message.providerFailure} /> : null}
+                  </span>
+                </div>
+                {out && message.providerStatus === "failed" && message.providerFailure ? (
+                  <p className={ww.fail} role="status"><strong>Motivo ({message.providerFailure.code}): </strong>{message.providerFailure.message}</p>
+                ) : null}
+              </div>
+            </Fragment>
+          );
+        })}
+      </div>
+      {fullscreenMedia ? <MediaLightbox media={fullscreenMedia} onClose={() => setFullscreenMedia(null)} /> : null}
+    </div>
+  );
+}
+
+const WW_TEMPERATURE: Record<string, string> = { hot: "Quente", warm: "Morno", cold: "Frio" };
+const WW_AI_STATUS: Record<string, string> = { HUMAN_ACTIVE: "Humano assumiu", WAITING_HUMAN: "Aguardando humano", CLOSED: "Encerrou e passou", FAILED: "Falhou" };
+
+/** Perfil copiado do artifact: cartão de identidade e cartões Atendimento, Tags, Qualificação, Próxima ação e Anotações. */
+function WwProfile({ client, viewerRole, tagsSlot }: { client: ConversationItem; viewerRole?: string; tagsSlot?: ReactNode }) {
+  const broker = brokerDisplayName(client.corretorNome);
+  const temperature = WW_TEMPERATURE[client.status];
+  const ai = client.aiConversation;
+  return (
+    <div className={cn(ww.ww, ww.profile)}>
+      <div className={cn(ww.card, ww.idCard)}>
+        <span className={cn(ww.avatar, ww.avatarXl)}><ContactAvatar name={client.nome} photoUrl={contactPhotoUrl(client)} /></span>
+        <p className={ww.idCardName}>{client.nome}</p>
+        <p className={cn(ww.idCardPhone, ww.num)}>{client.telefone}</p>
+        <Link className={ww.pillQuiet} href={`/leads/${client.id}`}>Abrir lead completo</Link>
+      </div>
+      <div className={cn(ww.card, ww.cardBody)}>
+        <p className={ww.cardTitle}>Atendimento</p>
+        <div className={ww.kv}><span>Etapa</span><span>{getConversationStatusLabel(client.status, client.qualificationStatus)}</span></div>
+        <div className={ww.kv}><span>Corretor</span><span>{client.corretorId && broker ? <BrokerProfileLink brokerId={client.corretorId} name={broker} viewerRole={viewerRole} /> : "Sem dono"}</span></div>
+        {client.branchName ? <div className={ww.kv}><span>Unidade</span><span>{client.branchName}</span></div> : null}
+        <div className={ww.kv}><span>Fila</span><span>{client.queueName ?? "Sem fila"}</span></div>
+        {temperature ? (
+          <div className={ww.kv}><span>Temperatura</span><span className={ww.temp}><span aria-hidden="true" className={ww.tempDot} data-temp={client.status} />{temperature}</span></div>
+        ) : null}
+        <div className={ww.kv}><span>Entrou</span><span className={ww.num}>{formatMessageDateTime(client.createdAt)}</span></div>
+      </div>
+      {tagsSlot ? (
+        <div className={cn(ww.card, ww.cardBody)}>
+          <p className={ww.cardTitle}>Tags</p>
+          {tagsSlot}
+        </div>
+      ) : null}
+      <div className={cn(ww.card, ww.cardBody)}>
+        <p className={ww.cardTitle}>Qualificação</p>
+        {client.planName ? <div className={ww.kv}><span>Plano</span><span>{client.planName}</span></div> : null}
+        {client.carrierName ? <div className={ww.kv}><span>Operadora</span><span>{client.carrierName}</span></div> : null}
+        <div className={ww.kv}><span>Atendente Virtual</span><span>{ai ? WW_AI_STATUS[ai.status] ?? "Conversando agora" : "Ainda não falou"}</span></div>
+        {ai?.transferReason ? <div className={ww.kv}><span>Motivo</span><span>{ai.transferReason}</span></div> : null}
+        {ai?.qualificationSummary ? <p className={ww.cardText}>{ai.qualificationSummary}</p> : null}
+      </div>
+      <div className={cn(ww.card, ww.cardBody)}>
+        <p className={ww.cardTitle}>Próxima ação</p>
+        <Link className={ww.cardLink} href={`/leads/${client.id}`}>Ver tarefas e documentos</Link>
+      </div>
+      <div className={cn(ww.card, ww.cardBody, ww.notes)}>
+        <LeadNotesSection key={client.id} leadId={client.id} initialNote={client.privateNotes} />
+      </div>
+      <p className={ww.profileFoot}>Documentos, links e resumo do atendimento ficam no lead completo.</p>
+    </div>
+  );
+}
+
+function WwOrClientProfile({ lite, ...props }: { lite: boolean } & React.ComponentProps<typeof ClientProfile>) {
+  return lite ? <WwProfile client={props.client} viewerRole={props.viewerRole} tagsSlot={props.tagsSlot} /> : <ClientProfile {...props} />;
+}
+
+/** Celular: sem a faixa de topo, o menu principal abre por aqui (27/11/2026). */
+function WwMenuButton() {
+  let sidebar: ReturnType<typeof useSidebar> | null = null;
+  try {
+    sidebar = useSidebar();
+  } catch {
+    sidebar = null;
+  }
+  if (!sidebar) return null;
+  const open = sidebar.setOpenMobile;
+  return (
+    <button type="button" className={cn(ww.iconbtn, ww.narrowOnly)} aria-label="Abrir menu principal" onClick={() => open(true)}>
+      <Menu aria-hidden="true" />
+    </button>
   );
 }

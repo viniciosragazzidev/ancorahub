@@ -1054,3 +1054,147 @@
 /* A rolagem (Radix) embrulha o conteúdo em display: table, que crescia com um link longo e empurrava os balões para
    fora da coluna. Em bloco, a largura é a da coluna. */
 .root[data-skin="diretor"] [data-conversations-part="pane"] [data-slot="scroll-area-viewport"] > div { display: block !important; min-width: 0 !important; }
+
+/* ------------------------------------------------------------------ estilo WhatsApp Web (27/11/2026)
+ * Desenho aprovado no artifact "Conversas da gestão no estilo WhatsApp Web": visões Leads, Distribuídos e Corretores
+ * à vista no topo da lista; abas numa linha só com rolagem; linha com avatar de 44px e selo do WhatsApp; conversa
+ * sobre fundo pontilhado, cliente em balão branco à esquerda, equipe em balão à direita; campo de mensagem flutuante.
+ * Mesmo conteúdo e ações de antes.
+ */
+.views { flex: none; padding: 12px 12px 4px; }
+.views [data-conversations-nav] { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; width: 100%; padding: 3px !important; border: 0 !important; border-radius: 9999px !important; background: var(--surface-muted) !important; }
+.views [data-conversations-nav] > a { justify-content: center; min-height: 36px; padding: 0 10px !important; border-radius: 9999px !important; font-size: var(--text-sm) !important; font-weight: 500 !important; white-space: nowrap; }
+.views [data-conversations-nav] > a[aria-current="page"] { background: var(--surface) !important; color: var(--foreground) !important; box-shadow: var(--shadow-resting) !important; }
+.views [data-conversations-nav] > a [data-slot="badge"] { display: none; }
+.root[data-skin="diretor"] [data-conversations-part="search-header"] { border-bottom: 0; padding: 8px 12px; }
+.root[data-skin="diretor"] [data-conversations-part="search"] input { border-color: transparent; border-radius: 9999px; background: var(--surface-muted); }
+
+/* Abas numa linha só, com rolagem de lado e barra fina à vista (o que não cabe não fica cortado). */
+.root[data-skin="diretor"] .quickTabs {
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 2px 12px 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  border-bottom: 1px solid var(--border);
+}
+.root[data-skin="diretor"] .quickTabs::after { content: ""; flex: 0 0 4px; }
+.root[data-skin="diretor"] .quickTabs::-webkit-scrollbar { height: 6px; }
+.root[data-skin="diretor"] .quickTabs::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; }
+.root[data-skin="diretor"] .quickTab { scroll-snap-align: start; border: 1px solid var(--border); border-radius: 9999px; background: var(--surface); font-weight: 500; }
+.root[data-skin="diretor"] .quickTab[data-active="true"] { border-color: transparent; background: var(--accent-subtle); color: var(--accent-strong); }
+.root[data-skin="diretor"] .quickTab[data-active="true"] .quickCount { color: inherit; }
+
+/* Linha: avatar de 44px com o selo do canal; nome em 14/500, prévia em 14. */
+.root[data-skin="diretor"] [data-conversations-part="row"] { padding: 10px 14px; border-bottom-color: var(--border-subtle, var(--border)); }
+.root[data-skin="diretor"] [data-conversations-part="row-avatar"] > [role="img"],
+.root[data-skin="diretor"] [data-conversations-part="row-avatar"] > span:first-child { width: 44px; height: 44px; }
+.root[data-skin="diretor"] [data-conversations-part="row-channel"] {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.truncate.text-sm) { font-size: var(--text-sm); font-weight: 500; }
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.truncate.text-xs.leading-5) { font-size: var(--text-sm); }
+
+/* Conversa sobre fundo pontilhado; balões com a sombra de repouso. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] {
+  background-color: var(--background);
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="client"] [data-slot="bubble-content"] {
+  padding: 8px 12px;
+  border-radius: 6px 16px 16px 16px;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-resting);
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="bubble-content"] {
+  border-radius: 16px 6px 16px 16px;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-resting);
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-kind="broker"] [data-slot="bubble-content"] { background: var(--accent-subtle) !important; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message"]:hover { background: transparent !important; }
+
+/* Campo de mensagem flutuante sobre o fundo da conversa. */
+.root[data-skin="diretor"] [data-conversations-part="chat-input"] { padding: 8px 20px 16px; background: var(--background); }
+.root[data-skin="diretor"] [data-conversations-part="chat-input"] > form {
+  border-radius: var(--radius-panel);
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+}
+/* Lista com largura de leitura (27/11/2026): 360px no computador largo, a conversa fica com o resto. */
+@media (min-width: 1280px) {
+  .root[data-skin="diretor"] [data-conversations-part="panes"] { grid-template-columns: 360px minmax(0, 1fr); }
+  .root[data-skin="diretor"] [data-conversations-part="panes"][data-profile-open="true"] { grid-template-columns: 360px minmax(0, 1fr) 20rem; }
+}
+.root[data-skin="diretor"] [data-conversations-part="page-actions"] [data-conversations-nav] > a [data-slot="badge"],
+.views [data-conversations-nav] > a :global([data-slot="badge"]) { display: none; }
+
+/* Linha como no desenho: nome e hora; prévia; etapa e com quem está. O "· corretor" do nome sai (vai para baixo). */
+.root[data-skin="diretor"] [data-conversations-part="row"] [data-conversations-part="row-owner-name"] { display: none !important; }
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.truncate.text-sm) { max-width: 100% !important; }
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.pt-0\.5) { flex-wrap: nowrap; min-width: 0; }
+.root[data-skin="diretor"] [data-conversations-part="row"] [data-slot="badge"] { flex: none; border-radius: 9999px; }
+
+/* Perfil em cartões sobre o fundo da página, como no desenho. */
+.root[data-skin="diretor"] [data-conversations-part="pane"][aria-label="Perfil do cliente"],
+.root[data-skin="diretor"] [data-conversations-part="pane"][aria-label="Perfil do cliente"] :is(header, [data-slot="scroll-area"], [data-slot="scroll-area-viewport"]) { background: var(--background) !important; }
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] :global(.space-y-5) > * {
+  padding: 14px 16px !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-panel) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-resting);
+}
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] :global(.space-y-5) > * + * { margin-top: 12px; border-top: 1px solid var(--border-subtle) !important; }
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] h3 { font-size: var(--text-sm); font-weight: 500; }
+
+/* Título da lista e busca com o atalho "/", como no desenho. */
+.listTitle { display: flex; align-items: center; gap: 4px; padding: 16px 12px 4px 20px; }
+.listTitle h1 { flex: 1; margin: 0; font-size: var(--text-xl, 22px); font-weight: 500; line-height: 1.2; color: var(--foreground); }
+.listTitle :is(button, [role="button"]) { width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; border: 0 !important; border-radius: 9999px !important; background: transparent !important; box-shadow: none !important; justify-content: center; }
+.listTitle :is(button, [role="button"]):hover { background: var(--surface-muted) !important; }
+.searchKey { position: absolute; right: 10px; top: 50%; translate: 0 -50%; padding: 1px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-muted); font: inherit; font-size: 12px; pointer-events: none; }
+.root[data-skin="diretor"] [data-conversations-part="search-header"] { padding: 4px 12px 10px; }
+.root[data-skin="diretor"] [data-conversations-part="search"] { position: relative; }
+.root[data-skin="diretor"] [data-conversations-part="search"] input { height: 44px !important; min-height: 44px !important; padding-left: 36px; font-size: var(--text-sm); }
+
+/* Topo da conversa: avatar, nome e etapa, linha com telefone · dono · fila; à direita ligar, perfil e "⋯". */
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] { min-height: 72px; padding: 10px 12px 10px 20px; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-layout"] { min-height: 52px; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] [aria-label="Ligar para cliente"] { display: inline-flex !important; align-items: center; justify-content: center; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [data-slot="avatar"] { display: inline-flex !important; width: 44px; height: 44px; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] h2 { font-size: var(--text-base) !important; font-weight: 500 !important; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [data-conversations-part="header-owner-name"] { display: none !important; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-title"] > [data-slot="badge"] + [data-slot="badge"] { display: none !important; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-title"] > [data-slot="badge"] { display: inline-flex !important; border: 0; border-radius: 9999px; background: var(--surface-muted); color: var(--text-secondary); font-weight: 400; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-details"] > p { display: block !important; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] > div { border: 0 !important; padding-left: 0 !important; gap: 0; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] > div > div { border: 0 !important; padding-left: 0 !important; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] [data-conversations-part="chat-more"] { order: 3; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] :is(a, button) { width: 44px !important; height: 44px !important; min-width: 44px; border-radius: 9999px !important; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] :is(a, button) svg { width: 20px; height: 20px; }
+
+/* Fala da equipe em azul claro de ação, como no desenho. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="bubble-content"],
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-kind="broker"] [data-slot="bubble-content"] {
+  background: color-mix(in oklab, var(--chat-action) 12%, var(--surface)) !important;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="row-avatar"] > [role="img"] { display: grid !important; place-items: center; font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); }
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [role="img"] { display: grid !important; place-items: center; width: 44px; height: 44px; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-details"] { display: flex !important; flex-direction: column; align-items: flex-start; gap: 2px; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-details"] > p { margin: 0; }

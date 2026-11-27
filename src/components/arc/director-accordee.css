@@ -389,3 +389,21 @@
 @media (prefers-reduced-motion: reduce) {
   .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-nav-link"] { transition: none; }
 }
+
+/* Barra recolhida (27/11/2026): o estilo Lite acima ligava o contador (display inline-grid) por cima do
+   `group-data-[collapsible=icon]:hidden`, e no recolhido o "99+" empurrava o ícone para fora do quadrado de 40px.
+   Recolhida, cada área fica só com o ícone centrado; o contador vira um ponto no canto do ícone (o número segue no
+   aria-label do contador e aparece ao abrir a barra). */
+@media (hover: hover) and (pointer: fine) {
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-nav-link"] {
+    position: relative; width: 40px; min-width: 40px; padding: 0; gap: 0; justify-content: center;
+  }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-nav-label"],
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-nav-group-toggle"] { display: none; }
+  .arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-nav-count"] {
+    position: absolute; top: 6px; right: 6px; z-index: 1;
+    display: block; width: 8px; min-width: 8px; height: 8px; margin: 0; padding: 0; overflow: hidden;
+    border-radius: 9999px; background: var(--chat-action, var(--accent)); box-shadow: 0 0 0 2px var(--sidebar, var(--surface));
+    color: transparent; font-size: 0; pointer-events: none;
+  }
+}

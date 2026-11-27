@@ -57,6 +57,8 @@ interface ConversasHeaderNavProps {
   coexLabel?: string | null;
   /** "vertical": one view per line, full width (used inside the floating filters menu). */
   orientation?: "horizontal" | "vertical";
+  /** Segmentado do topo da lista (27/11/2026): rótulos curtos ("Corretores") e sem contagem. */
+  segmented?: boolean;
 }
 
 export function ConversasHeaderNav({
@@ -65,6 +67,7 @@ export function ConversasHeaderNav({
   distributedCount,
   coexLabel,
   orientation = "horizontal",
+  segmented = false,
 }: ConversasHeaderNavProps) {
   const vertical = orientation === "vertical";
   const directorSkinEnabled = useDirectorLitePage();
@@ -128,7 +131,7 @@ export function ConversasHeaderNav({
             : "text-muted-foreground hover:text-foreground hover:bg-background/40",
         )}
       >
-        <span>{"Número oficial"}{directorSkinEnabled ? null : <> <span className="hidden lg:inline">· corretores</span></>}</span>
+        <span>{segmented ? "Corretores" : "Número oficial"}{directorSkinEnabled ? null : <> <span className="hidden lg:inline">· corretores</span></>}</span>
       </Link>
 
       {coexLabel ? (

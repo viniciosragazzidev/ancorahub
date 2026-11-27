@@ -2,6 +2,8 @@
 
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { useEffect, useRef } from "react";
+import { useSidebar } from "@/components/ui/sidebar";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 import { ConversationsWorkspace, type ConversationItem } from "./conversations-workspace";
 import { OfficialBrokerConversations, type OfficialBrokerConversation } from "./official-broker-conversations";
@@ -48,10 +50,11 @@ export function ConversationsFrame({
   officialBrokerTab: boolean;
 }) {
   const directorSkinEnabled = useDirectorLitePage();
+  useRailWhileOpen(directorSkinEnabled);
   const pageActions = canSeeBrokerTab ? (
     <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
       <ConversationsBulkQualificationAction />
-      <ConversasHeaderNav currentTab={currentTab} leadsCount={leadsCount} distributedCount={distributedCount} coexLabel={coexLabel} />
+      <ConversasHeaderNav currentTab={currentTab} leadsCount={leadsCount} distributedCount={distributedCount} coexLabel={coexLabel} segmented={directorSkinEnabled} />
     </nav>
   ) : null;
   // Resumo do topo (anatomia de página): as conversas que a aba aberta já carregou.
@@ -93,7 +96,8 @@ export function ConversationsFrame({
       className={`arc-venancor ${styles.root} flex h-app min-h-0 w-full flex-1 flex-col overflow-hidden`}
       data-skin={directorSkinEnabled ? "diretor" : undefined}
     >
-      {header}
+      {/* Desenho "WhatsApp Web" (27/11/2026): no Lite o título fica dentro da lista; o topo só aparece na aba Corretores. */}
+      {directorSkinEnabled && !officialBrokerTab ? null : header}
       <main
         className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background p-0"
         data-conversations-part={directorSkinEnabled ? "content" : undefined}
@@ -113,4 +117,33 @@ export function ConversationsFrame({
       </main>
     </div>
   );
+}
+
+/**
+ * Barra lateral só com os ícones enquanto a Conversas está aberta (27/11/2026, desenho "WhatsApp Web"): a conversa
+ * ganha a largura. Ao sair da tela, a barra volta como estava.
+ */
+function useRailWhileOpen(enabled: boolean) {
+  let sidebar: ReturnType<typeof useSidebar> | null = null;
+  try {
+    sidebar = useSidebar();
+  } catch {
+    sidebar = null;
+  }
+  const setOpen = sidebar?.setOpen;
+  const isMobile = sidebar?.isMobile ?? true;
+  const wasOpen = useRef<boolean | null>(null);
+  const open = sidebar?.open;
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+  useEffect(() => {
+    if (!enabled || !setOpen || isMobile) return;
+    wasOpen.current = openRef.current ?? true;
+    setOpen(false);
+    return () => {
+      if (wasOpen.current) setOpen(true);
+    };
+  }, [enabled, setOpen, isMobile]);
 }
