@@ -43,6 +43,8 @@
 
 @media (max-width: 767px) {
   .grid3, .grid2 { grid-template-columns: minmax(0, 1fr); }
+  /* No celular a gaveta tem 16px de respiro: o rodapé encosta nas bordas sem passar delas. */
+  .foot { bottom: -16px; margin: 0 -16px -16px; padding: 16px; }
   .footActions { width: 100%; }
   .footActions > * { flex: 1; }
   .panel :is(input, select, textarea) { font-size: 16px; }
