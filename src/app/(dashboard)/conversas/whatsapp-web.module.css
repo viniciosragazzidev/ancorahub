@@ -204,3 +204,6 @@
   button.narrowOnly { display: inline-grid !important; }
   .head { padding-left: 8px; }
 }
+/* Com a quarta visão (Coex), os rótulos encolhem sem cortar. */
+.segbtn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.seg:has(> :nth-child(4)) .segbtn { font-size: 13px; padding: 0 4px; }

@@ -789,7 +789,7 @@ export function ConversationsWorkspace({
                     <Link className={ww.segbtn} href="/conversas" aria-current={currentTab === "leads" ? "page" : undefined}>Leads</Link>
                     <Link className={ww.segbtn} href="/conversas?tab=distribuidos" aria-current={currentTab === "distribuidos" ? "page" : undefined}>Distribuídos</Link>
                     <Link className={ww.segbtn} href="/conversas?tab=corretores" aria-label="Corretores: conversas pelo número da empresa">Corretores</Link>
-                    {coexLabel ? <Link className={ww.segbtn} href="/conversas?tab=coex" aria-current={currentTab === "coex" ? "page" : undefined}>{coexLabel.split(" · ")[0]}</Link> : null}
+                    {coexLabel ? <Link className={ww.segbtn} href="/conversas?tab=coex" aria-current={currentTab === "coex" ? "page" : undefined} aria-label={coexLabel} title={coexLabel}>Coex</Link> : null}
                   </nav>
                 </div>
               ) : null}
@@ -3080,7 +3080,7 @@ function getSharedMedia(messages: ConversationMessage[]) {
 }
 
 function initials(name: string) {
-  return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  return name.split(/\s+/).map((part) => part.match(/[\p{L}\p{N}]/u)?.[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 }
 
 function formatTime(value: string) {

@@ -7,7 +7,8 @@ import { motionTokens } from "../lib/motion-tokens";
 import styles from "./avatar.module.css";
 export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> { name: string; src?: string; size?: "sm" | "md" | "lg" | "xl"; status?: "online" | "offline" }
 export function Avatar({ name, src, size = "md", status, className, ...props }: AvatarProps) {
-  const initials = name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
+  // Só letras e números contam (27/11/2026): "Fernando 💙" vira "F", sem pedaço de emoji.
+  const initials = name.trim().split(/\s+/).map(part => part.match(/[\p{L}\p{N}]/u)?.[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
   const reduceMotion = !!useReducedMotion();
   const image = useRef<HTMLImageElement>(null);
   const [failedSrc, setFailedSrc] = useState<string>();

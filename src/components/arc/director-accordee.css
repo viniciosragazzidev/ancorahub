@@ -407,3 +407,12 @@
     color: transparent; font-size: 0; pointer-events: none;
   }
 }
+
+/* Barra recolhida (27/11/2026): o logo largo da empresa não cabe e saía cortado ("Âncor"). Recolhida, fica só o
+   símbolo, a parte da esquerda do logo, num quadrado de 40px centrado. */
+.arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child:has(img:not([src="/icon.png"])) {
+  width: 40px !important; max-width: 40px; height: 40px !important; margin-inline: auto; justify-content: flex-start;
+}
+.arc-venancor[data-skin="diretor"] [data-collapsible="icon"] .director-sidebar [data-slot="sidebar-header"] > div:not(.director-shortcuts) > a:first-child img:not([src="/icon.png"]) {
+  width: 96px; max-width: none; height: 28px; object-fit: contain; object-position: left center; clip-path: inset(0 calc(100% - 32px) 0 0);
+}
