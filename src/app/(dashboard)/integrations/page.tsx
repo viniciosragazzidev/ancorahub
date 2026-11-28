@@ -1,4 +1,5 @@
 import { DashboardHeader } from "@/components/dashboard-header";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { IntegrationsCatalog } from "@/features/communication-channels/components/integrations-catalog";
 import { requireCapability } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -19,12 +20,11 @@ export default async function IntegrationsPage() {
     const health = await getIntegrationHealth(context).catch(() => null);
     const receiving = health ? Object.values(health).filter((item) => item.state === "receiving").length : null;
     return (
-      <>
-        <DashboardHeader breadcrumb="Administração" title="Integrações" summary={receiving === null ? undefined : `3 canais · ${receiving} recebendo leads`} />
-        <main className={litePage.stack}>
+      <ComercialPage title="Integrações" summary={receiving === null ? undefined : `3 canais · ${receiving} recebendo leads`}>
+        <div className={litePage.stack} style={{ padding: 0 }}>
           <IntegrationsCatalogLite health={health ?? undefined} />
-        </main>
-      </>
+        </div>
+      </ComercialPage>
     );
   }
 

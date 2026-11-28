@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 
-import { DashboardHeader } from "@/components/dashboard-header";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { listTrackingLinks } from "@/features/tracking-links/service";
 import { requireCapability } from "@/shared/auth/authorization";
@@ -29,15 +29,12 @@ export default async function MarketingLinksPage() {
 
   if (!data.ready) {
     return (
-      <>
-        <DashboardHeader breadcrumb="Marketing" title="Links rastreáveis" summary="Ainda não ligado" />
-        <main className={litePage.stack}>
-          <section className={litePage.empty}>
-            <p className={litePage.emptyTitle}>Links rastreáveis ainda não ligados</p>
-            <p className={litePage.emptyText}>Falta uma atualização do banco nesta empresa. Assim que ela entrar, você cria os links aqui.</p>
-          </section>
-        </main>
-      </>
+      <ComercialPage title="Links rastreáveis" summary="Ainda não ligado">
+        <section className={litePage.empty}>
+          <p className={litePage.emptyTitle}>Links rastreáveis ainda não ligados</p>
+          <p className={litePage.emptyText}>Falta uma atualização do banco nesta empresa. Assim que ela entrar, você cria os links aqui.</p>
+        </section>
+      </ComercialPage>
     );
   }
 
@@ -48,11 +45,8 @@ export default async function MarketingLinksPage() {
   ].join(" · ");
 
   return (
-    <>
-      <DashboardHeader breadcrumb="Marketing" title="Links rastreáveis" summary={summary} />
-      <main className={litePage.stack}>
-        <TrackingLinksLite initialLinks={data.links} numbers={data.numbers} baseUrl={baseUrl} />
-      </main>
-    </>
+    <ComercialPage title="Links rastreáveis" summary={summary}>
+      <TrackingLinksLite initialLinks={data.links} numbers={data.numbers} baseUrl={baseUrl} />
+    </ComercialPage>
   );
 }

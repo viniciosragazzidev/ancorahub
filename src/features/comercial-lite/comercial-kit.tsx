@@ -114,3 +114,18 @@ export function SearchField({ value, onChange, placeholder, label }: { value: st
     </label>
   );
 }
+
+/** Ação do topo como link (servidor não usa as classes daqui; passa só href e rótulo). */
+export function HeadLink({ href, label, primary = false }: { href: string; label: string; primary?: boolean }) {
+  return <Link href={href} className={cn(s.pill, primary ? s.primary : s.quiet)}>{label}</Link>;
+}
+
+/** Atalhos discretos no fim da página (no lugar do bloco de "relacionados"): uma linha de links pequenos. */
+export function QuietLinks({ links, label }: { links: Array<{ href: string; label: string }>; label: string }) {
+  if (!links.length) return null;
+  return (
+    <nav className={s.quietLinks} aria-label={label}>
+      {links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}
+    </nav>
+  );
+}

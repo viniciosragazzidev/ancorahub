@@ -5,9 +5,7 @@
  * fontes de captura, unidade com data). As seções usam os mesmos componentes Lite da página real; as que leem o banco
  * no servidor entram pela versão de visualização com dados prontos.
  */
-import { DashboardHeader } from "@/components/dashboard-header";
-import litePage from "@/components/lite/page/lite-page.module.css";
-import { LiteRelatedLinks } from "@/components/lite/page/related-links";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { AccountSummaryLite } from "@/app/(dashboard)/settings/_components/lite/account-summary-lite";
 import { FeedbackLite, StageModeLite } from "@/app/(dashboard)/settings/_components/lite/atendimento-lite";
 import { EmpresaLite } from "@/app/(dashboard)/settings/_components/lite/empresa-lite";
@@ -61,21 +59,8 @@ export function SettingsShellScreen({ variant = "director" }: { variant?: "direc
   ];
   const sections = SETTINGS_TABS[variant].map((id) => all.find((section) => section.id === id)).filter((section): section is SettingsLiteSection => Boolean(section));
   return (
-    <>
-      <DashboardHeader breadcrumb="Administração" title="Configurações" />
-      <main className={litePage.stack}>
-        <SettingsLite sections={sections} />
-        <LiteRelatedLinks
-          title="Configurações relacionadas"
-          description="Atalhos para parâmetros avançados e módulos."
-          links={[
-            { label: "Qualificação e robô IA", href: "/qualificacao", description: "Prompt, diagnóstico do WhatsApp e MCP" },
-            { label: "Equipe e corretores", href: "/equipe", description: "Convites de usuários e permissões" },
-            { label: "Regras de distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
-            { label: "Guia e manual do sistema", href: "/guia", description: "Tours e definições de domínio" },
-          ]}
-        />
-      </main>
-    </>
+    <ComercialPage title="Ajustes">
+      <SettingsLite sections={sections} links={[{ label: "Guia do sistema", href: "/guia" }, { label: "Resultado do plantão", href: "/settings/resultado-plantao" }]} />
+    </ComercialPage>
   );
 }

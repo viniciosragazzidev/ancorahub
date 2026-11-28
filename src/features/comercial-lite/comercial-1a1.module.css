@@ -129,3 +129,8 @@
   .desktopOnly { display: none; }
   .mobileOnly { display: block; }
 }
+
+/* Atalhos discretos no rodapé da página (28/11/2026, Marketing e Configurações). */
+.quietLinks { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 4px 4px 0; font-size: 14px; }
+.quietLinks a { display: inline-flex; align-items: center; min-height: 44px; color: var(--c-text-secondary); text-decoration: none; }
+.quietLinks a:hover { color: var(--c-foreground); text-decoration: underline; text-underline-offset: 3px; }

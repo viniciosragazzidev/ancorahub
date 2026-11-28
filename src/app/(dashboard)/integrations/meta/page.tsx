@@ -1,4 +1,5 @@
 import { DashboardHeader } from "@/components/dashboard-header";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { MetaIntegrationHub } from "@/features/communication-channels/components/meta-integration-hub";
 import { getMetaConnectionState } from "@/features/meta-ads/actions";
 import { getMetaConversionsPanel } from "@/features/meta-ads/meta-conversion-service";
@@ -42,9 +43,8 @@ export default async function MetaIntegrationPage() {
     const connection = marketing.connection;
     const connected = connection?.status === "connected";
     return (
-      <>
-        <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" summary={summary} />
-        <main className={litePage.stack}>
+      <ComercialPage title="Meta" summary={summary}>
+        <div className={litePage.stack} style={{ padding: 0 }}>
           <MetaIntegrationLite
             connection={connection}
             assets={marketing.assets}
@@ -55,8 +55,8 @@ export default async function MetaIntegrationPage() {
           {conversions && connected ? (
             <MetaConversionsLite panel={conversions} datasets={(marketing.assets?.datasets ?? []).map(({ id, name }) => ({ id, name }))} />
           ) : null}
-        </main>
-      </>
+        </div>
+      </ComercialPage>
     );
   }
 

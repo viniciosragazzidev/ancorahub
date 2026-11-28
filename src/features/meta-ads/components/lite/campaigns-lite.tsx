@@ -14,6 +14,7 @@ import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import page from "@/components/lite/page/lite-page.module.css";
 import { formatCurrency } from "@/features/quotes/utils";
+import { StatStrip } from "@/features/comercial-lite/comercial-kit";
 import type { MetaCampaignItem } from "../../types";
 import { campaignDelivery, campaignDetailHref, distributionDestination } from "./meta-lite-shared";
 import styles from "./meta-lite.module.css";
@@ -65,13 +66,12 @@ export function CampaignsLite({ campaigns, totals }: { campaigns: MetaCampaignIt
   }, [filtered]);
 
   const activeCount = campaigns.filter((campaign) => campaign.status === "ACTIVE" || campaign.status === "active").length;
+  // Direção limpa (28/11/2026): quatro números numa faixa só; atendimento e receita viram o detalhe de cada um.
   const stats = [
-    { label: "Leads capturados", value: count.format(totals.leads) },
-    { label: "Leads em atendimento", value: count.format(totals.conversations) },
-    { label: "Vendas concluídas", value: count.format(totals.sales) },
-    { label: "Taxa de conversão", value: `${totals.conversionRate}%` },
-    { label: "Receita gerada", value: formatCurrency(totals.revenue, { maximumFractionDigits: 0 }) },
-    { label: "Campanhas ativas", value: count.format(activeCount) },
+    { label: "Leads capturados", value: count.format(totals.leads), detail: `${count.format(totals.conversations)} em atendimento` },
+    { label: "Vendas", value: count.format(totals.sales), detail: `${formatCurrency(totals.revenue, { maximumFractionDigits: 0 })} em receita` },
+    { label: "Conversão", value: `${totals.conversionRate}%`, detail: "de lead para venda" },
+    { label: "Campanhas ativas", value: count.format(activeCount), detail: `${count.format(campaigns.length)} no total` },
   ];
 
   const columns: LiteColumn<MetaCampaignItem>[] = [
@@ -82,7 +82,6 @@ export function CampaignsLite({ campaigns, totals }: { campaigns: MetaCampaignIt
       render: (campaign) => (
         <span className={styles.campaignCell}>
           <Link href={campaignDetailHref(campaign)} className={styles.campaignName}>{campaign.name}</Link>
-          <span className={`${page.cellSub} ${styles.wrapLine}`}>ID {campaign.campaignId}</span>
           <span className={`${page.cellSub} ${styles.wrapLine}`}>Destino: {distributionDestination(campaign)}</span>
         </span>
       ),
@@ -132,20 +131,12 @@ export function CampaignsLite({ campaigns, totals }: { campaigns: MetaCampaignIt
 
   return (
     <>
-      <div className={`${page.stats} ${styles.stats6}`}>
-        {stats.map((stat) => (
-          <div key={stat.label} className={page.stat}>
-            <span className={page.statLabel}>{stat.label}</span>
-            <span className={page.statValue}>{stat.value}</span>
-          </div>
-        ))}
-      </div>
+      <StatStrip items={stats} label="Resumo das campanhas" />
 
       <section className={page.group} aria-labelledby="meta-campaigns-title">
         <div className={styles.sectionHead}>
           <div className={page.cardHead}>
-            <h2 id="meta-campaigns-title" className={page.cardTitle}>Desempenho por conta, campanha e anúncio</h2>
-            <p className={page.cardDescription}>Cada linha mostra o caminho do lead: ativo recuperado da Meta, captura no CRM e fila de distribuição.</p>
+            <h2 id="meta-campaigns-title" className={page.cardTitle}>Campanhas por conta de anúncios</h2>
           </div>
           <label className={page.search}>
             <Search aria-hidden="true" size={18} className={page.searchIcon} />
