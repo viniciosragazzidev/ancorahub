@@ -100,8 +100,8 @@ export function ArchivedLeadsLite({ rows, total, page: currentPage, totalPages, 
   return (
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
       <div className={page.group}>
-        <p className={page.cardDescription}>
-          {total} {total === 1 ? "lead retirado" : "leads retirados"} da distribuição sem apagar o histórico. O arquivamento é reversível pela administração e só o diretor consulta esta lista.
+        <p className={page.resultLine} title="Retirados da distribuição sem apagar o histórico. O arquivamento é reversível pela administração e só o diretor consulta esta lista.">
+          {total.toLocaleString("pt-BR")} {total === 1 ? "lead arquivado" : "leads arquivados"}
         </p>
         <form className={`${page.toolbar} ${styles.searchRow}`} method="get" role="search" aria-label="Buscar leads arquivados">
           <label className={page.search}>

@@ -319,7 +319,6 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
             <section className={page.card} aria-labelledby="membro-feedbacks">
               <div className={page.cardHead}>
                 <h2 id="membro-feedbacks" className={page.sectionTitle}>Feedbacks</h2>
-                <p className={page.muted}>Histórico de feedbacks registrados pelo supervisor.</p>
               </div>
               <SupervisorNoteHistory notes={notes} />
             </section>
@@ -352,7 +351,6 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
           <section className={page.card} aria-labelledby="membro-resultado">
             <div className={page.cardHead}>
               <h2 id="membro-resultado" className={page.sectionTitle}>Resultado comercial</h2>
-              <p className={page.muted}>Produção registrada no CRM.</p>
             </div>
             <dl className={styles.quad}>
               <div><dt>Cotações criadas</dt><dd>{metrics.quotes.total}</dd><dd className={page.cellSub}>{metrics.quotes.sent} enviadas</dd></div>
@@ -364,7 +362,7 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
           <section className={page.card} aria-labelledby="membro-redistribuicoes">
             <div className={page.cardHead}>
               <h2 id="membro-redistribuicoes" className={page.sectionTitle}>Redistribuições</h2>
-              <p className={page.muted}>Leads que saíram da carteira deste membro. Não pressupõe responsabilidade individual sem uma causa registrada.</p>
+              <p className={page.muted}>Saídas da carteira, sem pressupor culpa sem causa registrada.</p>
             </div>
             {recentRedistributions.length ? (
               <ul className={styles.events}>

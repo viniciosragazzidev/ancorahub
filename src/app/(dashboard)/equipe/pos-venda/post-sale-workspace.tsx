@@ -374,7 +374,6 @@ function PostSaleCampaigns({ data, initialAudience, initialPreview, initialFeedb
       <section className={page.card} aria-labelledby="pos-venda-campanhas">
         <div className={page.cardHead}>
           <h2 id="pos-venda-campanhas" className={page.cardTitle}>Campanhas recentes</h2>
-          <p className={page.cardDescription}>Últimas campanhas desta empresa ou unidade, manuais e da régua.</p>
         </div>
         {data.campaigns.length ? (
           <ul className={styles.alertList}>

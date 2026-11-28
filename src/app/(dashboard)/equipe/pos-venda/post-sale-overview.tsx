@@ -72,7 +72,6 @@ export function PostSaleOverview({ summary, rules, days, alerts, periodDays, onF
         <section className={page.card} aria-labelledby="pos-venda-funil">
           <div className={page.cardHead}>
             <h2 id="pos-venda-funil" className={page.cardTitle}>Do envio à resposta</h2>
-            <p className={page.cardDescription}>Cada passo em relação às enviadas.</p>
           </div>
           <PostSaleFunnel steps={postSaleFunnel(summary)} />
         </section>
@@ -80,7 +79,6 @@ export function PostSaleOverview({ summary, rules, days, alerts, periodDays, onF
         <section className={page.card} aria-labelledby="pos-venda-regras">
           <div className={page.cardHead}>
             <h2 id="pos-venda-regras" className={page.cardTitle}>Por regra</h2>
-            <p className={page.cardDescription}>Responderam de enviadas. Clique para ver os leads.</p>
           </div>
           <PostSaleRuleBars rules={rules} onSelect={(key) => onFilter({ rule: key })} />
           <PostSaleLegend />
@@ -90,7 +88,6 @@ export function PostSaleOverview({ summary, rules, days, alerts, periodDays, onF
           <div className={styles.cardHeadRow}>
             <div className={page.cardHead}>
               <h2 id="pos-venda-dias" className={page.cardTitle}>Por dia de envio</h2>
-              <p className={page.cardDescription}>Clique num dia para ver os leads.</p>
             </div>
             <PostSaleLegend />
           </div>
@@ -101,7 +98,6 @@ export function PostSaleOverview({ summary, rules, days, alerts, periodDays, onF
       <section className={page.card} aria-labelledby="pos-venda-alertas">
         <div className={page.cardHead}>
           <h2 id="pos-venda-alertas" className={page.cardTitle}>Alertas abertos ({fmt(alerts.length)})</h2>
-          <p className={page.cardDescription}>Clientes que precisam de acompanhamento da direção ou da unidade.</p>
         </div>
         {alerts.length ? (
           <ul className={styles.alertList}>

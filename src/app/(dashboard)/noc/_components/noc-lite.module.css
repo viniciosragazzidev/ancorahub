@@ -468,6 +468,17 @@
   }
 }
 
+/* Direção limpa (28/11/2026): sem o minigráfico, os cinco cabem numa faixa só a partir de 1280px. */
+@media (min-width: 1280px) {
+  .kpis.kpis {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .kpis.kpis > * {
+    grid-column: auto;
+  }
+}
+
 /* Precisa de atenção (20/11/2026): lista compacta, críticas primeiro. */
 .attentionList { display: grid; margin: 0; padding: 0; list-style: none; }
 .attentionRow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border-subtle); }
