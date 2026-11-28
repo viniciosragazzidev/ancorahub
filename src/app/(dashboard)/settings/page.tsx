@@ -1,4 +1,5 @@
 import { requireRouteAccess } from "@/features/custom-roles/require-route-access";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import CommissionRulesPage from "../configuracoes/comissoes/page";
 import { AccessibilityPreferences } from "@/features/assist/components/accessibility-preferences";
 import { and, count, eq, inArray } from "drizzle-orm";
@@ -45,9 +46,7 @@ import { RankingPreferences } from "@/features/journey/ranking-preferences";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import type { LightSettingsSection } from "./_components/light-settings";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
-import litePage from "@/components/lite/page/lite-page.module.css";
 import compat from "@/components/lite/page/lite-compat.module.css";
-import { LiteRelatedLinks } from "@/components/lite/page/related-links";
 import { SettingsLite, type SettingsLiteSection } from "./_components/lite/settings-lite";
 import { AccountLite } from "./_components/lite/account-lite";
 import { EmpresaLite } from "./_components/lite/empresa-lite";
@@ -317,26 +316,18 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
       : null;
     const extraSections = [proposalsSection, postSaleSequenceSection, tagsSection, internalSection, resourcesSection, lgpdSection, voiceSection].filter((section): section is SettingsLiteSection => Boolean(section));
     const sections = [...tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section)), ...extraSections];
+    // Direção limpa (28/11/2026): moldura da área (título e abas de Configurações), seções sem texto fixo e os
+    // atalhos que antes eram um bloco de "relacionados" como links discretos sob a lista de seções.
     return (
-      <>
-        <DashboardHeader breadcrumb="Administração" title="Configurações" />
-        <main className={litePage.stack}>
-          <SettingsLite sections={sections} />
-          {context.role !== "broker" ? (
-            <LiteRelatedLinks
-              title="Configurações relacionadas"
-              description="Atalhos para parâmetros avançados e módulos."
-              links={[
-                { label: "Qualificação e robô IA", href: "/qualificacao", description: "Prompt, diagnóstico do WhatsApp e MCP" },
-                { label: "Equipe e corretores", href: "/equipe", description: "Convites de usuários e permissões" },
-                { label: "Regras de distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
-                { label: "Guia e manual do sistema", href: "/guia", description: "Tours e definições de domínio" },
-                ...(context.role === "director" ? [{ label: "Resultado do plantão", href: "/settings/resultado-plantao", description: "Prévia e envio diário pelo WhatsApp" }] : []),
-              ]}
-            />
-          ) : null}
-        </main>
-      </>
+      <ComercialPage title="Ajustes">
+        <SettingsLite
+          sections={sections}
+          links={context.role !== "broker" ? [
+            { label: "Guia do sistema", href: "/guia" },
+            ...(context.role === "director" ? [{ label: "Resultado do plantão", href: "/settings/resultado-plantao" }] : []),
+          ] : []}
+        />
+      </ComercialPage>
     );
   }
 

@@ -6,6 +6,7 @@
  * esquerda e a seção aberta ao lado; no celular, a lista primeiro e a seção em tela própria com "Voltar". A seção
  * ativa segue o ?tab= (tab=passkey abre Segurança e rola até as chaves de acesso), como hoje.
  */
+import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -24,7 +25,7 @@ function resolveTab(requested: string | null, sections: SettingsLiteSection[]) {
   return sections.some((section) => section.id === id) ? id : null;
 }
 
-export function SettingsLite({ sections }: { sections: SettingsLiteSection[] }) {
+export function SettingsLite({ sections, links = [] }: { sections: SettingsLiteSection[]; links?: Array<{ label: string; href: string }> }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const requested = searchParams.get("tab");
@@ -89,6 +90,11 @@ export function SettingsLite({ sections }: { sections: SettingsLiteSection[] }) 
             );
           })}
         </ul>
+        {links.length ? (
+          <ul className={styles.links}>
+            {links.map((link) => <li key={link.href}><Link href={link.href}>{link.label}</Link></li>)}
+          </ul>
+        ) : null}
       </nav>
       {active ? (
         <section className={styles.content} aria-labelledby={`settings-${active.id}-title`}>
@@ -97,8 +103,7 @@ export function SettingsLite({ sections }: { sections: SettingsLiteSection[] }) 
             Todas as configurações
           </button>
           <header className={styles.head}>
-            <h2 id={`settings-${active.id}-title`} className={styles.title}>{active.title}</h2>
-            <p className={styles.description}>{active.description}</p>
+            <h2 id={`settings-${active.id}-title`} className={styles.title} title={active.description}>{active.title}</h2>
           </header>
           <div key={active.id} className={styles.body}>{active.node}</div>
         </section>

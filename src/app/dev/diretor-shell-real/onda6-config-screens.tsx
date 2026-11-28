@@ -5,6 +5,7 @@
  * extensão, diagnóstico e fluxos) no visual Lite dentro da moldura real, com dados de exemplo realistas. Cada tela usa
  * os mesmos componentes Lite da página real.
  */
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { DashboardHeader } from "@/components/dashboard-header";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { FlowEditorLite } from "@/app/(dashboard)/atendimento/fluxo/_components/flow-editor-lite";
@@ -31,10 +32,9 @@ const AT = new Date("2026-10-20T13:00:00.000Z");
 
 export function IntegracoesShellScreen() {
   return (
-    <>
-      <DashboardHeader breadcrumb="Administração" title="Integrações" />
-      <main className={litePage.stack}><IntegrationsCatalogLite /></main>
-    </>
+    <ComercialPage title="Integrações" summary="3 canais · 2 recebendo leads">
+      <div className={litePage.stack} style={{ padding: 0 }}><IntegrationsCatalogLite /></div>
+    </ComercialPage>
   );
 }
 
@@ -47,10 +47,9 @@ const CHANNEL_BASE: WhatsAppChannel = {
 export function WhatsappShellScreen() {
   const coexist: WhatsAppChannel = { ...CHANNEL_BASE, id: "ch-2", isDefault: false, displayPhoneNumber: "+55 21 98888-7777", verifiedName: "Âncora Anúncios Barra da Tijuca", onboardingMode: "coexistence", branchId: "branch-barra", branchName: "Barra da Tijuca" };
   return (
-    <>
-      <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
+    <ComercialPage title="WhatsApp" summary="2 números oficiais">
       <WhatsAppPageLite official={{ enabled: true, configured: true, missing: [], appId: "app-1", embeddedSignupConfigId: "cfg-1", canConfigure: true, branches: [{ id: "branch-barra", name: "Barra da Tijuca" }], channels: [CHANNEL_BASE, coexist], companyAccount: CHANNEL_BASE, queues: [{ id: "q1", name: "PME" }], adAccountNames: ["Âncora Saúde Ads"] }} />
-    </>
+    </ComercialPage>
   );
 }
 

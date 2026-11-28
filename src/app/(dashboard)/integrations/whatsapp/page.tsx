@@ -1,4 +1,5 @@
 import { DashboardHeader } from "@/components/dashboard-header";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { getMetaCloudConfigurationState } from "@/features/communication-channels/meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
 import { channelLeadIntakeKey, parseChannelLeadIntake } from "@/features/communication-channels/channel-lead-intake";
@@ -87,10 +88,11 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
   const official = { ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels: channelsWithIntake, companyAccount, queues, adAccountNames: adAccounts.map((account) => account.name) };
   const summary = `${channels.length.toLocaleString("pt-BR")} ${channels.length === 1 ? "número oficial" : "números oficiais"}`;
   if (lite) {
-    return <>
-      <DashboardHeader breadcrumb="Integrações" title="WhatsApp" summary={summary} />
-      <WhatsAppPageLite official={official} />
-    </>;
+    return (
+      <ComercialPage title="WhatsApp" summary={summary}>
+        <WhatsAppPageLite official={official} />
+      </ComercialPage>
+    );
   }
 
   return <>

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { eq } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -35,9 +36,8 @@ export default async function MarketingImportacoesPage() {
 
   if (await isDirectorLitePageOnServer(context, "/marketing/importacoes")) {
     return (
-      <>
-        <DashboardHeader breadcrumb="Marketing / Importações" title="Importar leads Meta" summary={summary} />
-        <main className={litePage.stack}>
+      <ComercialPage title="Importações" summary={summary}>
+        <div className={litePage.stack} style={{ padding: 0 }}>
           <MarketingImportLite
             branches={branches}
             history={history}
@@ -45,8 +45,8 @@ export default async function MarketingImportacoesPage() {
             canChooseBranch={context.role === "director" || isCentralMarketing}
             userBranchId={context.branchId}
           />
-        </main>
-      </>
+        </div>
+      </ComercialPage>
     );
   }
 

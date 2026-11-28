@@ -180,3 +180,11 @@
     display: none;
   }
 }
+
+/* Direção limpa (28/11/2026): sem a descrição fixa de cada seção, atalhos discretos sob a lista e a seção aberta
+   sem sombra nos cartões das seções. */
+.navDescription { display: none; }
+.links { display: grid; gap: 0; margin: 12px 0 0; padding: 0 8px; list-style: none; }
+.links a { display: flex; align-items: center; min-height: 40px; padding: 0 8px; font-size: var(--text-sm); color: var(--text-secondary); text-decoration: none; border-radius: 9999px; }
+.links a:hover { color: var(--foreground); background: var(--surface-muted); }
+.body :global([data-slot="card"]) { box-shadow: none; }

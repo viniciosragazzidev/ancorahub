@@ -12,13 +12,13 @@ import { CampaignsDashboardView } from "@/features/meta-ads/components/campaigns
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCapability } from "@/shared/auth/authorization";
 import { RelatedActions } from "@/components/related-actions";
-import { LiteRelatedLinks } from "@/components/lite/page/related-links";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { CampaignsLite } from "@/features/meta-ads/components/lite/campaigns-lite";
 import { CaptureControlLite } from "@/features/meta-ads/components/lite/capture-control-lite";
 import { buildMetaSyncInfo } from "@/features/meta-ads/components/lite/meta-lite-shared";
 import { MetaStatusLite } from "@/features/meta-ads/components/lite/meta-status-lite";
+import { ComercialPage, HeadLink, QuietLinks } from "@/features/comercial-lite/comercial-kit";
 
 export const dynamic = "force-dynamic";
 
@@ -46,25 +46,24 @@ export default async function CampaignsPage() {
 
   if (await isDirectorLitePageOnServer(context, "/marketing/campanhas")) {
     const sync = connected && connection ? buildMetaSyncInfo(marketing?.logs ?? [], connection.lastSyncedAt, canConfigure, new Date()) : null;
+    // Direção limpa (28/11/2026): moldura da área (título, resumo e abas de Marketing), sem a faixa de topo e sem o
+    // bloco de "relacionados" (as importações já são uma aba; os outros atalhos viram links discretos no fim).
     return (
-      <>
-        <DashboardHeader breadcrumb="Marketing" title="Campanhas Meta Ads e ROI" summary={summary} />
-        <main className={litePage.stack}>
+      <ComercialPage title="Campanhas" summary={summary} actions={<HeadLink href="/integrations/meta" label={connected ? "Conexão Meta" : "Conectar a Meta"} />}>
+        <div className={litePage.stack} style={{ padding: 0 }}>
           <MetaStatusLite connected={Boolean(connected && connection)} sync={sync} captureModeLabel={connection ? CAPTURE_MODE_LABEL[connection.globalCaptureMode ?? "selective"] : null} />
           <CampaignsLite campaigns={data.campaigns} totals={data.totals} />
           {connected && connection ? <CaptureControlLite globalMode={connection.globalCaptureMode ?? "selective"} canConfigure={canConfigure} /> : null}
-          <LiteRelatedLinks
-            title="Ferramentas e integrações de marketing"
-            description="Navegação contextual para captação de leads e anúncios."
+          <QuietLinks
+            label="Atalhos de marketing"
             links={[
-              { label: "Importações de leads Meta", href: "/marketing/importacoes", description: "Logs de entrada e formulários" },
-              { label: "Materiais de divulgação", href: "/materiais-divulgacao", description: "Banners, e-books e artes de apoio" },
-              { label: "Configurar webhooks Meta Lead Ads", href: "/settings?tab=integrations", description: "Token de acesso e formulários" },
-              { label: "Regras de qualificação IA", href: "/qualificacao", description: "Como a IA atende os novos leads" },
+              { label: "Materiais de divulgação", href: "/materiais-divulgacao" },
+              { label: "Webhooks e formulários", href: "/settings?tab=integracoes" },
+              { label: "Como a IA atende os leads", href: "/qualificacao" },
             ]}
           />
-        </main>
-      </>
+        </div>
+      </ComercialPage>
     );
   }
 

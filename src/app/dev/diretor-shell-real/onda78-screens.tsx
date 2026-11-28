@@ -5,8 +5,8 @@
  * os mesmos componentes Lite da página real (o servidor calcula o resumo da sincronização; aqui ele vem pronto).
  */
 import { DashboardHeader } from "@/components/dashboard-header";
-import { LiteRelatedLinks } from "@/components/lite/page/related-links";
 import litePage from "@/components/lite/page/lite-page.module.css";
+import { ComercialPage, HeadLink, QuietLinks } from "@/features/comercial-lite/comercial-kit";
 import { CampaignsLite } from "@/features/meta-ads/components/lite/campaigns-lite";
 import { CampaignDetailLite } from "@/features/meta-ads/components/lite/campaign-detail-lite";
 import { CaptureControlLite } from "@/features/meta-ads/components/lite/capture-control-lite";
@@ -34,24 +34,14 @@ const SYNC: MetaSyncInfo = { tone: "success", label: "Concluída", detail: "há 
 
 export function CampanhasShellScreen() {
   return (
-    <>
-      <DashboardHeader breadcrumb="Marketing" title="Campanhas Meta Ads e ROI" />
-      <main className={litePage.stack}>
+    <ComercialPage title="Campanhas" summary="12 campanhas · 1.284 leads · 46 vendas" actions={<HeadLink href="/integrations/meta" label="Conexão Meta" />}>
+      <div className={litePage.stack} style={{ padding: 0 }}>
         <MetaStatusLite connected sync={SYNC} captureModeLabel="Captura seletiva" />
         <CampaignsLite campaigns={META_CAMPAIGNS_FIXTURE} totals={META_TOTALS_FIXTURE} />
         <CaptureControlLite globalMode="selective" canConfigure />
-        <LiteRelatedLinks
-          title="Ferramentas e integrações de marketing"
-          description="Navegação contextual para captação de leads e anúncios."
-          links={[
-            { label: "Importações de leads Meta", href: "/marketing/importacoes", description: "Logs de entrada e formulários" },
-            { label: "Materiais de divulgação", href: "/materiais-divulgacao", description: "Banners, e-books e artes de apoio" },
-            { label: "Configurar webhooks Meta Lead Ads", href: "/settings?tab=integrations", description: "Token de acesso e formulários" },
-            { label: "Regras de qualificação IA", href: "/qualificacao", description: "Como a IA atende os novos leads" },
-          ]}
-        />
-      </main>
-    </>
+        <QuietLinks label="Atalhos de marketing" links={[{ label: "Materiais de divulgação", href: "/materiais-divulgacao" }, { label: "Webhooks e formulários", href: "/settings?tab=integracoes" }, { label: "Como a IA atende os leads", href: "/qualificacao" }]} />
+      </div>
+    </ComercialPage>
   );
 }
 
@@ -83,24 +73,22 @@ const IMPORT_HISTORY = Array.from({ length: 9 }, (_, index) => ({
 
 export function ImportacoesShellScreen() {
   return (
-    <>
-      <DashboardHeader breadcrumb="Marketing / Importações" title="Importar leads Meta" />
-      <main className={litePage.stack}>
+    <ComercialPage title="Importações" summary="9 importações no histórico">
+      <div className={litePage.stack} style={{ padding: 0 }}>
         <MarketingImportLite branches={[{ id: "b1", name: "Barra da Tijuca" }, { id: "b2", name: "Niterói 1" }]} history={IMPORT_HISTORY} lastImport={IMPORT_HISTORY[0]!} canChooseBranch userBranchId={null} />
-      </main>
-    </>
+      </div>
+    </ComercialPage>
   );
 }
 
 export function MetaShellScreen() {
   return (
-    <>
-      <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" />
-      <main className={litePage.stack}>
+    <ComercialPage title="Meta" summary="Conectada · 2 contas de anúncios">
+      <div className={litePage.stack} style={{ padding: 0 }}>
         <MetaIntegrationLite connection={META_CONNECTION_FIXTURE} assets={META_ASSETS_FIXTURE} sync={SYNC} captureModeLabel="Captura seletiva" canConfigure />
         <MetaConversionsLite panel={META_CONVERSIONS_FIXTURE} datasets={[{ id: "556677889900", name: "Conversões CRM Âncora" }]} />
-      </main>
-    </>
+      </div>
+    </ComercialPage>
   );
 }
 
@@ -166,12 +154,11 @@ export function GuiaShellScreen() {
 
 export function WebhookShellScreen() {
   return (
-    <>
-      <DashboardHeader breadcrumb="Guia do sistema" title="Integração via webhook" />
-      <main className={litePage.stack}>
+    <ComercialPage title="Integração via webhook">
+      <div className={litePage.stack} style={{ padding: 0 }}>
         <WebhookTutorialLite />
-      </main>
-    </>
+      </div>
+    </ComercialPage>
   );
 }
 
