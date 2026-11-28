@@ -34,6 +34,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { useErpSkin } from "./skin-context";
 import { competenceOptions, plural } from "./format";
 import kit from "./erp-kit.module.css";
+import { PlInfo } from "@/app/(dashboard)/leads/distribuicao/plantao/_components/plantoes-1a1-kit";
 
 export type ErpColumn<T> = LiteColumn<T>;
 export type ErpMenuItem = LiteMenuItem;
@@ -94,7 +95,8 @@ export function ErpHelp({ title, children, label = "Como funciona" }: { title: s
 /** Card section with a title, a short description and header actions (secondary content only). */
 export function ErpSection({ icon, title, description, actions, children }: { icon?: ReactNode; title: string; description?: ReactNode; actions?: ReactNode; children: ReactNode }) {
   const skin = useErpSkin();
-  if (skin === "lite") return <section className={page.card} aria-label={title}><header className={kit.listHead}><div className={page.cardHead}><h2 className={page.cardTitle}>{title}</h2>{description ? <p className={page.cardDescription}>{description}</p> : null}</div>{actions ? <div className={kit.headerActions}>{actions}</div> : null}</header>{children}</section>;
+  // Direção limpa: a descrição fica atrás do "?" ao lado do título, não como parágrafo fixo.
+  if (skin === "lite") return <section className={page.card} aria-label={title}><header className={kit.listHead}><div className={kit.listTitle}><h2 className={page.cardTitle}>{title}</h2>{description ? <PlInfo label={`Sobre ${title}`}>{description}</PlInfo> : null}</div>{actions ? <div className={kit.headerActions}>{actions}</div> : null}</header>{children}</section>;
   return <Card variant="overview"><SectionCardHeader icon={icon} title={title} description={description} actions={actions} /><CardContent className="p-4">{children}</CardContent></Card>;
 }
 
@@ -113,10 +115,9 @@ export function ErpList<T>({ icon, title, description, actions, columns, rows, r
     const empty = <div className={page.empty}><p className={page.emptyTitle}>{emptyTitle}</p><p className={page.emptyText}>{emptyText}</p></div>;
     return <section className={page.group} aria-label={title}>
       <header className={kit.listHead}>
-        <div className={kit.listTitle}><h2 className={page.sectionTitle}>{title}</h2>{countText && rows.length ? <span className={kit.count}>{countText}</span> : null}</div>
+        <div className={kit.listTitle}><h2 className={page.sectionTitle}>{title}</h2>{countText && rows.length ? <span className={kit.count}>{countText}</span> : null}{description ? <PlInfo label={`Sobre ${title}`}>{description}</PlInfo> : null}</div>
         {actions ? <div className={kit.headerActions}>{actions}</div> : null}
       </header>
-      {description ? <p className={page.cardDescription}>{description}</p> : null}
       {rows.length ? <LiteResponsiveData caption={title} columns={columns} rows={rows} rowKey={rowKey} onRowOpen={onRowOpen} empty={empty} /> : empty}
       {footer}
     </section>;

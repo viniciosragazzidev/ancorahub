@@ -6,6 +6,7 @@ import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getErpSkin } from "./skin";
 import { ErpSkinProvider } from "./skin-context";
 import kit from "./erp-kit.module.css";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 
 /**
  * Shell of every ERP screen, in the system of the viewer's skin.
@@ -24,8 +25,13 @@ export async function ErpPage({ pathname, breadcrumb, title, summary, actions, c
       {children}
     </main>
   </ErpSkinProvider>;
+  // Direção limpa (28/11/2026): no visual Lite do diretor, a mesma moldura do Comercial (título de 28px, resumo, ações e
+  // as abas da área pelo nav-registry), sem a faixa de topo antiga. Vale para Financeiro e Operação ERP de uma vez.
+  if (skin === "lite") return <ErpSkinProvider skin="lite">
+    <ComercialPage title={title} summary={summary} actions={actions}>{children}</ComercialPage>
+  </ErpSkinProvider>;
   return <ErpSkinProvider skin={skin}>
     <DashboardHeader breadcrumb={breadcrumb} title={title} summary={summary} rightSlot={actions} />
-    <main className={skin === "lite" ? litePage.stack : "flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6"}>{children}</main>
+    <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">{children}</main>
   </ErpSkinProvider>;
 }

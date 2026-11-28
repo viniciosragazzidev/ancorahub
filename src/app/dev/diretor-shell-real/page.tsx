@@ -25,6 +25,7 @@ import { LeadsShellScreen } from "./leads-screen";
 import { ONDA3_SCREENS } from "./onda3-registry";
 import { DistribuicaoShellScreen } from "./distribuicao-screen";
 import { AbasShellScreen } from "./abas-screen";
+import { ErpShellScreen } from "./erp-screen";
 import { PlantoesShellScreen } from "./plantoes-screen";
 import { PlantaoShellScreen } from "./plantao-screen";
 import { ONDA6_SCREENS } from "./onda6-registry";
@@ -247,7 +248,7 @@ export default async function DirectorShellRealPage({
   const leadsView = leadsViews[screen];
   const onda3 = ONDA3_SCREENS[screen] ?? ONDA6_SCREENS[screen] ?? ONDA10_SCREENS[screen];
   const onda5 = ONDA5_SCREENS[screen];
-  const pathname = showConversations ? "/conversas" : onda5 ? onda5.path : onda3 ? onda3.path : leadsView ? "/leads" : screen === "distribuicao" ? "/distribuicao" : screen === "entradas" ? "/distribuicao?view=roteamento" : screen === "filas" ? "/distribuicao?view=filas" : screen === "saude" ? "/distribuicao?view=saude_historico" : screen === "plantoes" ? "/distribuicao?view=plantao" : screen === "plantao" ? "/leads/distribuicao/plantao/00000000-0000-4000-8000-0000000000aa" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
+  const pathname = showConversations ? "/conversas" : onda5 ? onda5.path : onda3 ? onda3.path : leadsView ? "/leads" : screen === "distribuicao" ? "/distribuicao" : screen === "entradas" ? "/distribuicao?view=roteamento" : screen === "filas" ? "/distribuicao?view=filas" : screen === "saude" ? "/distribuicao?view=saude_historico" : screen === "plantoes" ? "/distribuicao?view=plantao" : screen === "plantao" ? "/leads/distribuicao/plantao/00000000-0000-4000-8000-0000000000aa" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : screen === "financeiro" ? "/financeiro" : "/dashboard";
   const name = isSuperAdminViewingDirector ? "Alex Exemplo" : papel ? "Rafaela Exemplo" : "Marina Exemplo";
   // Painel: ?aba=operacao|qualidade|funil e ?caso=uma-hora|zerado|cheio|uma-fila (casos de borda com dados de exemplo).
   const tab = params.aba === "qualidade" ? "qualidade" : params.aba === "funil" ? "funil" : "operacao";
@@ -354,6 +355,8 @@ export default async function DirectorShellRealPage({
         <DistribuicaoShellScreen />
       ) : screen === "entradas" || screen === "filas" || screen === "saude" ? (
         <AbasShellScreen tab={screen} />
+      ) : screen === "financeiro" ? (
+        <ErpShellScreen />
       ) : screen === "lead" ? (
         <>
           <DashboardHeader breadcrumb="Operação comercial" title="Perfil do lead" />
