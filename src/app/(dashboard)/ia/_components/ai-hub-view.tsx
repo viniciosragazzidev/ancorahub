@@ -25,6 +25,7 @@ import {
 
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 import type { AiHubSection, AiHubSummaryItem } from "@/features/ai-qualification/ai-area-hub";
 
 import hub from "./ia-hub.module.css";
@@ -73,8 +74,7 @@ export function AiHubView({ summary, sections: list }: { summary: AiHubSummaryIt
         <section key={section.id} className={sections.group} aria-labelledby={`ia-${section.id}`}>
           <div className={sections.row}>
             <div className={sections.rowText}>
-              <h2 id={`ia-${section.id}`} className={sections.rowTitle}>{section.title}</h2>
-              <p className={sections.rowDescription}>{section.description}</p>
+              <h2 id={`ia-${section.id}`} className={sections.rowTitle}>{section.title}<LiteHint text={section.description} /></h2>
             </div>
           </div>
           <ul className={sections.list}>

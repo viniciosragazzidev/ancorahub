@@ -34,7 +34,6 @@ export default async function FluxosWhatsappPage() {
       <>
         <DashboardHeader breadcrumb="Atendimento" title="Fluxos de WhatsApp" summary={summary} />
         <main className={litePage.stack}>
-          <p className={litePage.cardDescription}>Recepção, qualificação e roteamento de contatos do WhatsApp usando a frota ativa do WAHA.</p>
           <WhatsappFlowsLite initialFlows={flows} />
         </main>
       </>

@@ -13,6 +13,7 @@ import sections from "@/components/lite/page/lite-sections.module.css";
 import type { QualificationStatsSummary } from "@/features/ai-qualification/stats-service";
 
 import styles from "./qualification-lite.module.css";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 const PAUSE_OPTIONS = [
   { value: "handoff_active", label: "Transferir ativas para corretores (recomendado)" },
@@ -91,8 +92,7 @@ export function OverviewTabLite({ stats, fields, onChange, onToggleEnabled, enab
         <section className={sections.group} aria-labelledby="ai-identity-title">
           <div className={sections.row}>
             <div className={sections.rowText}>
-              <h2 id="ai-identity-title" className={sections.rowTitle}>Identidade do assistente</h2>
-              <p className={sections.rowDescription}>Nome exibido e mensagem inicial de acolhimento.</p>
+              <h2 id="ai-identity-title" className={sections.rowTitle}>Identidade do assistente<LiteHint text="Nome exibido e mensagem inicial de acolhimento." /></h2>
             </div>
           </div>
           <div className={sections.formBody}>
@@ -109,8 +109,7 @@ export function OverviewTabLite({ stats, fields, onChange, onToggleEnabled, enab
         <section className={`${sections.group} ${styles.wide}`} aria-labelledby="ai-context-title">
           <div className={sections.row}>
             <div className={sections.rowText}>
-              <h2 id="ai-context-title" className={sections.rowTitle}>Conhecimento e diretrizes da empresa</h2>
-              <p className={sections.rowDescription}>A base de conhecimento, os planos vendidos e as regras de conduta que fundamentam o atendimento da IA. Salve pelo botão do topo.</p>
+              <h2 id="ai-context-title" className={sections.rowTitle}>Conhecimento e diretrizes da empresa<LiteHint text="A base de conhecimento, os planos vendidos e as regras de conduta que fundamentam o atendimento da IA. Salve pelo botão do topo." /></h2>
             </div>
           </div>
           <div className={sections.formBody}>

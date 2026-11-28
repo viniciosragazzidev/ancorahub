@@ -27,6 +27,7 @@ import {
 } from "@/features/ai-qualification/direction-questions-core";
 
 import hub from "../../_components/ia-hub.module.css";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 export type DirectionQuestionsServices = {
   answer: (input: { id: string; answer: string; sendToLead: boolean; teach: boolean }) => Promise<{ ok: true; row: DirectionQuestionRow | null } | { ok: false; error: string }>;
@@ -114,8 +115,7 @@ export function DirectionQuestionsWorkspace({ initialRows, canTeach = true, serv
     <>
       <section className={page.group} aria-labelledby="ia-direction-title">
         <header className={page.cardHead}>
-          <h2 id="ia-direction-title" className={page.cardTitle}>Perguntas para a direção</h2>
-          <p className={page.cardDescription}>Quando a IA não sabe algo, ela diz ao lead que vai confirmar com a equipe e a pergunta chega aqui.</p>
+          <h2 id="ia-direction-title" className={page.cardTitle}>Perguntas para a direção<LiteHint text="Quando a IA não sabe algo, ela diz ao lead que vai confirmar com a equipe e a pergunta chega aqui." /></h2>
         </header>
         <nav className={page.countTabs} aria-label="Filtrar perguntas">
           {([

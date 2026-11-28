@@ -18,12 +18,13 @@ import { aiRunPurposeLabel, aiRunStatusView, explainAiRun, formatAiRunLatency, i
 import type { AiRunRow } from "@/features/ai-qualification/ai-runs-service";
 
 import hub from "../../_components/ia-hub.module.css";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 function when(value: string | null) {
   return formatLiteDate(value, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }, "Sem data");
 }
 
-export function RunsWorkspace({ rows, onlyFailures, page: current, totalPages, totalItems, pageSize, summaryText, failed24h }: {
+export function RunsWorkspace({ rows, onlyFailures, page: current, totalPages, totalItems, pageSize, summaryText }: {
   rows: AiRunRow[];
   onlyFailures: boolean;
   page: number;
@@ -75,11 +76,8 @@ export function RunsWorkspace({ rows, onlyFailures, page: current, totalPages, t
     <>
       <section className={page.group} aria-labelledby="ia-runs-title">
         <header className={page.cardHead}>
-          <h2 id="ia-runs-title" className={page.cardTitle}>Últimas execuções</h2>
-          <p className={page.cardDescription}>
-            Cada vez que a IA foi chamada, com o tempo e a situação. {summaryText}.
-            {failed24h > 0 && !onlyFailures ? " Use Só falhas para ver o que deu errado." : ""}
-          </p>
+          <h2 id="ia-runs-title" className={page.cardTitle}>Últimas execuções<LiteHint text="Cada vez que a IA foi chamada, com o tempo e a situação. Use Só falhas para ver o que deu errado." /></h2>
+          <p className={page.cardDescription}>{summaryText}</p>
         </header>
         <LiteFilterChips
           label="Filtrar execuções"

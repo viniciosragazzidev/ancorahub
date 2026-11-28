@@ -18,6 +18,7 @@ import { acknowledgeAlertAction } from "@/features/ai-qualification/actions";
 import { alertLevelView, alertsForTab, alertTitle, alertWhatToDo, canResolveAlert, isOpenAlert, toAlertRow, type AlertRow, type AlertTab } from "@/features/ai-qualification/alerts-view";
 
 import hub from "../../_components/ia-hub.module.css";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 export type AlertsServices = { resolve: (id: string) => Promise<AlertRow[]> };
 
@@ -91,8 +92,7 @@ export function AlertsWorkspace({ initialRows, services = defaultServices }: { i
     <>
       <section className={page.group} aria-labelledby="ia-alerts-title">
         <header className={page.cardHead}>
-          <h2 id="ia-alerts-title" className={page.cardTitle}>Alertas da IA</h2>
-          <p className={page.cardDescription}>Lead sem corretor, falhas seguidas da IA e problemas da operação. Os calculados somem sozinhos quando o problema acaba.</p>
+          <h2 id="ia-alerts-title" className={page.cardTitle}>Alertas da IA<LiteHint text="Lead sem corretor, falhas seguidas da IA e problemas da operação. Os calculados somem sozinhos quando o problema acaba." /></h2>
         </header>
         <nav className={page.countTabs} aria-label="Filtrar alertas">
           {([

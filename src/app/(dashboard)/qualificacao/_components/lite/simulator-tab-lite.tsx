@@ -15,6 +15,7 @@ import sections from "@/components/lite/page/lite-sections.module.css";
 
 import type { SimMemory } from "../simulator-memory";
 import styles from "./qualification-lite.module.css";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 const MEMORY_FIELDS: Array<[keyof SimMemory, string]> = [["nome", "Nome"], ["plano", "Plano"], ["vidas", "Vidas"], ["idade", "Idade"], ["cidade", "Cidade"], ["email", "E-mail"]];
 
@@ -37,8 +38,7 @@ export function SimulatorTabLite({ activeAlerts, messages, input, onInput, onSen
         <section className={sections.group} aria-labelledby="simulator-title">
           <div className={sections.row}>
             <div className={sections.rowText}>
-              <h2 id="simulator-title" className={sections.rowTitle}>Simulador de qualificação</h2>
-              <p className={sections.rowDescription}>Teste o comportamento da IA com a memória sendo preenchida em tempo real. Nada é enviado ao cliente.</p>
+              <h2 id="simulator-title" className={sections.rowTitle}>Simulador de qualificação<LiteHint text="Teste o comportamento da IA com a memória sendo preenchida em tempo real. Nada é enviado ao cliente." /></h2>
             </div>
           </div>
           <div className={styles.chat}>

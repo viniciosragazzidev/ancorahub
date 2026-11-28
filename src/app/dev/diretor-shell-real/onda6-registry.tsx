@@ -18,6 +18,7 @@ import {
   WhatsappShellScreen,
 } from "./onda6-config-screens";
 import { SettingsShellScreen } from "./onda6-settings-screens";
+import { IaShellScreen } from "./ia-screen";
 
 export const ONDA6_SCREENS: Record<string, { path: string; render: () => ReactNode }> = {
   configuracoes: { path: "/settings", render: () => <SettingsShellScreen /> },
@@ -32,6 +33,7 @@ export const ONDA6_SCREENS: Record<string, { path: string; render: () => ReactNo
   situacoes: { path: "/atendimento/situacoes", render: () => <SituacoesShellScreen /> },
   mensagens: { path: "/atendimento/mensagens", render: () => <MensagensShellScreen /> },
   fluxo: { path: "/atendimento/fluxo", render: () => <FluxoShellScreen /> },
+  ia: { path: "/ia", render: () => <IaShellScreen /> },
   qualificacao: { path: "/qualificacao", render: () => <QualificacaoShellScreen /> },
   turbo: { path: "/qualificacao/turbo", render: () => <TurboShellScreen /> },
   "fluxos-whatsapp": { path: "/fluxos-whatsapp", render: () => <FluxosWhatsappShellScreen /> },

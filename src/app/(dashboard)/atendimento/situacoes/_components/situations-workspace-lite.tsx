@@ -28,6 +28,7 @@ import type { SuggestionRow } from "@/features/situation-learning/service";
 import { SituationDrawer, type SituationTarget } from "./situation-drawer";
 import { SuggestionDrawer } from "./suggestion-drawer";
 import type { LearningOverview } from "./situations-workspace";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 type KindFilter = "all" | SituationRow["kind"] | "suggestions";
 type Row = SituationRow & { aiActivated?: boolean };
@@ -56,8 +57,7 @@ function PhraseTesterLite() {
     <section className={sections.group} aria-labelledby="phrase-tester-title">
       <div className={sections.row}>
         <div className={sections.rowText}>
-          <h2 id="phrase-tester-title" className={sections.rowTitle}>Teste uma frase</h2>
-          <p className={sections.rowDescription}>Escreva o que um cliente diria no meio da qualificação e veja qual situação dispara, a resposta e o que acontece. Nada é enviado.</p>
+          <h2 id="phrase-tester-title" className={sections.rowTitle}>Teste uma frase<LiteHint text="Escreva o que um cliente diria no meio da qualificação e veja qual situação dispara, a resposta e o que acontece. Nada é enviado." /></h2>
         </div>
       </div>
       <div className={sections.formBody}>
@@ -143,8 +143,8 @@ export function SituationsWorkspaceLite({ situations, learning, autoActivatedKey
       </section>
       <section className={page.group} aria-labelledby="situations-title">
         <header className={page.cardHead}>
-          <h2 id="situations-title" className={page.cardTitle}>Situações ({situations.length})</h2>
-          <p className={page.cardDescription}>O que acontece quando o cliente diz algo fora da pergunta: respostas prontas (do sistema e da empresa) e os roteiros que orientam a IA quando nenhuma situação cobre. {coverage}.</p>
+          <h2 id="situations-title" className={page.cardTitle}>Situações<LiteHint text="O que acontece quando o cliente diz algo fora da pergunta: respostas prontas (do sistema e da empresa) e os roteiros que orientam a IA quando nenhuma situação cobre." /></h2>
+          <p className={page.cardDescription}>{situations.length} situações · {coverage}</p>
         </header>
         <div className={page.toolbar}>
           <label className={page.search}>
@@ -171,7 +171,7 @@ export function SituationsWorkspaceLite({ situations, learning, autoActivatedKey
         />
         {filter === "suggestions" ? (
           <>
-            <p className={page.cardDescription}>Perguntas que nenhuma situação cobriu, agrupadas pela IA a cada 30 minutos. Nada entra em uso sem a sua aprovação{learning.autoActivate ? ", exceto o que a ativação automática permitir" : ""}.</p>
+            <p className={page.cardDescription}>Perguntas que nenhuma situação cobriu<LiteHint text={`Agrupadas pela IA a cada 30 minutos. Nada entra em uso sem a sua aprovação${learning.autoActivate ? ", exceto o que a ativação automática permitir" : ""}.`} /></p>
             <LiteResponsiveData caption="Sugestões da IA" columns={suggestionColumns} rows={suggestionPages.pageRows} rowKey={(row) => row.id} onRowOpen={(row) => setSuggestionId(row.id)} empty={<p className={page.emptyText}>Nenhuma sugestão agora.</p>} />
             <LitePagination {...suggestionPages.pagination} label="Páginas das sugestões" />
           </>

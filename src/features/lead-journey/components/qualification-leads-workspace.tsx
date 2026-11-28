@@ -28,6 +28,7 @@ import { JOURNEY_TABS, rowsForTab, type QualificationLeadRow } from "../rows";
 import type { TimelineItem } from "../timeline";
 import { LeadJourneyView } from "./lead-journey-view";
 import { QualificationTimeline } from "./qualification-timeline";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 export type QualificationLeadsServices = {
   timeline: (leadId: string) => Promise<{ ok: true; data: { items: TimelineItem[] } } | { ok: false; error: string }>;
@@ -171,10 +172,8 @@ export function QualificationLeadsWorkspace({ rows, filters, summary, truncated 
     <>
       <section className={page.group} aria-labelledby="qualification-leads-title">
         <header className={page.cardHead}>
-          <h2 id="qualification-leads-title" className={page.cardTitle}>Leads na qualificação ({rows.length.toLocaleString("pt-BR")}{truncated ? "+" : ""})</h2>
-          <p className={page.cardDescription}>
-            Onde cada lead está, o que falta e o que acontece depois. {hot.toLocaleString("pt-BR")} quentes, {stopped.toLocaleString("pt-BR")} pararam no meio e {never.toLocaleString("pt-BR")} nunca responderam.
-          </p>
+          <h2 id="qualification-leads-title" className={page.cardTitle}>Leads na qualificação<LiteHint text="Onde cada lead está, o que falta e o que acontece depois." /></h2>
+          <p className={page.cardDescription}>{rows.length.toLocaleString("pt-BR")}{truncated ? "+" : ""} leads · {hot.toLocaleString("pt-BR")} quentes · {stopped.toLocaleString("pt-BR")} pararam no meio · {never.toLocaleString("pt-BR")} nunca responderam</p>
         </header>
         {filters ? <div className={page.toolbar}>{filters}</div> : null}
         {summary}
