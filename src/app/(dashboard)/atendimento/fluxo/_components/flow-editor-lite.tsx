@@ -18,6 +18,7 @@ import { saveQualificationFlowAction } from "@/features/qualification-flow/actio
 import { QUALIFICATION_FIELDS, questionTextProblem } from "@/features/qualification-flow/domain";
 
 import styles from "./flow-editor-lite.module.css";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 type Row = { key: QualificationFieldKey; enabled: boolean; text: string };
 
@@ -73,8 +74,8 @@ export function FlowEditorLite({ enabledOrder, texts, canEdit }: { enabledOrder:
     <>
       <section className={page.group} aria-labelledby="flow-title">
         <header className={page.cardHead}>
-          <h2 id="flow-title" className={page.cardTitle}>Perguntas da qualificação ({enabledCount} ligadas)</h2>
-          <p className={page.cardDescription}>A IA pergunta nesta ordem, uma por vez, e pula o que o cliente já respondeu. Texto vazio usa o texto do sistema, que se ajusta ao tipo de plano.</p>
+          <h2 id="flow-title" className={page.cardTitle}>Perguntas da qualificação<LiteHint text="A IA pergunta nesta ordem, uma por vez, e pula o que o cliente já respondeu. Texto vazio usa o texto do sistema, que se ajusta ao tipo de plano." /></h2>
+          <p className={page.cardDescription}>{enabledCount} ligadas</p>
         </header>
         <ol className={styles.list}>
           {rows.map((row, index) => {

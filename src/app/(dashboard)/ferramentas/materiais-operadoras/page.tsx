@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import compat from "@/components/lite/page/lite-compat.module.css";
+import litePage from "@/components/lite/page/lite-page.module.css";
 import { MaterialsWorkspace } from "@/features/operator-catalog/components/materials-workspace";
 import { getCatalogOverview, getReviewQueue, listCarriersForSelect, listOperatorMaterials } from "@/features/operator-catalog/queries";
 import { requireCapability } from "@/shared/auth/authorization";
@@ -33,7 +35,9 @@ export default async function MateriaisOperadorasPage() {
   return (
     <>
       <DashboardHeader breadcrumb="Ferramentas" title="Materiais das operadoras" summary={summary} />
-      <main className="flex flex-1 flex-col p-(--mobile-page-padding) lg:p-6">
+      {/* Direção limpa (28/11/2026): moldura Lite, sem sombra, alvos de 44px e cartões de borda. */}
+      <main className={litePage.stack}>
+        <div className={compat.compat}>
         <MaterialsWorkspace
           materials={materials}
           queue={queue}
@@ -42,6 +46,7 @@ export default async function MateriaisOperadorasPage() {
           carrierOptions={carrierOptions}
           semanticSearch={overview.semanticSearch}
         />
+        </div>
       </main>
     </>
   );

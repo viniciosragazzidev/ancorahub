@@ -13,6 +13,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 
 import { CallQueuePanel } from "./call-queue-panel";
 import { rate, RECOVERY_BASELINE_PER_WEEK, RECOVERY_TARGET_PER_WEEK, type RecoveryFunnelData, type RecoveryStepRow, type RecoveryWeek } from "../metrics-core";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 const n = (value: number) => value.toLocaleString("pt-BR");
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -62,10 +63,8 @@ export function RecoveryFunnelView({ data, filters, canEdit = false }: { data: R
     <>
       <section className={page.group} aria-labelledby="recovery-numbers-title">
         <header className={page.cardHead}>
-          <h2 id="recovery-numbers-title" className={page.cardTitle}>Funil de recuperação</h2>
-          <p className={page.cardDescription}>
-            Leads de anúncio · {data.periodText.toLowerCase()} · {data.queueName ?? "todas as filas"}. Recuperado = entrou na recuperação (virou frio, recebeu lembrete ou follow-up) e depois respondeu e ficou quente, morno ou foi para cotação.
-          </p>
+          <h2 id="recovery-numbers-title" className={page.cardTitle}>Funil de recuperação<LiteHint text="Recuperado: entrou na recuperação (virou frio, recebeu lembrete ou follow-up) e depois respondeu e ficou quente, morno ou foi para cotação." /></h2>
+          <p className={page.cardDescription}>Leads de anúncio · {data.periodText.toLowerCase()} · {data.queueName ?? "todas as filas"}</p>
         </header>
         {filters ? <div className={page.toolbar}>{filters}</div> : null}
         <p className={page.resultLine} aria-live="polite">{statusLine}{data.touchesTableMissing ? " A migration 0234 ainda não foi aplicada: os toques novos não aparecem." : ""}</p>
@@ -85,18 +84,14 @@ export function RecoveryFunnelView({ data, filters, canEdit = false }: { data: R
 
       <section className={page.group} aria-labelledby="recovery-steps-title">
         <header className={page.cardHead}>
-          <h2 id="recovery-steps-title" className={page.cardTitle}>Por forma de follow-up</h2>
-          <p className={page.cardDescription}>Cada passo: quantos saíram, quantos foram pulados e por quê, quem respondeu em 24 h e quanto custou na Meta (estimativa).</p>
+          <h2 id="recovery-steps-title" className={page.cardTitle}>Por forma de follow-up<LiteHint text="Cada passo: quantos saíram, quantos foram pulados e por quê, quem respondeu em 24 h e quanto custou na Meta (estimativa)." /></h2>
         </header>
         <LiteResponsiveData caption="Recuperação por forma de follow-up" columns={stepColumns} rows={steps} rowKey={(row) => row.step} empty={<p className={page.emptyText}>Nenhum lembrete ou follow-up no período.</p>} rowTone={(row) => (row.skipped > row.sent ? "warning" : undefined)} />
       </section>
 
       <section className={page.group} aria-labelledby="recovery-goal-title">
         <header className={page.cardHead}>
-          <h2 id="recovery-goal-title" className={page.cardTitle}>Meta: dobrar os recuperados</h2>
-          <p className={page.cardDescription}>
-            Linha de base {n(RECOVERY_BASELINE_PER_WEEK)} por semana, meta {n(RECOVERY_TARGET_PER_WEEK)}. Última semana fechada: {n(lastTotal)}. O grupo de controle recebe só o que existe hoje; a diferença entre as taxas é o efeito da cadência. Sem conclusão antes de 6 a 8 semanas.
-          </p>
+          <h2 id="recovery-goal-title" className={page.cardTitle}>Meta: dobrar os recuperados<LiteHint text="O grupo de controle recebe só o que existe hoje; a diferença entre as taxas é o efeito da cadência. Sem conclusão antes de 6 a 8 semanas." /></h2>
         </header>
         <div className={page.stats} aria-label="Meta">
           <Stat label="Última semana" value={n(lastTotal)} hint={`de ${n(RECOVERY_TARGET_PER_WEEK)} (meta)`} tone={lastTotal < RECOVERY_BASELINE_PER_WEEK ? "warning" : undefined} />
@@ -108,8 +103,7 @@ export function RecoveryFunnelView({ data, filters, canEdit = false }: { data: R
 
       <section className={page.group} aria-labelledby="recovery-health-title">
         <header className={page.cardHead}>
-          <h2 id="recovery-health-title" className={page.cardTitle}>Saúde do envio</h2>
-          <p className={page.cardDescription}>Opt-out, limite da Meta e templates que ainda não estão aprovados.</p>
+          <h2 id="recovery-health-title" className={page.cardTitle}>Saúde do envio<LiteHint text="Opt-out, limite da Meta e templates que ainda não estão aprovados." /></h2>
         </header>
         <div className={page.stats} aria-label="Saúde">
           <Stat label="Envios" value={n(health.sends)} hint="lembretes e follow-ups" />

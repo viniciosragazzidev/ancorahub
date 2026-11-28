@@ -8,6 +8,7 @@ import type { WhatsAppConnectionDiagnostic } from "@/features/ai-qualification/w
 import { WhatsAppTestMessageCard } from "@/features/communication-channels/components/whatsapp-test-message-card";
 
 import styles from "./qualification-lite.module.css";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 export function DiagnosticTabLite({ diagnostic }: { diagnostic: WhatsAppConnectionDiagnostic }) {
   const token = diagnostic.tokenStatus === "valid" ? `Válido${diagnostic.tokenExpirationDays ? ` (${diagnostic.tokenExpirationDays} dias)` : ""}` : "Não configurado";
@@ -16,8 +17,7 @@ export function DiagnosticTabLite({ diagnostic }: { diagnostic: WhatsAppConnecti
       <section className={sections.group} aria-labelledby="diag-title">
         <div className={sections.row}>
           <div className={sections.rowText}>
-            <h2 id="diag-title" className={sections.rowTitle}>Status da conexão WhatsApp</h2>
-            <p className={sections.rowDescription}>Diagnóstico da API da Meta (WABA).</p>
+            <h2 id="diag-title" className={sections.rowTitle}>Status da conexão WhatsApp<LiteHint text="Diagnóstico da API da Meta (WABA)." /></h2>
           </div>
         </div>
         <dl className={styles.kv}>

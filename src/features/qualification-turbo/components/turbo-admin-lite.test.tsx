@@ -30,7 +30,7 @@ afterEach(() => {
 describe("qualificação turbo Lite", () => {
   it("envia os que faltam pela mesma ação", async () => {
     render(<TurboAdminLite data={data(true)} />);
-    expect(screen.getByText("Templates da qualificação (1 de 3 aprovados)")).toBeInTheDocument();
+    expect(screen.getByText("1 de 3 aprovados")).toBeInTheDocument();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Enviar 2 à Meta" }));
     });

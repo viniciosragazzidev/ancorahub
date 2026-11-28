@@ -50,7 +50,6 @@ export default async function AiAreaPage() {
       <DashboardHeader
         breadcrumb="Atendimento IA"
         title="Atendimento IA"
-        summary="A IA conversa com cada lead novo, faz as perguntas do plano e entrega o lead pronto ao corretor."
       />
       <main className={page.stack}>
         <AiHubView summary={summary} sections={hubSections} />

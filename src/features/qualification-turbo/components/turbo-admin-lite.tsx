@@ -28,6 +28,7 @@ import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import { SILENCE_FOLLOW_UP_CHANNEL_OPTIONS, SILENCE_FOLLOW_UP_DESCRIPTION } from "./silence-follow-up-copy";
 import { RecoverySettingsLite } from "@/features/lead-recovery/components/recovery-settings-lite";
 import { recoveryBlockers, type RecoverySettings } from "@/features/lead-recovery/settings-core";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 type TemplateRow = TurboAdminData["templates"][number];
 
@@ -50,8 +51,7 @@ function SettingRow({ id, title, description, checked, onChange, disabled }: { i
   return (
     <div className={sections.row}>
       <div className={sections.rowText}>
-        <span id={id} className={sections.rowTitle}>{title}</span>
-        <span className={sections.rowDescription}>{description}</span>
+        <span className={sections.rowTitle}><span id={id}>{title}</span><LiteHint text={description} /></span>
       </div>
       <span style={{ display: "inline-grid", placeItems: "center", minWidth: 44, minHeight: 44 }}>
         <Switch aria-labelledby={id} checked={checked} onCheckedChange={onChange} disabled={disabled} />
@@ -183,8 +183,8 @@ export function TurboAdminLite({ data, recovery }: { data: TurboAdminData; recov
     <>
       <section className={page.group} aria-labelledby="turbo-templates-title">
         <header className={page.cardHead}>
-          <h2 id="turbo-templates-title" className={page.cardTitle}>Templates da qualificação ({approved} de {data.templates.length} aprovados)</h2>
-          <p className={page.cardDescription}>Primeira mensagem e lembrete são utilidade (R$ 0,035); reengajamento é marketing (R$ 0,32). Cada botão já responde uma pergunta ou encerra a sequência. Templates ainda não aprovados são pulados sem afetar o atendimento.</p>
+          <h2 id="turbo-templates-title" className={page.cardTitle}>Templates da qualificação<LiteHint text="Primeira mensagem e lembrete são utilidade (R$ 0,035); reengajamento é marketing (R$ 0,32). Cada botão já responde uma pergunta ou encerra a sequência. Templates ainda não aprovados são pulados sem afetar o atendimento." /></h2>
+          <p className={page.cardDescription}>{approved} de {data.templates.length} aprovados</p>
         </header>
         <div className={page.toolbar}>
           <button type="button" className={page.button} onClick={() => setSettingsOpen(true)}>

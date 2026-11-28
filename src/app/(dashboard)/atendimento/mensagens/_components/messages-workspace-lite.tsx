@@ -23,6 +23,7 @@ import type { LibraryMessage } from "@/features/message-library/service";
 import { TemplateBuilderWizard } from "../../../integrations/whatsapp/_components/template-builder-wizard";
 import { MessagePoliciesPanel } from "../../../qualificacao/_components/message-policies-panel";
 import { MessageDrawer, type DrawerTarget } from "./message-drawer";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 type KindFilter = "all" | MessageKind;
 
@@ -86,8 +87,8 @@ export function MessagesWorkspaceLite({ messages, dutyReminderEnabled = false }:
     <>
       <section className={page.group} aria-labelledby="messages-title">
         <header className={page.cardHead}>
-          <h2 id="messages-title" className={page.cardTitle}>Mensagens ({messages.length} · {inUse} em uso)</h2>
-          <p className={page.cardDescription}>Tudo o que o sistema envia para clientes e para a equipe. Abra uma mensagem para ver onde ela vale, onde é usada e por qual canal sai.</p>
+          <h2 id="messages-title" className={page.cardTitle}>Mensagens<LiteHint text="Tudo o que o sistema envia para clientes e para a equipe. Abra uma mensagem para ver onde ela vale, onde é usada e por qual canal sai." /></h2>
+          <p className={page.cardDescription}>{messages.length} mensagens · {inUse} em uso</p>
         </header>
         <div className={page.toolbar}>
           <label className={page.search}>

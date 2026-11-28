@@ -15,6 +15,7 @@ import { followUpInertBadge } from "@/features/ai-qualification/followup-executi
 
 import type { QualificationHubProps } from "../qualification-hub-types";
 import { ActionNote, BusyLabel, type ActionStatus } from "./action-status-lite";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 type Rule = QualificationHubProps["followUpRules"][number];
 export type FollowUpDraft = { name: string; trigger: string; delay: number; messageMode: "fixed" | "template" | "ai_generated"; messageText: string };
@@ -51,8 +52,7 @@ export function FollowUpTabLite({ rules, draft, onDraft, onSubmit, onDelete, rul
       <form onSubmit={onSubmit} className={sections.group} aria-labelledby="followup-new-title">
         <div className={sections.row}>
           <div className={sections.rowText}>
-            <h2 id="followup-new-title" className={sections.rowTitle}>Nova regra de follow-up</h2>
-            <p className={sections.rowDescription}>Mensagens automáticas de retorno por inatividade ou abandono. Respeitam o opt-out e a janela comercial; a regra nasce com o envio automático desligado.</p>
+            <h2 id="followup-new-title" className={sections.rowTitle}>Nova regra de follow-up<LiteHint text="Mensagens automáticas de retorno por inatividade ou abandono. Respeitam o opt-out e a janela comercial; a regra nasce com o envio automático desligado." /></h2>
           </div>
         </div>
         <div className={sections.formBody}>

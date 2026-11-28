@@ -13,6 +13,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { AgentTriggersPanel } from "../agent-triggers-panel";
 import type { QualificationHubProps } from "../qualification-hub-types";
 import { ActionNote, BusyLabel, type ActionStatus } from "./action-status-lite";
+import { LiteHint } from "@/components/lite/page/lite-hint";
 
 type Tool = QualificationHubProps["toolPermissions"][number];
 
@@ -41,8 +42,7 @@ export function PermissionsTabLite({ tools, onToggle, status = {} }: { tools: To
       </div>
       <section className={page.group} aria-labelledby="tools-title">
         <header className={page.cardHead}>
-          <h2 id="tools-title" className={page.cardTitle}>Governança das ferramentas (MCP)</h2>
-          <p className={page.cardDescription}>O que a IA pode consultar ou alterar. Ações críticas ficam sempre bloqueadas.</p>
+          <h2 id="tools-title" className={page.cardTitle}>Ferramentas da IA<LiteHint text="O que a IA pode consultar ou alterar (MCP). Ações críticas ficam sempre bloqueadas." /></h2>
           <ActionNote status={status.tools} />
         </header>
         <LiteResponsiveData caption="Permissões das ferramentas da IA" columns={columns} rows={tools} rowKey={(tool) => tool.toolName} rowTone={(tool) => (tool.isCritical ? "muted" : undefined)} empty={<p className={page.emptyText}>Nenhuma ferramenta cadastrada.</p>} />
