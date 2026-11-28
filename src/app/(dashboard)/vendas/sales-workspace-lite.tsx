@@ -141,7 +141,7 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
 
         {sales.length === 0 ? (
           <div className={cm.empty}>
-            <p className={cm.emptyTitle}>Nenhuma venda registrada ainda</p>
+            <h2 className={cm.emptyTitle}>Nenhuma venda registrada ainda</h2>
             <p className={cm.emptyText}>As vendas aparecem aqui assim que um lead é fechado como vendido.</p>
             <Link href="/leads" className={cn(cm.pill, cm.primary)}>Ir para leads</Link>
           </div>

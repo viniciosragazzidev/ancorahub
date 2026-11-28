@@ -136,7 +136,7 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
 
         {clients.length === 0 ? (
           <div className={cm.empty}>
-            <p className={cm.emptyTitle}>Nenhum cliente convertido ainda</p>
+            <h2 className={cm.emptyTitle}>Nenhum cliente convertido ainda</h2>
             <p className={cm.emptyText}>Aqui fica a carteira de clientes. Para adicionar um, feche um lead como vendido.</p>
             <Link href="/leads" className={cn(cm.pill, cm.primary)}>Ir para leads</Link>
           </div>

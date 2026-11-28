@@ -36,20 +36,20 @@ const sale = (id: string, leadName: string, status: string, saleValue: number): 
 const SALES = [sale("s1", "Justiniano Albuquerque de Souza", "active", 1200), sale("s2", "Cristiane Farizele", "cancelled", 800), sale("s3", "Nazareth Pereira", "active", 950)];
 
 describe("vendas Lite", () => {
-  it("mostra os números, filtra por status e busca, e leva aos detalhes", () => {
+  it("mostra os números, filtra por status e busca, e abre a gaveta da venda", () => {
     render(<SalesWorkspaceLite sales={SALES} totalRevenue={2950} currentRole="director" period={30} branches={[{ id: "b1", name: "Centro" }, { id: "b2", name: "Barra" }]} />);
-    expect(screen.getAllByTestId("stat")[0]).toHaveTextContent("Total de vendas: 3");
-    const table = () => document.querySelector('[data-lite="table"]') as HTMLElement;
+    const strip = within(screen.getByRole("region", { name: "Resumo" }));
+    expect(strip.getByText("Vendas").nextElementSibling).toHaveTextContent("3");
+    expect(strip.getByText("Ticket médio")).toBeInTheDocument();
+    const table = () => screen.getByRole("table", { name: "Vendas" });
     expect(within(table()).getAllByRole("row")).toHaveLength(4);
-    expect(screen.getAllByTestId("stat")[3]).toHaveTextContent("Ticket médio");
     fireEvent.click(screen.getByRole("button", { name: /^Canceladas/ }));
     expect(within(table()).getAllByRole("row")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: /^Todas/ }));
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar vendas" }), { target: { value: "nazareth" } });
     expect(within(table()).getAllByRole("row")).toHaveLength(2);
-    expect(within(table()).getByRole("link", { name: "Ver detalhes da venda" })).toHaveAttribute("href", "/vendas/s3");
     fireEvent.click(within(table()).getByText("Nazareth Pereira"));
-    expect(push).toHaveBeenLastCalledWith("/vendas/s3");
+    expect(screen.getByRole("link", { name: "Abrir venda completa" })).toHaveAttribute("href", "/vendas/s3");
   });
 
   it("unidade e período vão para a URL como os seletores atuais", () => {
@@ -66,7 +66,7 @@ describe("vendas Lite", () => {
     URL.createObjectURL = vi.fn(() => "blob:x");
     URL.revokeObjectURL = vi.fn();
     render(<SalesWorkspaceLite sales={SALES} totalRevenue={2950} currentRole="director" period={30} branches={[]} />);
-    const table = document.querySelector('[data-lite="table"]') as HTMLElement;
+    const table = screen.getByRole("table", { name: "Vendas" });
     fireEvent.click(within(table).getByRole("checkbox", { name: "Selecionar venda Cristiane Farizele" }));
     const bar = within(screen.getByRole("region", { name: "Ações em lote" }));
     await act(async () => {
