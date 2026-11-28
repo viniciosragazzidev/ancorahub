@@ -221,8 +221,7 @@ function BranchTable({ branches }: { branches: BranchHealth[] }) {
     <section className={page.group} aria-labelledby="noc-unidades">
       <div className={page.toolbar}>
         <div className={page.cardHead}>
-          <h2 id="noc-unidades" className={page.sectionTitle}>Saúde das unidades</h2>
-          <p className={page.muted}>As piores primeiro: risco de SLA, fila sem corretor e corretores disponíveis.</p>
+          <h2 id="noc-unidades" className={page.sectionTitle}>Saúde das unidades <span className={page.countPill}>piores primeiro</span></h2>
         </div>
         <nav aria-label="Filtrar unidades por saúde" className={styles.healthTabs}>
           {healthTabs.map((tab) => (
@@ -302,8 +301,7 @@ export function NocLite({ data, period, now, urgentLead = null }: { data: NocDat
         <section className={page.card} aria-labelledby="noc-fluxo">
           <div className={styles.cardHeadRow}>
             <div className={page.cardHead}>
-              <h2 id="noc-fluxo" className={page.sectionTitle}>Fluxo de leads</h2>
-              <p className={page.muted}>Últimos 7 dias: leads, contatos e conversões</p>
+              <h2 id="noc-fluxo" className={page.sectionTitle}>Fluxo de leads <span className={page.countPill}>7 dias</span></h2>
             </div>
             <Legend items={[{ label: "Leads", color: "var(--chart-1)" }, { label: "Contatos", color: "var(--chart-3)" }, { label: "Conversões", color: "var(--chart-5)" }]} />
           </div>
@@ -325,8 +323,7 @@ export function NocLite({ data, period, now, urgentLead = null }: { data: NocDat
         <section className={page.card} aria-labelledby="noc-status">
           <div className={styles.cardHeadRow}>
             <div className={page.cardHead}>
-              <h2 id="noc-status" className={page.sectionTitle}>Distribuição por status</h2>
-              <p className={page.muted}>Leads por etapa nos últimos 30 dias</p>
+              <h2 id="noc-status" className={page.sectionTitle}>Leads por etapa <span className={page.countPill}>30 dias</span></h2>
             </div>
             <span className={page.badge}>{statusTotal.toLocaleString("pt-BR")} leads</span>
           </div>
@@ -353,8 +350,7 @@ export function NocLite({ data, period, now, urgentLead = null }: { data: NocDat
         <section className={page.card} aria-labelledby="noc-hoje">
           <div className={styles.cardHeadRow}>
             <div className={page.cardHead}>
-              <h2 id="noc-hoje" className={page.sectionTitle}>Atividade hoje</h2>
-              <p className={page.muted}>Leads recebidos e contatos por hora</p>
+              <h2 id="noc-hoje" className={page.sectionTitle}>Atividade hoje <span className={page.countPill}>por hora</span></h2>
             </div>
             <Legend items={[{ label: "Leads", color: "var(--chart-1)" }, { label: "Contatos", color: "var(--chart-3)" }]} />
           </div>
@@ -374,8 +370,7 @@ export function NocLite({ data, period, now, urgentLead = null }: { data: NocDat
 
         <section className={page.card} aria-labelledby="noc-equipe">
           <div className={page.cardHead}>
-            <h2 id="noc-equipe" className={page.sectionTitle}>Desempenho da equipe</h2>
-            <p className={page.muted}>Corretores: conversões sobre leads hoje</p>
+            <h2 id="noc-equipe" className={page.sectionTitle}>Desempenho da equipe <span className={page.countPill}>hoje</span></h2>
           </div>
           {teamPerformance.length === 0 ? (
             <p className={page.muted}>Sem dados de corretores hoje.</p>
@@ -397,7 +392,6 @@ export function NocLite({ data, period, now, urgentLead = null }: { data: NocDat
         <section className={page.card} aria-labelledby="noc-servicos">
           <div className={page.cardHead}>
             <h2 id="noc-servicos" className={page.sectionTitle}>Status dos serviços</h2>
-            <p className={page.muted}>Saúde atual da infraestrutura</p>
           </div>
           <ul className={styles.services}>
             {SERVICES.map((service) => (
@@ -415,7 +409,6 @@ export function NocLite({ data, period, now, urgentLead = null }: { data: NocDat
         <div className={styles.cardHeadRow}>
           <div className={page.cardHead}>
             <h2 id="noc-feed" className={page.sectionTitle}>Atividades recentes</h2>
-            <p className={page.muted}>Movimentações da operação</p>
           </div>
           <span className={page.badge}>Tempo real</span>
         </div>

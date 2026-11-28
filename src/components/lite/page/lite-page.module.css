@@ -77,11 +77,37 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
-/* Cartão de número em repouso: borda de 1px e nenhuma sombra (contrato de refino). A classe dobrada vence a pele diretor. */
-.stats.stats :global([data-slot="stat-card"]) {
+/* Números em faixa única (28/11/2026, docs/design-system/lite/DIRECAO-LIMPA.md): um contorno só, divisórias finas
+   entre os números, sem sombra nem minigráfico. Cada item ganha borda à direita e embaixo; a faixa corta a última
+   coluna e a última linha (margem -1px), então as divisórias ficam certas em qualquer quebra de linha. */
+.stats.stats {
+  gap: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
-  box-shadow: none;
+  border-radius: var(--radius-surface);
+  background: var(--surface);
 }
+.stats.stats > * {
+  min-width: 0;
+  margin: 0 -1px -1px 0;
+  border: 0;
+  border-right: 1px solid var(--border-subtle, var(--border));
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.stats.stats :global([data-slot="stat-card"]) {
+  border: 0;
+  border-right: 1px solid var(--border-subtle, var(--border));
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.stats.stats :global([data-slot="stat-card"]:hover) { background: transparent; }
+/* O minigráfico do cartão de número sai: na faixa, o número e o rótulo bastam. */
+.stats.stats :global([data-slot="stat-card"]) > div:last-child > :nth-child(2) { display: none; }
 
 /* Botão só de ícone (abrir, alterar): alvo de 44px, nome acessível obrigatório em aria-label. */
 .iconButton {
@@ -134,7 +160,7 @@
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 16px 20px;
+  padding: 18px 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-surface);
   background: var(--surface);
@@ -400,7 +426,6 @@
   /* Celular: números em 2 colunas, para a lista aparecer sem rolar quatro cartões. */
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
   }
 
   /* No celular, o cartão de número mostra só o valor e o rótulo: a tendência (gráfico) fica para telas maiores. */
@@ -457,7 +482,7 @@
 .countTabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-muted); width: fit-content; max-width: 100%; }
 .countTab { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; white-space: nowrap; }
 .countTab:hover { color: var(--foreground); }
-.countTab[data-active="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
+.countTab[data-active="true"] { background: var(--surface); color: var(--foreground); box-shadow: inset 0 0 0 1px var(--border); }
 .countPill { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--surface-muted); color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; text-align: center; }
 .resultLine { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
 .resultLine button { border: 0; background: none; padding: 0; color: var(--primary); font: inherit; cursor: pointer; }

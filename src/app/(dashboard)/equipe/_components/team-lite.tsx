@@ -82,6 +82,8 @@ function TransferRequestsLite({ initial }: { initial: PendingTransferRequest[] }
       return result;
     }, { done: approve ? "Transferência aprovada" : "Pedido recusado", fallback: "Não deu para registrar a decisão agora.", keeps: "O pedido continua aguardando." }).finally(() => setActiveId(null));
   };
+  // Direção limpa (28/11/2026): sem pedido e sem decisão recente, o cartão nem aparece.
+  if (requests.length === 0 && !status.transfers) return null;
   return (
     <section className={page.card} aria-labelledby="equipe-transferencias">
       <div className={styles.cardHeadRow}>
@@ -343,8 +345,7 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
 
       <section className={page.group} aria-labelledby="equipe-acessos">
         <div className={page.cardHead}>
-          <h2 id="equipe-acessos" className={page.sectionTitle}>Acessos vinculados</h2>
-          <p className={page.muted}>{activeCount} acesso{activeCount === 1 ? "" : "s"} ativo{activeCount === 1 ? "" : "s"}. Convites pendentes ficam sinalizados até o primeiro login.</p>
+          <h2 id="equipe-acessos" className={page.sectionTitle}>Acessos vinculados <span className={page.countPill} title="Convites pendentes ficam sinalizados até o primeiro login.">{activeCount} ativo{activeCount === 1 ? "" : "s"}</span></h2>
           {feedback.members?.state === "busy" ? <p className={page.muted} role="status">Salvando…</p> : <ActionNote status={feedback.members} />}
         </div>
         <div className={page.toolbar}>

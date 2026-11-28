@@ -165,7 +165,6 @@ export function RecoveryLite({ requests }: { requests: RecoveryLiteRequest[] }) 
   return (
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
       <section className={page.group} aria-label="Resumo">
-        <p className={page.muted}>Aprove ou rejeite os pedidos de recuperação de senha da equipe. Ao aprovar, um link de acesso único vai por WhatsApp para quem pediu.</p>
         <div className={page.stats}>
           <StatCard label="Pendentes" value={counts.requested} sublabel="aguardando análise" sparklineData={trends.pending} sparklineColor="var(--warning)" animated />
           <StatCard label="Aprovadas" value={counts.approved} sublabel="link enviado ao membro" sparklineData={trends.resolved} sparklineColor="var(--chart-2)" animated animationDelay={0.06} />

@@ -306,7 +306,7 @@ export function CargosLite({ enabled, catalog, routeCatalog, roles }: { enabled:
   return (
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
       <div className={page.toolbar}>
-        <p className={page.muted}>Crie cargos personalizados para definir acessos a dados, rotas, relatórios e ferramentas do CRM.</p>
+        <span className={page.resultLine} title="Cargos personalizados definem acessos a dados, rotas, relatórios e ferramentas do CRM.">{roles.length} {roles.length === 1 ? "cargo" : "cargos"}</span>
         <button type="button" className={`${page.primaryButton} ${page.toolbarEnd}`} disabled={!enabled} onClick={() => setSelectedId("new")}><Plus aria-hidden="true" size={16} />Novo cargo</button>
       </div>
 
