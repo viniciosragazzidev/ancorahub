@@ -437,3 +437,8 @@ button.stripItem:hover { background: #fafafc; }
 .turnLabel { font-size: 13px; }
 .turnName { display: inline; font-size: 13px; }
 .turnDetail { display: none; }
+
+/* "?" no celular: o balão ocupa a largura da tela (16px de margem) logo abaixo do botão, sem passar da borda. */
+@media (max-width: 767px) {
+  .infoPop, .infoPopEnd { position: fixed; top: auto; left: 16px; right: 16px; width: auto; max-width: none; margin-top: 24px; }
+}
