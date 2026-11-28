@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 import styles from "./duty-queue-order-board.module.css";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
-import { initials, pl } from "./plantoes-1a1-kit";
+import { PlInfo, initials, pl } from "./plantoes-1a1-kit";
 import { isRotationSignal } from "./duty-turn-auto-refresh";
 
 const timeZone = "America/Sao_Paulo";
@@ -338,14 +338,13 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
       });
     };
     return (
-      <section className={cn(pl.card, pl.in, pl.queue)} aria-labelledby="duty-queue-order-title">
-        <div className={pl.sectionHead}>
-          <div className={pl.sectionText}>
-            <h3 id="duty-queue-order-title" className={pl.h3}>Quem recebe o próximo lead</h3>
-            <p className={cn(pl.lead, pl.queueIntro)}>Prévia da fila de cada plantão em andamento. A escolha final é recalculada quando o lead chega.</p>
-          </div>
+      // Direção limpa (28/11/2026): sem cartão em volta dos cartões; a explicação foi para o "?" e o "Como funciona".
+      <section className={cn(pl.in, pl.queueBare)} aria-labelledby="duty-queue-order-title">
+        <h3 id="duty-queue-order-title" className={cn(pl.h3, pl.queueTitle)}>
+          Quem recebe o próximo lead
           <span className={cn(pl.badge, pl.bGood, pl.flexNone)}><span className={pl.dot} style={{ background: "var(--success)" }} aria-hidden="true" />Ao vivo</span>
-        </div>
+          <PlInfo label="Sobre a prévia da fila">Prévia da fila de cada plantão em andamento. A escolha final é recalculada quando o lead chega.</PlInfo>
+        </h3>
         {previews === null ? <p className={pl.empty}>Não foi possível montar a prévia da fila agora. A distribuição dos leads segue normal.</p> : !previews.length ? <p className={pl.empty}>Nenhum plantão está em andamento agora.</p> : (
           <div className={pl.queueGrid}>
             {/* Do plantão com mais gente para o com menos (27/11/2026): cartões de tamanho parecido lado a lado. */}
@@ -372,11 +371,7 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
                     ) : null}
                   </div>
                   {preview.rotation ? <TurnStrip1a1 preview={preview} nextName={orderedRows[0]?.name ?? null} reduceMotion={reduceMotion} /> : null}
-                  <p className={pl.qnote}>{isSaving
-                    ? "Salvando a ordem…"
-                    : preview.rotation
-                      ? "Cada um tem sua vez, na ordem em que chegou: quem recebe vai para o fim. Lead expirado ou recusado gasta a vez e conta como pulo; no 3º pulo o corretor entra em pausa."
-                      : preview.manual ? "O corretor disponível no início da fila recebe e vai para o fim." : "Ordem automática, com indicação quando houver empate."}</p>
+                  {isSaving ? <p className={pl.qnote} role="status">Salvando a ordem…</p> : null}
                   {orderedRows.length ? (
                     <DndContext id={`duty-queue-${preview.scheduleId}`} sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={(event) => { void onDragEnd(event, preview); }}>
                       <SortableContext items={orderedRows.map((item) => item.id)} strategy={verticalListSortingStrategy}>
@@ -419,6 +414,13 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
           <button type="button" className={cn(pl.pill, pl.pillGhost, pl.queueMore)} style={{ color: "var(--d-action-text)" }} aria-expanded={showAllQueues} onClick={() => setShowAllQueues((value) => !value)}>
             {showAllQueues ? "Ver só a primeira fila" : `Ver as ${previews.length} filas`}
           </button>
+        ) : null}
+        {previews && previews.length ? (
+          <details className={pl.how}>
+            <summary>Como funciona a fila</summary>
+            <p>Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim. Lead expirado ou recusado gasta a vez e conta como pulo; no 3º pulo o corretor entra em pausa.</p>
+            <p>Fila manual: o corretor disponível no início da fila recebe e vai para o fim. Automática: ordem do sistema, com indicação quando houver empate.</p>
+          </details>
         ) : null}
       </section>
     );
@@ -528,11 +530,8 @@ export function DutyQueueOrderBoardLoading() {
   const lite = useDirectorLitePage();
   if (lite) {
     return (
-      <section className={cn(pl.card, pl.queue)} aria-labelledby="duty-queue-order-title" aria-busy="true">
-        <div className={pl.sectionText}>
-          <h3 id="duty-queue-order-title" className={pl.h3}>Quem recebe o próximo lead</h3>
-          <p className={pl.lead}>Prévia da fila de cada plantão em andamento. A escolha final é recalculada quando o lead chega.</p>
-        </div>
+      <section className={pl.queueBare} aria-labelledby="duty-queue-order-title" aria-busy="true">
+        <h3 id="duty-queue-order-title" className={cn(pl.h3, pl.queueTitle)}>Quem recebe o próximo lead</h3>
         <p className={pl.empty} role="status">Montando a prévia da fila.</p>
       </section>
     );

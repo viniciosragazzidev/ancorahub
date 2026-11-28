@@ -8,7 +8,7 @@
  */
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { useArcPortalTarget } from "@/components/arc/arc-scope-context";
 import { cn } from "@/lib/utils";
@@ -276,5 +276,28 @@ export function PlMenu({ trigger, triggerClassName, triggerLabel, items, align =
         </MenuPrimitive.Positioner>
       </MenuPrimitive.Portal>
     </MenuPrimitive.Root>
+  );
+}
+
+/**
+ * Explicação recolhida num "?" (28/11/2026, direção limpa): o texto que ficava fixo embaixo do título abre num
+ * balão ao clicar e fecha com outro clique, Esc ou clique fora.
+ */
+export function PlInfo({ label, children, align = "start" }: { label: string; children: ReactNode; align?: "start" | "end" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => { if (!ref.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", escape); };
+  }, [open]);
+  return (
+    <span ref={ref} className={s.info}>
+      <button type="button" className={s.infoBtn} aria-label={label} aria-expanded={open} onClick={() => setOpen((value) => !value)}>?</button>
+      {open ? <span role="note" className={cn(s.infoPop, align === "end" && s.infoPopEnd)}>{children}</span> : null}
+    </span>
   );
 }

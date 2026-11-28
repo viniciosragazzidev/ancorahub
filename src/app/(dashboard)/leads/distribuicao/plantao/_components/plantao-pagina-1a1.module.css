@@ -227,3 +227,18 @@
 @keyframes turnTagIn { from { opacity: 0; transform: translateY(-4px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes turnPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.7); } }
 @media (prefers-reduced-motion: reduce) { .turnTag, .turnPulse { animation: none; } }
+
+/* Direção limpa (28/11/2026, artifact "Distribuição limpa"): mais respiro, escala sem cartão em volta dos cartões e o
+   rodízio em linha ("Anterior X · aceitou 14:02  Recebendo Y  Próximo Z"), sem caixas. */
+.page { gap: 24px; padding-top: 24px !important; }
+.h1 { font-size: 28px; }
+.escalaBare { padding: 0; background: transparent; border: 0; border-radius: 0; gap: 12px; }
+.turn { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; }
+.turnSlot { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 6px; padding: 0; border-radius: 0; background: transparent; }
+.turnSlot[data-turn="current"] { background: transparent; }
+.turnSlot > span { display: inline-flex; align-items: baseline; gap: 6px; }
+.turnLabel { font-size: 13px; }
+.turnName { display: inline; font-size: 13px; }
+.turnSlot[data-turn="current"] .turnName { color: var(--d-action-text, var(--chat-action-text)); }
+.turnDetail { display: inline; font-size: 13px; }
+.turnDetail::before { content: "\00B7  "; }

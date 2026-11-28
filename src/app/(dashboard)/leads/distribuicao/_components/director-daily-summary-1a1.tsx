@@ -15,6 +15,7 @@ import type { BrokerDailySummaryAggregate, BrokerDailySummaryItem } from "@/feat
 import { useBrokerDailySummary, type SummaryPeriod } from "./broker-daily-summary-panel";
 import { availabilityGroup, sortBrokersForFollowUp } from "./director-daily-summary";
 import { PageButtons, PillSelect, initialsOf } from "./resumo-1a1-parts";
+import { PlInfo } from "../plantao/_components/plantoes-1a1-kit";
 import s from "./resumo-1a1.module.css";
 
 const PAGE_SIZE = 10;
@@ -102,8 +103,7 @@ export function DirectorDailySummary1a1({ initialData, branches, canFilterBranch
     <section className={s.brokers} aria-labelledby="resumo-corretores" aria-busy={isLoading}>
       <div className={s.brokersHead}>
         <div>
-          <h2 id="resumo-corretores" className={s.h2}>Resumo dos corretores</h2>
-          <p className={s.h2Lead}>Leads recebidos, atendimento, perdas e conversão de cada corretor no período.</p>
+          <h2 id="resumo-corretores" className={s.h2}>Resumo dos corretores <PlInfo label="O que é este resumo">Leads recebidos, atendimento, perdas e conversão de cada corretor no período.</PlInfo></h2>
         </div>
         <div className={s.headActions} ref={exportRef}>
           <div className={s.segment} role="group" aria-label="Período">
@@ -140,7 +140,7 @@ export function DirectorDailySummary1a1({ initialData, branches, canFilterBranch
 
       <dl className={s.stats}>
         {stats.map((stat, index) => (
-          <div key={stat.label} className={`${s.card} ${s.stat} ${s.in}`} style={{ animationDelay: `${120 + index * 40}ms` }}>
+          <div key={stat.label} className={`${s.stat} ${s.in}`} style={{ animationDelay: `${120 + index * 40}ms` }}>
             <dt className={s.statLabel}>{stat.label}</dt>
             <dd className={`${s.statValue} ${stat.valueCls ?? ""}`}>{stat.value}</dd>
             <dd className={`${s.statDetail} ${stat.detailCls ?? ""}`}>{stat.detail}</dd>

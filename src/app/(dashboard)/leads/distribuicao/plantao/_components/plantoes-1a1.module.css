@@ -399,3 +399,41 @@
 
 /* Fila do próximo lead: até uns 5 corretores à vista, o resto rola (27/11/2026). */
 .qlistScroll [data-slot="scroll-area-viewport"] { max-height: 372px; }
+
+/* Direção limpa (28/11/2026): explicação no "?", faixa única de números e "Como funciona" recolhível. */
+.info { position: relative; display: inline-flex; vertical-align: middle; font-weight: 400; }
+.infoBtn { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 500; line-height: 1; cursor: pointer; }
+.infoBtn::after { content: ""; position: absolute; inset: -11px; }
+.infoBtn:hover, .infoBtn[aria-expanded="true"] { color: var(--foreground); border-color: rgb(16 16 40 / 0.2); }
+.infoPop { position: absolute; top: calc(100% + 8px); left: -8px; z-index: 40; width: max-content; max-width: min(360px, 80vw); padding: 12px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-floating, 0 16px 40px rgb(16 16 40 / 0.14)); font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--text-secondary); letter-spacing: normal; white-space: normal; text-align: left; }
+.infoPopEnd { left: auto; right: -8px; }
+.strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); background: var(--surface); border: 1px solid var(--d-border-subtle, var(--border)); border-radius: 24px; overflow: hidden; }
+.stripItem { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 16px 20px; margin-left: -1px; border-left: 1px solid var(--d-border-subtle, var(--border)); text-align: left; font: inherit; color: inherit; background: transparent; border-top: 0; border-right: 0; border-bottom: 0; }
+button.stripItem { cursor: pointer; }
+button.stripItem:hover { background: #fafafc; }
+.stripLabel { font-size: 13px; color: var(--text-muted); }
+.stripValue { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stripText { font-size: 16px; font-weight: 500; line-height: 1.3; }
+.stripHint { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.stripAction { font-size: 12px; font-weight: 500; color: var(--d-action-text, var(--chat-action-text)); }
+.how { border: 1px solid var(--d-border-subtle, var(--border)); border-radius: 20px; background: var(--surface); padding: 0 20px; font-size: 13px; color: var(--text-muted); }
+.how > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; list-style: none; font-weight: 500; color: var(--text-secondary); }
+.how > summary::-webkit-details-marker { display: none; }
+.how > summary::after { content: ""; width: 7px; height: 7px; margin-left: 10px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform 200ms; }
+.how[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
+.how > p { margin: 0 0 14px; line-height: 1.5; }
+@media (max-width: 767px) { .stripItem { padding: 12px 14px; } .stripValue { font-size: 20px; } }
+.page { gap: 24px; padding-top: 32px; }
+.h2 { font-size: 18px; letter-spacing: -0.01em; }
+.h2Row { display: flex; align-items: center; gap: 8px; }
+.queueBare { display: flex; flex-direction: column; gap: 12px; animation-delay: 120ms; min-width: 0; }
+.queueTitle { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 16px; }
+.qcard { gap: 12px; }
+/* Rodízio em linha (direção limpa): "Anterior X · Recebendo Y · Próximo Z", sem caixas. */
+.turn { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; }
+.turnSlot { background: transparent; padding: 0; border-radius: 0; flex-direction: row; align-items: baseline; gap: 6px; }
+.turnSlot[data-turn="current"] { background: transparent; }
+.turnSlot[data-turn="current"] .turnName { color: var(--d-action-text, var(--chat-action-text)); }
+.turnLabel { font-size: 13px; }
+.turnName { display: inline; font-size: 13px; }
+.turnDetail { display: none; }

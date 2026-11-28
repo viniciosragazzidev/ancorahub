@@ -83,7 +83,7 @@ import directorLiteStyles from "./director-duty-operations.module.css";
 import { UNIT_PHOTO_OPTIONS, UnitPhotoDefaultsButton, UnitPhotoDefaultsSheet } from "./unit-photo-defaults-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LiteActionButton } from "@/components/lite/controls/action-button";
-import { ChevronIcon, CloseIcon, DotsIcon, PlConfirm, PlField, PlMenu, PlSection, PlSegmented, PlSelect, PlSheet, PlSwitch, PlusIcon, SearchIcon, TypeDot, initials, pl } from "./plantoes-1a1-kit";
+import { ChevronIcon, CloseIcon, DotsIcon, PlConfirm, PlField, PlInfo, PlMenu, PlSection, PlSegmented, PlSelect, PlSheet, PlSwitch, PlusIcon, SearchIcon, TypeDot, initials, pl } from "./plantoes-1a1-kit";
 
 type Snapshot = DutyRosterSnapshot;
 type Schedule = Snapshot["schedules"][number];
@@ -2185,11 +2185,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
       <>
         <div className={cn(pl.top, pl.in)}>
           <div className={pl.topText}>
-            <h2 className={pl.h2}>Plantões de {monthName}</h2>
-            <p className={pl.lead}>
-              <span className={pl.leadLong}>Cada plantão tem um tipo e vale no dia escolhido. ↻ marca os que repetem toda semana.</span>
-              <span className={pl.leadShort}>↻ marca os que repetem toda semana.</span>
-            </p>
+            <h2 className={cn(pl.h2, pl.h2Row)}>Plantões de {monthName} <PlInfo label="Como os plantões funcionam">Cada plantão tem um tipo e vale no dia escolhido. ↻ marca os que repetem toda semana.</PlInfo></h2>
           </div>
           <div className={pl.actions}>
             {monthlySchedulingEnabled ? (
@@ -2214,17 +2210,17 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
           </div>
         </div>
 
-        <section className={cn(pl.stats, pl.in)} aria-label="Números do mês">
-          <article className={cn(pl.card, pl.stat)}>
-            <p className={pl.statLabel}><span className={pl.statLabelLong}>Dias com plantão em {monthName}</span><span className={pl.statLabelShort}>Dias com plantão</span></p>
-            <p className={pl.statValue}>{monthDays.total}</p>
-            <p className={pl.statDetail}>{monthDays.upcoming} por acontecer<span className={pl.statLabelLong}> · {monthDays.finished} {monthDays.finished === 1 ? "encerrado" : "encerrados"}</span></p>
-          </article>
-          <article className={cn(pl.card, pl.stat)}>
-            <p className={pl.statLabel}>Dias sem cobertura</p>
-            <p className={pl.statValue} style={gapCount ? { color: "var(--warning)" } : undefined}>{gapCount}</p>
-            <p className={pl.statDetail}><span className={pl.statLabelLong}>abaixo do mínimo de corretores na escala</span><span className={pl.statLabelShort}>abaixo do mínimo</span></p>
-          </article>
+        <section className={cn(pl.strip, pl.in)} aria-label="Números do mês">
+          <div className={pl.stripItem}>
+            <span className={pl.stripLabel}>Dias com plantão</span>
+            <span className={pl.stripValue}>{monthDays.total}</span>
+            <span className={pl.stripHint}>{monthDays.upcoming} por acontecer<span className={pl.statLabelLong}> · {monthDays.finished} {monthDays.finished === 1 ? "encerrado" : "encerrados"}</span></span>
+          </div>
+          <div className={pl.stripItem}>
+            <span className={pl.stripLabel}>Dias sem cobertura</span>
+            <span className={pl.stripValue} style={gapCount ? { color: "var(--warning)" } : undefined}>{gapCount}</span>
+            <span className={pl.stripHint}>abaixo do mínimo</span>
+          </div>
         </section>
 
         {isPreviewPromise(queueOrders) ? (

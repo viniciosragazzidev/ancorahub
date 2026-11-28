@@ -15,7 +15,7 @@ import { DutyLeadsCutControl } from "./duty-leads-cut-control";
 import { DutyTurnAutoRefresh } from "./duty-turn-auto-refresh";
 import { DutyTurnSortableGrid } from "./duty-turn-sortable-grid";
 import { PlantaoActions, PlantaoHistoryDistributions, PlantaoLeadsTable, PlantaoPendingRoster, PlantaoSinceControl, PlantaoTurnStrip, type PlantaoLeadRow } from "./plantao-pagina-1a1";
-import { TypeDot } from "./plantoes-1a1-kit";
+import { PlInfo, TypeDot } from "./plantoes-1a1-kit";
 // Este arquivo roda no servidor: as classes e funções vêm direto daqui, nunca de um módulo "use client" (lá elas chegam
 // como referência de cliente e a página saía sem estilo em produção, 27/11/2026).
 import pp from "./plantao-pagina-1a1.module.css";
@@ -154,29 +154,28 @@ export function PlantaoPagina1a1({ backHref, header, actions, invalidDateMessage
         </section>
       ) : null}
 
-      <section className={cn(pp.stats, pl.in)} aria-label="Resumo do plantão" style={{ animationDelay: "80ms" }}>
+      {/* Direção limpa (28/11/2026): números numa faixa só. */}
+      <section className={cn(pl.strip, pl.in)} aria-label="Resumo do plantão" style={{ animationDelay: "80ms" }}>
         {stats.map((stat) => (
-          <article key={stat.label} className={cn(pl.card, pl.stat)}>
-            <p className={pl.statLabel}><span className={pp.long}>{stat.label}</span><span className={pp.short}>{stat.shortLabel ?? stat.label}</span></p>
-            <p className={pl.statValue} style={stat.warn ? { color: "var(--warning)" } : undefined}>{stat.value}</p>
-            <p className={pl.statDetail}><span className={pp.long}>{stat.detail}</span><span className={pp.short}>{stat.shortDetail ?? stat.detail}</span></p>
-          </article>
+          <div key={stat.label} className={pl.stripItem}>
+            <span className={pl.stripLabel}><span className={pp.long}>{stat.label}</span><span className={pp.short}>{stat.shortLabel ?? stat.label}</span></span>
+            <span className={pl.stripValue} style={stat.warn ? { color: "var(--warning)" } : undefined}>{stat.value}</span>
+            <span className={pl.stripHint}><span className={pp.long}>{stat.detail}</span><span className={pp.short}>{stat.shortDetail ?? stat.detail}</span></span>
+          </div>
         ))}
       </section>
 
       {escala ? (
-        <section className={cn(pl.card, pl.in, pp.escala)} aria-labelledby="plantao-escala" style={{ animationDelay: "120ms" }}>
+        <section className={cn(pl.in, pp.escala, pp.escalaBare)} aria-labelledby="plantao-escala" style={{ animationDelay: "120ms" }}>
           <div className={pp.headRow}>
             <div className={pp.headText}>
-              <h2 id="plantao-escala" className={pp.h2}><span className={pp.long}>{escala.title}</span><span className={pp.short}>{escala.shortTitle}</span> <span className={cn(pl.badge, pl.num, escala.badgeGood && pl.bGood)}>{escala.badge}</span></h2>
-              <p className={cn(pp.sub, pp.hideMobile)}>{escala.sub}</p>
+              <h2 id="plantao-escala" className={pp.h2}><span className={pp.long}>{escala.title}</span><span className={pp.short}>{escala.shortTitle}</span> <span className={cn(pl.badge, pl.num, escala.badgeGood && pl.bGood)}>{escala.badge}</span> <PlInfo label="Sobre a escala">{escala.sub}{escala.rotationText ? <><br /><br />{escala.rotationText}</> : null}</PlInfo></h2>
             </div>
             {escala.turn ? <span className={cn(pl.badge, pl.bGood, pp.hideMobile)}><span className={pl.dot} style={{ background: "var(--success)" }} aria-hidden="true" />Ao vivo</span> : null}
           </div>
           {escala.autoRefresh ? <DutyTurnAutoRefresh /> : null}
           {escala.turn ? <PlantaoTurnStrip {...escala.turn} /> : null}
           {escala.startIntervalText ? <p role="status" className={pp.note}>{escala.startIntervalText}</p> : null}
-          {escala.rotationText ? <p className={pp.note}>{escala.rotationText}</p> : null}
           {escala.noneEligible ? <p role="alert" className={pp.alert}><span style={{ fontWeight: 500 }}>Nenhum escalado está elegível para receber leads.</span> Há pendências de cadastro ou confirmação; os leads seguem aguardando.</p> : null}
           {escala.sections.map((section) => (
             <section key={section.key} aria-label={section.label ?? "Escalados"} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -231,8 +230,7 @@ export function PlantaoPagina1a1({ backHref, header, actions, invalidDateMessage
         <>
           <section className={cn(pl.card, pl.in, pp.escala)} aria-labelledby="historico-escalados" style={{ animationDelay: "120ms" }}>
             <div className={pp.headText}>
-              <h2 id="historico-escalados" className={pp.h2}>Corretores escalados <span className={cn(pl.badge, pl.num)}>{history.rosterCount}</span></h2>
-              <p className={pp.sub}>Leads recebidos por corretor neste turno. Alterações posteriores podem limitar a reconstituição de turnos antigos.</p>
+              <h2 id="historico-escalados" className={pp.h2}>Corretores escalados <span className={cn(pl.badge, pl.num)}>{history.rosterCount}</span> <PlInfo label="Sobre os escalados">Leads recebidos por corretor neste turno. Alterações posteriores podem limitar a reconstituição de turnos antigos.</PlInfo></h2>
             </div>
             {history.brokers.length ? (
               <div className={pp.grid}>
@@ -251,8 +249,7 @@ export function PlantaoPagina1a1({ backHref, header, actions, invalidDateMessage
           <section className={cn(pl.card, pl.in, pp.leads)} aria-labelledby="historico-leads" style={{ animationDelay: "160ms" }}>
             <div className={pp.leadsHead}>
               <div className={pp.headText}>
-                <h2 id="historico-leads" className={pp.h2}>Leads distribuídos <span className={cn(pl.badge, pl.num)}>{history.distributions.length}</span></h2>
-                <p className={pp.sub}>Aceites e atribuições deste turno. O vínculo antigo pode ser estimado quando a fila era compartilhada.</p>
+                <h2 id="historico-leads" className={pp.h2}>Leads distribuídos <span className={cn(pl.badge, pl.num)}>{history.distributions.length}</span> <PlInfo label="Sobre os leads distribuídos">Aceites e atribuições deste turno. O vínculo antigo pode ser estimado quando a fila era compartilhada.</PlInfo></h2>
               </div>
             </div>
             <PlantaoHistoryDistributions rows={history.distributions} />

@@ -289,3 +289,31 @@
   .mobileOnly { display: block; }
   .mBroker .badge { min-height: 22px; padding: 0 9px; }
 }
+
+/* Direção limpa (28/11/2026, artifact "Distribuição limpa"): título menor, faixa ao vivo sem cartão, sem ícone e sem
+   frase no "Leads aguardando corretor", números numa faixa só e aviso de 1º contato em linha, sem cartão. */
+.page { gap: 24px; padding-top: 32px; }
+.title { font-size: 28px; letter-spacing: -0.02em; line-height: 1.15; }
+.summary { font-size: 14px; }
+.views { padding: 3px; border: 0; }
+.gx a.viewbtn { min-height: 38px; }
+.gx a.viewbtn[aria-current="page"] { box-shadow: inset 0 0 0 1px var(--border); border-color: transparent; }
+.card.live { background: transparent; border: 0; border-radius: 0; padding: 0; gap: 12px; }
+.card.live .liveTag { font-size: 13px; color: var(--success); }
+.assignIcon, .assignHint { display: none; }
+.assignTitle { font-size: 16px; }
+.h2 { font-size: 16px; letter-spacing: 0; display: flex; align-items: center; gap: 8px; }
+.brokers { gap: 16px; margin-top: 0; }
+.stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 0; background: var(--surface); border: 1px solid var(--d-border-subtle); border-radius: 24px; overflow: hidden; }
+.stat { padding: 16px 20px; gap: 4px; margin-left: -1px; border-left: 1px solid var(--d-border-subtle); }
+.statLabel { font-size: 13px; color: var(--text-muted); }
+.statValue { font-size: 22px; line-height: 1.15; }
+.card.warnCard { background: transparent; border: 0; border-radius: 0; padding: 0 4px; }
+@media (max-width: 720px) {
+  .page { gap: 16px; padding-top: 16px; }
+  .title { font-size: 22px; }
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stat { padding: 12px 14px; }
+  .statValue { font-size: 20px; }
+  .statDetail { display: none; }
+}

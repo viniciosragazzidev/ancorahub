@@ -7,7 +7,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { PlSheet, SearchIcon, pl } from "../plantao/_components/plantoes-1a1-kit";
+import { PlInfo, PlSheet, SearchIcon, pl } from "../plantao/_components/plantoes-1a1-kit";
 import ab from "./abas-1a1.module.css";
 
 export type Tab1a1Stat = {
@@ -30,31 +30,27 @@ export function Tab1a1({ title, lead, stats, actions, children }: { title: strin
   const open = stats.find((stat) => stat.key === openKey && stat.panel) ?? null;
   return (
     <section className={ab.tab} aria-label={title}>
+      {/* Direção limpa (28/11/2026): título e o "?" com a explicação; números numa faixa só. */}
       <div className={cn(ab.head, pl.in)}>
-        <div className={ab.headText}>
-          <h2 className={ab.title}>{title}</h2>
-          <p className={ab.lead}>{lead}</p>
-        </div>
+        <h2 className={ab.title}>{title} <PlInfo label={`Sobre ${title}`}>{lead}</PlInfo></h2>
         {actions ? <div className={ab.headActions}>{actions}</div> : null}
       </div>
-      <div className={cn(ab.stats, pl.in)} style={{ animationDelay: "80ms" }}>
+      <div className={cn(pl.strip, pl.in)} style={{ animationDelay: "80ms" }}>
         {stats.map((stat) => {
           const body = (
             <>
-              <span className={ab.statLabel}>{stat.label}</span>
-              <span className={cn(stat.text ? ab.statText : ab.statValue, stat.tone ? TONE[stat.tone] : undefined)}>
+              <span className={pl.stripLabel}>{stat.label}</span>
+              <span className={cn(stat.text ? pl.stripText : pl.stripValue, stat.tone ? TONE[stat.tone] : undefined)}>
                 {typeof stat.value === "number" ? stat.value.toLocaleString("pt-BR") : stat.value}
               </span>
-              {stat.hint ? <span className={ab.statHint}>{stat.hint}</span> : null}
+              {stat.hint ? <span className={pl.stripHint}>{stat.hint}</span> : null}
+              {stat.panel ? <span className={pl.stripAction}>Ajustar</span> : null}
             </>
           );
           return stat.panel ? (
-            <button key={stat.key} type="button" className={cn(pl.card, ab.stat)} onClick={() => setOpenKey(stat.key)} aria-haspopup="dialog">
-              {body}
-              <span className={ab.statFoot}>Ajustar</span>
-            </button>
+            <button key={stat.key} type="button" className={pl.stripItem} onClick={() => setOpenKey(stat.key)} aria-haspopup="dialog">{body}</button>
           ) : (
-            <div key={stat.key} className={cn(pl.card, ab.stat)}>{body}</div>
+            <div key={stat.key} className={pl.stripItem}>{body}</div>
           );
         })}
       </div>
@@ -72,8 +68,7 @@ export function Section1a1({ title, count, lead, actions, children, delay = 120,
     <section className={cn(pl.card, pl.in, ab.section)} style={{ animationDelay: `${delay}ms` }} aria-labelledby={id}>
       <div className={ab.sectionHead}>
         <div className={ab.sectionText}>
-          <h3 id={id} className={ab.h2}>{title}{typeof count === "number" ? <span className={cn(pl.badge, pl.num)}>{count.toLocaleString("pt-BR")}</span> : null}</h3>
-          {lead ? <p className={ab.sectionLead}>{lead}</p> : null}
+          <h3 id={id} className={ab.h2}>{title}{typeof count === "number" ? <span className={cn(pl.badge, pl.num)}>{count.toLocaleString("pt-BR")}</span> : null}{lead ? <PlInfo label="Sobre esta seção">{lead}</PlInfo> : null}</h3>
         </div>
         {actions ? <div className={ab.headActions}>{actions}</div> : null}
       </div>
