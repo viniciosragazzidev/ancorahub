@@ -9,7 +9,7 @@
   --d-action-soft: var(--chat-action-soft, oklch(62% 0.2 255 / 0.1));
   --d-action-text: var(--chat-action-text, oklch(48% 0.2 258));
   --d-accent: #3b2dff;
-  --d-border-subtle: rgb(16 16 40 / 0.05);
+  --d-border-subtle: rgb(16 16 40 / 0.08);
   --d-ease: cubic-bezier(0.16, 1, 0.3, 1);
   color: var(--foreground);
   letter-spacing: -0.01em;

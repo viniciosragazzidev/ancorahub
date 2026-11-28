@@ -67,7 +67,8 @@
   --text-4xl: 36px;
   --text-5xl: 48px;
   --ease-in-out: ease-in-out;
-  --shadow-resting: 0 2px 8px rgb(24 24 27 / 0.08);
+  /* Cartões chapados (28/11/2026, referência eiaira.com): sem sombra, só o contorno fino. Menus e gavetas seguem com --shadow-floating. */
+  --shadow-resting: none;
   --control-height-sm: 44px;
 }
 

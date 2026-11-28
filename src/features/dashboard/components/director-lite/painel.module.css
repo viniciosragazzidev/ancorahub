@@ -11,7 +11,7 @@
   --p-text-secondary: #4b4b59;
   --p-text-muted: #666674;
   --p-border: rgb(16 16 40 / 0.08);
-  --p-border-subtle: rgb(16 16 40 / 0.05);
+  --p-border-subtle: rgb(16 16 40 / 0.08);
   --p-action: oklch(62% 0.2 255);
   --p-action-strong: oklch(55% 0.21 258);
   --p-action-soft: oklch(62% 0.2 255 / 0.1);
@@ -23,7 +23,7 @@
   --p-hot: oklch(64% 0.2 30);
   --p-warm: oklch(75% 0.16 75);
   --p-cold: oklch(68% 0.12 235);
-  --p-shadow-resting: 0 1px 2px rgb(16 16 40 / 0.04), 0 2px 8px rgb(16 16 40 / 0.04);
+  --p-shadow-resting: none;
   --p-ease: cubic-bezier(0.16, 1, 0.3, 1);
   font-family: var(--font-inter), Inter, system-ui, sans-serif;
   color: var(--p-foreground);

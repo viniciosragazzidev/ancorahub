@@ -8,7 +8,7 @@
   --l-action-strong: var(--chat-action-strong, oklch(55% 0.21 258));
   --l-action-soft: var(--chat-action-soft, oklch(62% 0.2 255 / 0.1));
   --l-action-text: var(--chat-action-text, oklch(48% 0.2 258));
-  --l-border-subtle: rgb(16 16 40 / 0.05);
+  --l-border-subtle: rgb(16 16 40 / 0.08);
   --l-ease: cubic-bezier(0.16, 1, 0.3, 1);
   color: var(--foreground);
   letter-spacing: -0.01em;

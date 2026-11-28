@@ -99,7 +99,7 @@
   --destructive-foreground: #ffffff;
   --success-foreground: #ffffff;
   --border: rgb(16 16 40 / 0.08);
-  --border-subtle: rgb(16 16 40 / 0.05);
+  --border-subtle: rgb(16 16 40 / 0.08);
   --border-strong: rgb(16 16 40 / 0.18);
   --accent: #002b73;
   --accent-strong: #001c4d;
@@ -110,8 +110,8 @@
   --success: #0f7a4d;
   --warning: #a15c00;
   --danger: #d4263a;
-  /* Cards rest on one soft shadow, no border. Only floating layers use --shadow-floating. */
-  --shadow-resting: 0 1px 2px rgb(16 16 40 / 0.04), 0 8px 24px rgb(16 16 40 / 0.05);
+  /* Cartões chapados (28/11/2026, referência eiaira.com): sem sombra, contorno fino. Só as camadas que flutuam usam --shadow-floating. */
+  --shadow-resting: none;
   --shadow-floating: 0 16px 40px rgb(16 16 40 / 0.14);
   --radius-control: 9999px;
   --radius-panel: 1.5rem;
