@@ -1,5 +1,8 @@
 "use client";
 
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
+import { ToolsLite } from "@/features/tools/components/tools-lite";
+
 /**
  * Dev-only: as telas da Onda 3 no visual Lite dentro da moldura real, com dados de exemplo realistas (nomes longos,
  * valores grandes, várias unidades). Cada tela usa os mesmos componentes Lite da página real.
@@ -51,12 +54,7 @@ export const SALES: SaleLiteRow[] = SALE_NAMES.map((name, index) => ({
 export function VendasShellScreen({ role = "director" }: { role?: string } = {}) {
   const totalRevenue = SALES.reduce((sum, sale) => sum + sale.saleValue, 0);
   return (
-    <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />
-      <main className={litePage.stack}>
-        <SalesWorkspaceLite sales={SALES} totalRevenue={totalRevenue} currentRole={role} period={30} branches={BRANCHES} />
-      </main>
-    </>
+    <SalesWorkspaceLite sales={SALES} totalRevenue={totalRevenue} currentRole={role} period={30} branches={BRANCHES} />
   );
 }
 
@@ -107,23 +105,17 @@ export function VendaShellScreen() {
 
 export function PropostasShellScreen() {
   return (
-    <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Propostas" />
-      <main className={litePage.stack}>
-        <PropostasLite initialProposals={PROPOSAL_FIXTURES} expiringProposals={PROPOSAL_FIXTURES.slice(0, 3)} leads={PROPOSAL_LEADS} />
-      </main>
-    </>
+    <ComercialPage title="Propostas" summary="12 propostas · 3 vencendo em 7 dias">
+      <PropostasLite initialProposals={PROPOSAL_FIXTURES} expiringProposals={PROPOSAL_FIXTURES.slice(0, 3)} leads={PROPOSAL_LEADS} />
+    </ComercialPage>
   );
 }
 
 export function DocumentosShellScreen() {
   return (
-    <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />
-      <main className={litePage.stack}>
-        <DocumentsLite carriers={CARRIER_FIXTURES} plans={PLAN_FIXTURES} initialRequirements={REQUIREMENT_FIXTURES} initialPendingDocs={DOC_FIXTURES} />
-      </main>
-    </>
+    <ComercialPage title="Documentos" summary="4 pendentes · 6 documentos na fila">
+      <DocumentsLite carriers={CARRIER_FIXTURES} plans={PLAN_FIXTURES} initialRequirements={REQUIREMENT_FIXTURES} initialPendingDocs={DOC_FIXTURES} />
+    </ComercialPage>
   );
 }
 
@@ -207,4 +199,8 @@ export function AssistenteShellScreen() {
       </main>
     </>
   );
+}
+
+export function FerramentasShellScreen() {
+  return <ToolsLite isDirector />;
 }

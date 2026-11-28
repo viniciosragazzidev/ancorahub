@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { ONDA78_SCREENS } from "./onda78-registry";
 import { ONDA9_SCREENS } from "./onda9-registry";
-import { AssistenteShellScreen, DocumentosShellScreen, DrillShellScreen, IntegridadeShellScreen, NocShellScreen, PropostasShellScreen, TarefasShellScreen, VendaShellScreen, VendasShellScreen } from "./onda3-screens";
+import { AssistenteShellScreen, DocumentosShellScreen, DrillShellScreen, FerramentasShellScreen, IntegridadeShellScreen, NocShellScreen, PropostasShellScreen, TarefasShellScreen, VendaShellScreen, VendasShellScreen } from "./onda3-screens";
 import { CargosShellScreen, ConvidarShellScreen, EquipeShellScreen, MembroShellScreen, RecuperacoesShellScreen, UnidadeShellScreen, UnidadesShellScreen } from "./onda4-screens";
 
 export const ONDA3_SCREENS: Record<string, { path: string; render: () => ReactNode }> = {
@@ -19,6 +19,7 @@ export const ONDA3_SCREENS: Record<string, { path: string; render: () => ReactNo
   venda: { path: "/vendas/sale-1", render: () => <VendaShellScreen /> },
   propostas: { path: "/propostas", render: () => <PropostasShellScreen /> },
   documentos: { path: "/documentos", render: () => <DocumentosShellScreen /> },
+  ferramentas: { path: "/ferramentas", render: () => <FerramentasShellScreen /> },
   drill: { path: "/relatorios/drill/stale-negotiations", render: () => <DrillShellScreen /> },
   integridade: { path: "/integridade", render: () => <IntegridadeShellScreen /> },
   assistente: { path: "/assistente", render: () => <AssistenteShellScreen /> },

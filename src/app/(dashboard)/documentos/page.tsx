@@ -6,7 +6,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { DocumentsWorkspace } from "@/features/documents/components/documents-workspace";
 import { DocumentsLite } from "@/features/documents/components/documents-lite";
-import litePage from "@/components/lite/page/lite-page.module.css";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import {
@@ -59,10 +59,9 @@ export default async function DocumentsPage() {
 
   // Chave do diretor: a mesma tela (fila e requisitos) no visual Lite.
   if (await isDirectorLitePageOnServer(context, "/documentos")) {
+    // Lite (28/11/2026, artifact "Comercial"): a moldura da área, com título, resumo e abas na página.
     return (
-      <>
-        <DashboardHeader breadcrumb="Operação comercial" title="Documentos" summary={pageSummary} />
-        <main className={litePage.stack}>
+      <ComercialPage title="Documentos" summary={pageSummary}>
           <DocumentsLite
             carriers={carriers}
             plans={plans}
@@ -71,8 +70,7 @@ export default async function DocumentsPage() {
             canConfigure={context.role === "director"}
             generatedAt={new Date()}
           />
-        </main>
-      </>
+      </ComercialPage>
     );
   }
 

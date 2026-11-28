@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
-import litePage from "@/components/lite/page/lite-page.module.css";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { readAutoSaleFlags } from "@/features/auto-sale/flag";
 import { getAutoSaleOverview } from "@/features/auto-sale/queries";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
@@ -28,10 +28,18 @@ export default async function AutoSalePage() {
   const pageSummary = overview.state === "ready"
     ? `${overview.summary.total.toLocaleString("pt-BR")} ${overview.summary.total === 1 ? "venda acompanhada" : "vendas acompanhadas"} · ${overview.summary.documentsRequested.toLocaleString("pt-BR")} com documentos pedidos`
     : undefined;
+  // Lite (28/11/2026, artifact "Comercial"): a moldura da área, com título, resumo e abas na página.
+  if (lite) {
+    return (
+      <ComercialPage title="Venda automatizada" summary={pageSummary}>
+        <AutoSaleWorkspace overview={overview} lite={lite} isDirector={context.role === "director"} />
+      </ComercialPage>
+    );
+  }
   return (
     <>
       <DashboardHeader breadcrumb="Comercial" title="Venda Automatizada" summary={pageSummary} />
-      <main className={lite ? litePage.stack : "flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6"}>
+      <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <AutoSaleWorkspace overview={overview} lite={lite} isDirector={context.role === "director"} />
       </main>
     </>
