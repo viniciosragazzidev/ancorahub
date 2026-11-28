@@ -3,8 +3,7 @@ import { getProposals, getExpiringProposals, getLeadsForProposals } from "@/feat
 import { getProposalDefaults } from "@/features/proposals/defaults";
 import { PropostasClient } from "./_components/propostas-client";
 import { PropostasLite } from "./_components/propostas-lite";
-import { DashboardHeader } from "@/components/dashboard-header";
-import litePage from "@/components/lite/page/lite-page.module.css";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 
@@ -32,13 +31,11 @@ export default async function PropostasPage() {
   const context = await getRequiredTenantContext();
   if (await isDirectorLitePageOnServer(context, "/propostas")) {
     const defaults = await getProposalDefaults(context.tenantId);
+    // Lite (28/11/2026, artifact "Comercial"): a moldura da área, com título, resumo e abas na página.
     return (
-      <>
-        <DashboardHeader breadcrumb="Operação comercial" title="Propostas" summary={pageSummary} />
-        <main className={litePage.stack}>
-          <PropostasLite initialProposals={proposals} expiringProposals={expiringProposals} leads={leads} defaults={defaults} now={serverNow()} />
-        </main>
-      </>
+      <ComercialPage title="Propostas" summary={pageSummary}>
+        <PropostasLite initialProposals={proposals} expiringProposals={expiringProposals} leads={leads} defaults={defaults} now={serverNow()} />
+      </ComercialPage>
     );
   }
 

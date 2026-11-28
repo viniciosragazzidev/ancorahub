@@ -30,17 +30,12 @@ export function ClientesShellScreen() {
     branchName: index % 7 === 6 ? null : BRANCHES[index % BRANCHES.length]!.name,
   }));
   return (
-    <>
-      <DashboardHeader breadcrumb="Pós-venda" title="Clientes" />
-      <main className={litePage.stack}>
-        <ClientesLite
-          clients={clients}
-          metrics={{ totalClients: clients.length, conversionRate: "8.4", avgClientsPerBroker: 6, upcomingRenewals: 5, recentConversions: clients.length, totalBrokers: 4 }}
-          period={30}
-          branches={BRANCHES}
-        />
-      </main>
-    </>
+    <ClientesLite
+      clients={clients}
+      metrics={{ totalClients: clients.length, conversionRate: "8.4", avgClientsPerBroker: 6, upcomingRenewals: 5, recentConversions: clients.length, totalBrokers: 4 }}
+      period={30}
+      branches={BRANCHES}
+    />
   );
 }
 

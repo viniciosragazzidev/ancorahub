@@ -1,26 +1,24 @@
 "use client";
 
 /**
- * /vendas no visual Lite do diretor: os mesmos números (com as mesmas tendências), a mesma busca e o mesmo filtro de
- * status, unidade e período na barra (mesmos ?branch= e ?period=), a lista Lite (tabela no desktop, cartões no
- * celular) com seleção e a exportação em lote pela mesma Server Action, e o "Exportar CSV" de comissões do mês.
+ * /vendas no Lite (28/11/2026, artifact "Comercial", direção limpa): os números numa faixa só, a lista em tabela com
+ * seleção (exportação em lote pela mesma Server Action), busca, unidade e período na barra (mesmos ?branch= e
+ * ?period=), abas de status e a gaveta da venda no clique da linha, com o atalho para a venda completa. O "Comissões
+ * do mês" baixa o mesmo CSV de antes.
  */
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronRight, Download, Search } from "lucide-react";
 
-import { StatCard } from "@/components/dashboard/metric-card";
 import { LiteBulkBar, LiteUrlSelect } from "@/components/lite/controls";
-import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
-import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import page from "@/components/lite/page/lite-page.module.css";
 import { toast } from "@/components/ui/sonner";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkExportSalesAction } from "@/features/sales/actions";
 import { formatLiteDate } from "@/components/lite/format/date";
 import { formatCurrency } from "@/features/quotes/utils";
-import { dailyCounts, dailySums } from "@/shared/trends";
+import { ComercialPage, FilterTabs, ListFoot, SearchField, StatStrip, cm } from "@/features/comercial-lite/comercial-kit";
+import { PlSheet } from "@/app/(dashboard)/leads/distribuicao/plantao/_components/plantoes-1a1-kit";
+import { cn } from "@/lib/utils";
 import { DEFAULT_PERIOD, PERIOD_OPTIONS, type PeriodValue } from "@/shared/period";
 
 export type SaleLiteRow = {
@@ -42,6 +40,7 @@ export type SaleLiteRow = {
 type StatusFilter = "all" | "active" | "cancelled";
 
 const PAGE_SIZE = 10;
+const COLUMNS = "28px minmax(200px, 1.5fr) minmax(140px, 1fr) minmax(120px, .9fr) minmax(160px, 1.1fr) 110px 120px 100px";
 
 /** Ticket médio das vendas ativas (canceladas não entram); 0 sem venda ativa. */
 export function averageSaleTicket(sales: Pick<SaleLiteRow, "status" | "saleValue">[]) {
@@ -55,18 +54,23 @@ function exportMonthCommissions() {
   window.open(`/api/internal/export/commissions?startMonth=${month}&endMonth=${month}&format=csv`, "_blank");
 }
 
+const compactCurrency = (value: number) => value >= 10_000
+  ? `R$ ${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value / 1000)} mil`
+  : formatCurrency(value);
+
 export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, branches, branchId }: {
   sales: SaleLiteRow[];
   totalRevenue: number;
   currentRole?: string;
   period: PeriodValue;
-  /** Unidades para o filtro (vazio esconde o seletor, como o BranchSelect com 1 unidade ou menos). */
+  /** Unidades para o filtro (vazio esconde o seletor). */
   branches: { id: string; name: string }[];
   branchId?: string;
 }) {
-  const router = useRouter();
   const [status, setStatus] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
+  const [pageNumber, setPageNumber] = useState(1);
+  const [openSale, setOpenSale] = useState<SaleLiteRow | null>(null);
 
   const filtered = useMemo(() => {
     const byStatus = status === "all" ? sales : sales.filter((sale) => sale.status === status);
@@ -75,14 +79,16 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
     return byStatus.filter((sale) => [sale.leadName, sale.clientName ?? "", sale.brokerName ?? "", sale.planName ?? ""]
       .some((value) => value.toLocaleLowerCase("pt-BR").includes(needle)));
   }, [sales, status, query]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(pageNumber, totalPages);
+  const pageRows = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
   const ids = useMemo(() => filtered.map((sale) => sale.id), [filtered]);
   const multiSelect = useMultiSelect(ids);
   const clearSelection = multiSelect.clear;
-  const { pageRows, pagination } = useLitePages(filtered, PAGE_SIZE);
 
   const [exportState, exportAction, exportPending] = useActionState(bulkExportSalesAction, {});
-  // Mesmo download e mesmos avisos da tela atual.
+  // Mesmo download e mesmos avisos de antes.
   useEffect(() => {
     if (exportState.csvData && exportState.count) {
       const blob = new Blob([exportState.csvData], { type: "text/csv;charset=utf-8" });
@@ -92,7 +98,7 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
       anchor.download = `vendas-exportadas-${new Date().toISOString().slice(0, 10)}.csv`;
       anchor.click();
       URL.revokeObjectURL(url);
-      toast.success(`${exportState.count} venda(s) exportada(s).`);
+      toast.success(`${exportState.count} ${exportState.count === 1 ? "venda exportada" : "vendas exportadas"}.`);
       clearSelection();
     }
     if (exportState.error) toast.error(exportState.error);
@@ -107,136 +113,119 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
   const activeSales = sales.filter((sale) => sale.status === "active").length;
   const cancelledSales = sales.length - activeSales;
   const averageTicket = averageSaleTicket(sales);
-  const statusTabs: { value: StatusFilter; label: string; count: number }[] = [
-    { value: "all", label: "Todas", count: sales.length },
-    { value: "active", label: "Ativas", count: activeSales },
-    { value: "cancelled", label: "Canceladas", count: cancelledSales },
-  ];
-  const trend = useMemo(() => ({
-    total: dailyCounts(sales.map((sale) => new Date(sale.saleDate)), period),
-    active: dailyCounts(sales.filter((sale) => sale.status === "active").map((sale) => new Date(sale.saleDate)), period),
-    revenue: dailySums(sales.map((sale) => ({ date: new Date(sale.saleDate), value: sale.saleValue })), period),
-  }), [sales, period]);
-
-  const columns = useMemo<LiteColumn<SaleLiteRow>[]>(() => [
-    {
-      id: "lead",
-      label: "Lead",
-      primary: true,
-      render: (sale) => (
-        <span>
-          <span className={page.cellTitle}>{sale.leadName}</span>
-          {sale.clientName ? <span className={page.cellSub}>{sale.clientName}</span> : null}
-        </span>
-      ),
-    },
-    { id: "broker", label: "Corretor", nowrap: true, render: (sale) => sale.brokerName ? <span title={sale.brokerName}>{sale.brokerName}</span> : <span className={page.muted}>Sem corretor</span> },
-    { id: "branch", label: "Filial", nowrap: true, render: (sale) => sale.branchName ? <span title={sale.branchName}>{sale.branchName}</span> : <span className={page.muted}>Sem filial</span> },
-    {
-      id: "plan",
-      label: "Plano",
-      render: (sale) => (
-        <span>
-          {sale.planName ?? <span className={page.muted}>Não informado</span>}
-          {sale.carrierName ? <span className={page.cellSub}>{sale.carrierName}</span> : null}
-        </span>
-      ),
-    },
-    { id: "date", label: "Data da venda", render: (sale) => <span className={page.numeric}>{formatLiteDate(sale.saleDate)}</span> },
-    { id: "value", label: "Valor", numeric: true, render: (sale) => <span className={page.numeric}>{formatCurrency(sale.saleValue)}</span> },
-    {
-      id: "status",
-      label: "Status",
-      render: (sale) => <span className={page.badge} data-tone={sale.status === "active" ? "success" : undefined}>{sale.status === "active" ? "Ativa" : "Cancelada"}</span>,
-    },
-    {
-      id: "actions",
-      label: "Ações",
-      numeric: true,
-      render: (sale) => (
-        <Link href={`/vendas/${sale.id}`} className={page.iconButton} aria-label="Ver detalhes da venda" title={`Ver detalhes da venda de ${sale.leadName}`}>
-          <ChevronRight aria-hidden="true" size={18} />
-        </Link>
-      ),
-    },
-  ], []);
-
-  const selection = {
-    isSelected: (sale: SaleLiteRow) => multiSelect.isSelected(sale.id),
-    onToggle: (sale: SaleLiteRow) => multiSelect.toggle(sale.id),
-    allSelected: multiSelect.isAllSelected,
-    onToggleAll: () => multiSelect.selectAll(),
-    rowLabel: (sale: SaleLiteRow) => `Selecionar venda ${sale.leadName}`,
-  };
+  const summary = `${sales.length.toLocaleString("pt-BR")} ${sales.length === 1 ? "venda" : "vendas"} · ${formatCurrency(totalRevenue)} em ${period} dias`;
+  const changeQuery = (value: string) => { setQuery(value); setPageNumber(1); };
+  const changeStatus = (value: StatusFilter) => { setStatus(value); setPageNumber(1); };
 
   return (
-    <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
-      <div className={page.stats}>
-        <StatCard label="Total de vendas" value={sales.length} sublabel={`últimos ${period} dias`} sparklineData={trend.total} sparklineColor="var(--chart-1)" animated />
-        <StatCard label="Vendas ativas" value={activeSales} sublabel="em andamento" sparklineData={trend.active} sparklineColor="var(--chart-3)" animated animationDelay={0.06} />
-        <StatCard label="Receita total" value={formatCurrency(totalRevenue)} sublabel="acumulado no período" sparklineData={trend.revenue} sparklineColor="var(--chart-2)" animated animationDelay={0.12} />
-        <StatCard label="Ticket médio" value={formatCurrency(averageTicket)} sublabel="por venda ativa" animated animationDelay={0.18} />
-      </div>
+    <ComercialPage
+      title="Vendas"
+      summary={summary}
+      actions={<button type="button" className={cn(cm.pill, cm.quiet)} onClick={exportMonthCommissions} title="Baixa as comissões do mês atual em CSV">Comissões do mês</button>}
+    >
+      <StatStrip items={[
+        { label: "Vendas", value: sales.length, detail: `últimos ${period} dias` },
+        { label: "Ativas", value: activeSales, detail: `${cancelledSales} ${cancelledSales === 1 ? "cancelada" : "canceladas"}` },
+        { label: "Receita", value: compactCurrency(totalRevenue), detail: "acumulado no período" },
+        { label: "Ticket médio", value: formatCurrency(averageTicket), detail: "por venda ativa" },
+      ]} />
 
-      <div className={page.group}>
-        <div className={page.toolbar}>
-          <label className={page.search}>
-            <Search aria-hidden="true" size={18} className={page.searchIcon} />
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por lead, corretor ou plano" aria-label="Buscar vendas" className={page.searchInput} />
-          </label>
+      <section className={cm.card} aria-label="Lista de vendas">
+        <div className={cm.bar}>
+          <SearchField value={query} onChange={changeQuery} placeholder="Buscar lead, corretor ou plano" label="Buscar vendas" />
           {branches.length > 1 ? (
             <LiteUrlSelect className={page.select} label="Unidade" param="branch" value={branchId ?? ""} resetPage options={[{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))]} />
           ) : null}
           <LiteUrlSelect className={page.selectNarrow} label="Período" param="period" value={String(period)} defaultValue={String(DEFAULT_PERIOD)} method="replace" options={PERIOD_OPTIONS.map((days) => ({ value: String(days), label: `${days} dias` }))} />
-          <button type="button" className={`${page.button} ${page.toolbarEnd}`} onClick={exportMonthCommissions} title="Baixa as comissões do mês atual em CSV">
-            <Download aria-hidden="true" size={16} /> Comissões do mês
-          </button>
         </div>
 
-        {sales.length > 0 ? (
-          <nav className={page.countTabs} aria-label="Filtrar vendas por status">
-            {statusTabs.map((tab) => (
-              <button key={tab.value} type="button" className={page.countTab} data-active={status === tab.value ? "true" : undefined} aria-pressed={status === tab.value} onClick={() => setStatus(tab.value)}>
-                {tab.label}<span className={page.countPill}>{tab.count}</span>
-              </button>
-            ))}
-          </nav>
-        ) : null}
-        {query.trim() ? (
-          <p className={page.resultLine} role="status">
-            {filtered.length} {filtered.length === 1 ? "venda" : "vendas"} para “{query.trim()}” · <button type="button" onClick={() => setQuery("")}>Limpar busca</button>
-          </p>
-        ) : null}
-
         {sales.length === 0 ? (
-          <div className={page.empty}>
-            <h2 className={page.emptyTitle}>Nenhuma venda registrada ainda</h2>
-            <p className={page.emptyText}>Equipes que fecham a primeira venda nos primeiros 3 dias têm 4× mais chance de bater a meta mensal. Registre a primeira venda pelos leads.</p>
-            <Link href="/leads" className={page.primaryButton}>Ir para leads <ArrowRight aria-hidden="true" size={16} /></Link>
+          <div className={cm.empty}>
+            <h2 className={cm.emptyTitle}>Nenhuma venda registrada ainda</h2>
+            <p className={cm.emptyText}>As vendas aparecem aqui assim que um lead é fechado como vendido.</p>
+            <Link href="/leads" className={cn(cm.pill, cm.primary)}>Ir para leads</Link>
           </div>
         ) : (
           <>
-            <LiteResponsiveData
-              caption="Vendas"
-              columns={columns}
-              rows={pageRows}
-              rowKey={(sale) => sale.id}
-              selection={selection}
-              onRowOpen={(sale) => router.push(`/vendas/${sale.id}`)}
-              empty={<p>Nenhuma venda encontrada. Ajuste a busca ou o filtro de status.</p>}
-            />
-            <LitePagination label="Páginas de vendas" {...pagination} itemNoun="vendas" />
+            <FilterTabs<StatusFilter> label="Filtrar vendas por status" value={status} onChange={changeStatus} items={[
+              { value: "all", label: "Todas", count: sales.length },
+              { value: "active", label: "Ativas", count: activeSales },
+              { value: "cancelled", label: "Canceladas", count: cancelledSales },
+            ]} />
+            {query.trim() ? (
+              <p className={cm.resultLine} role="status">
+                {filtered.length} {filtered.length === 1 ? "venda" : "vendas"} para “{query.trim()}” · <button type="button" onClick={() => changeQuery("")}>Limpar busca</button>
+              </p>
+            ) : null}
+
+            <div className={cm.desktopOnly} style={{ overflowX: "auto" }}>
+              <div className={cm.tableMin} role="table" aria-label="Vendas">
+                <div className={cn(cm.row, cm.th)} role="row" style={{ gridTemplateColumns: COLUMNS }}>
+                  <span role="columnheader"><input type="checkbox" className={cm.check} checked={multiSelect.isAllSelected} onChange={() => multiSelect.selectAll()} aria-label="Selecionar todas as vendas" /></span>
+                  <span role="columnheader">Lead</span><span role="columnheader">Corretor</span><span role="columnheader">Unidade</span>
+                  <span role="columnheader">Plano</span><span role="columnheader">Data</span><span role="columnheader" className={cm.right}>Valor</span><span role="columnheader">Status</span>
+                </div>
+                {pageRows.length ? pageRows.map((sale) => (
+                  <div key={sale.id} className={cm.row} role="row" tabIndex={0} style={{ gridTemplateColumns: COLUMNS }}
+                    onClick={() => setOpenSale(sale)} onKeyDown={(event) => { if (event.key === "Enter") setOpenSale(sale); }}>
+                    <span role="cell" onClick={(event) => event.stopPropagation()}>
+                      <input type="checkbox" className={cm.check} checked={multiSelect.isSelected(sale.id)} onChange={() => multiSelect.toggle(sale.id)} aria-label={`Selecionar venda ${sale.leadName}`} />
+                    </span>
+                    <span role="cell"><span className={cm.t1}>{sale.leadName}</span>{sale.clientName ? <span className={cm.sub}>{sale.clientName}</span> : null}</span>
+                    <span role="cell" className={cn(cm.cell, !sale.brokerName && cm.muted)}>{sale.brokerName ?? "Sem corretor"}</span>
+                    <span role="cell" className={cn(cm.cell, cm.muted)}>{sale.branchName ?? "Sem unidade"}</span>
+                    <span role="cell"><span className={cn(cm.t1, !sale.planName && cm.muted)} style={{ fontWeight: 400 }}>{sale.planName ?? "Não informado"}</span>{sale.carrierName ? <span className={cm.sub}>{sale.carrierName}</span> : null}</span>
+                    <span role="cell" className={cn(cm.num, cm.muted)}>{formatLiteDate(sale.saleDate)}</span>
+                    <span role="cell" className={cn(cm.num, cm.right)}>{formatCurrency(sale.saleValue)}</span>
+                    <span role="cell"><span className={cn(cm.badge, sale.status === "active" && cm.bGood)}>{sale.status === "active" ? "Ativa" : "Cancelada"}</span></span>
+                  </div>
+                )) : <div className={cm.empty}><p className={cm.emptyText}>Nenhuma venda encontrada. Ajuste a busca ou o filtro de status.</p></div>}
+              </div>
+            </div>
+
+            <div className={cm.mobileOnly}>
+              {pageRows.map((sale) => (
+                <div key={sale.id} className={cm.mRow} role="button" tabIndex={0} onClick={() => setOpenSale(sale)} onKeyDown={(event) => { if (event.key === "Enter") setOpenSale(sale); }}>
+                  <span className={cm.mBody}><span className={cm.t1}>{sale.leadName}</span><span className={cm.sub}>{sale.brokerName ?? "Sem corretor"} · {formatLiteDate(sale.saleDate)}</span></span>
+                  <span className={cm.mEnd}><span className={cm.num}>{formatCurrency(sale.saleValue)}</span><span className={cn(cm.badge, sale.status === "active" && cm.bGood)}>{sale.status === "active" ? "Ativa" : "Cancelada"}</span></span>
+                </div>
+              ))}
+            </div>
+
+            <ListFoot page={current} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} noun="vendas" onPage={setPageNumber} label="Páginas de vendas" />
           </>
         )}
-      </div>
+      </section>
+
+      <PlSheet
+        open={Boolean(openSale)}
+        onOpenChange={(open) => { if (!open) setOpenSale(null); }}
+        title={openSale?.leadName ?? "Venda"}
+        description={openSale ? `${formatCurrency(openSale.saleValue)} · ${formatLiteDate(openSale.saleDate)}` : undefined}
+        badges={openSale ? <span className={cn(cm.badge, openSale.status === "active" && cm.bGood)}>{openSale.status === "active" ? "Ativa" : "Cancelada"}</span> : null}
+        footer={openSale ? <Link href={`/vendas/${openSale.id}`} className={cn(cm.pill, cm.primary)} style={{ flex: 1 }}>Abrir venda completa</Link> : null}
+      >
+        {openSale ? (
+          <dl className={cn(cm.dl, cm.num)}>
+            <dt>Cliente</dt><dd>{openSale.clientName ?? "Ainda não cadastrado"}</dd>
+            <dt>Corretor</dt><dd>{openSale.brokerName ?? "Sem corretor"}</dd>
+            <dt>Unidade</dt><dd>{openSale.branchName ?? "Sem unidade"}</dd>
+            <dt>Plano</dt><dd>{openSale.planName ?? "Não informado"}</dd>
+            <dt>Operadora</dt><dd>{openSale.carrierName ?? "Não informada"}</dd>
+            <dt>Data da venda</dt><dd>{formatLiteDate(openSale.saleDate)}</dd>
+            <dt>Valor</dt><dd>{formatCurrency(openSale.saleValue)}</dd>
+            <dt>Lead</dt><dd><Link href={`/leads/${openSale.leadId}`}>Abrir o lead</Link></dd>
+          </dl>
+        ) : null}
+      </PlSheet>
 
       {currentRole ? (
         <LiteBulkBar
           count={multiSelect.count}
           onClear={multiSelect.clear}
-          actions={[{ id: "export", label: exportPending ? "Exportando..." : "Exportar CSV", shortLabel: "Exportar", onRun: exportSelected, disabled: exportPending }]}
+          actions={[{ id: "export", label: exportPending ? "Exportando…" : "Exportar CSV", shortLabel: "Exportar", onRun: exportSelected, disabled: exportPending }]}
         />
       ) : null}
-    </div>
+    </ComercialPage>
   );
 }

@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
-import { DashboardHeader } from "@/components/dashboard-header";
+import { ComercialPage } from "@/features/comercial-lite/comercial-kit";
 import { LiteSelect } from "@/components/lite/controls";
 import { LiteDataTable } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
@@ -138,8 +138,9 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt, conversati
   return (
     <ArcScopeProvider enabled>
       <div className="arc-venancor" data-skin="diretor">
-        <DashboardHeader breadcrumb="Equipe" title="Negociações" summary={`${formatNegotiationMetric(data.leads.length)} ${data.leads.length === 1 ? "atendimento acompanhado" : "atendimentos acompanhados"}`} />
-        <main className={`${litePage.stack} ${styles.root}`} aria-label="Negociações da equipe">
+        {/* Lite (28/11/2026, artifact "Comercial"): a moldura da área, com título e abas na página. */}
+        <ComercialPage title="Negociações">
+        <div className={styles.root} aria-label="Negociações da equipe">
           <div className={styles.summaryLine}>
             <p className={styles.summary}>{formatNegotiationMetric(data.leads.length)} atendimentos acompanhados · atualizado às {formatLiteDate(generatedAt, { hour: "2-digit", minute: "2-digit" })}</p>
             {data.scope.role === "director" && branchOptions.length > 1 ? <div className={styles.select}><LiteSelect label="Unidade" hideLabel value={branchFilter} options={branchOptions} onChange={setBranch} /></div> : null}
@@ -221,7 +222,8 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt, conversati
               )}
             </>
           )}
-        </main>
+        </div>
+        </ComercialPage>
 
         <LiteSidePanel open={Boolean(selectedLead)} onOpenChange={(open) => { if (!open) closeLead(); }} title={selectedLead?.name ?? "Atendimento"} description={selectedLead ? `${LEVEL_LABELS[selectedLead.level]} · ${statusLabel(selectedLead.status)}` : undefined}>
           {selectedLead ? (

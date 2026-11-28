@@ -1,27 +1,24 @@
 "use client";
 
 /**
- * /clientes no visual Lite do diretor: os mesmos quatro números (com a mesma tendência), a mesma busca local, unidade
- * e período na barra (mesmos ?branch= e ?period=), a lista Lite (tabela no desktop, cartões no celular) com 10 por
- * página e o mesmo atalho para o perfil do cliente (nome em link e a linha inteira, sem coluna de ação que vira
- * ruído no cartão do celular). Os dados chegam do servidor já no escopo de quem vê.
+ * /clientes no Lite (28/11/2026, artifact "Comercial", direção limpa): os quatro números numa faixa só, a busca local,
+ * unidade e período na barra (mesmos ?branch= e ?period=), as abas Todos / Renovam em 30 dias, a tabela com os
+ * atalhos de WhatsApp e copiar telefone e a gaveta do cliente no clique da linha, com o atalho para o perfil.
+ * Os dados chegam do servidor já no escopo de quem vê.
  */
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowRight, Copy, MessageCircle, Search } from "lucide-react";
 
-import { StatCard } from "@/components/dashboard/metric-card";
 import { LiteUrlSelect } from "@/components/lite/controls";
-import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
-import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { formatLiteDate } from "@/components/lite/format/date";
-import { toast } from "@/components/ui/sonner";
 import page from "@/components/lite/page/lite-page.module.css";
-import styles from "./clientes-lite.module.css";
+import { toast } from "@/components/ui/sonner";
+import { ComercialPage, FilterTabs, ListFoot, SearchField, StatStrip, cm } from "@/features/comercial-lite/comercial-kit";
+import { PlSheet } from "@/app/(dashboard)/leads/distribuicao/plantao/_components/plantoes-1a1-kit";
+import { cn } from "@/lib/utils";
 import { DEFAULT_PERIOD, PERIOD_OPTIONS, type PeriodValue } from "@/shared/period";
 
-import { clientConversionTrend, type ClientsMetrics } from "./clientes-list";
+import type { ClientsMetrics } from "./clientes-list";
 
 export type ClientLiteRow = {
   id: string;
@@ -36,6 +33,8 @@ export type ClientLiteRow = {
 };
 
 const RENEWAL_WINDOW_DAYS = 30;
+const PAGE_SIZE = 10;
+const COLUMNS = "minmax(200px, 1.4fr) minmax(190px, 1.1fr) minmax(140px, 1fr) minmax(120px, .9fr) 110px 120px";
 
 /** Dias até a renovação (0 = hoje); null sem data. Conta em dias de calendário, sem fuso. */
 export function daysUntilRenewal(renewalOn: string | null | undefined, today: Date = new Date()) {
@@ -51,8 +50,6 @@ export function renewsSoon(client: Pick<ClientLiteRow, "renewalOn">, today?: Dat
   return days !== null && days >= 0 && days <= RENEWAL_WINDOW_DAYS;
 }
 
-const PAGE_SIZE = 10;
-
 /** Link do WhatsApp com o número só em dígitos; sem DDI, assume Brasil (55). Vazio sem número. */
 export function whatsappHref(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -60,39 +57,52 @@ export function whatsappHref(phone: string) {
   return `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}`;
 }
 
-/** Atalhos de quem atende a carteira o dia todo (20/11): abrir o WhatsApp e copiar o telefone sem sair da lista. */
+function copyPhone(phone: string) {
+  void navigator.clipboard?.writeText(phone.replace(/\D/g, "")).then(() => toast.success("Telefone copiado"));
+}
+
+/** Atalhos de quem atende a carteira o dia todo: abrir o WhatsApp e copiar o telefone sem sair da lista. */
 function ContactShortcuts({ client }: { client: ClientLiteRow }) {
   const href = whatsappHref(client.phone);
   if (!href) return null;
   return (
-    <span className={styles.shortcuts} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-      <a href={href} target="_blank" rel="noreferrer" className={page.iconButton} aria-label={`Abrir WhatsApp de ${client.name}`} title="Abrir no WhatsApp">
-        <MessageCircle aria-hidden="true" size={16} />
+    <span className={cm.shortcuts} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+      <a href={href} target="_blank" rel="noreferrer" className={cm.icon} aria-label={`Abrir WhatsApp de ${client.name}`} title="Abrir no WhatsApp">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-13.2 7.9L3 21l1.1-4.6A9 9 0 1 1 21 12Z" /></svg>
       </a>
-      <button type="button" className={page.iconButton} aria-label={`Copiar telefone de ${client.name}`} title="Copiar telefone"
-        onClick={() => { void navigator.clipboard?.writeText(client.phone.replace(/\D/g, "")).then(() => toast.success("Telefone copiado")); }}>
-        <Copy aria-hidden="true" size={16} />
+      <button type="button" className={cm.icon} aria-label={`Copiar telefone de ${client.name}`} title="Copiar telefone" onClick={() => copyPhone(client.phone)}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></svg>
       </button>
     </span>
   );
+}
+
+function RenewalCell({ client }: { client: ClientLiteRow }) {
+  const days = daysUntilRenewal(client.renewalOn);
+  if (days === null || days < 0) return <span className={cm.muted}>-</span>;
+  const label = days === 0 ? "hoje" : days === 1 ? "amanhã" : `em ${days} dias`;
+  return days <= RENEWAL_WINDOW_DAYS
+    ? <span className={cn(cm.badge, cm.bWarn)} title={client.renewalOn ?? undefined}>{label}</span>
+    : <span className={cn(cm.num, cm.muted)} title={client.renewalOn ?? undefined}>{formatLiteDate(`${client.renewalOn}T12:00:00`)}</span>;
 }
 
 export function ClientesLite({ clients, metrics, period, branches, branchId }: {
   clients: ClientLiteRow[];
   metrics: ClientsMetrics;
   period: PeriodValue;
-  /** Unidades para o filtro (vazio esconde o seletor, como o BranchSelect com 1 unidade ou menos). */
+  /** Unidades para o filtro (vazio esconde o seletor). */
   branches: { id: string; name: string }[];
   branchId?: string;
 }) {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"all" | "renewal">("all");
+  const [pageNumber, setPageNumber] = useState(1);
+  const [openClient, setOpenClient] = useState<ClientLiteRow | null>(null);
   const renewalCount = useMemo(() => clients.filter((client) => renewsSoon(client)).length, [clients]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("pt-BR");
-    // Renovação: a mais próxima primeiro, para o corretor ligar antes de vencer (20/11).
+    // Renovação: a mais próxima primeiro, para ligar antes de vencer.
     const base = tab === "renewal"
       ? clients.filter((client) => renewsSoon(client)).sort((a, b) => (a.renewalOn ?? "").localeCompare(b.renewalOn ?? ""))
       : clients;
@@ -100,82 +110,24 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
     return base.filter((client) => [client.name, client.phone, client.email ?? "", client.brokerName ?? "", client.branchName ?? ""]
       .some((value) => value.toLocaleLowerCase("pt-BR").includes(needle)));
   }, [clients, query, tab]);
-  const { pageRows, pagination, reset } = useLitePages(filtered, PAGE_SIZE);
-
-  const trend = useMemo(() => clientConversionTrend(clients, period), [clients, period]);
-  // A taxa chega como texto: "8.4" com leads, "0,0" sem leads. Number("0,0") daria NaN no gráfico.
-  const conversionRate = parseFloat(metrics.conversionRate.replace(",", ".")) || 0;
-
-  const columns = useMemo<LiteColumn<ClientLiteRow>[]>(() => [
-    {
-      id: "client",
-      label: "Cliente",
-      primary: true,
-      render: (client) => (
-        <span className={styles.title}>
-          <Link href={`/clientes/${client.id}`} className={`${page.cellLink} ${page.cellTitle}`}>{client.name}</Link>
-          {/* Selo do cartão do celular, como na versão completa; na tabela todos já são clientes ativos. */}
-          <span className={`${page.badge} ${styles.phoneOnly}`} data-tone="success">Ativo</span>
-        </span>
-      ),
-    },
-    {
-      id: "contact",
-      label: "Contato",
-      secondary: true,
-      render: (client) => (
-        <span className={styles.contact}>
-          <span>
-            <span className={page.numeric}>{client.phone}</span>
-            {client.email ? <span className={page.cellSub}>{client.email}</span> : null}
-          </span>
-          <ContactShortcuts client={client} />
-        </span>
-      ),
-    },
-    { id: "broker", label: "Responsável", nowrap: true, render: (client) => client.brokerName ? <span title={client.brokerName}>{client.brokerName}</span> : <span className={page.muted}>Sem responsável</span> },
-    { id: "branch", label: "Unidade", nowrap: true, render: (client) => client.branchName ? <span title={client.branchName}>{client.branchName}</span> : <span className={page.muted}>Geral da empresa</span> },
-    { id: "converted", label: "Conversão", render: (client) => <span className={page.numeric}>{formatLiteDate(client.convertedAt)}</span> },
-    {
-      id: "renewal",
-      label: "Renovação",
-      phonePriority: "low",
-      render: (client) => {
-        const days = daysUntilRenewal(client.renewalOn);
-        if (days === null || days < 0) return <span className={page.muted}>—</span>;
-        const label = days === 0 ? "hoje" : days === 1 ? "amanhã" : `em ${days} dias`;
-        return days <= RENEWAL_WINDOW_DAYS
-          ? <span className={page.badge} data-tone="warning" title={client.renewalOn ?? undefined}>{label}</span>
-          : <span className={page.numeric} title={client.renewalOn ?? undefined}>{formatLiteDate(`${client.renewalOn}T12:00:00`)}</span>;
-      },
-    },
-  ], []);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(pageNumber, totalPages);
+  const pageRows = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const changeQuery = (value: string) => { setQuery(value); setPageNumber(1); };
+  const summary = `${metrics.totalClients.toLocaleString("pt-BR")} ${metrics.totalClients === 1 ? "cliente" : "clientes"} · ${metrics.upcomingRenewals} ${metrics.upcomingRenewals === 1 ? "renova" : "renovam"} em 30 dias`;
 
   return (
-    <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
-      <div className={page.stats}>
-        <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos ${period} dias`} sparklineData={trend} sparklineColor="var(--chart-1)" animated />
-        <StatCard label="Taxa de conversão" value={`${metrics.conversionRate.replace(".", ",")}%`} sublabel="Clientes por lead" sparklineData={trend.map((value) => Math.round(value * conversionRate))} sparklineColor="var(--chart-3)" animated animationDelay={0.06} />
-        <StatCard label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={trend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" animated animationDelay={0.12} />
-        <StatCard label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={trend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" animated animationDelay={0.18} />
-      </div>
+    <ComercialPage title="Clientes" summary={summary}>
+      <StatStrip items={[
+        { label: "Clientes", value: metrics.totalClients.toLocaleString("pt-BR"), detail: `${metrics.recentConversions} nos últimos ${period} dias` },
+        { label: "Conversão", value: `${metrics.conversionRate.replace(".", ",")}%`, detail: "clientes por lead" },
+        { label: "Por corretor", value: metrics.avgClientsPerBroker, detail: `${metrics.totalBrokers} ${metrics.totalBrokers === 1 ? "responsável" : "responsáveis"}` },
+        { label: "Renovações", value: metrics.upcomingRenewals, detail: "próximos 30 dias" },
+      ]} />
 
-      <div className={page.group}>
-        <div className={page.toolbar}>
-          <label className={page.search}>
-            <Search aria-hidden="true" size={18} className={page.searchIcon} />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                reset();
-              }}
-              placeholder="Buscar nome, contato ou responsável"
-              aria-label="Buscar cliente"
-              className={page.searchInput}
-            />
-          </label>
+      <section className={cm.card} aria-label="Carteira de clientes">
+        <div className={cm.bar}>
+          <SearchField value={query} onChange={changeQuery} placeholder="Buscar nome, contato ou responsável" label="Buscar cliente" />
           {branches.length > 1 ? (
             <LiteUrlSelect className={page.select} label="Unidade" param="branch" value={branchId ?? ""} resetPage options={[{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))]} />
           ) : null}
@@ -183,45 +135,87 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
         </div>
 
         {clients.length === 0 ? (
-          <div className={page.empty}>
-            <h2 className={page.emptyTitle}>Nenhum cliente convertido ainda</h2>
-            <p className={page.emptyText}>Aqui fica o histórico de todos os clientes convertidos. Para adicionar um, feche um lead como vendido.</p>
-            <Link href="/leads" className={page.primaryButton}>Ir para leads <ArrowRight aria-hidden="true" size={16} /></Link>
+          <div className={cm.empty}>
+            <h2 className={cm.emptyTitle}>Nenhum cliente convertido ainda</h2>
+            <p className={cm.emptyText}>Aqui fica a carteira de clientes. Para adicionar um, feche um lead como vendido.</p>
+            <Link href="/leads" className={cn(cm.pill, cm.primary)}>Ir para leads</Link>
           </div>
         ) : (
           <>
-            <nav className={page.countTabs} aria-label="Filtrar clientes">
-              {([
-                { value: "all", label: "Todos", count: clients.length },
-                { value: "renewal", label: "Renovam em 30 dias", count: renewalCount },
-              ] as const).map((item) => (
-                <button key={item.value} type="button" className={page.countTab} data-active={tab === item.value ? "true" : undefined} aria-pressed={tab === item.value} onClick={() => { setTab(item.value); reset(); }}>
-                  {item.label}<span className={page.countPill}>{item.count}</span>
-                </button>
-              ))}
-            </nav>
+            <FilterTabs<"all" | "renewal"> label="Filtrar clientes" value={tab} onChange={(value) => { setTab(value); setPageNumber(1); }} items={[
+              { value: "all", label: "Todos", count: clients.length },
+              { value: "renewal", label: "Renovam em 30 dias", count: renewalCount },
+            ]} />
             {query.trim() ? (
-              <p className={page.resultLine} role="status">
-                {filtered.length} {filtered.length === 1 ? "cliente" : "clientes"} para “{query.trim()}” · <button type="button" onClick={() => { setQuery(""); reset(); }}>Limpar busca</button>
+              <p className={cm.resultLine} role="status">
+                {filtered.length} {filtered.length === 1 ? "cliente" : "clientes"} para “{query.trim()}” · <button type="button" onClick={() => changeQuery("")}>Limpar busca</button>
               </p>
             ) : null}
-            <LiteResponsiveData
-              caption="Carteira de clientes ativos"
-              columns={columns}
-              rows={pageRows}
-              rowKey={(client) => client.id}
-              onRowOpen={(client) => router.push(`/clientes/${client.id}`)}
-              empty={(
-                <div>
-                  <p className={page.emptyTitle}>Nenhum cliente encontrado</p>
-                  <p className={page.emptyText}>Ajuste a busca para ver outros resultados.</p>
+
+            <div className={cm.desktopOnly} style={{ overflowX: "auto" }}>
+              <div className={cm.tableMin} role="table" aria-label="Carteira de clientes ativos">
+                <div className={cn(cm.row, cm.th)} role="row" style={{ gridTemplateColumns: COLUMNS }}>
+                  <span role="columnheader">Cliente</span><span role="columnheader">Contato</span><span role="columnheader">Responsável</span>
+                  <span role="columnheader">Unidade</span><span role="columnheader">Conversão</span><span role="columnheader">Renovação</span>
                 </div>
-              )}
-            />
-            <LitePagination {...pagination} label="Páginas de clientes" itemNoun="clientes" />
+                {pageRows.length ? pageRows.map((client) => (
+                  <div key={client.id} className={cm.row} role="row" tabIndex={0} style={{ gridTemplateColumns: COLUMNS }}
+                    onClick={() => setOpenClient(client)} onKeyDown={(event) => { if (event.key === "Enter") setOpenClient(client); }}>
+                    <span role="cell" className={cm.t1}>{client.name}</span>
+                    <span role="cell" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ minWidth: 0, flex: 1 }}><span className={cn(cm.cell, cm.num)} style={{ display: "block" }}>{client.phone}</span>{client.email ? <span className={cm.sub}>{client.email}</span> : null}</span>
+                      <ContactShortcuts client={client} />
+                    </span>
+                    <span role="cell" className={cn(cm.cell, !client.brokerName && cm.muted)}>{client.brokerName ?? "Sem responsável"}</span>
+                    <span role="cell" className={cn(cm.cell, cm.muted)}>{client.branchName ?? "Geral da empresa"}</span>
+                    <span role="cell" className={cn(cm.num, cm.muted)}>{formatLiteDate(client.convertedAt)}</span>
+                    <span role="cell"><RenewalCell client={client} /></span>
+                  </div>
+                )) : (
+                  <div className={cm.empty}><p className={cm.emptyTitle}>Nenhum cliente encontrado</p><p className={cm.emptyText}>Ajuste a busca para ver outros resultados.</p></div>
+                )}
+              </div>
+            </div>
+
+            <div className={cm.mobileOnly}>
+              {pageRows.map((client) => (
+                <div key={client.id} className={cm.mRow} role="button" tabIndex={0} onClick={() => setOpenClient(client)} onKeyDown={(event) => { if (event.key === "Enter") setOpenClient(client); }}>
+                  <span className={cm.mBody}><span className={cm.t1}>{client.name}</span><span className={cn(cm.sub, cm.num)}>{client.phone}</span></span>
+                  <span className={cm.mEnd}><RenewalCell client={client} /></span>
+                </div>
+              ))}
+            </div>
+
+            <ListFoot page={current} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} noun="clientes" onPage={setPageNumber} label="Páginas de clientes" />
           </>
         )}
-      </div>
-    </div>
+      </section>
+
+      <PlSheet
+        open={Boolean(openClient)}
+        onOpenChange={(open) => { if (!open) setOpenClient(null); }}
+        title={openClient?.name ?? "Cliente"}
+        description={openClient ? `Cliente desde ${formatLiteDate(openClient.convertedAt)}` : undefined}
+        footer={openClient ? <Link href={`/clientes/${openClient.id}`} className={cn(cm.pill, cm.primary)} style={{ flex: 1 }}>Abrir perfil do cliente</Link> : null}
+      >
+        {openClient ? (
+          <>
+            <dl className={cn(cm.dl, cm.num)}>
+              <dt>Telefone</dt><dd>{openClient.phone}</dd>
+              <dt>E-mail</dt><dd>{openClient.email ?? "Não informado"}</dd>
+              <dt>Responsável</dt><dd>{openClient.brokerName ?? "Sem responsável"}</dd>
+              <dt>Unidade</dt><dd>{openClient.branchName ?? "Geral da empresa"}</dd>
+              <dt>Renovação</dt><dd><RenewalCell client={openClient} /></dd>
+            </dl>
+            {whatsappHref(openClient.phone) ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <a href={whatsappHref(openClient.phone)!} target="_blank" rel="noreferrer" className={cn(cm.pill, cm.quiet)}>Abrir no WhatsApp</a>
+                <button type="button" className={cn(cm.pill, cm.quiet)} onClick={() => copyPhone(openClient.phone)}>Copiar telefone</button>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </PlSheet>
+    </ComercialPage>
   );
 }

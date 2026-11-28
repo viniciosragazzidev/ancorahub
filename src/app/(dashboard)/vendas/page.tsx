@@ -12,7 +12,6 @@ import { SalesWorkspace } from "./sales-workspace";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildSalesPageScope } from "@/features/sales/sales-page-scope";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
-import litePage from "@/components/lite/page/lite-page.module.css";
 import { SalesWorkspaceLite } from "./sales-workspace-lite";
 
 export default async function SalesPage({
@@ -81,20 +80,16 @@ export default async function SalesPage({
 
   // Chave do diretor: a mesma página no visual Lite (unidade e período vão para a barra da lista).
   if (await isDirectorLitePageOnServer(context, "/vendas")) {
+    // Lite (28/11/2026, artifact "Comercial"): sem a faixa de topo; título, resumo e abas da área ficam na página.
     return (
-      <>
-        <DashboardHeader breadcrumb="Operação comercial" title="Vendas" summary={pageSummary} />
-        <main className={litePage.stack}>
-          <SalesWorkspaceLite
-            sales={sales.map((s) => ({ ...s, saleValue: Number(s.saleValue), saleDate: s.saleDate.toISOString(), createdAt: s.createdAt.toISOString() }))}
-            totalRevenue={totalRevenue}
-            currentRole={context.role}
-            period={period}
-            branches={canFilterBranch ? branches : []}
-            branchId={effectiveBranchId}
-          />
-        </main>
-      </>
+      <SalesWorkspaceLite
+        sales={sales.map((s) => ({ ...s, saleValue: Number(s.saleValue), saleDate: s.saleDate.toISOString(), createdAt: s.createdAt.toISOString() }))}
+        totalRevenue={totalRevenue}
+        currentRole={context.role}
+        period={period}
+        branches={canFilterBranch ? branches : []}
+        branchId={effectiveBranchId}
+      />
     );
   }
 

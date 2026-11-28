@@ -26,22 +26,22 @@ const metrics = { totalClients: 12, conversionRate: "10.0", avgClientsPerBroker:
 const branches = [{ id: "b1", name: "Centro" }, { id: "b2", name: "Zona Norte" }];
 
 describe("clientes Lite", () => {
-  it("mostra os números, pagina de 10 em 10, busca e abre o perfil", () => {
+  it("mostra os números, pagina de 10 em 10, busca e abre a gaveta com o atalho para o perfil", () => {
     const clients = Array.from({ length: 12 }, (_, index) => client(index + 1));
     clients[11] = client(12, { name: "Nazareth Pereira", brokerName: null, branchName: null });
     render(<ClientesLite clients={clients} metrics={metrics} period={30} branches={branches} />);
-    expect(screen.getAllByTestId("stat")[0]).toHaveTextContent("Total de clientes: 12");
-    const table = () => document.querySelector('[data-lite="table"]') as HTMLElement;
+    const strip = within(screen.getByRole("region", { name: "Resumo" }));
+    expect(strip.getByText("Clientes").nextElementSibling).toHaveTextContent("12");
+    const table = () => screen.getByRole("table", { name: "Carteira de clientes ativos" });
     expect(within(table()).getAllByRole("row")).toHaveLength(11);
-    fireEvent.click(screen.getAllByRole("button", { name: "Próxima página" })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     expect(within(table()).getAllByRole("row")).toHaveLength(3);
     expect(within(table()).getByText("Sem responsável")).toBeInTheDocument();
     expect(within(table()).getAllByText("20/10/2026")).toHaveLength(2);
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar cliente" }), { target: { value: "nazareth" } });
     expect(within(table()).getAllByRole("row")).toHaveLength(2);
-    expect(within(table()).getByRole("link", { name: "Nazareth Pereira" })).toHaveAttribute("href", "/clientes/c12");
-    fireEvent.click(within(table()).getAllByRole("row")[1]!);
-    expect(push).toHaveBeenLastCalledWith("/clientes/c12");
+    fireEvent.click(within(table()).getByText("Nazareth Pereira"));
+    expect(screen.getByRole("link", { name: "Abrir perfil do cliente" })).toHaveAttribute("href", "/clientes/c12");
   });
 
   it("unidade e período vão para a URL como os seletores atuais", () => {
@@ -61,10 +61,9 @@ describe("clientes Lite", () => {
     expect(screen.getByRole("link", { name: /Ir para leads/ })).toHaveAttribute("href", "/leads");
   });
 
-  it("cartão do celular tem o selo Ativo e taxa \"0,0\" não quebra os números", () => {
+  it("taxa \"0,0\" não quebra os números", () => {
     render(<ClientesLite clients={[client(1)]} metrics={{ ...metrics, conversionRate: "0,0" }} period={30} branches={[]} />);
-    expect(screen.getAllByTestId("stat")[1]).toHaveTextContent("Taxa de conversão: 0,0%");
-    const list = document.querySelector('[data-lite="list"]') as HTMLElement;
-    expect(within(list).getByText("Ativo")).toBeInTheDocument();
+    const strip = within(screen.getByRole("region", { name: "Resumo" }));
+    expect(strip.getByText("Conversão").nextElementSibling).toHaveTextContent("0,0%");
   });
 });

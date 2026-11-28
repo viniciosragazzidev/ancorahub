@@ -10,7 +10,7 @@ import { sortClosingLeads } from "./negotiation-closing-now";
 
 const navigation = vi.hoisted(() => ({ search: "" }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), useSearchParams: () => new URLSearchParams(navigation.search) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), useSearchParams: () => new URLSearchParams(navigation.search), usePathname: () => "/negociacoes" }));
 vi.mock("next/link", async () => {
   const React = await import("react");
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement("a", { href, ...props }, children) };

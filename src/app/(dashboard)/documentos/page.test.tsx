@@ -27,7 +27,7 @@ vi.mock("@/features/documents/actions", () => ({
   bulkReviewDocumentsAction: vi.fn(),
 }));
 vi.mock("@/components/dashboard-header", () => ({ DashboardHeader: ({ title }: { title: string }) => <header>{title}</header> }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }), usePathname: () => "/documentos", useSearchParams: () => new URLSearchParams() }));
 
 import DocumentsPage from "./page";
 

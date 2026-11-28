@@ -8,7 +8,6 @@ import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { ClientesList } from "./clientes-list";
 import { ClientesLite } from "./clientes-lite";
-import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
@@ -284,10 +283,9 @@ export default async function CustomersPage({
 
   // Chave do diretor: a mesma carteira no visual Lite (unidade e período vão para a barra da lista).
   if (await isDirectorLitePageOnServer(context, "/clientes")) {
+    // Lite (28/11/2026, artifact "Comercial"): sem a faixa de topo; título, resumo e abas ficam na página.
     return (
       <>
-        <DashboardHeader breadcrumb="Pós-venda" title="Clientes" summary={pageSummary} />
-        <main className={litePage.stack}>
           <ClientesLite
             clients={clients.map((client) => ({
               id: client.id,
@@ -304,7 +302,6 @@ export default async function CustomersPage({
             branches={canFilterBranch ? branches : []}
             branchId={branchParam}
           />
-        </main>
       </>
     );
   }
